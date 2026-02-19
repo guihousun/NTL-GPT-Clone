@@ -1,0 +1,9 @@
+{
+  "timestamp_utc": "20260219T021655Z",
+  "source_tool": "execute_geospatial_script_tool",
+  "thread_id": "764176f0-ead",
+  "original_script_name": "find_highest_antl_district.py",
+  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\764176f0-ead\\outputs\\find_highest_antl_district.py",
+  "content_hash": "6981932fd830e3312cebb37584d824197a192089f63cd84cf3b7f8b680a41275",
+  "stdout_excerpt": "District ANTL Statistics for Shanghai 2022:\n              Raster_file  Year Region     ANTL\n0   shanghai_ntl_2022.tif  2022    黄浦区  56.9693\n1   shanghai_ntl_2022.tif  2022    徐汇区  39.5948\n2   shanghai_ntl_2022.tif  2022    长宁区  56.8617\n3   shanghai_ntl_2022.tif  2022    静安区  44.7877\n4   shanghai_ntl_2022.tif  2022    普陀区  42.2470\n5   shanghai_ntl_2022.tif  2022    虹口区  39.0814\n6   shanghai_ntl_2022.tif  2022    杨浦区  34.1247\n7   shanghai_ntl_2022.tif  2022    闵行区  31.0373\n8   shanghai_ntl_2022.tif  2022    宝山区  23.4537\n9   shanghai_ntl_2022.tif  2022    嘉定区  21.6214\n10  shanghai_ntl_2022.tif  2022   浦东新区  18.5713\n11  shanghai_ntl_2022.tif  2022    金山区   9.0541\n12  shanghai_ntl_2022.tif  2022    松江区  16.7215\n13  shanghai_ntl_2022.tif  2022    青浦区  13.0829\n14  shanghai_ntl_2022.tif  2022    奉贤区   9.8211\n15  shanghai_ntl_2022.tif  2022    崇明区   2.3153\n\nTotal districts: 16\n\n=== District with Highest ANTL ===\nDistrict Name (Region): 黄浦区\nANTL Value: 56.9693\n\n=== All Districts Ranked by ANTL (Descending) ===\n黄浦区: 56.9693\n长宁区: 56.8617\n静安区: 44.7877\n普陀区: 42.2470\n徐汇区: 39.5948\n虹口区: 39.0814\n杨浦区: 34.1247\n闵行区: 31.0373\n宝山区: 23.4537\n嘉定区: 21.6214\n浦东新区: 18.5713\n松江区: 16.7215\n青浦区: 13.0829\n奉贤区: 9.8211\n金山区: 9.0541\n崇明区: 2.3153\n\nRanking saved to: E:\\NTL-GPT-Clone\\user_data\\764176f0-ead\\outputs\\shanghai_district_antl_ranking_2022.csv\n"
+}

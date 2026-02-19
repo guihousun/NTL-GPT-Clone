@@ -1,0 +1,9 @@
+{
+  "timestamp_utc": "20260217T152428Z",
+  "source_tool": "execute_geospatial_script_tool",
+  "thread_id": "5b12f66f",
+  "original_script_name": "myanmar_earthquake_antl_analysis.py",
+  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\5b12f66f\\outputs\\myanmar_earthquake_antl_analysis.py",
+  "content_hash": "a7592b834d1452f1a4b880fa67851a6f213a83cfc87a5d9135a9c4e2997e659a",
+  "stdout_excerpt": "Daily ANTL saved to: E:\\NTL-GPT-Clone\\user_data\\5b12f66f\\outputs\\myanmar_earthquake_daily_antl.csv\nSummary statistics saved to: E:\\NTL-GPT-Clone\\user_data\\5b12f66f\\outputs\\myanmar_earthquake_antl_summary.csv\nDamage assessment saved to: E:\\NTL-GPT-Clone\\user_data\\5b12f66f\\outputs\\myanmar_earthquake_damage_assessment.csv\n\n=== Myanmar Earthquake ANTL Damage Assessment ===\nEarthquake Date: 2025-03-28 (M7.7, Epicenter: 22.013°N, 95.922°E)\n\nPre-event Period: 2025-03-20 to 2025-03-27\n  Mean ANTL: 0.7030\n\nEarthquake Day: 2025-03-28\n  ANTL: 0.9517\n  Change from Pre-event: 35.38%\n\nPost-event Period: 2025-03-29 to 2025-04-05\n  Mean ANTL: 0.7196\n  Change from Pre-event: 2.37%\n\n===============================================\n"
+}

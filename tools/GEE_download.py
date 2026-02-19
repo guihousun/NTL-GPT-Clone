@@ -1,0 +1,392 @@
+﻿from __future__ import annotations
+
+import os
+import re
+import calendar
+from datetime import datetime, timedelta
+from typing import Optional, Literal
+
+import ee
+import geemap
+from langchain_core.tools import StructuredTool
+from pydantic import BaseModel, Field
+
+from storage_manager import storage_manager
+
+_PROJECT_ID = "empyrean-caster-430308-m2"
+
+
+def _ensure_ee_initialized() -> None:
+    try:
+        ee.Initialize(project=_PROJECT_ID)
+    except Exception:
+        # If credentials are not available, caller will receive this as tool error.
+        ee.Authenticate()
+        ee.Initialize(project=_PROJECT_ID)
+
+
+def _contains_cjk(text: str) -> bool:
+    return bool(re.search(r"[\u4e00-\u9fff]", text or ""))
+
+
+def _guess_is_in_china(study_area: str, is_in_china: Optional[bool]) -> bool:
+    if isinstance(is_in_china, bool):
+        return is_in_china
+    token = (study_area or "").strip().lower()
+    if token in {"china", "prc", "people's republic of china", "中国", "中华人民共和国"}:
+        return True
+    return _contains_cjk(study_area)
+
+
+def _normalize_dataset_name(dataset_name: Optional[str], temporal_resolution: str) -> Optional[str]:
+    if not dataset_name:
+        return dataset_name
+    key = str(dataset_name).strip().lower()
+    key = key.replace("_", "-").replace("–", "-").replace("—", "-").replace(" ", "")
+
+    annual_alias = {
+        "npp-viirs-like": "NPP-VIIRS-Like",
+        "nppviirslike": "NPP-VIIRS-Like",
+        "npp-viirs": "NPP-VIIRS",
+        "nppviirs": "NPP-VIIRS",
+        "dmsp-ols": "DMSP-OLS",
+        "dmspols": "DMSP-OLS",
+        "dmsp/ols": "DMSP-OLS",
+    }
+    monthly_alias = {
+        "noaa-vcmslcfg": "NOAA_VCMSLCFG",
+        "vcmslcfg": "NOAA_VCMSLCFG",
+        "noaa_vcmslcfg": "NOAA_VCMSLCFG",
+    }
+    daily_alias = {
+        "vnp46a2": "VNP46A2",
+        "vnp46a1": "VNP46A1",
+    }
+
+    if temporal_resolution == "annual":
+        return annual_alias.get(key, dataset_name)
+    if temporal_resolution == "monthly":
+        return monthly_alias.get(key, dataset_name)
+    if temporal_resolution == "daily":
+        return daily_alias.get(key, dataset_name)
+    return dataset_name
+
+
+def _normalize_study_area(study_area: str, scale_level: str) -> str:
+    raw = (study_area or "").strip()
+    if scale_level == "country":
+        m = {
+            "中国": "China",
+            "中华人民共和国": "China",
+            "china": "China",
+            "prc": "China",
+        }
+        for k, v in m.items():
+            if raw.lower() == k.lower():
+                return v
+    return raw
+
+
+def _filter_region_with_fallback(admin_boundary, name_property: str, study_area: str):
+    # exact
+    region = admin_boundary.filter(ee.Filter.eq(name_property, study_area))
+    if region.size().getInfo() > 0:
+        return region
+
+    # title case fallback
+    title = study_area.title()
+    if title != study_area:
+        region = admin_boundary.filter(ee.Filter.eq(name_property, title))
+        if region.size().getInfo() > 0:
+            return region
+
+    # token contains fallback (e.g. "Sagaing Region, Myanmar" -> "Sagaing")
+    token = study_area.split(",")[0].strip()
+    token = re.sub(r"\b(region|province|state)\b", "", token, flags=re.IGNORECASE).strip()
+    if token:
+        region = admin_boundary.filter(ee.Filter.stringContains(name_property, token))
+        if region.size().getInfo() > 0:
+            return region
+
+    return None
+
+
+def _error_result(message: str) -> dict:
+    return {"output_files": [], "error": message}
+
+
+def _ensure_tif_suffix(filename: str) -> str:
+    safe = (filename or "").strip()
+    if not safe:
+        return safe
+    base, ext = os.path.splitext(safe)
+    if ext:
+        return safe
+    return f"{base}.tif" if base else "output.tif"
+
+
+def _parse_time_range(time_range_input: str, temporal_resolution: str) -> tuple[str, str]:
+    tr = (time_range_input or "").replace(" ", "")
+    if "to" in tr:
+        start_str, end_str = [s.strip() for s in tr.split("to", 1)]
+    else:
+        start_str = end_str = tr
+
+    if temporal_resolution == "annual":
+        if re.fullmatch(r"\d{4}-01-01", start_str) and re.fullmatch(r"\d{4}-12-31", end_str):
+            start_str = start_str[:4]
+            end_str = end_str[:4]
+
+        if not re.fullmatch(r"\d{4}", start_str) or not re.fullmatch(r"\d{4}", end_str):
+            raise ValueError("Annual format must be 'YYYY' or 'YYYY to YYYY'.")
+        start_date, end_date = f"{start_str}-01-01", f"{end_str}-12-31"
+
+    elif temporal_resolution == "monthly":
+        if not re.fullmatch(r"\d{4}-\d{2}", start_str) or not re.fullmatch(r"\d{4}-\d{2}", end_str):
+            raise ValueError("Monthly format must be 'YYYY-MM' or 'YYYY-MM to YYYY-MM'.")
+        sy, sm = map(int, start_str.split("-"))
+        ey, em = map(int, end_str.split("-"))
+        start_date = f"{sy}-{sm:02d}-01"
+        end_date = f"{ey}-{em:02d}-{calendar.monthrange(ey, em)[1]}"
+
+    elif temporal_resolution == "daily":
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", start_str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", end_str):
+            raise ValueError("Daily format must be 'YYYY-MM-DD' or 'YYYY-MM-DD to YYYY-MM-DD'.")
+        start_date, end_date = start_str, end_str
+    else:
+        raise ValueError("temporal_resolution must be one of: annual, monthly, daily")
+
+    if datetime.strptime(start_date, "%Y-%m-%d") > datetime.strptime(end_date, "%Y-%m-%d"):
+        raise ValueError("Start date cannot be later than end date.")
+    return start_date, end_date
+
+
+class NightlightDataInput(BaseModel):
+    study_area: str = Field(..., description="Name of the study area. Example: 'Nanjing' or '南京市'.")
+    scale_level: Literal["country", "province", "city", "county"] = Field(..., description="Administrative scale level.")
+    temporal_resolution: Literal["annual", "monthly", "daily"] = Field(..., description="Temporal resolution.")
+    time_range_input: str = Field(..., description="Annual: YYYY to YYYY; Monthly: YYYY-MM to YYYY-MM; Daily: YYYY-MM-DD to YYYY-MM-DD")
+    out_name: str = Field(..., description="Output filename only, e.g. 'ntl_shanghai_2020.tif'")
+    dataset_name: Optional[str] = Field(None, description="Annual: NPP-VIIRS-Like/NPP-VIIRS/DMSP-OLS; Monthly fixed; Daily: VNP46A2/VNP46A1")
+    collection_name: Optional[str] = Field(None, description="Reserved optional field.")
+    is_in_China: Optional[bool] = Field(None, description="Whether study area is in China. If omitted, inferred from study_area.")
+
+
+def ntl_download_tool(
+    study_area: str,
+    scale_level: str,
+    temporal_resolution: str,
+    time_range_input: str,
+    out_name: str,
+    dataset_name: Optional[str] = None,
+    collection_name: Optional[str] = None,
+    is_in_China: Optional[bool] = None,
+    **kwargs,
+):
+    try:
+        _ensure_ee_initialized()
+
+        # Backward-compatible aliases from legacy callers.
+        if dataset_name is None and collection_name:
+            dataset_name = collection_name
+        if is_in_China is None and "is_in_china" in kwargs:
+            is_in_China = kwargs.get("is_in_china")
+
+        scale_level = str(scale_level or "").strip().lower()
+        temporal_resolution = str(temporal_resolution or "").strip().lower()
+        is_in_China = _guess_is_in_china(study_area, is_in_China)
+        study_area = _normalize_study_area(study_area, scale_level)
+        dataset_name = _normalize_dataset_name(dataset_name, temporal_resolution)
+        out_name = _ensure_tif_suffix(out_name)
+
+        # If caller uses province for "China", auto-correct to country.
+        if scale_level == "province" and study_area.lower() == "china":
+            scale_level = "country"
+
+        national_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/World_countries")
+        province_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/province")
+        city_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/city")
+        county_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/county")
+        intl_country_collection = ee.FeatureCollection("FAO/GAUL/2015/level0")
+        intl_province_collection = ee.FeatureCollection("FAO/GAUL/2015/level1")
+
+        def get_administrative_boundaries(level: str, in_china: bool):
+            directly_governed = {"北京市", "天津市", "上海市", "重庆市", "Beijing", "Tianjin", "Shanghai", "Chongqing"}
+            if in_china:
+                if level == "country":
+                    return national_collection, "NAME"
+                if level == "province" or (level == "city" and study_area in directly_governed):
+                    return province_collection, "name"
+                if level == "city":
+                    return city_collection, "name"
+                if level == "county":
+                    return county_collection, "name"
+                raise ValueError("Unknown scale level. Options: country/province/city/county")
+
+            # global mode
+            if level == "country":
+                return intl_country_collection, "ADM0_NAME"
+            if level == "province":
+                return intl_province_collection, "ADM1_NAME"
+            raise ValueError("Global mode only supports country/province.")
+
+        admin_boundary, name_property = get_administrative_boundaries(scale_level, is_in_China)
+        region = _filter_region_with_fallback(admin_boundary, name_property, study_area)
+        if region is None:
+            return _error_result(
+                f"No area named '{study_area}' found under scale level '{scale_level}'. "
+                "Try an alias or call get_administrative_division_osm_tool first."
+            )
+
+        start_date, end_date = _parse_time_range(time_range_input, temporal_resolution)
+
+        # ---------- Dataset routing ----------
+        if temporal_resolution == "annual":
+            dataset_name = dataset_name or "NPP-VIIRS-Like"
+            start_year, end_year = int(start_date[:4]), int(end_date[:4])
+
+            if dataset_name == "NPP-VIIRS-Like":
+                if start_year < 2000 or end_year > 2024:
+                    return _error_result("NPP-VIIRS-Like valid year range: 2000-2024")
+                col_id, band = "projects/sat-io/open-datasets/npp-viirs-ntl", "b1"
+
+                images = []
+                for y in range(start_year, end_year + 1):
+                    y_start, y_end = f"{y}-01-01", f"{y+1}-01-01"
+                    col = ee.ImageCollection(col_id).filterDate(y_start, y_end).select(band).filterBounds(region.geometry())
+                    img = col.map(lambda i: i.clip(region)).mean().set("system:time_start", ee.Date(y_start).millis())
+                    images.append(img)
+                NTL_collection = ee.ImageCollection(images)
+
+            elif dataset_name == "NPP-VIIRS":
+                if start_year < 2012 or end_year > 2024:
+                    return _error_result("NPP-VIIRS valid year range: 2012-2024")
+                v21, v22, band = "NOAA/VIIRS/DNB/ANNUAL_V21", "NOAA/VIIRS/DNB/ANNUAL_V22", "average"
+                images = []
+                for y in range(start_year, end_year + 1):
+                    y_start, y_end = f"{y}-01-01", f"{y+1}-01-01"
+                    src_id = v21 if y <= 2021 else v22
+                    col = ee.ImageCollection(src_id).filterDate(y_start, y_end).select(band).filterBounds(region.geometry())
+                    img = col.map(lambda i: i.clip(region)).mean().set("system:time_start", ee.Date(y_start).millis())
+                    images.append(img)
+                NTL_collection = ee.ImageCollection(images)
+
+            elif dataset_name == "DMSP-OLS":
+                if start_year < 1992 or end_year > 2013:
+                    return _error_result("DMSP-OLS valid year range: 1992-2013")
+                col_id, band = "NOAA/DMSP-OLS/NIGHTTIME_LIGHTS", "avg_vis"
+                images = []
+                for y in range(start_year, end_year + 1):
+                    y_start, y_end = f"{y}-01-01", f"{y+1}-01-01"
+                    col = ee.ImageCollection(col_id).filterDate(y_start, y_end).select(band).filterBounds(region.geometry())
+                    img = col.map(lambda i: i.clip(region)).mean().set("system:time_start", ee.Date(y_start).millis())
+                    images.append(img)
+                NTL_collection = ee.ImageCollection(images)
+            else:
+                return _error_result("For annual, dataset_name must be one of: NPP-VIIRS-Like, NPP-VIIRS, DMSP-OLS")
+
+        elif temporal_resolution == "monthly":
+            sy, sm = map(int, start_date[:7].split("-"))
+            ey, em = map(int, end_date[:7].split("-"))
+            if sy < 2014:
+                return _error_result("Monthly VIIRS is available from 2014-01 onwards.")
+
+            col_id, band = "NOAA/VIIRS/DNB/MONTHLY_V1/VCMSLCFG", "avg_rad"
+            images = []
+            for y in range(sy, ey + 1):
+                m_start = sm if y == sy else 1
+                m_end = em if y == ey else 12
+                for m in range(m_start, m_end + 1):
+                    s_day = f"{y}-{m:02d}-01"
+                    e_day = f"{y}-{m:02d}-{calendar.monthrange(y, m)[1]}"
+                    collection = ee.ImageCollection(col_id).filterDate(s_day, e_day).select(band).filterBounds(region.geometry())
+                    image = collection.map(lambda i: i.clip(region)).mean().set("system:time_start", ee.Date(s_day).millis())
+                    images.append(image)
+            NTL_collection = ee.ImageCollection(images)
+
+        elif temporal_resolution == "daily":
+            dataset_name = dataset_name or "VNP46A2"
+            daily_map = {
+                "VNP46A2": {"id": "NASA/VIIRS/002/VNP46A2", "band": "Gap_Filled_DNB_BRDF_Corrected_NTL"},
+                "VNP46A1": {"id": "NOAA/VIIRS/001/VNP46A1", "band": "DNB_At_Sensor_Radiance_500m"},
+            }
+            if dataset_name not in daily_map:
+                return _error_result("For daily, dataset_name must be VNP46A2 or VNP46A1")
+
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+            days = (end_dt - start_dt).days + 1
+            if days > 31:
+                return _error_result("For daily requests longer than 31 days, please use server-side GEE script workflow.")
+            if int(start_date[:4]) < 2014:
+                return _error_result("Daily VIIRS is available from 2014-01 onwards.")
+
+            col_id = daily_map[dataset_name]["id"]
+            band = daily_map[dataset_name]["band"]
+            NTL_collection = (
+                ee.ImageCollection(col_id)
+                .filterDate(start_date, (end_dt + timedelta(days=1)).strftime("%Y-%m-%d"))
+                .select(band)
+                .filterBounds(region.geometry())
+                .map(lambda i: i.clip(region))
+            )
+        else:
+            return _error_result("temporal_resolution must be annual/monthly/daily")
+
+        num_images = int(NTL_collection.size().getInfo())
+        if num_images <= 0:
+            return _error_result("No images found for the specified date range and region.")
+
+        images_list = NTL_collection.toList(num_images)
+        exported_files = []
+
+        for i in range(num_images):
+            image = ee.Image(images_list.get(i))
+            if num_images == 1:
+                filename = out_name
+            else:
+                if temporal_resolution == "annual":
+                    image_date = image.date().format("YYYY").getInfo()
+                elif temporal_resolution == "monthly":
+                    image_date = image.date().format("YYYY-MM").getInfo()
+                else:
+                    image_date = image.date().format("YYYY-MM-dd").getInfo()
+                base, ext = os.path.splitext(out_name)
+                filename = f"{base}_{image_date}{ext}"
+
+            abs_input = storage_manager.resolve_input_path(filename)
+            os.makedirs(os.path.dirname(abs_input), exist_ok=True)
+
+            try:
+                geemap.ee_export_image(
+                    ee_object=image,
+                    filename=abs_input,
+                    scale=500,
+                    region=region.geometry(),
+                    crs="EPSG:4326",
+                    file_per_band=False,
+                )
+                exported_files.append(filename)
+            except Exception:
+                continue
+
+        if not exported_files:
+            return _error_result("Export failed for all target images.")
+
+        return {"output_files": exported_files}
+
+    except Exception as e:
+        return _error_result(f"NTL_download_tool failed: {e}")
+
+
+NTL_download_tool = StructuredTool.from_function(
+    ntl_download_tool,
+    name="NTL_download_tool",
+    description=(
+        "Download nighttime light (NTL) imagery from Google Earth Engine. "
+        "Use output filename only (saved to workspace inputs/). "
+        "Annual datasets: NPP-VIIRS-Like/NPP-VIIRS/DMSP-OLS; monthly fixed NOAA_VCMSLCFG; daily VNP46A2/VNP46A1. "
+        "For long daily ranges, switch to server-side GEE script mode."
+    ),
+    args_schema=NightlightDataInput,
+)

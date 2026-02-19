@@ -1,0 +1,9 @@
+{
+  "timestamp_utc": "20260218T163257Z",
+  "source_tool": "execute_geospatial_script_tool",
+  "thread_id": "45209f5b",
+  "original_script_name": "myanmar_earthquake_antl_analysis.py",
+  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\45209f5b\\outputs\\myanmar_earthquake_antl_analysis.py",
+  "content_hash": "17bb6cfe7da9f8d614bb7f05115c7e8380aa08b5bb6f0cc5fd83d3767d7c4bb3",
+  "stdout_excerpt": "Loaded 3 buffers\nCreating image collections...\nBaseline collection: 8 images\nFirst night collection: 1 images\nRecovery collection: 8 images\n\nComputing baseline ANTL...\nComputing first night ANTL...\nComputing recovery ANTL...\n\nDownloading results...\n\nZonal statistics saved to: E:\\NTL-GPT-Clone\\user_data\\45209f5b\\outputs\\myanmar_earthquake_2025_antl_zonal_stats.csv\nTotal records: 9\n\nResults:\n      buffer_id  buffer_km       period  mean_ANTL  std_ANTL  pixel_count\n0   buffer_25km         25     baseline   1.462727  3.664434         8671\n3   buffer_25km         25  first_night   0.864341  0.940051         8671\n6   buffer_25km         25     recovery   1.132902  2.652124         8671\n1   buffer_50km         50     baseline   0.703854  2.180306        34329\n4   buffer_50km         50  first_night   0.682486  0.554139        34329\n7   buffer_50km         50     recovery   0.576330  1.481511        34329\n2  buffer_100km        100     baseline   0.486856  1.911326       136515\n5  buffer_100km        100  first_night   0.653349  1.093352       136515\n8  buffer_100km        100     recovery   0.384001  0.875724       136515\n"
+}

@@ -1,0 +1,10 @@
+﻿id,category,label,case,difficulty_score,priority_level,shard_id
+5,data retrieval and preprocessing,NPP VIIRS monthly,Retrieve NPP VIIRS monthly NTL data for Shanghai from January to December 2020.,0,normal,5
+14,data retrieval and preprocessing,GDELT Event,Retrieve event records related to the 2023 Turkey earthquake from the GDELT Event Database.,0,normal,5
+19,data retrieval and preprocessing,VNP46A2 angular effect correction,"Perform angle effect correction on daily VNP46A2 NTL data for Shanghai from Jan 1 to Dec 31, 2024.",2,normal,5
+25,data retrieval and preprocessing,NOAA20 preprocess,Preprocess NOAA-20 VIIRS data saved in inputs/NOAA20.,0,normal,5
+34,NTL spatial statistic and querying,Point statistics,"Identify the WGS84 coordinate of the darkest pixel of NPP-VIIRS NTL imagery in Shanghai, June, 2022.",0,normal,5
+42,NTL spatial statistic and querying,3D edge density [3DED],"Calculate 3D edge density of  NPP-VIIRS-like annual NTL image for each district in Shanghai, 2020.",0,normal,5
+58,NTL spatial statistic and querying,Visualization,"Download NPP-VIIRS-like imagery of Shanghai in 2020, set noise values less than 1 to NaN, and visualize using a 'viridis' color map.",2,normal,5
+60,NTL spatial statistic and querying,Trend analysis,Conduct a slope trend analysis on annual NPP-VIIRS-like NTL data for Shanghai (2000–2020).,0,normal,5
+64,NTL application and modeling,GDP,"Please retrieve Shanghai’s GDP data and the NPP-VIIRS NTL imagery from 2013 to 2022, analyze the relationship between ANTL and GDP using multiple regression models, and select the best-fitting model.",7,high,5

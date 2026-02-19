@@ -1,0 +1,9 @@
+{
+  "timestamp_utc": "20260219T031752Z",
+  "source_tool": "execute_geospatial_script_tool",
+  "thread_id": "09463d1c-f6f",
+  "original_script_name": "myanmar_earthquake_ntl_analysis.py",
+  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\09463d1c-f6f\\outputs\\myanmar_earthquake_ntl_analysis.py",
+  "content_hash": "e33e47d020dd15a3e4e4c536f39aad09877b7cd26b01f872409807655f84d79e",
+  "stdout_excerpt": "[StorageManager] Resolving 'myanmar_boundary.shp' for thread_id='09463d1c-f6f'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\09463d1c-f6f\\inputs\\myanmar_boundary.shp\nDaily ANTL saved to: E:\\NTL-GPT-Clone\\user_data\\09463d1c-f6f\\outputs\\myanmar_earthquake_daily_antl.csv\nImpact assessment report saved to: E:\\NTL-GPT-Clone\\user_data\\09463d1c-f6f\\outputs\\myanmar_earthquake_impact_assessment.json\n\n=== ANTL Damage Assessment Summary ===\nPre-event baseline mean ANTL: 0.7030\nFirst night (2025-03-29) ANTL: 0.8779\nFirst night change from baseline: 24.89%\nPost-event mean ANTL: 0.6581\nPost-event change from baseline: -6.39%\n"
+}

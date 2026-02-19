@@ -1,0 +1,72 @@
+﻿id,category,label,case,gpt41_a1,gpt41_a2,gpt41_a3,gpt41_s,gpt41m_a1,gpt41m_a2,gpt41m_a3,gpt41m_s,qwen_a1,qwen_a2,qwen_a3,qwen_s,fail_models,hallucination_models,execution_error_models,difficulty_score,priority_level
+1,data retrieval and preprocessing,NPP VIIRS annual,Retrieve NPP VIIRS annual NTL data for Shanghai from 2015 to 2020.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+2,data retrieval and preprocessing,DMSP-OLS annual,Retrieve DMSP–OLS annual NTL data for Shanghai from 2005 to 2010.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+3,data retrieval and preprocessing,"DMSP-OLS, NPP VIIRS annual mix",Retrieve DMSP–OLS annual NTL data for Shanghai from 2005 to 2011 and NPP VIIRS annual NTL data for Shanghai from 2012 to 2015.,1,-,-,Y,H,1,-,Y,1,-,-,Y,0,1,0,2,normal
+4,data retrieval and preprocessing,NPP-VIIRS-like annual,Retrieve NPP-VIIRS-like annual NTL data for Shanghai from 2010 to 2020.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+5,data retrieval and preprocessing,NPP VIIRS monthly,Retrieve NPP VIIRS monthly NTL data for Shanghai from January to December 2020.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+6,data retrieval and preprocessing,VNP46A1,"Retrieve NPP VIIRS VNP46A1 daily NTL data for Shanghai from December 1 to December 7, 2020.",1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+7,data retrieval and preprocessing,VNP46A2,"Retrieve NPP VIIRS VNP46A2 daily NTL data for Shanghai, from January 1 to January 7, 2020.",1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+8,data retrieval and preprocessing,"Annual,monthly,daily mix","Retrieve NPP VIIRS annual NTL data for Shanghai in 2020, NPP VIIRS monthly NTL data for January 2020, and NPP VIIRS daily NTL data in January 1 2020.",1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+9,data retrieval and preprocessing,Monthly composite,"Retrieve NPP VIIRS VNP46A2 daily NTL data for Shanghai, from Jan 1 to Jan 31, 2020,and composite them into a monthly NTL imagery",1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+10,data retrieval and preprocessing,Weekends composite,Composite VNP46A2 NTL data for Shanghai on all weekends of Jan 2020 into a single image.,1,-,-,Y,H,E,1,Y,1,-,-,Y,0,1,1,4,normal
+11,data retrieval and preprocessing,NPP VIIRS daily,Retrieve VNP46A2 daily NTL imagery of Beijing during the 2022 Winter Olympics.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+12,data retrieval and preprocessing,Landscan,Retrieve LandScan population imagery for Shanghai in 2020.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+13,data retrieval and preprocessing,NDVI,Retrieve MODIS MOD13Q1 NDVI data for Shanghai in 2020.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+14,data retrieval and preprocessing,GDELT Event,Retrieve event records related to the 2023 Turkey earthquake from the GDELT Event Database.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+15,data retrieval and preprocessing,Event news,Retrieve event information about 2025 Myanmar earthquake from USGS and ReliefWeb.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+16,data retrieval and preprocessing,Administrative boundary,Retrieve Shanghai's administrative boundary from Amap.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+17,data retrieval and preprocessing,POI,Retrieve POI data within 200 meters of the Oriental Pearl Tower from Amap.,1,-,-,Y,1,-,-,Y,H,1,-,Y,0,1,0,2,normal
+18,data retrieval and preprocessing,Coordinates,Retrieve coordinates for the Oriental Pearl Tower in Shanghai.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+19,data retrieval and preprocessing,VNP46A2 angular effect correction,"Perform angle effect correction on daily VNP46A2 NTL data for Shanghai from Jan 1 to Dec 31, 2024.",1,-,-,Y,E,1,-,Y,1,-,-,Y,0,0,1,2,normal
+20,data retrieval and preprocessing,VNP46A2 seasonal adjustment,"Perform seasonal adjustment on daily VNP46A2 NTL data for Shanghai from Jan 1 to Dec 31, 2024.",1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+21,data retrieval and preprocessing,DMSP-OLS preprocess,Preprocess the 2010 DMSP NTL data for Shanghai using EVI imagery,1,-,-,Y,E,1,-,Y,1,-,-,Y,0,0,1,2,normal
+22,data retrieval and preprocessing,SDGSAT-1 stripe noise removal,Perform stripe noise removal on SDGSAT-1 GLI image at inputs/.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+23,data retrieval and preprocessing,SDGSAT-1 radiometric calibration,Perform radiometric calibration on SDGSAT-1 GLI image at inputs/.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+24,data retrieval and preprocessing,SDGSAT-1 grayscale brightness,Create grayscale brightness image using SDGSAT-1 GLI image at inputs/.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+25,data retrieval and preprocessing,NOAA20 preprocess,Preprocess NOAA-20 VIIRS data saved in inputs/NOAA20.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+26,data retrieval and preprocessing,VNCI,Calculate VNCI using the NPP-VIIRS-like NTL and NDVI images for Shanghai in 2020.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+27,data retrieval and preprocessing,SDGSAT-1 NDIGR,Calculate NDIGR using the SDGSAT-1 GLI image at inputs/.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+28,data retrieval and preprocessing,SDGSAT-1 NDIBG,Calculate NDIBG using the SDGSAT-1 GLI image at inputs/.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+29,data retrieval and preprocessing,SDGSAT-1 RRLI,Calculate RRLI using the SDGSAT-1 GLI image at inputs/.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+30,data retrieval and preprocessing,SDGSAT-1 RBLI,Calculate RBLI using the SDGSAT-1 GLI image at inputs/.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+31,NTL spatial statistic and querying,Zonal statistics,Identify the district in Shanghai with the highest ANTL in a 2022 NPP-VIIRS-like image.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+32,NTL spatial statistic and querying,Point statistics,"Identify the WGS84 coordinate of the brightest pixel of NPP-VIIRS NTL imagery in Shanghai, 2022.",1,-,-,Y,H,H,1,Y,1,-,-,Y,0,2,0,2,normal
+33,NTL spatial statistic and querying,Point statistics,Report the NTL intensity of NPP-VIIRS imagery at the location of the Oriental Pearl Tower in 2020.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+34,NTL spatial statistic and querying,Point statistics,"Identify the WGS84 coordinate of the darkest pixel of NPP-VIIRS NTL imagery in Shanghai, June, 2022.",1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+35,NTL spatial statistic and querying,Maximum NTL intensity [MaxNTL(P)],"Calculate maximum NTL intensity of  NPP-VIIRS-like annual NTL image for each district in Shanghai, 2020.",1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+36,NTL spatial statistic and querying,Minimum NTL intensity [MinNTL],"Calculate minimum NTL intensity of  NPP-VIIRS-like annual NTL image for each district in Shanghai, 2020.",1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+37,NTL spatial statistic and querying,Standard deviation of NTL [SDNTL],"Calculate standard deviation of  NPP-VIIRS-like annual NTL image for each district in Shanghai, 2020.",1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+38,NTL spatial statistic and querying,Pixel value distribution [HistNTL],"Calculate pixel value distribution of  NPP-VIIRS-like annual NTL image for each district in Shanghai, 2020.",1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+39,NTL spatial statistic and querying,Total NTL intensity [TNTL],"Calculate total NTL intensity of  NPP-VIIRS-like annual NTL image for each district in Shanghai, 2020.",1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+40,NTL spatial statistic and querying,Total lit area [LArea],"Calculate total lit area of NPP-VIIRS-like annual NTL image for each district in Shanghai, 2020.",1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+41,NTL spatial statistic and querying,3D percentage of landscape area [3DPL],"Calculate 3D percentage of  landscape area of NPP-VIIRS-like annual NTL image for each district in Shanghai, 2020.",1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+42,NTL spatial statistic and querying,3D edge density [3DED],"Calculate 3D edge density of  NPP-VIIRS-like annual NTL image for each district in Shanghai, 2020.",1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+43,NTL spatial statistic and querying,3D largest patch index [3DLPI],"Calculate 3D largest patch index of  NPP-VIIRS-like annual NTL image for each district in Shanghai, 2020.",1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+44,NTL spatial statistic and querying,ANTL [ANTL],"Calculate ANTL of  NPP-VIIRS-like annual NTL image for each district in Shanghai, 2020.",1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+45,NTL spatial statistic and querying,Deviation of NTL intensity [DNTL],"Calculate deviation of NTL intensity of  NPP-VIIRS-like annual NTL image for each district in Shanghai, 2020.",1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+46,NTL spatial statistic and querying,Digital economy index [DEI],"Estimate digital economy index of  NPP-VIIRS-like annual NTL image for each city in Jiangsu province, 2020.",1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+47,NTL spatial statistic and querying,Threshold processing,"Within Shanghai’s 2020 administrative boundary, calculate the proportion of NPP-VIIRS NTL pixels with values greater than 50.",1,-,-,Y,E,1,-,Y,H,H,1,Y,0,2,1,4,normal
+48,NTL spatial statistic and querying,Threshold processing,"Within Shanghai’s 2020 administrative boundary, calculate the proportion of NPP-VIIRS NTL pixels with values lower than 3.",1,-,-,Y,E,1,-,Y,1,-,-,Y,0,0,1,2,normal
+49,NTL spatial statistic and querying,Numerical statistics,Calculate the compound annual growth rate of Total NTL intensity for Shanghai from 2015 to 2020.,1,-,-,Y,H,H,1,Y,1,-,-,Y,0,2,0,2,normal
+50,NTL spatial statistic and querying,Numerical statistics,Calculate the annual growth rate of total NTL intensity in Shanghai for each year between 2015 and 2020,1,-,-,Y,E,1,-,Y,1,-,-,Y,0,0,1,2,normal
+51,NTL spatial statistic and querying,Numerical statistics,Identify the district with the highest NTL growth rate in Shanghai from 2019 to 2020.,E,1,-,Y,E,E,1,Y,1,-,-,Y,0,0,3,2,normal
+52,NTL spatial statistic and querying,Anomaly detection,Detect anomalous pixels in Shanghai from 2015 to 2020.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+53,NTL spatial statistic and querying,GEE statistics,"Calculate VNP46A2 average nighttime light intensity (ANTL) in Shanghai each day, from January 1, 2022, to January 31, 2022, using GEE Python Code,and save it as a csv.",H,E,1,Y,E,H,1,Y,H,E,1,Y,0,3,3,4,normal
+54,NTL spatial statistic and querying,GEE statistics,"Calculate NPP-VIIRS average nighttime light intensity (ANTL) in Shanghai each year, from 2015 to 2022, using GEE Python Code,and save it as a csv.",E,1,-,Y,H,E,1,Y,E,1,-,Y,0,1,3,4,normal
+55,NTL spatial statistic and querying,Change,"Download VNP46A2 daily NTL data, and detect the brightness value in the Oriental Pearl Tower, Shanghai before and after the 2024 National Day of China.",H,1,-,Y,H,1,-,Y,H,1,-,Y,0,3,0,2,normal
+56,NTL spatial statistic and querying,Thresholded pixel extraction,Extract the built-up area in Shanghai for 2018 using a threshold of 10.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+57,NTL spatial statistic and querying,Different,Calculate and visualize the NTL intensity difference between 2020 and 2021 in Shanghai.,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+58,NTL spatial statistic and querying,Visualization,"Download NPP-VIIRS-like imagery of Shanghai in 2020, set noise values less than 1 to NaN, and visualize using a 'viridis' color map.",1,-,-,Y,E,1,-,Y,E,1,-,Y,0,0,2,2,normal
+59,NTL spatial statistic and querying,Compare,Compare ANTL in Shanghai and Beijing in 2022 and tell me which is brighter.,1,-,-,Y,E,1,-,Y,1,-,-,Y,0,0,1,2,normal
+60,NTL spatial statistic and querying,Trend analysis,Conduct a slope trend analysis on annual NPP-VIIRS-like NTL data for Shanghai (2000–2020).,1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+61,NTL application and modeling,COVID19,"Calculate the ANTL for Wuhan during the official lockdown period (January 23 – April 8, 2020), and compare it with the corresponding dates in 2019.",1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+62,NTL application and modeling,Earthquake,"Assess the impact of the 2025 Myanmar earthquake using daily NPP-VIIRS VNP46A2 imagery. Retrieve earthquake details from official sources (USGS, ReliefWeb) to identify the epicenter. Compute ANTL during pre-event and post-event periods,
+ and the first night after the earthquake using the GEE Python API, and summarize results for damage assessment.",H,E,1,Y,H,H,H,N,H,H,1,Y,1,6,1,9,critical
+63,NTL application and modeling,Digital economy index [DEI],"Please read the 2022 DEI data for the top 20 Chinese cities from inputs\DEI_1_20.xlsx, retrieve the corresponding 2022 ANTL values by matching city names, analyze the relationship between ANTL and DEI, and fit a regression model for analysis.",E,1,-,Y,H,E,H,N,E,1,-,Y,1,2,3,9,critical
+64,NTL application and modeling,GDP,"Please retrieve Shanghai’s GDP data and the NPP-VIIRS NTL imagery from 2013 to 2022, analyze the relationship between ANTL and GDP using multiple regression models, and select the best-fitting model.",H,1,-,Y,H,H,1,Y,H,H,H,N,1,6,0,7,high
+65,NTL application and modeling,Population,"Please retrieve the NPP VIIRS NTL imagery and LandScan imagery from 2013 to 2023, compute the annual ANTL and total population for each year, analyze the relationship between ANTL and total population.",E,1,-,Y,E,E,1,Y,1,-,-,Y,0,0,3,2,normal
+66,NTL application and modeling,Built-Up Areas Extraction,"Download the 2020 NTL imagery for Shanghai. Then, extract the built-up area using the SVM method. Finally, calculate the proportion of built-up area within each district of Shanghai.",1,-,-,Y,E,1,-,Y,E,1,-,Y,0,0,2,2,normal
+67,NTL application and modeling,Urban main roads extraction,"Extract urban main roads based on the SDGSAT-1 GLI NTL imagery located at inputs\SDG_rgb.tif, and convert the result to a shapefile (.shp).",1,-,-,Y,1,-,-,Y,1,-,-,Y,0,0,0,0,normal
+68,NTL application and modeling,SDG 7.1.1,Please use the 2020 NPP-VIIRS NTL imagery and LandScan population data to measure the population with access to electricity.,E,1,-,Y,H,E,E,N,E,1,1,N,2,1,4,14,critical
+69,NTL application and modeling,Streetlight classification,"Compute the Ratio Red Light Index (RRLI) and Ratio Blue Light Index (RBLI) based on the RGB NTL image located at inputs\SDG_rgb.tif. Then, classify the pixels into different types according to Jia et al. (2024).",1,-,-,Y,E,1,-,Y,E,1,-,Y,0,0,2,2,normal
+70,NTL application and modeling,Urban Center Detection,"Autonomously implement the localized contour tree method from Chen et al. (2017) by writing a complete, executable script that identifies all elementary urban centers in Shanghai from annual NPP-VIIRS NTL imagery (2020).",E,H,E,N,E,H,H,N,H,H,E,N,3,5,4,19,critical

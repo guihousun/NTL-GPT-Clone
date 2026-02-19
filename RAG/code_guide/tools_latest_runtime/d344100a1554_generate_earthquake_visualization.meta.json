@@ -1,0 +1,9 @@
+{
+  "timestamp_utc": "20260218T073542Z",
+  "source_tool": "execute_geospatial_script_tool",
+  "thread_id": "case_1771399476_2",
+  "original_script_name": "generate_earthquake_visualization.py",
+  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\case_1771399476_2\\outputs\\generate_earthquake_visualization.py",
+  "content_hash": "d344100a155494c11f16a3339b214753f2263d255d0506d69b58b152e899f71a",
+  "stdout_excerpt": "Saved visualization to: E:\\NTL-GPT-Clone\\user_data\\case_1771399476_2\\outputs\\myanmar_earthquake_impact_visualization.png\n"
+}

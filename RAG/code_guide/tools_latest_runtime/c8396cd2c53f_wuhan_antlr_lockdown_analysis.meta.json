@@ -1,0 +1,9 @@
+{
+  "timestamp_utc": "20260217T115210Z",
+  "source_tool": "execute_geospatial_script_tool",
+  "thread_id": "20675068-66f",
+  "original_script_name": "wuhan_antlr_lockdown_analysis.py",
+  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\20675068-66f\\outputs\\wuhan_antlr_lockdown_analysis.py",
+  "content_hash": "c8396cd2c53fa8ebd36c76c897ea8f4150930b7897b8011776ed776de35fd744",
+  "stdout_excerpt": "[StorageManager] Resolving 'wuhan_boundary.shp' for thread_id='20675068-66f'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\20675068-66f\\inputs\\wuhan_boundary.shp\nBoundary loaded: 10 features\nCRS: EPSG:4326\nRegion bounds: [113.69653841  30.25216682 114.6358898   31.36331553]\nCreating ANTL composite for 2019 lockdown period...\nCreating ANTL composite for 2020 lockdown period...\nGenerating URL ...\nDownloading data from https://earthengine.googleapis.com/v1/projects/empyrean-caster-430308-m2/thumbnails/81ab8207daaab1be1cec545a071191df-ecd59428852dc23fe4a0c36e5add3805:getPixels\nPlease wait ...\nData downloaded to E:\\NTL-GPT-Clone\\user_data\\20675068-66f\\outputs\\wuhan_antlr_2019_lockdown_period.tif\n2019 ANTL exported to: E:\\NTL-GPT-Clone\\user_data\\20675068-66f\\outputs\\wuhan_antlr_2019_lockdown_period.tif\nGenerating URL ...\nDownloading data from https://earthengine.googleapis.com/v1/projects/empyrean-caster-430308-m2/thumbnails/2c35352bdbce0cf537e3dbb429f08c8d-d03a4db502fcd12b20977aa8c3aa62d2:getPixels\nPlease wait ...\nData downloaded to E:\\NTL-GPT-Clone\\user_data\\20675068-66f\\outputs\\wuhan_antlr_2020_lockdown_period.tif\n2020 ANTL exported to: E:\\NTL-GPT-Clone\\user_data\\20675068-66f\\outputs\\wuhan_antlr_2020_lockdown_period.tif\nANTL composites created successfully!\n"
+}

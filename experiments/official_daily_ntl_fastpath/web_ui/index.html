@@ -1,0 +1,170 @@
+﻿<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NTL NRT Monitor</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  >
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="layout">
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h1 data-i18n="title">Official Daily NTL Fast Monitor</h1>
+          <p class="muted" data-i18n="subtitle">NRT priority availability + global render (GIBS).</p>
+        </div>
+        <label class="lang-switch">
+          <span data-i18n="language">Language</span>
+          <select id="langSelect">
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+      </div>
+
+      <form id="queryForm" class="form-grid form-grid-query">
+        <label class="field-span-2">
+          <span data-i18n="studyArea">Study Area</span>
+        </label>
+        <label>
+          <span data-i18n="studyCountry">国家</span>
+          <select id="studyCountry"></select>
+        </label>
+        <label>
+          <span data-i18n="studyProvince">省份/州</span>
+          <select id="studyProvince"></select>
+        </label>
+        <label class="field-span-2">
+          <span data-i18n="studyCity">市级</span>
+          <select id="studyCity"></select>
+        </label>
+        <p id="studyAreaStatus" class="muted small field-span-2">Study area catalog: -</p>
+        <label class="field-span-2">
+          <span data-i18n="bbox">BBox</span>
+          <input id="bbox" type="text" placeholder="minx,miny,maxx,maxy">
+        </label>
+        <div class="actions field-span-2">
+          <button type="submit" id="queryBtn" data-i18n="queryBtn">Query Availability</button>
+          <label class="inline auto-toggle" title="Auto refresh every 3 minutes">
+            <input id="autoRefresh" type="checkbox" checked>
+            <span class="sr-only" id="autoRefreshText" data-i18n="autoRefresh">Auto refresh every 3 minutes</span>
+          </label>
+        </div>
+      </form>
+
+      <section class="download-panel">
+        <h2 class="section-title" data-i18n="downloadSection">Data Download</h2>
+        <div class="form-grid form-grid-download">
+          <label>
+            <span data-i18n="timeStart">开始日期</span>
+            <input id="downloadStartDate" type="date">
+          </label>
+          <label>
+            <span data-i18n="timeEnd">结束日期</span>
+            <input id="downloadEndDate" type="date">
+          </label>
+          <label>
+            <span data-i18n="downloadProvider">Provider</span>
+            <select id="downloadProvider">
+              <option value="gee" selected data-i18n="providerGee">GEE</option>
+              <option value="official" data-i18n="providerOfficial">Official</option>
+            </select>
+          </label>
+          <label>
+            <span data-i18n="downloadSource">Download Source</span>
+            <select id="downloadSource"></select>
+          </label>
+          <label id="officialFormatWrap">
+            <span data-i18n="downloadFormat">Download Format</span>
+            <select id="downloadFormat">
+              <option value="raw_h5" data-i18n="fmtRawH5">Raw .h5/.nc</option>
+              <option value="clipped_tif" data-i18n="fmtClippedTif">Clipped .tif</option>
+            </select>
+          </label>
+          <label id="geeBandWrap" class="field-span-2">
+            <span data-i18n="geeBand">GEE Band</span>
+            <select id="geeBand"></select>
+          </label>
+          <div class="actions field-span-2">
+            <button type="button" id="downloadDataBtn" class="button-secondary" data-i18n="downloadDataBtn">Download Data</button>
+          </div>
+        </div>
+      </section>
+
+      <p id="status" class="status">Data status: ready</p>
+      <div class="table-wrap">
+        <table id="resultTable">
+          <thead>
+            <tr>
+              <th data-i18n="colSource">Source</th>
+              <th data-i18n="colGlobalLatest">Global Latest</th>
+              <th data-i18n="colGlobalLag">Global Lag (d)</th>
+              <th data-i18n="colBBoxLatest">BBox Latest</th>
+              <th data-i18n="colBBoxLag">BBox Lag (d)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel panel-map">
+      <div class="map-controls map-controls-primary">
+        <label>
+          <span data-i18n="layer">Layer</span>
+          <select id="layerSelect"></select>
+        </label>
+        <label>
+          <span data-i18n="renderMode">Render Mode</span>
+          <select id="renderMode">
+            <option value="tiles" selected data-i18n="modeTiles">Global Tiles</option>
+            <option value="snapshot" data-i18n="modeSnapshot">Region Snapshot</option>
+          </select>
+        </label>
+        <label>
+          <span data-i18n="region">Region</span>
+          <select id="regionPreset">
+            <option value="global" selected data-i18n="regionGlobal">Global</option>
+            <option value="china" data-i18n="regionChina">China</option>
+            <option value="shanghai" data-i18n="regionShanghai">Shanghai</option>
+            <option value="custom" data-i18n="regionCustom">Custom (use BBox)</option>
+          </select>
+        </label>
+        <div class="actions actions-map">
+          <button type="button" id="applyLayerBtn" data-i18n="loadBtn">Load Imagery</button>
+        </div>
+      </div>
+      <div class="map-controls map-controls-secondary">
+        <label>
+          <span data-i18n="opacity">Opacity</span>
+          <input id="opacity" type="range" value="80" min="0" max="100">
+        </label>
+        <label>
+          <span data-i18n="snapshotPx">Snapshot px</span>
+          <input id="snapshotSize" type="number" min="512" max="4096" step="256" value="2048">
+        </label>
+      </div>
+      <p id="layerStatus" class="status status-layer warn">Layer status: parameters ready, click "Load Imagery".</p>
+      <div id="map"></div>
+      <p class="muted small" data-i18n="mapNote">
+        Tiles: NASA GIBS WMTS EPSG:3857. URL generated in browser from selected layer/date.
+      </p>
+    </section>
+  </main>
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script src="./main.js"></script>
+</body>
+</html>

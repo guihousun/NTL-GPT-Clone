@@ -1,0 +1,1 @@
+To reproduce this case, please apply for data access through the official platform: https://sdg.casearth.cn/en/datas/SDGSAT

@@ -1,0 +1,25 @@
+event_id,event_day,hazard_type,aoi_wkt,license_tag,source,region_name,severity_hint,quality_score,cloud_free_ratio
+eq_turkiye_202302,2023-02-06,earthquake,"POLYGON((36.1 36.0, 37.4 36.0, 37.4 37.2, 36.1 37.2, 36.1 36.0))",gee-public-catalog,public_report,Turkiye,0.92,0.95,0.91
+flood_libya_202309,2023-09-10,flood,"POLYGON((21.9 31.7, 23.1 31.7, 23.1 32.6, 21.9 32.6, 21.9 31.7))",gee-public-catalog,public_report,Libya,0.85,0.90,0.87
+wildfire_hawaii_202308,2023-08-08,wildfire,"POLYGON((-156.9 20.6, -156.2 20.6, -156.2 21.2, -156.9 21.2, -156.9 20.6))",cc-by-4.0,public_report,Hawaii,0.73,0.93,0.89
+storm_mozambique_202303,2023-03-12,hurricane,"POLYGON((39.8 -20.7, 41.0 -20.7, 41.0 -19.7, 39.8 -19.7, 39.8 -20.7))",cc-by-4.0,public_report,Mozambique,0.78,0.89,0.86
+conflict_ukraine_202210,2022-10-10,conflict,"POLYGON((29.0 49.0, 31.0 49.0, 31.0 50.4, 29.0 50.4, 29.0 49.0))",open-government-license,public_report,Ukraine,0.90,0.92,0.90
+eq_japan_202401,2024-01-01,earthquake,"POLYGON((136.4 36.8, 137.8 36.8, 137.8 38.0, 136.4 38.0, 136.4 36.8))",gee-public-catalog,public_report,Japan,0.80,0.94,0.93
+flood_brazil_202405,2024-05-03,flood,"POLYGON((-51.8 -30.7, -50.2 -30.7, -50.2 -29.4, -51.8 -29.4, -51.8 -30.7))",cc-by-sa-4.0,public_report,Brazil,0.84,0.88,0.81
+wildfire_chile_202402,2024-02-02,wildfire,"POLYGON((-71.9 -34.1, -70.4 -34.1, -70.4 -33.0, -71.9 -33.0, -71.9 -34.1))",cc-by-sa-4.0,public_report,Chile,0.69,0.90,0.85
+eq_morocco_202309,2023-09-08,earthquake,"POLYGON((-8.8 30.6, -7.2 30.6, -7.2 32.0, -8.8 32.0, -8.8 30.6))",gee-public-catalog,public_report,Morocco,0.88,0.91,0.88
+flood_pakistan_202208,2022-08-25,flood,"POLYGON((67.0 25.0, 69.1 25.0, 69.1 26.8, 67.0 26.8, 67.0 25.0))",cc-by-nc-4.0,public_report,Pakistan,0.86,0.87,0.80
+storm_mexico_202310,2023-10-25,hurricane,"POLYGON((-102.8 16.8, -100.9 16.8, -100.9 18.2, -102.8 18.2, -102.8 16.8))",cc-by-4.0,public_report,Mexico,0.76,0.88,0.83
+conflict_sudan_202304,2023-04-15,conflict,"POLYGON((32.0 15.1, 33.0 15.1, 33.0 16.0, 32.0 16.0, 32.0 15.1))",open-government-license,public_report,Sudan,0.89,0.86,0.84
+eq_nepal_201504,2015-04-25,earthquake,"POLYGON((84.7 27.2, 86.2 27.2, 86.2 28.5, 84.7 28.5, 84.7 27.2))",cc-by-4.0,public_report,Nepal,0.93,0.82,0.78
+flood_nigeria_202209,2022-09-20,flood,"POLYGON((6.2 6.0, 7.8 6.0, 7.8 7.3, 6.2 7.3, 6.2 6.0))",cc-by-nc-sa-4.0,public_report,Nigeria,0.79,0.83,0.76
+wildfire_canada_202307,2023-07-05,wildfire,"POLYGON((-124.0 54.2, -121.8 54.2, -121.8 55.8, -124.0 55.8, -124.0 54.2))",cc-by-4.0,public_report,Canada,0.67,0.93,0.90
+storm_philippines_202312,2023-12-02,hurricane,"POLYGON((124.0 10.6, 125.8 10.6, 125.8 12.1, 124.0 12.1, 124.0 10.6))",cc-by-4.0,public_report,Philippines,0.81,0.90,0.87
+conflict_syria_202311,2023-11-04,conflict,"POLYGON((36.0 35.2, 37.5 35.2, 37.5 36.3, 36.0 36.3, 36.0 35.2))",open-government-license,public_report,Syria,0.87,0.84,0.80
+eq_indonesia_201809,2018-09-28,earthquake,"POLYGON((119.7 -1.2, 121.0 -1.2, 121.0 0.1, 119.7 0.1, 119.7 -1.2))",gee-public-catalog,public_report,Indonesia,0.90,0.86,0.81
+flood_india_202308,2023-08-16,flood,"POLYGON((75.8 30.5, 77.2 30.5, 77.2 31.8, 75.8 31.8, 75.8 30.5))",cc-by-sa-4.0,public_report,India,0.74,0.89,0.84
+wildfire_australia_202001,2020-01-05,wildfire,"POLYGON((149.1 -36.4, 150.4 -36.4, 150.4 -35.2, 149.1 -35.2, 149.1 -36.4))",cc-by-4.0,public_report,Australia,0.71,0.92,0.88
+storm_myanmar_202305,2023-05-14,hurricane,"POLYGON((95.7 16.0, 97.2 16.0, 97.2 17.2, 95.7 17.2, 95.7 16.0))",cc-by-4.0,public_report,Myanmar,0.83,0.88,0.82
+conflict_gaza_202310,2023-10-09,conflict,"POLYGON((34.2 31.2, 34.7 31.2, 34.7 31.8, 34.2 31.8, 34.2 31.2))",open-government-license,public_report,Gaza,0.91,0.87,0.84
+eq_haiti_202108,2021-08-14,earthquake,"POLYGON((-73.0 18.0, -72.0 18.0, -72.0 18.8, -73.0 18.8, -73.0 18.0))",cc-by-4.0,public_report,Haiti,0.88,0.83,0.79
+flood_spain_202409,2024-09-19,flood,"POLYGON((-1.5 38.7, -0.1 38.7, -0.1 39.8, -1.5 39.8, -1.5 38.7))",cc-by-4.0,public_report,Spain,0.72,0.91,0.89

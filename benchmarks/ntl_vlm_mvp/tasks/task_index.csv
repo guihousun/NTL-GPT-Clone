@@ -1,0 +1,9 @@
+﻿task_id,task_name,task_type,sample_count
+T1,Impact Presence,objective,3600
+T2,Hazard Type,objective,3600
+T3,Outage Severity,objective,3600
+T4,Affected Area Localization,objective,3600
+T5,Blackout Cluster Counting,objective,3600
+T6,Temporal Recovery State,objective,3600
+T7,Situation Caption,text,3600
+T8,Recovery Recommendation,text,3600

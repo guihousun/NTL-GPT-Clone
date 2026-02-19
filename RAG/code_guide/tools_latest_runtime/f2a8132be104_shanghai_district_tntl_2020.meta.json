@@ -1,0 +1,9 @@
+{
+  "timestamp_utc": "20260218T064325Z",
+  "source_tool": "execute_geospatial_script_tool",
+  "thread_id": "case_1771395733_6",
+  "original_script_name": "shanghai_district_tntl_2020.py",
+  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\case_1771395733_6\\outputs\\shanghai_district_tntl_2020.py",
+  "content_hash": "f2a8132be104a1ac33d90eb098421c0902ff298b7dcbe7025fdc87d01f03c4ac",
+  "stdout_excerpt": "[StorageManager] Resolving 'shanghai_npp_viirs_like_2020.tif' for thread_id='case_1771395733_6'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\case_1771395733_6\\inputs\\shanghai_npp_viirs_like_2020.tif\n[StorageManager] Resolving 'shanghai_boundary.shp' for thread_id='case_1771395733_6'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\case_1771395733_6\\inputs\\shanghai_boundary.shp\nTNTL results saved to: E:\\NTL-GPT-Clone\\user_data\\case_1771395733_6\\outputs\\shanghai_district_TNTL_2020.csv\n\nSummary statistics:\nTotal districts: 16\nTotal TNTL (region): 490075.30\nMean TNTL per district: 30629.71\nDistrict with max TNTL: 浦东新区 (141902.12)\nDistrict with min TNTL: 虹口区 (4375.93)\n"
+}

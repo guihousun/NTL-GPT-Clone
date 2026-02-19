@@ -1,0 +1,4 @@
+﻿model,case_id,problem_type,reason,input_files_count,output_files_count,runtime_s
+qwen3-max-2026-01-23,1,retrieval_only_or_missing_analysis_output,Only retrieval/input artifacts were produced; no analysis output file detected in outputs/.,6,0,107.43
+gpt-5-mini,35,none,No fail-status tool response; run completed within timeout.,6,1,156.26
+qwen-plus-2025-12-01,70,retrieval_only_or_missing_analysis_output,Only retrieval/input artifacts were produced; no analysis output file detected in outputs/.,6,0,67.12

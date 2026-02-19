@@ -1,0 +1,9 @@
+{
+  "timestamp_utc": "20260218T064954Z",
+  "source_tool": "execute_geospatial_script_tool",
+  "thread_id": "case_1771395733_8",
+  "original_script_name": "shanghai_ntl_threshold_analysis.py",
+  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\case_1771395733_8\\outputs\\shanghai_ntl_threshold_analysis.py",
+  "content_hash": "a681278ceb2f1b536ea2abd4f77b0e79b8da43a9df61e831506faa30d4564e9b",
+  "stdout_excerpt": "[StorageManager] Resolving 'shanghai_boundary.shp' for thread_id='case_1771395733_8'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\case_1771395733_8\\inputs\\shanghai_boundary.shp\nResults saved to: E:\\NTL-GPT-Clone\\user_data\\case_1771395733_8\\outputs\\shanghai_ntl_proportion_2020.csv\nTotal pixels: 28684\nPixels above 50: 905.6823529411765\nProportion above 50: 0.0316\n"
+}

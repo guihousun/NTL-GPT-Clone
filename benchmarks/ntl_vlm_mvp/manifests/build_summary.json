@@ -1,0 +1,14 @@
+{
+  "target_scenes": 3600,
+  "event_count": 200,
+  "split_counts": {
+    "train": 2400,
+    "private_test": 400,
+    "public_test": 400,
+    "val": 400
+  },
+  "quality_mean": 0.8684275833333334,
+  "drop_ratio_mean": 0.21203333333333332,
+  "scene_manifest_path": "E:\\NTL-GPT-Clone\\benchmarks\\ntl_vlm_mvp\\manifests\\scene_manifest.parquet",
+  "seed": 42
+}

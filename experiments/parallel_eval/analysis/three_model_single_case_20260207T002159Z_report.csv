@@ -1,0 +1,4 @@
+﻿exp_id,model,worker,case_id,category,success,attempt_count,attempts_used,hallucination,execution_error,issue_type,reason,runtime_s,event_count,output_files_count,output_files
+three_model_single_case_20260207T002159Z,qwen3-max-2026-01-23,worker_01,1,,True,1,1,False,False,none_detected,No fail-status tool response captured.,116.45,4,0,
+three_model_single_case_20260207T002159Z,gpt-5-mini,worker_01,35,,True,1,1,False,False,none_detected,No fail-status tool response captured.,104.11,4,1,shanghai_districts_maxNTL_2020.csv
+three_model_single_case_20260207T002159Z,gpt-5.1,worker_01,70,,True,1,1,True,False,none_detected,No fail-status tool response captured.,65.18,2,0,

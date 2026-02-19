@@ -1,0 +1,9 @@
+{
+  "timestamp_utc": "20260218T163550Z",
+  "source_tool": "execute_geospatial_script_tool",
+  "thread_id": "45209f5b",
+  "original_script_name": "generate_impact_maps.py",
+  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\45209f5b\\outputs\\generate_impact_maps.py",
+  "content_hash": "13db7c93c806099c6ddd6f9a9b8a96bc28e5d1d0ff4d561f8d28fb8d99a35f30",
+  "stdout_excerpt": "Impact visualization saved to: E:\\NTL-GPT-Clone\\user_data\\45209f5b\\outputs\\myanmar_earthquake_2025_impact_maps.png\nVisualization complete!\nImpact schematic saved to: E:\\NTL-GPT-Clone\\user_data\\45209f5b\\outputs\\myanmar_earthquake_2025_impact_schematic.png\n"
+}

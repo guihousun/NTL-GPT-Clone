@@ -1,0 +1,26 @@
+{
+  "raw_count": 200,
+  "clean_count": 200,
+  "natural_count": 120,
+  "conflict_count": 80,
+  "source_counts": {
+    "gdacs_rss": 120,
+    "ucdp_ged_api": 80
+  },
+  "hazard_counts": {
+    "conflict": 80,
+    "earthquake": 29,
+    "wildfire": 29,
+    "flood": 29,
+    "hurricane": 23,
+    "other": 10
+  },
+  "event_day_range": {
+    "min": "2022-09-21",
+    "max": "2026-02-09"
+  },
+  "paths": {
+    "raw": "E:\\NTL-GPT-Clone\\benchmarks\\ntl_vlm_mvp\\manifests\\event_registry_fetched_raw.csv",
+    "clean": "E:\\NTL-GPT-Clone\\benchmarks\\ntl_vlm_mvp\\manifests\\event_registry_clean.csv"
+  }
+}

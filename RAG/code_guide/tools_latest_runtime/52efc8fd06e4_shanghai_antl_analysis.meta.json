@@ -1,0 +1,9 @@
+{
+  "timestamp_utc": "20260218T071723Z",
+  "source_tool": "execute_geospatial_script_tool",
+  "thread_id": "case_1771395733_14",
+  "original_script_name": "shanghai_antl_analysis.py",
+  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\case_1771395733_14\\outputs\\shanghai_antl_analysis.py",
+  "content_hash": "52efc8fd06e4a7034823c380d6a281e4f87d47c1d6b3c2f4164147a53ce58485",
+  "stdout_excerpt": "[StorageManager] Resolving 'shanghai_boundary.shp' for thread_id='case_1771395733_14'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\case_1771395733_14\\inputs\\shanghai_boundary.shp\nOutput saved to: E:\\NTL-GPT-Clone\\user_data\\case_1771395733_14\\outputs\\shanghai_antl_2015_2022.csv\n year      ANTL\n 2015 11.589366\n 2016 11.513847\n 2017 12.665455\n 2018 12.760819\n 2019 16.747868\n 2020 17.103924\n 2021 17.636190\n 2022 18.068982\n"
+}

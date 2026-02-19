@@ -1,0 +1,9 @@
+{
+  "timestamp_utc": "20260218T073633Z",
+  "source_tool": "execute_geospatial_script_tool",
+  "thread_id": "case_1771399476_2",
+  "original_script_name": "generate_final_impact_report.py",
+  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\case_1771399476_2\\outputs\\generate_final_impact_report.py",
+  "content_hash": "761145bd0a683e20bbaba3ea5971b8e663af9f88220f3f338b7ac829320edd19",
+  "stdout_excerpt": "Saved final impact report to: E:\\NTL-GPT-Clone\\user_data\\case_1771399476_2\\outputs\\myanmar_earthquake_final_impact_report.json\n\n======================================================================\nFINAL EARTHQUAKE IMPACT ASSESSMENT REPORT GENERATED\n======================================================================\n\nEvent: 2025 Myanmar Earthquake (Mw 7.7)\nDate: March 28, 2025, 06:20 UTC\nEpicenter: 22.013°N, 95.922°E\n\nMost Affected Zone: 25 km buffer\nSevere Damage Zones (blackout < -20%): [25]\n\nRecovery Status:\n  25 km: partial_recovery (44.8%)\n  50 km: continued_degradation (-422.5%)\n  100 km: good_recovery (164.1%)\n\nOutput Files:\n  - myanmar_earthquake_antl_analysis.csv\n  - myanmar_earthquake_damage_metrics.csv\n  - myanmar_earthquake_impact_visualization.png\n\n======================================================================\n"
+}
