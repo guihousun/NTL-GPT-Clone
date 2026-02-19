@@ -2142,3 +2142,29 @@ PYTHONPATH=. conda run -n NTL-GPT pytest -q tests/official_daily_fastpath/test_g
 ### 验证结果
 - 命令：`conda run -n NTL-GPT python -m py_compile app_ui.py Streamlit.py`
 - 结果：通过（exit 0）。
+
+## [2026-02-19] v2026.02.19.11 GitHub-Bootstrap-And-Safe-Publish
+### 目标
+- 将项目发布到 GitHub 仓库 `https://github.com/guihousun/NTL-GPT-Clone.git`。
+- 确保“可运行项目基线”可推送，同时避免提交本地大数据、运行产物与凭据。
+
+### 修改文件
+- `.gitignore`
+- `docs/Codex_变更记录.md`
+
+### 关键变更
+- 初始化并推送主分支：
+  - `git init -b main`
+  - `git remote add origin https://github.com/guihousun/NTL-GPT-Clone.git`
+  - `git push -u origin main`
+- 加强忽略规则，避免误传敏感/冗余内容：
+  - 忽略本地数据与运行目录：`base_data/`、`user_data/`、`userdata_0217/`、`cache/`、`reports/`、`outputs/`、`utils/sessions/`、`experiments/**/workspace*`
+  - 忽略 RAG 持久化向量库与压缩包：`RAG/Code_RAG/`、`RAG/Literature_RAG/`、`RAG/Solution_RAG/`、`RAG/RAG_Faiss/`、`RAG/*.zip`、`RAG/RAG.rar`
+  - 忽略本地凭据：`tools/bigquery/*.json`
+  - 忽略外部嵌套仓：`_external_refs/`
+
+### 验证结果
+- 命令：`git grep --cached -n "BEGIN PRIVATE KEY"`
+- 结果：无命中（exit 1）。
+- 命令：`git push -u origin main`
+- 结果：成功，`main -> origin/main`。
