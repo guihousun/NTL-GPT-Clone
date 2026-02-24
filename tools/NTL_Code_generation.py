@@ -6,6 +6,7 @@ import io
 import json
 import os
 import re
+import shutil
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
@@ -49,8 +50,13 @@ KNOWN_GEE_PUBLIC_COLLECTION_PREFIXES = (
 )
 
 ABSOLUTE_PATH_PATTERNS = [
-    re.compile(r"[A-Za-z]:\\\\"),
+    re.compile(r"[A-Za-z]:[\\/]"),
     re.compile(r"/(?:home|Users|mnt|tmp)/"),
+]
+
+ABSOLUTE_PATH_EXTRACT_PATTERNS = [
+    re.compile(r"[A-Za-z]:[\\/][^\s\"'`]+"),
+    re.compile(r"/(?:home|Users|mnt|tmp)/[^\s\"'`]+"),
 ]
 
 READ_PATTERNS = [
@@ -146,6 +152,110 @@ class ExecuteScriptInput(BaseModel):
 
 def _sanitize_ansi(text: str) -> str:
     return re.sub(r"\x1b\[[0-9;]*m", "", text or "")
+
+
+def _extract_absolute_paths(text: str) -> List[str]:
+    raw = str(text or "")
+    seen: set[str] = set()
+    out: List[str] = []
+    for pattern in ABSOLUTE_PATH_EXTRACT_PATTERNS:
+        for match in pattern.findall(raw):
+            path = str(match).strip().strip("\"'`")
+            path = path.rstrip(".,;:)]}>")
+            if path and path not in seen:
+                seen.add(path)
+                out.append(path)
+    return out
+
+
+def _build_artifact_audit(stdout: str, thread_id: Optional[str] = None) -> Dict[str, Any]:
+    tid = str(thread_id or current_thread_id.get() or "debug").strip() or "debug"
+    workspace_outputs = (storage_manager.get_workspace(tid) / "outputs").resolve()
+    workspace_outputs_norm = str(workspace_outputs).replace("/", "\\").lower()
+
+    extracted_paths = _extract_absolute_paths(stdout or "")
+    output_like_paths: List[str] = []
+    out_of_workspace_paths: List[str] = []
+    for raw_path in extracted_paths:
+        candidate_norm = raw_path.replace("/", "\\").lower()
+        if "\\outputs\\" not in candidate_norm:
+            continue
+        output_like_paths.append(raw_path)
+        try:
+            resolved = str(Path(raw_path).resolve())
+        except Exception:
+            resolved = os.path.abspath(raw_path)
+        resolved_norm = resolved.replace("/", "\\").lower()
+        in_workspace = resolved_norm == workspace_outputs_norm or resolved_norm.startswith(workspace_outputs_norm + "\\")
+        if not in_workspace:
+            out_of_workspace_paths.append(resolved)
+
+    return {
+        "thread_id": tid,
+        "workspace_outputs_dir": str(workspace_outputs),
+        "detected_output_paths": output_like_paths,
+        "out_of_workspace_paths": out_of_workspace_paths,
+        "pass": len(out_of_workspace_paths) == 0,
+        "auto_migration_attempted": False,
+        "auto_migration_success": False,
+        "migrated_paths": [],
+        "migration_failures": [],
+    }
+
+
+@contextlib.contextmanager
+def _thread_bound_storage_paths(thread_id: str):
+    """Temporarily force storage_manager path resolvers to current thread when thread_id is omitted."""
+    bound_tid = str(thread_id or current_thread_id.get() or "debug").strip() or "debug"
+    original_resolve_output_path = storage_manager.resolve_output_path
+    original_resolve_input_path = storage_manager.resolve_input_path
+
+    def _resolve_output(filename: str, thread_id: Optional[str] = None) -> str:
+        return original_resolve_output_path(filename, thread_id=bound_tid if thread_id is None else thread_id)
+
+    def _resolve_input(filename: str, thread_id: Optional[str] = None) -> str:
+        return original_resolve_input_path(filename, thread_id=bound_tid if thread_id is None else thread_id)
+
+    storage_manager.resolve_output_path = _resolve_output
+    storage_manager.resolve_input_path = _resolve_input
+    try:
+        yield
+    finally:
+        storage_manager.resolve_output_path = original_resolve_output_path
+        storage_manager.resolve_input_path = original_resolve_input_path
+
+
+def _auto_migrate_cross_workspace_outputs(
+    out_paths: List[str],
+    thread_id: str,
+) -> Tuple[List[str], List[str]]:
+    """Copy cross-workspace output artifacts back to current thread outputs."""
+    dst_dir = storage_manager.get_workspace(thread_id) / "outputs"
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    migrated: List[str] = []
+    failures: List[str] = []
+
+    seen: set[str] = set()
+    for raw in out_paths:
+        src_str = str(raw or "").strip().strip("\"'`")
+        if not src_str or src_str in seen:
+            continue
+        seen.add(src_str)
+        src_norm = src_str.replace("/", "\\").lower()
+        if "\\outputs\\" not in src_norm:
+            failures.append(f"{src_str} :: skipped_non_outputs_path")
+            continue
+        try:
+            src = Path(src_str)
+            if not src.exists():
+                failures.append(f"{src_str} :: source_not_found")
+                continue
+            dst = dst_dir / src.name
+            shutil.copy2(src, dst)
+            migrated.append(str(dst.resolve()))
+        except Exception as exc:  # noqa: BLE001
+            failures.append(f"{src_str} :: {exc}")
+    return migrated, failures
 
 
 def _timestamp() -> str:
@@ -635,9 +745,10 @@ def _execute_code(code_block: str) -> Tuple[bool, str, Optional[str], Optional[s
 
     buf = io.StringIO()
     try:
-        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
-            exec(bootstrap, user_globals)
-            exec(code_block, user_globals)
+        with _thread_bound_storage_paths(str(current_thread_id.get() or "debug")):
+            with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+                exec(bootstrap, user_globals)
+                exec(code_block, user_globals)
         logs = _sanitize_ansi(buf.getvalue())
         return True, logs, None, None, None
     except Exception as exc:  # noqa: BLE001
@@ -1021,6 +1132,10 @@ def execute_geospatial_script(
 ) -> str:
     token = _bind_thread_from_config(config)
     try:
+        enforced_strict_mode = True
+        thread_id = str(current_thread_id.get() or "debug").strip() or "debug"
+        empty_audit = _build_artifact_audit("", thread_id=thread_id)
+
         if not script_name or not script_name.strip():
             policy = _build_error_handling_policy(
                 "InvalidScriptName",
@@ -1034,6 +1149,7 @@ def execute_geospatial_script(
                     "error_type": "InvalidScriptName",
                     "error_message": "script_name is required.",
                     "error_handling_policy": policy,
+                    "artifact_audit": empty_audit,
                 },
                 indent=2,
                 ensure_ascii=False,
@@ -1064,13 +1180,14 @@ def execute_geospatial_script(
                     "error_message": f"Script '{safe_name}' was not found in current workspace inputs/outputs.",
                     "script_name": safe_name,
                     "error_handling_policy": policy,
+                    "artifact_audit": empty_audit,
                 },
                 indent=2,
                 ensure_ascii=False,
             )
 
         script_content = script_path.read_text(encoding="utf-8")
-        preflight = _preflight_checks(script_content, strict_mode=strict_mode)
+        preflight = _preflight_checks(script_content, strict_mode=enforced_strict_mode)
         thread_ctx = _get_thread_context()
         normalized_script_hash = hashlib.sha256(_normalize_whitespace(script_content).encode("utf-8")).hexdigest()
 
@@ -1089,6 +1206,7 @@ def execute_geospatial_script(
                 "code": script_content,
                 "preflight": preflight,
                 "next_action_hint": "transfer_back_to_ntl_engineer",
+                "artifact_audit": empty_audit,
             }
             _append_run_history(
                 {
@@ -1122,6 +1240,7 @@ def execute_geospatial_script(
                 "fix_suggestions": preflight["recommendations"],
                 "error_handling_policy": policy,
                 "execution_skipped": True,
+                "artifact_audit": empty_audit,
             }
             _append_run_history(
                 {
@@ -1137,7 +1256,65 @@ def execute_geospatial_script(
             return json.dumps(result, indent=2, ensure_ascii=False)
 
         ok, logs, etype, emsg, tb = _execute_code(script_content)
+        artifact_audit = _build_artifact_audit(logs, thread_id=thread_id)
         if ok:
+            if not artifact_audit.get("pass", True):
+                out_paths = artifact_audit.get("out_of_workspace_paths") or []
+                migrated_paths, migration_failures = _auto_migrate_cross_workspace_outputs(out_paths, thread_id)
+                artifact_audit["auto_migration_attempted"] = True
+                artifact_audit["migrated_paths"] = migrated_paths
+                artifact_audit["migration_failures"] = migration_failures
+                artifact_audit["auto_migration_success"] = bool(out_paths) and not migration_failures
+                if artifact_audit["auto_migration_success"]:
+                    artifact_audit["pass"] = True
+                else:
+                    message = (
+                        "Detected output paths outside current thread workspace outputs and auto-migration failed. "
+                        "Use storage_manager.resolve_output_path(...) for every generated file."
+                    )
+                    if out_paths:
+                        message = f"{message} Offending paths: {out_paths}"
+                    fix_suggestions = [
+                        "Replace hardcoded absolute output paths with storage_manager.resolve_output_path('filename').",
+                        "Do not write to other thread folders such as user_data/debug/outputs.",
+                    ]
+                    policy = _build_error_handling_policy(
+                        "CrossWorkspaceOutputError",
+                        message,
+                        preflight=preflight,
+                        fix_suggestions=fix_suggestions,
+                    )
+                    result = {
+                        "status": "fail",
+                        "stdout": logs,
+                        "error_type": "CrossWorkspaceOutputError",
+                        "error_message": message,
+                        "traceback": None,
+                        "script_name": safe_name,
+                        "script_path": str(script_path),
+                        "code": script_content,
+                        "preflight": preflight,
+                        "fix_suggestions": fix_suggestions,
+                        "error_handling_policy": policy,
+                        "execution_skipped": False,
+                        "cross_workspace_recovered": False,
+                        "auto_migrated_files": migrated_paths,
+                        "recovery_note": "Auto-migration failed for one or more files.",
+                        "artifact_audit": artifact_audit,
+                    }
+                    _append_run_history(
+                        {
+                            "timestamp": _timestamp(),
+                            "tool": "execute_geospatial_script_tool",
+                            "status": "fail",
+                            "reason": "cross_workspace_output",
+                            "script_name": safe_name,
+                            "script_path": str(script_path),
+                            "thread_id": current_thread_id.get(),
+                        }
+                    )
+                    return json.dumps(result, indent=2, ensure_ascii=False)
+
             thread_ctx["__ntl_last_executed_success_hash"] = normalized_script_hash
             thread_ctx["__ntl_last_executed_success_script_name"] = safe_name
             thread_ctx["__ntl_last_executed_success_script_path"] = str(script_path)
@@ -1161,12 +1338,20 @@ def execute_geospatial_script(
                 "code": script_content,
                 "preflight": preflight,
                 "execution_skipped": False,
+                "cross_workspace_recovered": bool(artifact_audit.get("auto_migration_success")),
+                "auto_migrated_files": list(artifact_audit.get("migrated_paths") or []),
+                "recovery_note": (
+                    "Cross-thread outputs were auto-migrated to current thread outputs."
+                    if artifact_audit.get("auto_migration_success")
+                    else ""
+                ),
+                "artifact_audit": artifact_audit,
             }
             _append_run_history(
                 {
                     "timestamp": _timestamp(),
                     "tool": "execute_geospatial_script_tool",
-                    "status": "success",
+                    "status": "success_recovered" if artifact_audit.get("auto_migration_success") else "success",
                     "script_name": safe_name,
                     "script_path": str(script_path),
                     "code_guide_archive": archive_info,
@@ -1216,6 +1401,7 @@ def execute_geospatial_script(
             "error_handling_policy": policy,
             "repeated_failure_signature_count": repeated_failure_count,
             "execution_skipped": False,
+            "artifact_audit": artifact_audit,
         }
         _append_run_history(
             {

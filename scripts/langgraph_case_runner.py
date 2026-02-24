@@ -241,6 +241,23 @@ def _msg_tool_calls(msg: Any) -> List[Dict[str, Any]]:
     return []
 
 
+def _msg_response_metadata(msg: Any) -> Dict[str, Any]:
+    md = _msg_get(msg, "response_metadata", None)
+    if isinstance(md, dict):
+        return md
+    akw = _msg_get(msg, "additional_kwargs", None)
+    if isinstance(akw, dict):
+        nested = akw.get("response_metadata")
+        if isinstance(nested, dict):
+            return nested
+    return {}
+
+
+def _is_handoff_back_control_message(msg: Any) -> bool:
+    md = _msg_response_metadata(msg)
+    return bool(md.get("__is_handoff_back"))
+
+
 def _parse_json_content(value: Any) -> Optional[Dict[str, Any]]:
     if isinstance(value, dict):
         return value
@@ -297,6 +314,10 @@ def analyze_messages(messages: List[Any]) -> Dict[str, Any]:
     router_mode: Optional[str] = None
 
     for idx, msg in enumerate(messages, start=1):
+        if _is_handoff_back_control_message(msg):
+            # Ignore supervisor-generated synthetic back-handoff messages.
+            continue
+
         name = _msg_name(msg)
         mtype = _msg_type(msg)
         content = _msg_content(msg)

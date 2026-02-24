@@ -119,17 +119,24 @@
     <section class="panel panel-map">
       <div class="map-controls map-controls-primary">
         <label>
+          <span data-i18n="viewMode">View</span>
+          <select id="viewMode">
+            <option value="2d" selected data-i18n="view2d">2D Imagery</option>
+            <option value="3d" data-i18n="view3d">3D Orbit</option>
+          </select>
+        </label>
+        <label id="layerWrap">
           <span data-i18n="layer">Layer</span>
           <select id="layerSelect"></select>
         </label>
-        <label>
+        <label id="renderModeWrap">
           <span data-i18n="renderMode">Render Mode</span>
           <select id="renderMode">
             <option value="tiles" selected data-i18n="modeTiles">Global Tiles</option>
             <option value="snapshot" data-i18n="modeSnapshot">Region Snapshot</option>
           </select>
         </label>
-        <label>
+        <label id="regionPresetWrap">
           <span data-i18n="region">Region</span>
           <select id="regionPreset">
             <option value="global" selected data-i18n="regionGlobal">Global</option>
@@ -138,23 +145,33 @@
             <option value="custom" data-i18n="regionCustom">Custom (use BBox)</option>
           </select>
         </label>
-        <div class="actions actions-map">
+        <div class="actions actions-map" id="applyLayerWrap">
           <button type="button" id="applyLayerBtn" data-i18n="loadBtn">Load Imagery</button>
         </div>
       </div>
       <div class="map-controls map-controls-secondary">
-        <label>
+        <label id="opacityWrap">
           <span data-i18n="opacity">Opacity</span>
           <input id="opacity" type="range" value="80" min="0" max="100">
         </label>
-        <label>
+        <label id="snapshotSizeWrap">
           <span data-i18n="snapshotPx">Snapshot px</span>
           <input id="snapshotSize" type="number" min="512" max="4096" step="256" value="2048">
         </label>
       </div>
       <p id="layerStatus" class="status status-layer warn">Layer status: parameters ready, click "Load Imagery".</p>
-      <div id="map"></div>
-      <p class="muted small" data-i18n="mapNote">
+      <p id="orbitStatus" class="status status-layer hidden">Orbit status: idle</p>
+      <div id="orbitSearchHints" class="orbit-hints hidden">
+        <span class="orbit-hints-label" data-i18n="orbitHintsLabel">可搜索卫星</span>
+        <div id="orbitHintChips" class="orbit-hints-chips"></div>
+      </div>
+      <div class="view-stack">
+        <div id="map"></div>
+        <div id="rogueSkyWrap" class="hidden">
+          <div id="rogueSkyGrid"></div>
+        </div>
+      </div>
+      <p id="mapNote" class="muted small" data-i18n="mapNote">
         Tiles: NASA GIBS WMTS EPSG:3857. URL generated in browser from selected layer/date.
       </p>
     </section>

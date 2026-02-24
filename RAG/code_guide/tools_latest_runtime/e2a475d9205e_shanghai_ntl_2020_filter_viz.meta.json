@@ -1,0 +1,9 @@
+{
+  "timestamp_utc": "20260223T152501Z",
+  "source_tool": "execute_geospatial_script_tool",
+  "thread_id": "e1060731",
+  "original_script_name": "shanghai_ntl_2020_filter_viz.py",
+  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\e1060731\\outputs\\shanghai_ntl_2020_filter_viz.py",
+  "content_hash": "e2a475d9205eec5bc14b287e4a52484eb3f86dc1961c86ab18d3a2e152e2c5f3",
+  "stdout_excerpt": "[StorageManager] Resolving 'shanghai_ntl_2020.tif' for thread_id='e1060731'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\e1060731\\inputs\\shanghai_ntl_2020.tif\nOriginal data range: 0.00 to 391.81\nNumber of pixels set to NaN (values < 1): 46048\nFiltered raster saved to: E:\\NTL-GPT-Clone\\user_data\\e1060731\\outputs\\shanghai_ntl_2020_filtered.tif\nVisualization saved to: E:\\NTL-GPT-Clone\\user_data\\e1060731\\outputs\\shanghai_ntl_2020_visualization.png\n\nProcessing complete!\n  - Filtered raster: E:\\NTL-GPT-Clone\\user_data\\e1060731\\outputs\\shanghai_ntl_2020_filtered.tif\n  - Visualization: E:\\NTL-GPT-Clone\\user_data\\e1060731\\outputs\\shanghai_ntl_2020_visualization.png\n"
+}

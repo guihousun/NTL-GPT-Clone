@@ -327,6 +327,20 @@ def build_latest_payload(query: dict[str, list[str]]) -> dict[str, Any]:
     }
 
 
+def build_orbit_feed_payload(query: dict[str, list[str]]) -> dict[str, Any]:
+    from experiments.official_daily_ntl_fastpath.orbit_service import build_orbit_feed
+
+    force_raw = (_get_param(query, "force_refresh", "0") or "0").strip().lower()
+    ttl_raw = (_get_param(query, "ttl_minutes", "180") or "180").strip()
+    force_refresh = force_raw in {"1", "true", "yes", "y"}
+    ttl_minutes = max(10, min(1440, int(ttl_raw)))
+    return build_orbit_feed(
+        workspace=DEFAULT_WORKSPACE,
+        force_refresh=force_refresh,
+        ttl_minutes=ttl_minutes,
+    )
+
+
 def build_download_data(
     query: dict[str, list[str]],
 ) -> tuple[bytes, str, str]:
@@ -437,21 +451,27 @@ def build_download_data(
 
     if output_format == "raw_h5":
         downloaded: list[Path] = []
+        failed: list[str] = []
         for day in selected_days:
             entries = groups.get(day, [])
             raw_dir = DEFAULT_WORKSPACE / "downloads" / "raw" / source / day
             for idx, entry in enumerate(entries, start=1):
                 link = extract_download_link(entry.links)
                 if not link:
+                    failed.append(f"{day}#{idx}:missing_download_link")
                     continue
                 filename = Path(link.split("?")[0]).name or f"{source}_{day}_{idx}.h5"
                 dst = raw_dir / filename
                 ok, err = download_file_with_curl(link, dst, earthdata_token=token)
                 if not ok:
-                    raise RuntimeError(f"download failed: {err}")
+                    failed.append(f"{day}#{idx}:{err}")
+                    continue
                 downloaded.append(dst)
         if not downloaded:
-            raise RuntimeError("no downloadable file in selected granules range")
+            preview = " | ".join(failed[:3]) if failed else "no downloadable file in selected granules range"
+            raise RuntimeError(
+                f"no downloadable file in selected granules range; failed={len(failed)}; detail={preview}"
+            )
 
         if len(downloaded) == 1:
             data = _read_file_bytes(downloaded[0])
@@ -568,6 +588,15 @@ class MonitorHandler(SimpleHTTPRequestHandler):
             try:
                 payload = build_latest_payload(parse_qs(parsed.query))
                 self._send_json(payload)
+            except Exception as exc:  # noqa: BLE001
+                self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+            return
+        if parsed.path == "/api/orbit_feed":
+            try:
+                payload = build_orbit_feed_payload(parse_qs(parsed.query))
+                self._send_json(payload)
+            except RuntimeError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.SERVICE_UNAVAILABLE)
             except Exception as exc:  # noqa: BLE001
                 self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
             return

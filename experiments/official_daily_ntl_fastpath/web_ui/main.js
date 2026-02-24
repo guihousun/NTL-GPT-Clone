@@ -2,6 +2,23 @@
 const DEFAULT_LAYER_ID = "VIIRS_NOAA20_DayNightBand";
 const DEFAULT_QUERY_DAYS = 10;
 const DEFAULT_QUERY_SOURCES = "nrt_priority";
+const ROGUE_SKY_URL = "https://sky.rogue.space/";
+const PRIMARY_ORBIT_SLOT = {
+  slot: "snpp_viirs",
+  defaultSearch: "NPP",
+  defaultLabelZh: "SNPP VIIRS",
+  defaultLabelEn: "SNPP VIIRS"
+};
+const ORBIT_SEARCH_CHOICES = [
+  { search: "NPP", labelZh: "SNPP VIIRS", labelEn: "SNPP VIIRS" },
+  { search: "SDGSAT", labelZh: "SDGSAT-1", labelEn: "SDGSAT-1" },
+  // Rogue Sky query parser does not decode `%20`/`+` reliably.
+  // Use no-space INTLDES aliases that are proven searchable in Rogue Sky.
+  { search: "2017-073A", labelZh: "NOAA 20 VIIRS", labelEn: "NOAA 20 VIIRS" },
+  { search: "2022-150A", labelZh: "NOAA 21 VIIRS", labelEn: "NOAA 21 VIIRS" },
+  { search: "JILIN", labelZh: "吉林1号", labelEn: "JILIN 1" },
+  { search: "LUOJIA", labelZh: "LUOJIA-1", labelEn: "LUOJIA-1" }
+];
 
 const GEE_SOURCE_LIST = [
   { id: "NASA/VIIRS/002/VNP46A2", label: "VNP46A2 (Daily)", band: "Gap_Filled_DNB_BRDF_Corrected_NTL" },
@@ -183,6 +200,9 @@ const I18N = {
     colGlobalLag: "全局滞后(天)",
     colBBoxLatest: "区域最新",
     colBBoxLag: "区域滞后(天)",
+    viewMode: "视图",
+    view2d: "二维影像",
+    view3d: "三维轨道",
     layer: "图层",
     renderMode: "渲染模式",
     modeTiles: "全球瓦片",
@@ -222,7 +242,17 @@ const I18N = {
     layerSuccessTiles: "成功 ({loaded}/{requested} 瓦片)",
     layerPartialTiles: "部分成功 ({loaded} 成功, {errors} 失败)",
     layerFailedTiles: "失败 (0 成功, {errors} 错误)",
-    layerOpacityUpdated: "透明度已更新"
+    layerOpacityUpdated: "透明度已更新",
+    orbitStatusFmt: "轨道状态：{text}",
+    orbitIdle: "未加载",
+    orbitFailed: "轨道加载失败：{msg}",
+    orbitRogueLoadingMulti: "正在加载同页卫星窗口（共 {total} 个）...",
+    orbitRogueReadyMulti: "同页卫星窗口加载完成（{loaded}/{total}）",
+    orbitRoguePartialMulti: "同页卫星窗口部分加载（{loaded}/{total}）",
+    orbitRogueBlocked: "Rogue Sky 嵌入失败，请点击下方链接在新标签页打开",
+    orbitHintsLabel: "可搜索卫星",
+    rogueOpenNewTab: "在新标签页打开",
+    rogueWindowOpen: "打开"
   },
   en: {
     title: "Official Daily NTL Fast Monitor",
@@ -257,6 +287,9 @@ const I18N = {
     colGlobalLag: "Global Lag (d)",
     colBBoxLatest: "BBox Latest",
     colBBoxLag: "BBox Lag (d)",
+    viewMode: "View",
+    view2d: "2D Imagery",
+    view3d: "3D Orbit",
     layer: "Layer",
     renderMode: "Render Mode",
     modeTiles: "Global Tiles",
@@ -296,7 +329,17 @@ const I18N = {
     layerSuccessTiles: "success ({loaded}/{requested} tiles)",
     layerPartialTiles: "partial ({loaded} ok, {errors} failed)",
     layerFailedTiles: "failed (0 loaded, {errors} errors)",
-    layerOpacityUpdated: "opacity updated"
+    layerOpacityUpdated: "opacity updated",
+    orbitStatusFmt: "Orbit status: {text}",
+    orbitIdle: "idle",
+    orbitFailed: "orbit failed: {msg}",
+    orbitRogueLoadingMulti: "loading in-page orbit windows ({total}) ...",
+    orbitRogueReadyMulti: "in-page orbit windows loaded ({loaded}/{total})",
+    orbitRoguePartialMulti: "in-page orbit windows partial ({loaded}/{total})",
+    orbitRogueBlocked: "Rogue Sky embed failed, open it in a new tab",
+    orbitHintsLabel: "Searchable Satellites",
+    rogueOpenNewTab: "Open in new tab",
+    rogueWindowOpen: "Open"
   }
 };
 
@@ -309,13 +352,22 @@ const FALLBACK_GIBS_LAYERS = [
 const state = {
   autoTimer: null,
   gibsLayers: [],
+  viewMode: "2d",
   overlay: null,
   map: null,
+  rogueSkyBound: false,
+  rogueSkyLoadTimer: null,
+  rogueSkyCycle: 0,
+  rogueSkyTotalCount: 0,
+  rogueSkyLoadedCount: 0,
+  rogueSkyFailedCount: 0,
+  orbitSearchChoice: ORBIT_SEARCH_CHOICES[0],
   overlayStats: null,
   hasRenderedLayer: false,
   lang: "zh",
   statusModel: { key: "dataReady", vars: {}, isError: false },
   layerStatusModel: { key: "layerWaitingQuery", vars: {}, level: "warn" },
+  orbitStatusModel: { key: "orbitIdle", vars: {}, level: "warn" },
   latestRows: [],
   studyAreaCatalog: {
     countries: [],
@@ -364,6 +416,25 @@ function renderLayerStatus() {
   el.classList.remove("ok", "warn", "err");
   if (state.layerStatusModel.level) {
     el.classList.add(state.layerStatusModel.level);
+  }
+}
+
+function setOrbitStatusModel(key, vars = {}, level = "warn") {
+  state.orbitStatusModel = { key, vars, level };
+  renderOrbitStatus();
+}
+
+function renderOrbitStatus() {
+  const el = qs("orbitStatus");
+  if (!el) return;
+  const msg = t(state.orbitStatusModel.key, state.orbitStatusModel.vars);
+  el.textContent = t("orbitStatusFmt", { text: msg });
+  el.classList.remove("ok", "warn", "err", "hidden");
+  if (state.orbitStatusModel.level) {
+    el.classList.add(state.orbitStatusModel.level);
+  }
+  if (state.viewMode !== "3d") {
+    el.classList.add("hidden");
   }
 }
 
@@ -550,8 +621,11 @@ function applyI18n() {
   if (autoWrap) {
     autoWrap.title = t("autoRefresh");
   }
+  renderOrbitHintChips();
+  renderRogueSkyCardTexts();
   renderStatus();
   renderLayerStatus();
+  renderOrbitStatus();
 }
 
 function setLanguage(lang) {
@@ -589,6 +663,242 @@ function resolveRegionBounds() {
     if (custom) return custom;
   }
   return { minLon: -180, minLat: -85, maxLon: 180, maxLat: 85 };
+}
+
+function buildRogueSatelliteUrl(searchToken, slotId) {
+  const base = ROGUE_SKY_URL.replace(/\/+$/, "").replace(/\?+$/, "");
+  const search = String(searchToken || "").trim();
+  const slot = String(slotId || "").trim();
+  const query = [
+    `search=${encodeURIComponent(search)}`,
+    `slot=${encodeURIComponent(slot)}`,
+    "from=ntl_fast_monitor"
+  ].join("&");
+  return `${base}/?${query}`;
+}
+
+function getOrbitChoiceLabel(choice) {
+  if (!choice) return state.lang === "zh" ? PRIMARY_ORBIT_SLOT.defaultLabelZh : PRIMARY_ORBIT_SLOT.defaultLabelEn;
+  return state.lang === "zh" ? choice.labelZh : choice.labelEn;
+}
+
+function renderOrbitHintChips() {
+  const wrap = qs("orbitHintChips");
+  if (!wrap) return;
+  if (!wrap.dataset.bound) {
+    wrap.innerHTML = "";
+    for (const choice of ORBIT_SEARCH_CHOICES) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "orbit-chip";
+      btn.dataset.search = choice.search;
+      btn.addEventListener("click", () => {
+        const selected = ORBIT_SEARCH_CHOICES.find((x) => x.search === choice.search);
+        if (!selected) return;
+        state.orbitSearchChoice = selected;
+        renderOrbitHintChips();
+        renderRogueSkyCardTexts();
+        if (state.viewMode === "3d") {
+          activateRogueSkyView(true);
+        }
+      });
+      wrap.appendChild(btn);
+    }
+    wrap.dataset.bound = "1";
+  }
+
+  const activeSearch = state.orbitSearchChoice?.search || PRIMARY_ORBIT_SLOT.defaultSearch;
+  wrap.querySelectorAll(".orbit-chip").forEach((btn) => {
+    const search = btn.dataset.search || "";
+    const choice = ORBIT_SEARCH_CHOICES.find((x) => x.search === search);
+    btn.textContent = getOrbitChoiceLabel(choice);
+    btn.classList.toggle("active", search === activeSearch);
+  });
+}
+
+function renderRogueSkyCardTexts() {
+  const grid = qs("rogueSkyGrid");
+  if (!grid) return;
+  const choice = state.orbitSearchChoice || ORBIT_SEARCH_CHOICES[0];
+  const titleText = getOrbitChoiceLabel(choice);
+  const slotTag = String(choice.search || PRIMARY_ORBIT_SLOT.defaultSearch).toLowerCase();
+  const url = buildRogueSatelliteUrl(choice.search, slotTag);
+
+  grid.querySelectorAll(".rogue-card").forEach((card) => {
+    const title = card.querySelector(".rogue-card-title");
+    const link = card.querySelector(".rogue-card-link");
+    const frame = card.querySelector(".rogue-card-frame");
+    if (title) title.textContent = titleText;
+    if (link) {
+      link.textContent = t("rogueWindowOpen");
+      link.href = url;
+    }
+    if (frame) {
+      frame.title = titleText;
+      frame.dataset.search = choice.search;
+      frame.dataset.slot = slotTag;
+    }
+  });
+}
+
+function _updateRogueLoadStatus() {
+  const loaded = state.rogueSkyLoadedCount;
+  const total = state.rogueSkyTotalCount;
+  const failed = state.rogueSkyFailedCount;
+  const done = loaded + failed;
+  if (done < total) return;
+
+  if (state.rogueSkyLoadTimer) {
+    clearTimeout(state.rogueSkyLoadTimer);
+    state.rogueSkyLoadTimer = null;
+  }
+
+  if (loaded === total) {
+    setOrbitStatusModel("orbitRogueReadyMulti", { loaded, total }, "ok");
+    return;
+  }
+  if (loaded > 0) {
+    setOrbitStatusModel("orbitRoguePartialMulti", { loaded, total }, "warn");
+    return;
+  }
+  setOrbitStatusModel("orbitRogueBlocked", {}, "warn");
+}
+
+function _buildRogueSkyGrid() {
+  const grid = qs("rogueSkyGrid");
+  if (!grid || state.rogueSkyBound) return;
+  grid.innerHTML = "";
+  const choice = state.orbitSearchChoice || ORBIT_SEARCH_CHOICES[0];
+  const slotTag = String(choice.search || PRIMARY_ORBIT_SLOT.defaultSearch).toLowerCase();
+  const card = document.createElement("section");
+  card.className = "rogue-card";
+  card.dataset.slot = slotTag;
+
+  const head = document.createElement("div");
+  head.className = "rogue-card-head";
+
+  const title = document.createElement("h3");
+  title.className = "rogue-card-title";
+  title.textContent = getOrbitChoiceLabel(choice);
+  head.appendChild(title);
+
+  const link = document.createElement("a");
+  link.className = "rogue-card-link";
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.textContent = t("rogueWindowOpen");
+  link.href = buildRogueSatelliteUrl(choice.search, slotTag);
+  head.appendChild(link);
+
+  const frame = document.createElement("iframe");
+  frame.className = "rogue-card-frame";
+  frame.loading = "lazy";
+  frame.referrerPolicy = "no-referrer-when-downgrade";
+  frame.allowFullscreen = true;
+  frame.title = getOrbitChoiceLabel(choice);
+  frame.dataset.slot = slotTag;
+  frame.dataset.search = choice.search;
+
+  frame.addEventListener("load", () => {
+    const cycle = Number(frame.dataset.loadCycle || "0");
+    if (!cycle || cycle !== state.rogueSkyCycle) return;
+    state.rogueSkyLoadedCount += 1;
+    _updateRogueLoadStatus();
+  });
+  frame.addEventListener("error", () => {
+    const cycle = Number(frame.dataset.loadCycle || "0");
+    if (!cycle || cycle !== state.rogueSkyCycle) return;
+    state.rogueSkyFailedCount += 1;
+    _updateRogueLoadStatus();
+  });
+
+  card.appendChild(head);
+  card.appendChild(frame);
+  grid.appendChild(card);
+  state.rogueSkyBound = true;
+  renderRogueSkyCardTexts();
+  renderOrbitHintChips();
+}
+
+function activateRogueSkyView(forceReload = false) {
+  _buildRogueSkyGrid();
+  const grid = qs("rogueSkyGrid");
+  const frames = Array.from(grid?.querySelectorAll(".rogue-card-frame") || []);
+  if (frames.length === 0) {
+    setOrbitStatusModel("orbitFailed", { msg: "missing rogue iframe grid" }, "err");
+    return;
+  }
+
+  if (!forceReload && frames.every((frame) => !!frame.src)) {
+    setOrbitStatusModel("orbitRogueReadyMulti", { loaded: frames.length, total: frames.length }, "ok");
+    return;
+  }
+
+  if (state.rogueSkyLoadTimer) {
+    clearTimeout(state.rogueSkyLoadTimer);
+    state.rogueSkyLoadTimer = null;
+  }
+
+  state.rogueSkyCycle += 1;
+  const cycle = state.rogueSkyCycle;
+  state.rogueSkyTotalCount = frames.length;
+  state.rogueSkyLoadedCount = 0;
+  state.rogueSkyFailedCount = 0;
+
+  setOrbitStatusModel("orbitRogueLoadingMulti", { total: frames.length }, "warn");
+
+  frames.forEach((frame) => {
+    const slot = frame.dataset.slot || "";
+    const search = frame.dataset.search || "";
+    frame.dataset.loadCycle = String(cycle);
+    frame.src = buildRogueSatelliteUrl(search, slot);
+  });
+
+  state.rogueSkyLoadTimer = setTimeout(() => {
+    if (state.viewMode !== "3d" || cycle !== state.rogueSkyCycle) return;
+    const loaded = state.rogueSkyLoadedCount;
+    const total = state.rogueSkyTotalCount;
+    if (loaded > 0) {
+      setOrbitStatusModel("orbitRoguePartialMulti", { loaded, total }, "warn");
+    } else {
+      setOrbitStatusModel("orbitRogueBlocked", {}, "warn");
+    }
+  }, 15000);
+}
+
+function _applyViewModeLayout() {
+  const is3d = state.viewMode === "3d";
+  qs("map")?.classList.toggle("hidden", is3d);
+  qs("rogueSkyWrap")?.classList.toggle("hidden", !is3d);
+  qs("layerStatus")?.classList.toggle("hidden", is3d);
+  qs("orbitStatus")?.classList.toggle("hidden", !is3d);
+  qs("orbitSearchHints")?.classList.toggle("hidden", !is3d);
+  qs("renderModeWrap")?.classList.toggle("hidden", is3d);
+  qs("regionPresetWrap")?.classList.toggle("hidden", is3d);
+  qs("layerWrap")?.classList.toggle("hidden", is3d);
+  qs("snapshotSizeWrap")?.classList.toggle("hidden", is3d);
+  qs("opacityWrap")?.classList.toggle("hidden", is3d);
+  qs("applyLayerWrap")?.classList.toggle("hidden", is3d);
+  qs("mapNote")?.classList.toggle("hidden", is3d);
+  if (!is3d) {
+    setOrbitStatusModel("orbitIdle", {}, "warn");
+    if (state.map) {
+      setTimeout(() => state.map.invalidateSize(), 80);
+    }
+  } else {
+    renderOrbitHintChips();
+    activateRogueSkyView(false);
+  }
+  renderOrbitStatus();
+}
+
+async function setViewMode(mode) {
+  state.viewMode = mode === "3d" ? "3d" : "2d";
+  qs("viewMode").value = state.viewMode;
+  _applyViewModeLayout();
+  if (state.viewMode === "3d") {
+    activateRogueSkyView(false);
+  }
 }
 
 function renderTable(rows) {
@@ -845,7 +1155,11 @@ async function downloadDataFile() {
   }
 }
 
-function updateOverlayLayer() {
+async function updateOverlayLayer() {
+  if (state.viewMode === "3d") {
+    activateRogueSkyView(false);
+    return;
+  }
   const select = qs("layerSelect");
   const date = getMapDate();
   const opacity = Number(qs("opacity").value) / 100;
@@ -942,6 +1256,9 @@ async function refresh() {
       start: payload.start_date,
       end: payload.end_date
     });
+    if (state.viewMode === "3d") {
+      activateRogueSkyView(false);
+    }
   } catch (err) {
     state.latestRows = [];
     renderTable([]);
@@ -950,6 +1267,9 @@ async function refresh() {
     populateDownloadSources();
     if (!state.hasRenderedLayer) markLayerDirty("layerDirtyApiFailed");
     setStatusModel("dataFailed", { msg: err.message }, true);
+    if (state.viewMode === "3d") {
+      setOrbitStatusModel("orbitRogueBlocked", {}, "warn");
+    }
   }
 }
 
@@ -966,8 +1286,13 @@ function setupEvents() {
     e.preventDefault();
     refresh();
   });
-  qs("applyLayerBtn").addEventListener("click", updateOverlayLayer);
+  qs("applyLayerBtn").addEventListener("click", () => {
+    updateOverlayLayer();
+  });
   qs("downloadDataBtn").addEventListener("click", downloadDataFile);
+  qs("viewMode").addEventListener("change", async (e) => {
+    await setViewMode(e.target.value);
+  });
 
   const markDirtyHandler = () => markLayerDirty();
   qs("layerSelect").addEventListener("change", markDirtyHandler);
@@ -998,7 +1323,9 @@ function setupEvents() {
   });
   qs("opacity").addEventListener("input", () => {
     const opacity = Number(qs("opacity").value) / 100;
-    if (state.overlay) {
+    if (state.viewMode === "3d") {
+      return;
+    } else if (state.overlay) {
       state.overlay.setOpacity(opacity);
       setLayerStatusModel("layerOpacityUpdated", {}, "ok");
     } else {
@@ -1028,6 +1355,7 @@ function setupEvents() {
 function init() {
   qs("downloadStartDate").value = todayIso();
   qs("downloadEndDate").value = todayIso();
+  qs("viewMode").value = "2d";
 
   const savedLang = localStorage.getItem("ntl_fast_monitor_lang");
   const browserLang = (navigator.language || "en").toLowerCase();
@@ -1038,6 +1366,7 @@ function init() {
   setLayerStatusModel("layerWaitingQuery", {}, "warn");
   setupMap();
   setupEvents();
+  _applyViewModeLayout();
 
   state.gibsLayers = FALLBACK_GIBS_LAYERS;
   populateLayerSelect(state.gibsLayers);

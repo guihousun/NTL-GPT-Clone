@@ -96,7 +96,7 @@ NTL_Solution_Knowledge = _build_retriever_tool(
         "dataset access instructions, and end-to-end NTL application solutions."
     ),
     embeddings=_EMBEDDINGS,
-    k=4,
+    k=3,
     score_threshold=0.3,
 )
 
@@ -110,6 +110,6 @@ NTL_Code_Knowledge = _build_retriever_tool(
         "Focused on executable logic."
     ),
     embeddings=_EMBEDDINGS,
-    k=8,
-    score_threshold=0.22,
+    k=5,
+    score_threshold=0.3,
 )

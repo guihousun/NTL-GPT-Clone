@@ -198,7 +198,6 @@ def _query_requires_server_side(query: str) -> bool:
         "pre-event",
         "post-event",
         "first night",
-        "zonal",
         "time series",
         "统计",
         "评估",
@@ -217,20 +216,15 @@ def _execution_mode(
 ) -> str:
     image_count = _estimate_image_count(temporal_resolution, start_dt, end_dt)
     intent = (analysis_intent or "").strip().lower()
-    heavy_intents = {"zonal_stats", "long_series", "composite_export", "time_series"}
-
-    # Generalized fast-path: small zonal stats workloads are cheaper as local direct downloads.
-    # Applies across daily/monthly/annual to avoid unnecessary server-side planning overhead.
-    if intent == "zonal_stats" and image_count <= 6:
-        return "direct_download"
+    heavy_intents = {"long_series", "composite_export", "time_series"}
 
     if intent in heavy_intents or _query_requires_server_side(query):
         return "gee_server_side"
 
     if temporal_resolution == "daily":
-        return "gee_server_side" if image_count > 31 else "direct_download"
+        return "gee_server_side" if image_count > 14 else "direct_download"
     if temporal_resolution == "monthly":
-        return "direct_download" if image_count <= 24 else "gee_server_side"
+        return "direct_download" if image_count <= 12 else "gee_server_side"
     if temporal_resolution == "annual":
         return "direct_download" if image_count <= 12 else "gee_server_side"
     return "direct_download"

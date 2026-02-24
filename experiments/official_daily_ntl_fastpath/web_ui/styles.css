@@ -16,6 +16,7 @@ body {
   font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
   background: radial-gradient(circle at 20% 10%, #153147, var(--bg) 45%);
   color: var(--text);
+  overflow: hidden;
 }
 
 .layout {
@@ -23,6 +24,9 @@ body {
   grid-template-columns: 500px 1fr;
   gap: 14px;
   padding: 14px;
+  height: calc(100vh - 28px);
+  align-items: stretch;
+  overflow: hidden;
 }
 
 .panel {
@@ -30,6 +34,11 @@ body {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 12px;
+  min-height: 0;
+}
+
+.layout > .panel:first-child {
+  overflow: auto;
 }
 
 .panel-head {
@@ -200,7 +209,10 @@ td {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-height: calc(100vh - 28px);
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  min-width: 0;
 }
 
 .map-controls {
@@ -211,12 +223,12 @@ td {
 }
 
 .map-controls-primary {
-  grid-template-columns: minmax(260px, 2fr) minmax(180px, 1fr) minmax(180px, 1fr) auto;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.5fr) minmax(0, 0.9fr) minmax(0, 0.9fr) auto;
   align-items: end;
 }
 
 .map-controls-secondary {
-  grid-template-columns: minmax(340px, 2fr) minmax(180px, 1fr);
+  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr) minmax(220px, 1.5fr);
   align-items: end;
 }
 
@@ -230,6 +242,144 @@ td {
   min-height: 560px;
   border-radius: 10px;
   border: 1px solid var(--line);
+}
+
+.view-stack {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 560px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.view-stack > #map,
+.view-stack > #rogueSkyWrap {
+  width: 100%;
+}
+
+#rogueSkyWrap {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 560px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+  padding: 10px;
+  position: relative;
+  background: radial-gradient(circle at 40% 20%, #0f2b3d, #060e16 62%);
+}
+
+.orbit-hints {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.orbit-hints-label {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.orbit-hints-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.orbit-chip {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #0b1e2b;
+  color: #d2e8f7;
+  padding: 4px 10px;
+  font-size: 0.82rem;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.orbit-chip:hover {
+  border-color: #57b3d4;
+}
+
+.orbit-chip.active {
+  background: linear-gradient(135deg, #1f7ea2, #2f9b90);
+  border-color: #5ad5c0;
+  color: #f4fffb;
+}
+
+#rogueSkyGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  height: 100%;
+}
+
+.rogue-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-card) 90%, #000);
+  overflow: hidden;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.rogue-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  background: #0c2231;
+}
+
+.rogue-card-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #d7edf8;
+}
+
+.rogue-card-link {
+  color: #7fd1ff;
+  font-size: 0.82rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.rogue-card-link:hover {
+  color: #b0e3ff;
+}
+
+.rogue-card-frame {
+  width: 100%;
+  border: 0;
+  display: block;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  background: #03080d;
+}
+
+@media (max-width: 1480px) {
+  .layout {
+    grid-template-columns: 420px minmax(0, 1fr);
+  }
+
+  .map-controls-primary {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .actions-map {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 980px) {
@@ -252,5 +402,11 @@ td {
   }
   #map {
     min-height: 420px;
+  }
+  #rogueSkyWrap {
+    min-height: 420px;
+  }
+  .rogue-card-frame {
+    min-height: 360px;
   }
 }

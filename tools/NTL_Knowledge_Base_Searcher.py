@@ -14,6 +14,7 @@ from langchain_core.messages import SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import StructuredTool
 from langchain_openai import ChatOpenAI
+from langgraph.config import get_stream_writer
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
@@ -96,47 +97,17 @@ def _is_methodology_reproduction_query(query: str) -> bool:
         "experiment setup",
         "according to the paper",
         "paper method",
-        "复现",
-        "方法论",
-        "方法",
-        "公式",
-        "参数设置",
-        "实验设置",
-        "按论文",
-        "依据论文",
+        "according to paper",
+        "based on paper",
+        "reproduction",
+        "methodological",
+        "formula",
+        "parameter setting",
+        "experiment setup",
+        "according to literature",
+        "based on literature",
     )
     return any(keyword in q for keyword in keywords)
-
-
-def _tool_priority_names(mode: str, query: str, intent_profile: dict | None = None) -> list[str]:
-    m = (mode or "auto").lower()
-    intent = intent_profile if isinstance(intent_profile, dict) else _fallback_intent_profile(query, m)
-    if m == "theory":
-        return [
-            "NTL_Literature_Knowledge",
-            "NTL_Solution_Knowledge",
-            "NTL_Code_Knowledge",
-        ]
-    if intent.get("prefer_literature") or _is_methodology_reproduction_query(query):
-        return [
-            "NTL_Literature_Knowledge",
-            "NTL_Code_Knowledge",
-            "NTL_Solution_Knowledge",
-        ]
-    if m == "workflow":
-        return [
-            "NTL_Solution_Knowledge",
-            "NTL_Code_Knowledge",
-        ]
-    if m in {"code", "mixed"}:
-        return [
-            "NTL_Code_Knowledge",
-            "NTL_Solution_Knowledge",
-        ]
-    return [
-        "NTL_Solution_Knowledge",
-        "NTL_Code_Knowledge",
-    ]
 
 
 def _extract_latest_user_query(messages: list) -> str:
@@ -149,13 +120,6 @@ def _extract_latest_user_query(messages: list) -> str:
         if role in {"human", "user"}:
             return str(getattr(item, "content", ""))
     return ""
-
-
-def _select_tools_by_priority(mode: str, query: str, intent_profile: dict | None = None) -> list[StructuredTool]:
-    lookup = {tool.name: tool for tool in TOOLS}
-    ordered_names = _tool_priority_names(mode, query, intent_profile)
-    selected = [lookup[name] for name in ordered_names if name in lookup]
-    return selected if selected else TOOLS
 
 
 def _build_searcher_llm() -> ChatOpenAI:
@@ -375,58 +339,15 @@ def _is_event_analysis_intent(intent_profile: dict) -> bool:
 
 
 def _infer_tool_from_intent(intent_profile: dict, valid_tools: set[str]) -> str:
-    candidates: dict[str, int] = {}
-    intent_type = str(intent_profile.get("intent_type", "")).lower()
-
-    if "tavily_search" in valid_tools:
-        score = 0
-        if intent_profile.get("needs_official_sources"):
-            score += 7
-        if intent_type == "event_impact_assessment":
-            score += 2
-        if score > 0:
-            candidates["tavily_search"] = score
-
-    if "NTL_download_tool" in valid_tools:
-        score = 0
-        if intent_type == "data_retrieval":
-            score += 8
-        if intent_profile.get("needs_geospatial_analysis") and not intent_profile.get("needs_server_side_execution"):
-            score += 3
-        if intent_profile.get("needs_official_sources"):
-            score -= 4
-        if intent_type == "event_impact_assessment":
-            score -= 4
-        if score > 0:
-            candidates["NTL_download_tool"] = score
-
-    if "NTL_raster_statistics" in valid_tools and intent_profile.get("needs_geospatial_analysis"):
-        candidates["NTL_raster_statistics"] = 3
-
-    if not candidates:
-        return ""
-    return sorted(candidates.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
+    # Disabled by policy: do not auto-score/override tool names.
+    # Step names should be produced by the agent output and only normalized via alias rules.
+    _ = (intent_profile, valid_tools)
+    return ""
 
 
 def _infer_tool_from_query(query: str, valid_tools: set[str], intent_profile: dict | None = None, mode: str = "auto") -> str:
-    intent = intent_profile if isinstance(intent_profile, dict) else _classify_query_intent_with_fallback(query, mode)
-    chosen = _infer_tool_from_intent(intent, valid_tools)
-    if chosen:
-        return chosen
-
-    q = (query or "").lower()
-    exact_mappings = (
-        ("vnci", "VNCI_Compute"),
-        ("administrative", "get_administrative_division_data"),
-        ("boundary", "get_administrative_division_data"),
-        ("zonal", "NTL_raster_statistics"),
-        ("statistics", "NTL_raster_statistics"),
-        ("trend", "Analyze_NTL_trend"),
-        ("electrified", "Detect_Electrified_Areas_by_Thresholding"),
-    )
-    for marker, tool_name in exact_mappings:
-        if marker in q and tool_name in valid_tools:
-            return tool_name
+    # Disabled by policy: no query-level hardcoded fallback mapping.
+    _ = (query, valid_tools, intent_profile, mode)
     return ""
 
 
@@ -576,6 +497,69 @@ def _build_kb_response_contract(
     return contract
 
 
+def _build_non_executable_workflow_payload(
+    original_payload: dict,
+    normalized_payload: dict,
+    invalid_names: list[str],
+) -> dict:
+    """
+    Preserve agent-authored workflow semantics when builtin tool names are invalid.
+    Invalid builtin steps are downgraded to non-executable analysis steps while
+    keeping original step titles/descriptions.
+    """
+    invalid_set = set(str(x) for x in (invalid_names or []))
+    normalized = dict(normalized_payload or {})
+    original_steps = (
+        list(original_payload.get("steps", []))
+        if isinstance(original_payload, dict) and isinstance(original_payload.get("steps"), list)
+        else []
+    )
+    normalized_steps = normalized.get("steps", [])
+    if not isinstance(normalized_steps, list):
+        normalized_steps = []
+
+    preserved_steps: list[dict] = []
+    for idx, step in enumerate(normalized_steps):
+        if not isinstance(step, dict):
+            continue
+        current = dict(step)
+        step_type = str(current.get("type", ""))
+        step_name = str(current.get("name", ""))
+        if step_type == "builtin_tool" and step_name in invalid_set:
+            raw_step = original_steps[idx] if idx < len(original_steps) and isinstance(original_steps[idx], dict) else {}
+            raw_title = (
+                str(raw_step.get("name") or raw_step.get("tool_name") or raw_step.get("action") or "").strip()
+            )
+            title = raw_title or step_name or f"step_{idx + 1}"
+            description = str(
+                current.get("description")
+                or raw_step.get("description")
+                or raw_step.get("note")
+                or ""
+            ).strip()
+            if not description:
+                description = f"Agent-proposed step: {title}"
+            downgraded = {
+                "type": "analysis_step",
+                "name": title,
+                "description": description,
+            }
+            step_input = current.get("input")
+            if isinstance(step_input, dict) and step_input:
+                downgraded["input"] = step_input
+            preserved_steps.append(downgraded)
+            continue
+        preserved_steps.append(current)
+
+    normalized["steps"] = preserved_steps
+    normalized["status"] = "no_valid_tool"
+    normalized["reason"] = (
+        "Invalid or unavailable tool names after normalization: "
+        + ", ".join(sorted(invalid_set))
+    )
+    return normalized
+
+
 def _validate_and_normalize_workflow_output(
     content: str,
     user_query: str = "",
@@ -584,11 +568,26 @@ def _validate_and_normalize_workflow_output(
     intent_profile: dict | None = None,
     response_mode: str = "workflow",
 ) -> str:
+    """
+    浼樺寲鐗堟湰锛氬鐞嗗寘鍚?intent_analysis 鐨勬柊鏍煎紡鍝嶅簲
+    """
     valid_tools = set(_tool_registry_snapshot().keys())
-    intent = intent_profile if isinstance(intent_profile, dict) else _classify_query_intent_with_fallback(
-        user_query, response_mode
-    )
+
+    # Use the provided intent_profile, or fall back to rule-based intent.
+    intent = intent_profile if isinstance(intent_profile, dict) else _fallback_intent_profile(user_query, response_mode)
+
+    # 鎻愬彇 JSON
     data, rest = _extract_first_json_dict(content)
+
+    # If model returned {"intent_analysis": ..., "response": ...}, split them.
+    if isinstance(data, dict) and "intent_analysis" in data:
+        # 鏇存柊 intent锛圠LM 鐢熸垚鐨勪紭鍏堜簬瑙勫垯鐢熸垚鐨勶級
+        llm_intent = data.get("intent_analysis", {})
+        if isinstance(llm_intent, dict):
+            intent.update(llm_intent)
+        # Get the actual response payload.
+        data = data.get("response", data)
+
     if not isinstance(data, dict):
         if force_json:
             data = _build_force_json_fallback_payload(
@@ -681,74 +680,9 @@ def _validate_and_normalize_workflow_output(
             )
 
     normalized, invalid_names = normalize_workflow_payload(data, valid_tools)
-    if invalid_names:
-        fallback_tool = _infer_tool_from_query(
-            user_query,
-            valid_tools,
-            intent_profile=intent,
-            mode=response_mode,
-        )
-        if fallback_tool:
-            for step in normalized.get("steps", []):
-                if step.get("type") != "builtin_tool":
-                    continue
-                step_name = str(step.get("name", ""))
-                # Only patch placeholder/empty tool ids; preserve explicit model-selected names.
-                if (
-                    step_name.startswith("builtin_tool_step_")
-                    or not step_name
-                    or step_name in {"tool", "builtin_tool"}
-                ):
-                    step["name"] = fallback_tool
-            # Re-check after fallback replacement.
-            normalized, invalid_names = normalize_workflow_payload(normalized, valid_tools)
-
-    if invalid_names and force_json:
-        steps = normalized.get("steps", []) if isinstance(normalized, dict) else []
-        has_detailed_geospatial_steps = any(
-            isinstance(step, dict) and step.get("type") in {"geospatial_code", "code"} for step in steps
-        )
-        if has_detailed_geospatial_steps:
-            invalid_set = set(invalid_names)
-            patched_steps = []
-            fallback_tool = _infer_tool_from_query(
-                user_query,
-                valid_tools,
-                intent_profile=intent,
-                mode=response_mode,
-            )
-            for step in steps:
-                if not isinstance(step, dict):
-                    continue
-                if step.get("type") == "builtin_tool" and str(step.get("name", "")) in invalid_set:
-                    if fallback_tool:
-                        fixed = dict(step)
-                        fixed["name"] = fallback_tool
-                        patched_steps.append(fixed)
-                    # If no fallback tool exists, drop only invalid builtin step and preserve the rest.
-                    continue
-                patched_steps.append(step)
-            if patched_steps:
-                normalized["steps"] = patched_steps
-                normalized, invalid_names = normalize_workflow_payload(normalized, valid_tools)
 
     if invalid_names:
-        if force_json:
-            data = _build_force_json_fallback_payload(
-                user_query,
-                valid_tools,
-                intent_profile=intent,
-                mode=response_mode,
-            )
-        else:
-            data = {
-                "status": "no_valid_tool",
-                "reason": (
-                    "Invalid or unavailable tool names after normalization: "
-                    + ", ".join(sorted(set(invalid_names)))
-                ),
-                "sources": [],
-            }
+        data = _build_non_executable_workflow_payload(data, normalized, invalid_names)
         return json.dumps(
             _build_kb_response_contract(
                 data,
@@ -773,70 +707,121 @@ def _validate_and_normalize_workflow_output(
 
 
 def agent(state: State):
+    """
+    浼樺寲鍚庣殑 Agent锛氬湪鐢熸垚鍝嶅簲鐨勫悓鏃惰繘琛屾剰鍥惧垎鏋?    """
     mode = (state.get("response_mode") or "auto").lower()
     need_citations = bool(state.get("need_citations", True))
     locale = state.get("locale", "en")
     user_query = _extract_latest_user_query(state.get("messages", []))
-    intent_profile = state.get("intent_profile")
-    if not isinstance(intent_profile, dict):
-        intent_profile = _classify_query_intent_with_fallback(user_query, mode)
-    selected_tools = _select_tools_by_priority(mode, user_query, intent_profile=intent_profile)
-    priority_names = [tool.name for tool in selected_tools]
-    priority_text = " -> ".join(priority_names)
-    intent_label = str(intent_profile.get("intent_type", "general_query"))
-    intent_profile_json = json.dumps(intent_profile, ensure_ascii=False)
 
+    # 鑾峰彇宸ュ叿淇℃伅
     alias_lines = "\n".join(
         f"- `{legacy}` -> `{canonical}`" for legacy, canonical in sorted(TOOL_ALIAS_MAP.items())
     )
 
+    # Optimized system prompt with explicit intent-analysis requirement.
     system_prompt_text = SystemMessage(
-        f"""
-You are the NTL Knowledge Base Agent.
-Your mission is to generate grounded NTL workflows/theory/code using only registered tools.
+        f"""You are the NTL Knowledge Base Agent.
+Your mission is to analyze user intent and generate grounded NTL workflows/theory/code.
 
-### NTL Stores
-1. Literature Store: theory, formulas, scientific definitions
-2. Solution Store: workflows, tool usage, datasets, parameter patterns
-3. Code Store: concise Python/GEE snippets
+### Intent Analysis
+Analyze the query and output:
 
-Detected Query Intent: {intent_label}
-Intent Profile JSON: {intent_profile_json}
-Current Tool Priority: {priority_text}
+```json
+{{
+  "intent_analysis": {{
+    "intent_type": "event_impact_assessment|methodology_reproduction|data_retrieval|theory_explanation|code_generation|general_query",
+    "requires_workflow": true/false,
+    "needs_official_sources": true/false,
+    "needs_geospatial_analysis": true/false,
+    "needs_server_side_execution": true/false,
+    "prefer_literature": true/false,
+    "prefer_code": true/false,
+    "prefer_solution": true/false
+  }}
+}}
+```
 
-### AVAILABLE TOOL MANUAL (STRICT REGISTRY)
-You MUST ONLY use these tool names in workflow steps:
+Intent Type Guidelines:
+- **methodology_reproduction**: Query asks about reproducing paper methods, equations, parameters
+- **event_impact_assessment**: Query involves disasters (earthquake, flood, wildfire) with NTL analysis
+- **data_retrieval**: Query asks to download, fetch, or collect data
+- **theory_explanation**: Query asks "what is", "why", definitions, theoretical concepts
+- **code_generation**: Query asks for example code, scripts, implementation
+- **general_query**: Other general questions about NTL
+
+### Tool Selection
+You have access to 3 knowledge stores. Follow this strict retrieval budget policy:
+- Always prioritize **NTL_Solution_Knowledge** first.
+- Query at most **1-2 stores** per request (never all 3 by default).
+- Choose the second store by mode:
+  - **theory** -> add **NTL_Literature_Knowledge**
+  - **workflow/code/mixed/auto** -> add **NTL_Code_Knowledge**
+- Only use a single store when confidence is already high from Solution retrieval.
+
+**Store Selection Guide:**
+- **NTL_Literature_Knowledge**: Use for theory, formulas, scientific definitions, methodology reproduction
+- **NTL_Solution_Knowledge**: Use for workflows, best practices, tool usage patterns, datasets
+- **NTL_Code_Knowledge**: Use for Python/GEE code snippets, implementation examples
+
+### Available Tools
 {_tool_manual_str()}
 
-### LEGACY TOOL NAME ALIASES
-When retrieval returns legacy names, convert them to canonical names:
-{alias_lines}
+### Response Modes
+1) **workflow**: Return strict JSON object with intent_analysis and response (no markdown code fences).
+2) **theory**: Concise grounded bullets with intent_analysis.
+3) **code**: Minimal runnable code snippet with intent_analysis.
+4) **mixed**: workflow JSON + theory bullets + short code, all with intent_analysis.
 
-### RESPONSE MODES
-1) workflow: Return strict JSON object only (no markdown code fences).
-2) theory: concise grounded bullets.
-3) code: minimal runnable code snippet.
-4) mixed: workflow JSON + theory bullets + short code.
+### Output Format
+Your response MUST be a valid JSON object with this structure:
 
-### RULES
-- Do not invent tool names outside registry.
-- If a required parameter is missing, you MUST use safe defaults/placeholders and state them clearly.
-- NEVER return `no_valid_tool` only because parameters are missing.
-- `no_valid_tool` is allowed only when no tool in the registry can be mapped to the user intent.
-- If the query asks methodology/equations/reproduction, you MUST prioritize `NTL_Literature_Knowledge` first.
-- In `workflow` mode for non-reproduction queries, avoid literature retrieval to reduce noisy context.
-- Otherwise in `code`/`mixed` mode, you MUST try `NTL_Code_Knowledge` first for executable snippets.
-- If `NTL_Code_Knowledge` returns `{{"status":"empty_store","store":"Code_RAG",...}}`, you MUST clearly state:
-  `code corpus unavailable` and suggest rebuilding `Code_RAG`.
-- If no valid tool can be mapped, return:
-  {{"status":"no_valid_tool","reason":"...","sources":[]}}
-- If `NTL_Solution_Knowledge` returns a relevant workflow JSON (e.g., with detailed steps/windows/formulas),
-  you MUST preserve those details in your final workflow instead of replacing them with generic templates.
-- Prefer adapting retrieved workflow details (task_id, step descriptions, output paths, formulas)
-  and only use generic fallback steps when retrieval details are unavailable.
-- For disaster/event tasks using daily VNP46A2, treat "first night after event" as the first post-event
-  nighttime overpass at epicenter local time. If event time is after local nightly overpass (~01:30 local),
-  use local day D+1 for first-night (not day D), and state this rule explicitly in workflow text.
+```json
+{{
+  "intent_analysis": {{
+    "intent_type": "...",
+    "requires_workflow": true/false,
+    "needs_official_sources": true/false,
+    "needs_geospatial_analysis": true/false,
+    "needs_server_side_execution": true/false,
+    "prefer_literature": true/false,
+    "prefer_code": true/false,
+    "prefer_solution": true/false
+  }},
+  "response": {{
+    // For workflow mode:
+    "task_id": "...",
+    "task_name": "...",
+    "category": "...",
+    "description": "...",
+    "steps": [
+      {{
+        "type": "instruction",
+        "description": "Step description without tool call"
+      }},
+      {{
+        "type": "builtin_tool",
+        "name": "ActualToolNameFromRegistry",
+        "input": {{...}},
+        "description": "What this tool call does"
+      }}
+    ],
+    "output": "..."
+  }}
+}}
+```
+
+Rules:
+- Use only registered tools. Use defaults for missing parameters.
+- Return `no_valid_tool` only when intent cannot be mapped to any tool.
+- Preserve retrieved workflow details; use fallbacks only when necessary.
+
+**CRITICAL: Tool Name Requirements**
+- ONLY use tool names from the Available Tools list above
+- If a workflow step doesn't need a tool call, use {{"type": "instruction", "description": "..."}}
+- Valid step types: "builtin_tool" (for actual tool calls), "instruction" (for guidance only)
+- Handle Code_RAG empty status by reporting "code corpus unavailable".
+- Treat "first night after event" as the first post-event nighttime overpass at epicenter local time.
 
 Language: {locale}
 Citations Required: {need_citations}
@@ -848,7 +833,9 @@ Current Mode: {mode}
     formatted_prompt = prompt_template.format_prompt()
 
     llm_gpt = _build_searcher_llm()
-    model = llm_gpt.bind_tools(selected_tools)
+
+    # 缁戝畾鎵€鏈夊伐鍏凤紝璁?LLM 鑷繁鍒ゆ柇浣跨敤鍝釜
+    model = llm_gpt.bind_tools(TOOLS)
     response = model.invoke(formatted_prompt)
 
     return {
@@ -856,7 +843,6 @@ Current Mode: {mode}
         "response_mode": mode,
         "need_citations": need_citations,
         "locale": locale,
-        "intent_profile": intent_profile,
     }
 
 
@@ -883,6 +869,37 @@ class NTL_Knowledge_Searcher_Input(BaseModel):
     )
 
 
+def _safe_stream_writer():
+    try:
+        return get_stream_writer()
+    except Exception:
+        return lambda *_args, **_kwargs: None
+
+
+def _emit_kb_progress(
+    writer,
+    *,
+    run_id: str,
+    phase: str,
+    status: str,
+    label: str,
+    meta: Optional[dict] = None,
+):
+    payload = {
+        "event_type": "kb_progress",
+        "tool": "NTL_Knowledge_Base",
+        "run_id": run_id,
+        "phase": phase,
+        "status": status,
+        "label": label,
+        "meta": meta or {},
+    }
+    try:
+        writer(payload)
+    except Exception:
+        pass
+
+
 def _NTL_Knowledge_Searcher(
     query: str,
     response_mode: str = "auto",
@@ -890,64 +907,159 @@ def _NTL_Knowledge_Searcher(
     need_citations: bool = True,
 ) -> str:
     mode = (response_mode or "auto").lower()
-    intent_profile = _classify_query_intent_with_fallback(query, mode)
     unique_id = str(uuid.uuid4())[:8]
-    events = graph.stream(
-        input={
-            "messages": [("user", query)],
-            "response_mode": response_mode,
-            "locale": locale,
-            "need_citations": need_citations,
-            "intent_profile": intent_profile,
-        },
-        config={"configurable": {"thread_id": f"rag_{unique_id}"}, "recursion_limit": 25},
-        stream_mode="values",
+    run_id = f"kb_{unique_id}"
+    writer = _safe_stream_writer()
+    _emit_kb_progress(
+        writer,
+        run_id=run_id,
+        phase="query_received",
+        status="done",
+        label="Query received",
+    )
+    _emit_kb_progress(
+        writer,
+        run_id=run_id,
+        phase="knowledge_retrieval",
+        status="running",
+        label="Retrieving knowledge from KB stores",
     )
 
-    final_answer = ""
-    for event in events:
-        content = event["messages"][-1].content
-        if isinstance(content, str):
-            final_answer = content
-        else:
-            final_answer = json.dumps(content, ensure_ascii=False)
-
-    empty_store_payload = _extract_empty_store_status(final_answer)
-    if empty_store_payload and empty_store_payload.get("store") == "Code_RAG":
-        notice = (
-            "code corpus unavailable: Code_RAG currently has no indexed documents. "
-            "Rebuild command: conda run -n NTL-GPT python agents/NTL_Knowledge_Base_manager.py "
-            "--profile code --code-guide-dir RAG/code_guide --tool-dir tools "
-            "--persist-dir RAG/Code_RAG --collection-name Code_RAG --reset "
-            "--report-path RAG/Code_RAG/rebuild_report.json"
+    try:
+        events = graph.stream(
+            input={
+                "messages": [("user", query)],
+                "response_mode": response_mode,
+                "locale": locale,
+                "need_citations": need_citations,
+            },
+            config={"configurable": {"thread_id": f"rag_{unique_id}"}, "recursion_limit": 25},
+            stream_mode="values",
         )
-        if mode == "code":
-            return notice
-        if mode in {"mixed", "workflow", "auto"}:
-            return json.dumps(
-                _build_kb_response_contract(
-                    {
-                        "status": "code_corpus_unavailable",
-                        "reason": notice,
-                        "sources": [],
-                    },
-                    mode=mode,
-                    intent_profile=intent_profile,
-                ),
-                ensure_ascii=False,
-                indent=2,
+
+        final_answer = ""
+        intent_profile = {}
+        retrieval_done = False
+        for event in events:
+            content = event["messages"][-1].content
+            if not retrieval_done:
+                retrieval_done = True
+                _emit_kb_progress(
+                    writer,
+                    run_id=run_id,
+                    phase="knowledge_retrieval",
+                    status="done",
+                    label="Knowledge retrieval completed",
+                )
+            if isinstance(content, str):
+                final_answer = content
+                parsed = _safe_json_loads(content)
+                if isinstance(parsed, dict):
+                    intent_profile = parsed.get("intent_analysis", {})
+            else:
+                final_answer = json.dumps(content, ensure_ascii=False)
+                intent_profile = content.get("intent_analysis", {}) if isinstance(content, dict) else {}
+
+        if not intent_profile:
+            intent_profile = _fallback_intent_profile(query, mode)
+
+        empty_store_payload = _extract_empty_store_status(final_answer)
+        if empty_store_payload and empty_store_payload.get("store") == "Code_RAG":
+            notice = (
+                "code corpus unavailable: Code_RAG currently has no indexed documents. "
+                "Rebuild command: conda run -n NTL-GPT python agents/NTL_Knowledge_Base_manager.py "
+                "--profile code --code-guide-dir RAG/code_guide --tool-dir tools "
+                "--persist-dir RAG/Code_RAG --collection-name Code_RAG --reset "
+                "--report-path RAG/Code_RAG/rebuild_report.json"
             )
+            _emit_kb_progress(
+                writer,
+                run_id=run_id,
+                phase="workflow_assembly",
+                status="done",
+                label="Workflow assembly finished with empty code store notice",
+            )
+            _emit_kb_progress(
+                writer,
+                run_id=run_id,
+                phase="structured_output",
+                status="done",
+                label="Structured output ready",
+            )
+            if mode == "code":
+                return notice
+            if mode in {"mixed", "workflow", "auto"}:
+                return json.dumps(
+                    _build_kb_response_contract(
+                        {
+                            "status": "code_corpus_unavailable",
+                            "reason": notice,
+                            "sources": [],
+                        },
+                        mode=mode,
+                        intent_profile=intent_profile,
+                    ),
+                    ensure_ascii=False,
+                    indent=2,
+                )
 
-    if mode in {"workflow", "auto", "mixed"}:
-        return _validate_and_normalize_workflow_output(
-            final_answer,
-            query,
-            allow_trailing_text=mode == "mixed",
-            force_json=mode in {"workflow", "auto"},
-            intent_profile=intent_profile,
-            response_mode=mode,
+        if mode in {"workflow", "auto", "mixed"}:
+            _emit_kb_progress(
+                writer,
+                run_id=run_id,
+                phase="workflow_assembly",
+                status="running",
+                label="Normalizing and assembling workflow output",
+            )
+            normalized = _validate_and_normalize_workflow_output(
+                final_answer,
+                query,
+                allow_trailing_text=mode == "mixed",
+                force_json=mode in {"workflow", "auto"},
+                intent_profile=intent_profile,
+                response_mode=mode,
+            )
+            _emit_kb_progress(
+                writer,
+                run_id=run_id,
+                phase="workflow_assembly",
+                status="done",
+                label="Workflow assembly completed",
+            )
+            _emit_kb_progress(
+                writer,
+                run_id=run_id,
+                phase="structured_output",
+                status="done",
+                label="Structured output ready",
+            )
+            return normalized
+
+        _emit_kb_progress(
+            writer,
+            run_id=run_id,
+            phase="workflow_assembly",
+            status="done",
+            label="Workflow assembly skipped in current mode",
         )
-    return final_answer
+        _emit_kb_progress(
+            writer,
+            run_id=run_id,
+            phase="structured_output",
+            status="done",
+            label="Text output ready",
+        )
+        return final_answer
+    except Exception as exc:
+        _emit_kb_progress(
+            writer,
+            run_id=run_id,
+            phase="structured_output",
+            status="error",
+            label="Knowledge base execution failed",
+            meta={"error_summary": str(exc)[:280]},
+        )
+        raise
 
 
 NTL_Knowledge_Base = StructuredTool.from_function(

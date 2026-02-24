@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime
@@ -48,7 +49,13 @@ def _run_curl_json(url: str, headers: list[str] | None = None, timeout: int = 12
     cmd = [curl_bin, "--silent", "--show-error", "--location", url]
     for h in headers or []:
         cmd.extend(["--header", h])
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
+    proc = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=max(int(timeout) + 45, 120),
+        check=False,
+    )
     if proc.returncode != 0:
         raise RuntimeError(f"curl failed ({proc.returncode}): {proc.stderr.strip()}")
     try:
@@ -175,6 +182,16 @@ def download_file_with_curl(
         "--show-error",
         "--location",
         "--fail-with-body",
+        "--ipv4",
+        "--retry",
+        "3",
+        "--retry-delay",
+        "2",
+        "--retry-all-errors",
+        "--connect-timeout",
+        "30",
+        "--max-time",
+        str(max(60, int(timeout))),
         url,
         "--output",
         str(output_path),
@@ -183,15 +200,24 @@ def download_file_with_curl(
         cmd.extend(["--header", f"Authorization: Bearer {earthdata_token}"])
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
     if proc.returncode != 0:
+        # In unstable networks curl may report a transport error after bytes were already written.
+        # If payload is structurally valid, accept it and continue.
+        if output_path.exists() and output_path.stat().st_size > 0:
+            valid, reason = validate_download_payload(output_path)
+            if valid:
+                return True, "curl_nonzero_but_payload_valid"
+
         body_hint = _read_small_text(output_path)
-        detail = proc.stderr.strip() or f"curl exited with code {proc.returncode}"
+        detail = _normalize_error_text(proc.stderr) or f"curl exited with code {proc.returncode}"
         if body_hint:
             detail = f"{detail}; body_hint={body_hint}"
+        output_path.unlink(missing_ok=True)
         return False, detail
     if not output_path.exists() or output_path.stat().st_size <= 0:
         return False, "Downloaded file is missing or empty."
     valid, reason = validate_download_payload(output_path)
     if not valid:
+        output_path.unlink(missing_ok=True)
         return False, reason
     return True, ""
 
@@ -242,5 +268,23 @@ def _read_small_text(path: Path) -> str:
         raw = path.read_bytes()[:200]
     except OSError:
         return ""
-    text = raw.decode("utf-8", errors="ignore").strip().replace("\r", " ").replace("\n", " ")
+    if not raw:
+        return ""
+    if raw.startswith(HDF5_SIGNATURE):
+        return "binary_hdf5_signature_detected"
+
+    printable = sum(1 for b in raw if 32 <= b < 127 or b in (9, 10, 13))
+    if printable / len(raw) < 0.6:
+        return f"binary_payload_head_hex={raw[:16].hex()}"
+
+    text = raw.decode("utf-8", errors="replace")
+    text = _normalize_error_text(text)
     return text[:160]
+
+
+def _normalize_error_text(text: str | None) -> str:
+    if not text:
+        return ""
+    cleaned = "".join(ch if ch.isprintable() else " " for ch in text)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned[:300]

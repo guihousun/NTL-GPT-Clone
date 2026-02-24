@@ -1,0 +1,9 @@
+{
+  "timestamp_utc": "20260222T055827Z",
+  "source_tool": "execute_geospatial_script_tool",
+  "thread_id": "26cf1633",
+  "original_script_name": "shanghai_2020_ntl_clean_viz.py",
+  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\26cf1633\\outputs\\shanghai_2020_ntl_clean_viz.py",
+  "content_hash": "e5e95570034265b56a377ceab33b1d5ece261ae08d5a980de5876f54bd4a67b4",
+  "stdout_excerpt": "Loading data from: E:\\NTL-GPT-Clone\\user_data\\debug\\inputs\\shanghai_ntl__2020.tif\nOriginal data shape: (262, 281)\nOriginal min: 0.0000, max: 391.8100\nApplying noise filter: setting values < 1 to NaN...\nPixels set to NaN: 46258\nSaving cleaned raster to: E:\\NTL-GPT-Clone\\user_data\\debug\\outputs\\shanghai_ntl_2020_cleaned.tif\nCreating visualization with 'viridis' colormap...\nVisualization saved to: E:\\NTL-GPT-Clone\\user_data\\debug\\outputs\\shanghai_ntl_2020_viridis.png\n<string>:68: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown\n\n✅ Task Complete!\n   Cleaned Raster: E:\\NTL-GPT-Clone\\user_data\\debug\\outputs\\shanghai_ntl_2020_cleaned.tif\n   Visualization: E:\\NTL-GPT-Clone\\user_data\\debug\\outputs\\shanghai_ntl_2020_viridis.png\n"
+}

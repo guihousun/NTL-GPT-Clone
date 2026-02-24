@@ -1,0 +1,9 @@
+{
+  "timestamp_utc": "20260223T163224Z",
+  "source_tool": "execute_geospatial_script_tool",
+  "thread_id": "thread_auto_migrate_8b42e774",
+  "original_script_name": "auto_migrate_case.py",
+  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\thread_auto_migrate_8b42e774\\outputs\\auto_migrate_case.py",
+  "content_hash": "e651ef002de96727cf3b1f8533ebb5c1036d12d795ec486c4cbd4ed2872fde31",
+  "stdout_excerpt": "Saved to: E:\\NTL-GPT-Clone\\user_data\\debug\\outputs\\auto_migrate_case.csv"
+}

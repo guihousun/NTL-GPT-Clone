@@ -1,0 +1,9 @@
+{
+  "timestamp_utc": "20260221T093357Z",
+  "source_tool": "execute_geospatial_script_tool",
+  "thread_id": "9e95fc5b",
+  "original_script_name": "find_highest_antl_district.py",
+  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\9e95fc5b\\outputs\\find_highest_antl_district.py",
+  "content_hash": "379e230de127cba08f5be830357134cbb6af14bffca937cf5224151594414933",
+  "stdout_excerpt": "CSV Columns: ['Raster_file', 'Year', 'Region', 'ANTL']\n\nFirst few rows:\n             Raster_file  Year Region     ANTL\n0  shanghai_ntl_2022.tif  2022    黄浦区  56.9693\n1  shanghai_ntl_2022.tif  2022    徐汇区  39.5948\n2  shanghai_ntl_2022.tif  2022    长宁区  56.8617\n3  shanghai_ntl_2022.tif  2022    静安区  44.7877\n4  shanghai_ntl_2022.tif  2022    普陀区  42.2470\n\n============================================================\nRESULT: District with Highest ANTL in Shanghai (2022)\n============================================================\nDistrict Name: 黄浦区\nANTL Value: 56.9693\n============================================================\n\nResult saved to: E:\\NTL-GPT-Clone\\user_data\\9e95fc5b\\outputs\\shanghai_highest_antl_district_2022.csv\n\nAll districts sorted by ANTL (descending):\n        Region    ANTL\n           黄浦区 56.9693\n           长宁区 56.8617\n           静安区 44.7877\n           普陀区 42.2470\n           徐汇区 39.5948\n           虹口区 39.0814\n           杨浦区 34.1247\n           闵行区 31.0373\n           宝山区 23.4537\n           嘉定区 21.6214\n          浦东新区 18.5713\n           松江区 16.7215\nGlobal_Summary 13.8498\n           青浦区 13.0829\n           奉贤区  9.8211\n           金山区  9.0541\n           崇明区  2.3153\n"
+}

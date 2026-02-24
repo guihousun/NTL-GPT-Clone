@@ -32,6 +32,11 @@ from .GEE_specialist_toolkit import (
 )
 # from .NTL_Knowledge_Base import NTL_Code_Knowledge
 from .NTL_estimate_indicator import NTL_estimate_indicator_provincial_tool, DEI_estimate_city_tool
+from .uploaded_file_understanding_tool import (
+    uploaded_file_understanding_tool,
+    uploaded_pdf_understanding_tool,
+    uploaded_image_understanding_tool,
+)
 
 data_searcher_tools = [reverse_geocode_tool, geocode_tool, NTL_download_tool, 
          get_administrative_division_tool, poi_search_tool, get_administrative_division_osm_tool,
@@ -54,7 +59,13 @@ Engineer_tools = [
     noaa20_sdr_preprocess_tool, VNP46A2_angular_correction_tool, dmsp_evi_preprocess_tool,
     urban_extraction_by_thresholding_tool, svm_urban_extraction_tool, electrified_detection_tool, otsu_road_extraction_tool,detect_urban_centres_tool,
     NTL_Trend_Analysis, detect_ntl_anomaly_tool, NTL_composite_local_tool,
+    geodata_quick_check_tool,
     NTL_raster_statistics_tool,
     NTL_estimate_indicator_provincial_tool, DEI_estimate_city_tool,
-    SDGSAT1_index_tool, vnci_index_tool]
+    SDGSAT1_index_tool, vnci_index_tool,
+    save_geospatial_script_tool,
+    uploaded_file_understanding_tool,
+    uploaded_pdf_understanding_tool,
+    uploaded_image_understanding_tool,
+]
     

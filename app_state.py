@@ -1,5 +1,6 @@
-﻿import streamlit as st
-import uuid
+import streamlit as st
+
+import history_store
 from storage_manager import storage_manager
 
 MODEL_OPTIONS = ["qwen3.5-plus", "gpt-5-mini", "gpt-5.1"]
@@ -7,6 +8,32 @@ RECURSION_LIMIT = 51
 CHAT_CONTAINER_HEIGHT = 600
 ANALYSIS_CONTAINER_HEIGHT = 600
 LLM_REQUEST_TIMEOUT_S = 120
+
+
+def _new_thread_id_for_user(user_id: str) -> str:
+    return history_store.generate_thread_id(user_id)
+
+
+def _load_chat_history_for_thread(thread_id: str):
+    records = history_store.load_chat_records(thread_id, limit=400)
+    out = []
+    for row in records:
+        role = str(row.get("role", "")).strip()
+        content = str(row.get("content", "") or "")
+        if not role or not content.strip():
+            continue
+        out.append((role, content))
+    return out
+
+
+def set_active_thread(thread_id: str):
+    st.session_state.thread_id = str(thread_id)
+    st.session_state.user_workspace = storage_manager.get_workspace(st.session_state.thread_id)
+    st.session_state.chat_history = _load_chat_history_for_thread(st.session_state.thread_id)
+    st.session_state.analysis_logs = []
+    st.session_state.analysis_history = []
+    st.session_state.last_question = ""
+    st.session_state["runtime_recovered_notice"] = None
 
 
 def init_app():
@@ -20,10 +47,36 @@ def init_app():
     st.session_state.setdefault("chat_history", [])
     st.session_state.setdefault("run_counter", 0)
 
-    if "thread_id" not in st.session_state:
-        st.session_state.thread_id = str(uuid.uuid4())[:12]
+    user_identity_migrated = False
+    existing_user_id = str(st.session_state.get("user_id", "") or "").strip()
+    if not existing_user_id or history_store.is_reserved_user_id(existing_user_id):
+        st.session_state["user_id"] = history_store.generate_anonymous_user_id()
+        st.session_state["user_name"] = ""
+        user_identity_migrated = True
+    else:
+        st.session_state.setdefault("user_name", history_store.user_display_name(existing_user_id))
+        current_user_name = str(st.session_state.get("user_name", "") or "").strip()
+        if not current_user_name or history_store.is_reserved_user_name(current_user_name):
+            if str(existing_user_id).startswith("anon-"):
+                st.session_state["user_name"] = ""
+            else:
+                st.session_state["user_name"] = history_store.user_display_name(existing_user_id)
+
+    st.session_state.setdefault("injected_context_top_n", 4)
+    st.session_state.setdefault("injected_context_max_chars", 6000)
+
+    if "thread_id" not in st.session_state or user_identity_migrated:
+        st.session_state.thread_id = _new_thread_id_for_user(st.session_state["user_id"])
+        st.session_state["chat_history"] = []
 
     st.session_state.user_workspace = storage_manager.get_workspace(st.session_state.thread_id)
+    history_store.ensure_user_profile(
+        st.session_state["user_id"], st.session_state.get("user_name", "")
+    )
+    history_store.bind_thread_to_user(st.session_state["user_id"], st.session_state.thread_id)
+    if not st.session_state.get("chat_history"):
+        st.session_state.chat_history = _load_chat_history_for_thread(st.session_state.thread_id)
+
     st.session_state.setdefault("analysis_logs", [])
     st.session_state.setdefault("analysis_history", [])
     st.session_state.setdefault("last_question", "")

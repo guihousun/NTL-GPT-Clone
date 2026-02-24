@@ -46,7 +46,6 @@ def build_ntl_graph(
         tools=Code_tools,
         system_prompt=Code_Assistant_system_prompt_text,
         name="Code_Assistant",
-        middleware=error_interceptor,
     )
 
     data_searcher = create_agent(
@@ -54,15 +53,16 @@ def build_ntl_graph(
         tools=data_searcher_tools,
         system_prompt=system_prompt_data_searcher,
         name="Data_Searcher",
-        middleware=error_interceptor,
     )
 
     workflow = create_supervisor(
         model=llm,
         agents=[data_searcher, code_assistant],
         prompt=system_prompt_text,
-        add_handoff_back_messages=True,
-        output_mode="full_history",
+        # Keep handoff-back synthetic messages off to avoid duplicated
+        # transfer_back traces and noisy ParentCommand "errors" in observability.
+        add_handoff_back_messages=False,
+        output_mode="last_message",
         tools=list(Engineer_tools),
         supervisor_name="NTL_Engineer",
     )

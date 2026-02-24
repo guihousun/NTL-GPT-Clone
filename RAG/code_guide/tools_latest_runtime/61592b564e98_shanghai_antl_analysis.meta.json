@@ -1,0 +1,9 @@
+{
+  "timestamp_utc": "20260219T045132Z",
+  "source_tool": "execute_geospatial_script_tool",
+  "thread_id": "3e8b6238-a82",
+  "original_script_name": "shanghai_antl_analysis.py",
+  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\3e8b6238-a82\\outputs\\shanghai_antl_analysis.py",
+  "content_hash": "61592b564e98eb64a74b594a8c559a5992529dec0437cb782b973fb5dde926af",
+  "stdout_excerpt": "[StorageManager] Resolving 'ntl_shanghai_2022.tif' for thread_id='3e8b6238-a82'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\3e8b6238-a82\\inputs\\ntl_shanghai_2022.tif\n[StorageManager] Resolving 'shanghai_districts_boundary.shp' for thread_id='3e8b6238-a82'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\3e8b6238-a82\\inputs\\shanghai_districts_boundary.shp\nDistrict with highest ANTL: 黄浦区 (ANTL: 58.8270)\n\nAll districts ANTL:\n   District       ANTL\n0       黄浦区  58.827023\n2       长宁区  56.861679\n3       静安区  44.787735\n4       普陀区  42.246952\n1       徐汇区  40.377274\n5       虹口区  39.433514\n6       杨浦区  35.761719\n7       闵行区  31.505610\n10     浦东新区  26.715105\n8       宝山区  25.845835\n9       嘉定区  21.812593\n12      松江区  16.809954\n13      青浦区  14.502026\n14      奉贤区  12.441219\n11      金山区  10.185000\n15      崇明区   4.783783\n\nResults saved to: E:\\NTL-GPT-Clone\\user_data\\3e8b6238-a82\\outputs\\shanghai_district_antl_2022.csv\n"
+}

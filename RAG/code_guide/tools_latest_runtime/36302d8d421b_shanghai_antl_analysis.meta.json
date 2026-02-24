@@ -1,0 +1,9 @@
+{
+  "timestamp_utc": "20260219T055212Z",
+  "source_tool": "execute_geospatial_script_tool",
+  "thread_id": "f9f6f020",
+  "original_script_name": "shanghai_antl_analysis.py",
+  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\f9f6f020\\outputs\\shanghai_antl_analysis.py",
+  "content_hash": "36302d8d421bd1fe1569793fea4ed56bd1087659f7e570f41af440e2ec676a82",
+  "stdout_excerpt": "[StorageManager] Resolving 'shanghai_ntl_2022.tif' for thread_id='debug'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\debug\\inputs\\shanghai_ntl_2022.tif\n[StorageManager] Resolving 'shanghai_boundary.shp' for thread_id='debug'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\debug\\inputs\\shanghai_boundary.shp\nLoaded 16 districts from boundary file\nDistrict names: ['黄浦区', '徐汇区', '长宁区', '静安区', '普陀区', '虹口区', '杨浦区', '闵行区', '宝山区', '嘉定区', '浦东新区', '金山区', '松江区', '青浦区', '奉贤区', '崇明区']\nNTL raster CRS: EPSG:4326, nodata: None\nDistrict: 黄浦区, ANTL: 32.0242\nDistrict: 徐汇区, ANTL: 18.2419\nDistrict: 长宁区, ANTL: 25.7773\nDistrict: 静安区, ANTL: 20.3038\nDistrict: 普陀区, ANTL: 19.2296\nDistrict: 虹口区, ANTL: 18.3913\nDistrict: 杨浦区, ANTL: 21.0683\nDistrict: 闵行区, ANTL: 10.9887\nDistrict: 宝山区, ANTL: 12.2442\nDistrict: 嘉定区, ANTL: 12.3943\nDistrict: 浦东新区, ANTL: 8.5713\nDistrict: 金山区, ANTL: 4.2717\nDistrict: 松江区, ANTL: 9.8962\nDistrict: 青浦区, ANTL: 4.9171\nDistrict: 奉贤区, ANTL: 6.3600\nDistrict: 崇明区, ANTL: 0.7522\n\n============================================================\nDistrict with highest ANTL in Shanghai (2022): 黄浦区\nANTL Value: 32.0242 nW·cm⁻²·sr⁻¹\n============================================================\n\nResults saved to: E:\\NTL-GPT-Clone\\user_data\\debug\\outputs\\shanghai_district_antl_2022.csv\n\nTop 5 Districts by ANTL:\nDistrict      ANTL\n     黄浦区 32.024170\n     长宁区 25.777294\n     杨浦区 21.068317\n     静安区 20.303774\n     普陀区 19.229647\n"
+}
