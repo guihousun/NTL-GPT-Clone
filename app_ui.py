@@ -60,15 +60,23 @@ def _tr(zh: str, en: str) -> str:
     return en if _is_en() else zh
 
 
+APP_ROOT = Path(__file__).resolve().parent
+
+
+def _project_path(*parts: str) -> Path:
+    return APP_ROOT.joinpath(*parts)
+
+
 MONITOR_UI_URL = "http://127.0.0.1:8765/"
 MONITOR_API_URL = "http://127.0.0.1:8765/api/latest"
 _NTL_AVAIL_SNAPSHOT_KEY = "ntl_data_availability_snapshot_v1"
-_NTL_SCAN_SCRIPT_PATH = Path("experiments/official_daily_ntl_fastpath/scan_ntl_availability.py")
-_NTL_SCAN_OUTPUT_DIR = Path("experiments/official_daily_ntl_fastpath/workspace_monitor/outputs")
+_NTL_SCAN_SCRIPT_PATH = _project_path("experiments", "official_daily_ntl_fastpath", "scan_ntl_availability.py")
+_NTL_SCAN_OUTPUT_DIR = _project_path("experiments", "official_daily_ntl_fastpath", "workspace_monitor", "outputs")
 _NTL_SCAN_TIMEOUT_SECONDS = 160
 _NTL_SCAN_REFRESH_SECONDS = 3600
 _NTL_SCAN_LOCK_FILE = _NTL_SCAN_OUTPUT_DIR / ".ntl_availability_refresh.lock"
 _NTL_SCAN_LOCK_STALE_SECONDS = max(_NTL_SCAN_TIMEOUT_SECONDS * 2, 600)
+_TEST_CASE_FILES = [_project_path("example", "test_cases_mini.xlsx")]
 
 
 def _normalize_availability_rows(payload: dict) -> list[dict]:
@@ -376,11 +384,11 @@ def _render_data_availability_block() -> None:
 def _get_nasa_bg_data_uri() -> str:
     if "nasa_bg_data_uri" in st.session_state:
         return st.session_state["nasa_bg_data_uri"]
-    img_path = os.path.join("assets", "nasa_black_marble.jpg")
-    if not os.path.exists(img_path):
+    img_path = _project_path("assets", "nasa_black_marble.jpg")
+    if not img_path.exists():
         st.session_state["nasa_bg_data_uri"] = ""
         return ""
-    with open(img_path, "rb") as f:
+    with img_path.open("rb") as f:
         encoded = base64.b64encode(f.read()).decode("ascii")
     uri = f"data:image/jpeg;base64,{encoded}"
     st.session_state["nasa_bg_data_uri"] = uri
@@ -1949,7 +1957,7 @@ def render_sidebar():
 
         with st.expander(_tr("测试用例", "Test Cases"), expanded=False):
             try:
-                case_files = [Path("./example/test_cases_mini.xlsx")]
+                case_files = list(_TEST_CASE_FILES)
                 loaded_names = []
                 frames = []
                 for fp in case_files:
@@ -1958,7 +1966,8 @@ def render_sidebar():
                         loaded_names.append(fp.name)
 
                 if not frames:
-                    raise FileNotFoundError("No test case file found. Expected test_cases.xlsx or test_cases_extended_50.xlsx")
+                    expected = ", ".join(str(p) for p in case_files)
+                    raise FileNotFoundError(f"No test case file found. Expected one of: {expected}")
 
                 df_cases = pd.concat(frames, ignore_index=True)
                 df_cases = df_cases.dropna(subset=['Case'])
@@ -2661,8 +2670,8 @@ def _kb_phase_specs() -> list[tuple[str, str, str]]:
         ),
         (
             "workflow_assembly",
-            _tr("工作流组装", "Workflow Assembly"),
-            _tr("正在组装工作流步骤", "Assembling workflow steps"),
+            _tr("LLM 响应", "LLM Response"),
+            _tr("LLM 正在生成响应", "LLM is generating response"),
         ),
         (
             "structured_output",
@@ -2960,6 +2969,23 @@ def render_reasoning_map(events, interactive: bool = True, show_sub_steps: bool 
     components.html(html, height=graph_height + 8, scrolling=False)
 
 
+def _render_code_assistant_message(raw_content: str) -> None:
+    """Render Code_Assistant message by content shape (JSON vs non-JSON)."""
+    if isinstance(raw_content, (dict, list)):
+        st.json(_sanitize_paths_in_obj(raw_content))
+        return
+
+    raw_text = raw_content if isinstance(raw_content, str) else str(raw_content)
+    parsed, rest = _extract_json(raw_text)
+    if isinstance(parsed, (dict, list)):
+        if isinstance(rest, str) and rest.strip():
+            st.write(_sanitize_paths_in_text(rest))
+        st.json(_sanitize_paths_in_obj(parsed))
+        return
+
+    st.code(raw_text, language="python")
+
+
 def render_reasoning_content(events):
     """Render one-round reasoning in a single panel (no Step 1/2/3)."""
     grouped = _build_reasoning_sections(events)
@@ -3000,7 +3026,7 @@ def render_reasoning_content(events):
                 if agent_name.lower() == "data_searcher":
                     render_data_searcher_output(msg_content)
                 elif agent_name.lower() == "code_assistant":
-                    st.code(msg_content, language="python")
+                    _render_code_assistant_message(msg_content)
                 else:
                     st.markdown(
                         f"<div style='margin-left:15px;font-size:16px;'>{msg_content}</div>",
@@ -3323,7 +3349,7 @@ def render_content_layout():
                 _tr("推理过程", "Reasoning"),
                 _tr("推理图谱", "Reasoning Graph"),
                 _tr("地图视图", "Map View"),
-                _tr("结果预览", "Outputs"),
+                _tr("结果预览", "Result Preview"),
             ])
 
             reasoning_placeholder = None

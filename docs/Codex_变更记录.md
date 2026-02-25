@@ -4734,3 +4734,81 @@ conda run -n NTL-GPT python -m py_compile app_logic.py tests/test_app_logic_nest
   - Result: `exit 0`
 - `rg -n "ntl-sidebar-divider-tight" app_ui.py`
   - Result: style class and usage lines found
+
+## [2026-02-25] v2026.02.25.1 ECS-Path-Hardening-AppUI
+### Scope
+- Fixed ECS clone runtime failures caused by cwd-dependent relative paths in `app_ui.py`.
+- Covered three affected features only:
+  - background image loading,
+  - NTL availability scan script discovery,
+  - sidebar test case file loading.
+
+### Files
+- `app_ui.py`
+- `tests/test_app_ui_path_resolution.py`
+
+### Changes
+- Added project-root path helpers in `app_ui.py`:
+  - `APP_ROOT = Path(__file__).resolve().parent`
+  - `_project_path(*parts)`
+- Replaced relative scan paths with absolute project-root paths:
+  - `_NTL_SCAN_SCRIPT_PATH`
+  - `_NTL_SCAN_OUTPUT_DIR`
+- Replaced background image path resolution in `_get_nasa_bg_data_uri()`:
+  - from `os.path.join("assets", "nasa_black_marble.jpg")`
+  - to `_project_path("assets", "nasa_black_marble.jpg")` and `Path.open("rb")`.
+- Added `_TEST_CASE_FILES` constant and switched sidebar case loading to use it.
+- Corrected missing-file message to report actual expected file list instead of stale legacy names.
+
+### Verification
+- `python -m py_compile app_ui.py tests/test_app_ui_path_resolution.py`
+  - Result: `exit 0`
+- `conda run -n NTL-GPT python -m pytest -q tests/test_app_ui_path_resolution.py tests/test_ui_ntl_availability_snapshot.py`
+  - Result: `10 passed`
+
+## [2026-02-25] v2026.02.25.2 CodeAssistant-ShapeBased-JSON-Render
+### Scope
+- Upgraded Reasoning-panel rendering for `Code_Assistant` AI messages to be shape-based (JSON vs non-JSON) without schema-specific field matching.
+- Kept existing rendering behavior for `Data_Searcher`, `NTL_Engineer`, and tool expanders unchanged.
+
+### Files
+- `app_ui.py`
+- `tests/test_code_assistant_json_render_contract.py`
+
+### Changes
+- Added helper:
+  - `_render_code_assistant_message(raw_content: str) -> None`
+- Helper behavior:
+  - Uses existing `_extract_json(...)` to detect JSON object/array in message content.
+  - For JSON payloads:
+    - renders non-empty residual text first (`st.write(...)`)
+    - renders structured payload via `st.json(...)`
+  - For non-JSON payloads:
+    - falls back to `st.code(..., language="python")`
+- Updated `render_reasoning_content(...)`:
+  - Replaced direct `st.code(...)` in Code_Assistant branch with helper call.
+
+### Verification
+- `python -m py_compile app_ui.py tests/test_code_assistant_json_render_contract.py`
+  - Result: `exit 0`
+- `conda run -n NTL-GPT python -m pytest -q tests/test_code_assistant_json_render_contract.py tests/test_reasoning_ai_render_contract.py`
+  - Result: `5 passed`
+
+## [2026-02-25] v2026.02.25.1 CodeAssistant-Boundary-Escalation-Wording
+### Scope
+- Updated Code Assistant guardrail wording to escalate boundary verification through `NTL_Engineer` instead of directly requesting `Data_Searcher`.
+
+### Files
+- `tools/NTL_Code_generation.py`
+
+### Changes
+- Preflight AOI boundary warning text now says:
+  - use `NTL_Engineer`-confirmed boundary asset (upstream retrieval), or user-confirmed AOI marker.
+- Boundary-related fix suggestion now says:
+  - escalate to `NTL_Engineer` for verified administrative boundary (`source`, `CRS`, `bounds`).
+
+### Verification
+- `conda run -n NTL-GPT python -m py_compile tools/NTL_Code_generation.py`
+  - Result: `exit 0`
+- `rg -n "Data_Searcher-confirmed|Request Data_Searcher|NTL_Engineer-confirmed|Escalate to NTL_Engineer" tools/NTL_Code_generation.py`
+  - Result: no direct `Data_Searcher` request wording remains in these guardrail messages.

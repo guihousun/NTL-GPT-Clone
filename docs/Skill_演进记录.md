@@ -596,3 +596,34 @@
 ### Outcome
 - Screenshot paste (`Ctrl+V`) and inline file sending are now unified with text entry.
 - Files continue to land in per-thread `inputs/`, preserving existing downstream tool contracts.
+
+
+## [2026-02-25] Process Update: UI Runtime Paths Hardened Against Non-Root Startup
+### Process Change
+- Standardized `app_ui.py` runtime resource discovery to project-root absolute paths (`APP_ROOT + _project_path`) instead of cwd-relative lookups.
+- Applied to three runtime-critical resources:
+  - sidebar NTL availability scan script path,
+  - background image asset path,
+  - sidebar test case file path list.
+- Added dedicated regression tests for both target and non-target startup contexts:
+  - non-repo cwd startup,
+  - repo-root startup.
+
+### Outcome
+- ECS/service startup is robust even when process cwd is not repository root.
+- Eliminates false "script/file not found" errors for NTL Data Availability and Test Cases modules.
+- Prevents background loss due to relative asset resolution drift.
+
+
+## [2026-02-25] Process Update: Code_Assistant Reasoning Render Uses Content Shape
+### Process Change
+- Replaced Code_Assistant message rendering from fixed Python code block to shape-based rendering:
+  - JSON object/array -> structured `st.json`
+  - mixed text + JSON -> text then JSON
+  - non-JSON -> Python code block fallback
+- Parsing relies on existing `_extract_json` and does not inspect schema-specific fields.
+
+### Outcome
+- Improves readability for successful Code_Assistant JSON outputs without coupling UI to internal keys.
+- Maintains backward compatibility for non-JSON code responses.
+- Preserves Data_Searcher / NTL_Engineer and tool-output rendering paths.
