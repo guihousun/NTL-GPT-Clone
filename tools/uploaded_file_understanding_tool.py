@@ -24,7 +24,11 @@ class UploadedFileUnderstandingInput(BaseModel):
     query: str = Field(..., description="User question about uploaded PDF/images.")
     file_names: Optional[str] = Field(
         default=None,
-        description="Optional comma-separated filenames in inputs/. Example: a.pdf,b.png",
+        description="Optional comma-separated filenames in inputs/ or outputs/. Example: a.pdf,b.png",
+    )
+    workspace_lookup: str = Field(
+        default="auto",
+        description="File lookup scope: auto|inputs|outputs. auto prefers inputs then outputs.",
     )
     top_n: int = Field(default=4, ge=1, le=8, description="Top-N snippets returned.")
 
@@ -33,7 +37,11 @@ class UploadedPdfUnderstandingInput(BaseModel):
     query: str = Field(..., description="Question about uploaded PDF files.")
     file_names: Optional[str] = Field(
         default=None,
-        description="Optional comma-separated PDF filenames in inputs/. Example: a.pdf,b.pdf",
+        description="Optional comma-separated PDF filenames in inputs/ or outputs/. Example: a.pdf,b.pdf",
+    )
+    workspace_lookup: str = Field(
+        default="auto",
+        description="File lookup scope: auto|inputs|outputs. auto prefers inputs then outputs.",
     )
     top_n: int = Field(default=4, ge=1, le=8, description="Top-N snippets returned.")
 
@@ -42,7 +50,11 @@ class UploadedImageUnderstandingInput(BaseModel):
     query: str = Field(..., description="Question about uploaded image files.")
     file_names: Optional[str] = Field(
         default=None,
-        description="Optional comma-separated image filenames in inputs/. Example: a.png,b.jpg",
+        description="Optional comma-separated image filenames in inputs/ or outputs/. Example: a.png,b.jpg",
+    )
+    workspace_lookup: str = Field(
+        default="auto",
+        description="File lookup scope: auto|inputs|outputs. auto prefers inputs then outputs.",
     )
     top_n: int = Field(default=4, ge=1, le=8, description="Top-N snippets returned.")
 
@@ -123,16 +135,35 @@ def _pick_default_files(
     query: str,
     allowed_exts: Optional[set[str]] = None,
     desired_count: int = 1,
+    workspace_lookup: str = "auto",
 ) -> list[str]:
     workspace = storage_manager.get_workspace(thread_id)
-    input_dir = workspace / "inputs"
-    if not input_dir.exists():
-        return []
-    all_files = sorted(
-        [p for p in input_dir.glob("*.*") if p.suffix.lower() in file_context_service.SUPPORTED_EXTS],
-        key=lambda p: p.stat().st_mtime,
-        reverse=True,
-    )
+    lookup = str(workspace_lookup or "auto").strip().lower()
+    if lookup == "outputs":
+        candidate_dirs = [workspace / "outputs", workspace / "inputs"]
+    elif lookup == "inputs":
+        candidate_dirs = [workspace / "inputs", workspace / "outputs"]
+    else:
+        candidate_dirs = [workspace / "inputs", workspace / "outputs"]
+
+    ranked_files = []
+    for pref_idx, d in enumerate(candidate_dirs):
+        if not d.exists():
+            continue
+        for p in d.glob("*.*"):
+            if p.suffix.lower() in file_context_service.SUPPORTED_EXTS:
+                ranked_files.append((pref_idx, -p.stat().st_mtime, p))
+
+    # Keep deterministic order: preferred directory first, then latest mtime.
+    ranked_files.sort(key=lambda x: (x[0], x[1], x[2].name.lower()))
+    all_files = []
+    seen_names = set()
+    for _, __, p in ranked_files:
+        k = p.name.lower()
+        if k in seen_names:
+            continue
+        seen_names.add(k)
+        all_files.append(p)
     if allowed_exts:
         all_files = [p for p in all_files if p.suffix.lower() in allowed_exts]
     if not all_files:
@@ -156,7 +187,13 @@ def _pick_default_files(
     return [p.name for p in all_files[: max(1, int(desired_count))]]
 
 
-def _run_understanding(query: str, file_names: Optional[str], top_n: int, allowed_exts: Optional[set[str]]) -> dict:
+def _run_understanding(
+    query: str,
+    file_names: Optional[str],
+    top_n: int,
+    allowed_exts: Optional[set[str]],
+    workspace_lookup: str = "auto",
+) -> dict:
     """
     Understand uploaded PDF/images in current thread workspace and return relevant snippets.
     Also upserts extracted context into thread-level context store for subsequent QA turns.
@@ -173,12 +210,13 @@ def _run_understanding(query: str, file_names: Optional[str], top_n: int, allowe
         query,
         allowed_exts=allowed_exts,
         desired_count=desired_count,
+        workspace_lookup=workspace_lookup,
     )
     if not targets:
         return {
             "status": "no_input_files",
             "thread_id": thread_id,
-            "message": "No supported files found in inputs/ for current thread.",
+            "message": "No supported files found in inputs/ or outputs/ for current thread.",
             "targets": [],
             "snippets": [],
         }
@@ -189,6 +227,7 @@ def _run_understanding(query: str, file_names: Optional[str], top_n: int, allowe
         max_pages=120,
         vlm_model_name="qwen3.5-plus",
         vlm_timeout_s=90,
+        workspace_lookup=workspace_lookup,
     )
     items = result.get("items", []) or []
     merge_stats = {"inserted": 0, "updated": 0, "total": 0}
@@ -234,20 +273,48 @@ def _run_understanding(query: str, file_names: Optional[str], top_n: int, allowe
     }
 
 
-def uploaded_file_understanding_tool_fn(query: str, file_names: Optional[str] = None, top_n: int = 4) -> dict:
-    return _run_understanding(query=query, file_names=file_names, top_n=top_n, allowed_exts=None)
+def uploaded_file_understanding_tool_fn(
+    query: str,
+    file_names: Optional[str] = None,
+    workspace_lookup: str = "auto",
+    top_n: int = 4,
+) -> dict:
+    return _run_understanding(
+        query=query,
+        file_names=file_names,
+        top_n=top_n,
+        allowed_exts=None,
+        workspace_lookup=workspace_lookup,
+    )
 
 
-def uploaded_pdf_understanding_tool_fn(query: str, file_names: Optional[str] = None, top_n: int = 4) -> dict:
-    return _run_understanding(query=query, file_names=file_names, top_n=top_n, allowed_exts={".pdf"})
+def uploaded_pdf_understanding_tool_fn(
+    query: str,
+    file_names: Optional[str] = None,
+    workspace_lookup: str = "auto",
+    top_n: int = 4,
+) -> dict:
+    return _run_understanding(
+        query=query,
+        file_names=file_names,
+        top_n=top_n,
+        allowed_exts={".pdf"},
+        workspace_lookup=workspace_lookup,
+    )
 
 
-def uploaded_image_understanding_tool_fn(query: str, file_names: Optional[str] = None, top_n: int = 4) -> dict:
+def uploaded_image_understanding_tool_fn(
+    query: str,
+    file_names: Optional[str] = None,
+    workspace_lookup: str = "auto",
+    top_n: int = 4,
+) -> dict:
     return _run_understanding(
         query=query,
         file_names=file_names,
         top_n=top_n,
         allowed_exts=_IMAGE_UNDERSTANDING_EXTS,
+        workspace_lookup=workspace_lookup,
     )
 
 
@@ -255,7 +322,7 @@ uploaded_file_understanding_tool = StructuredTool.from_function(
     func=uploaded_file_understanding_tool_fn,
     name="uploaded_file_understanding_tool",
     description=(
-        "Read and understand uploaded PDF/images in current inputs/ workspace, "
+        "Read and understand uploaded PDF/images in current workspace (inputs/outputs), "
         "inject context, and return relevant snippets for current query."
     ),
     args_schema=UploadedFileUnderstandingInput,
@@ -266,7 +333,7 @@ uploaded_pdf_understanding_tool = StructuredTool.from_function(
     func=uploaded_pdf_understanding_tool_fn,
     name="uploaded_pdf_understanding_tool",
     description=(
-        "Understand uploaded PDF files in current inputs/ workspace, inject context, "
+        "Understand uploaded PDF files in current workspace (inputs/outputs), inject context, "
         "and return relevant snippets for current query. "
         "Use when user asks to summarize/read/extract information from uploaded PDF(s)."
     ),
@@ -278,7 +345,7 @@ uploaded_image_understanding_tool = StructuredTool.from_function(
     func=uploaded_image_understanding_tool_fn,
     name="uploaded_image_understanding_tool",
     description=(
-        "Understand uploaded image files in current inputs/ workspace with VLM, inject context, "
+        "Understand uploaded image files in current workspace (inputs/outputs) with VLM, inject context, "
         "and return relevant snippets for current query. "
         "Use when user asks to describe/explain an uploaded image/photo/screenshot."
     ),

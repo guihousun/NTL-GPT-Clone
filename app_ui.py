@@ -1,12 +1,16 @@
-import os
+﻿import os
 import re
 import json
+import hashlib
+import ast
 import html
+import io
 import zipfile
 import base64
 import textwrap
 import uuid
 import socket
+import time
 from pathlib import Path
 from typing import Optional
 from datetime import UTC, datetime, timedelta
@@ -15,7 +19,7 @@ from urllib.error import URLError
 import subprocess
 import sys
 
-# --- 1. 鐜閰嶇疆 ---
+# --- 1. 閻滈柊宥囩枂 ---
 if 'CONDA_PREFIX' in os.environ:
     proj_path = os.path.join(os.environ['CONDA_PREFIX'], 'Library', 'share', 'proj')
     if os.path.exists(proj_path):
@@ -27,7 +31,7 @@ if 'CONDA_PREFIX' in os.environ:
         except:
             pass
 
-# --- 2. 绗笁鏂瑰簱瀵煎叆 ---
+# --- 2. 第三方依赖 ---
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
@@ -40,11 +44,12 @@ from PIL import Image
 from matplotlib import cm
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 
-# --- 3. 鏈湴妯″潡瀵煎叆 ---
+# --- 3. 项目内部依赖 ---
 import app_state 
 import app_logic
 import history_store
 from storage_manager import storage_manager
+from map_view_policy import build_layer_signature, advance_map_view_state
 
 try:
     from st_chat_input_multimodal import multimodal_chat_input
@@ -56,8 +61,23 @@ def _is_en() -> bool:
     return st.session_state.get("ui_lang", "EN") == "EN"
 
 
+_MOJIBAKE_TOKENS = ("锛", "銆", "鈥", "鈩", "鍙", "鎺", "鏆", "璇", "宸", "妯", "闈", "绗")
+
+
+def _looks_mojibake(text: str) -> bool:
+    s = str(text or "")
+    if not s:
+        return False
+    if "\ufffd" in s:
+        return True
+    hits = sum(1 for token in _MOJIBAKE_TOKENS if token in s)
+    return hits >= 2 and any(ord(ch) > 127 for ch in s)
+
+
 def _tr(zh: str, en: str) -> str:
-    return en if _is_en() else zh
+    if _is_en():
+        return en
+    return en if _looks_mojibake(zh) else zh
 
 
 APP_ROOT = Path(__file__).resolve().parent
@@ -67,8 +87,26 @@ def _project_path(*parts: str) -> Path:
     return APP_ROOT.joinpath(*parts)
 
 
-MONITOR_UI_URL = "http://127.0.0.1:8765/"
-MONITOR_API_URL = "http://127.0.0.1:8765/api/latest"
+def _normalize_monitor_base_url(raw: Optional[str], default: str) -> str:
+    value = (raw or "").strip() or default
+    if not re.match(r"^https?://", value, re.IGNORECASE):
+        value = f"http://{value}"
+    if not value.endswith("/"):
+        value = f"{value}/"
+    return value
+
+
+MONITOR_UI_URL = _normalize_monitor_base_url(
+    os.getenv("NTL_MONITOR_PUBLIC_URL"),
+    "http://139.9.165.59:8765",
+)
+_MONITOR_API_URL_OVERRIDE = (os.getenv("NTL_MONITOR_API_URL") or "").strip()
+if _MONITOR_API_URL_OVERRIDE:
+    MONITOR_API_URL = _MONITOR_API_URL_OVERRIDE
+elif ("127.0.0.1" in MONITOR_UI_URL) or ("localhost" in MONITOR_UI_URL):
+    MONITOR_API_URL = "http://127.0.0.1:8765/api/latest"
+else:
+    MONITOR_API_URL = f"{MONITOR_UI_URL}api/latest"
 _NTL_AVAIL_SNAPSHOT_KEY = "ntl_data_availability_snapshot_v1"
 _NTL_SCAN_SCRIPT_PATH = _project_path("experiments", "official_daily_ntl_fastpath", "scan_ntl_availability.py")
 _NTL_SCAN_OUTPUT_DIR = _project_path("experiments", "official_daily_ntl_fastpath", "workspace_monitor", "outputs")
@@ -317,7 +355,7 @@ def _render_monitor_jump_button(label: str) -> None:
     )
 
 def _render_data_availability_block() -> None:
-    """Render NTL availability snapshot with the same row contract as monitor table."""
+    """Render NTL data availability table from local cached scan, with shared refresh."""
     if _NTL_AVAIL_SNAPSHOT_KEY not in st.session_state:
         first_hit = _find_latest_scan_json()
         if first_hit is not None and _is_scan_fresh(first_hit):
@@ -334,43 +372,38 @@ def _render_data_availability_block() -> None:
             df = pd.DataFrame(rows).rename(
                 columns={
                     "source": "Source",
-                    "latest_global_date": "Global Latest",
-                    "range_start": "Available Start",
+                    "latest_global_date": "Latest",
+                    "range_start": "Start",
                 }
             )
             if not df.empty and "Source" in df.columns:
-                df = df.set_index("Source")[["Available Start", "Global Latest"]]
+                df = df.set_index("Source")[["Start", "Latest"]]
             st.caption(f"Snapshot: {snapshot.get('generated_at_utc') or '-'}")
             jump_label = "Open NTL Data Monitor"
         else:
             df = pd.DataFrame(rows).rename(
                 columns={
-                    "source": "Source",
-                    "latest_global_date": "全局最新",
-                    "range_start": "可用起始",
+                    "source": "数据源",
+                    "latest_global_date": "Latest",
+                    "range_start": "Start",
                 }
             )
-            if not df.empty and "Source" in df.columns:
-                df = df.set_index("Source")[["可用起始", "全局最新"]]
+            if not df.empty and "数据源" in df.columns:
+                df = df.set_index("数据源")[["Start", "Latest"]]
             st.caption(f"快照时间: {snapshot.get('generated_at_utc') or '-'} | 来源={snapshot.get('snapshot_source') or '-'}")
             if snapshot.get("start_date") or snapshot.get("end_date"):
                 st.caption(f"查询窗口: {snapshot.get('start_date') or '-'} -> {snapshot.get('end_date') or '-'}")
             jump_label = "打开夜光遥感数据监控界面"
 
         st.dataframe(df, use_container_width=True, hide_index=False, height=260)
-        if snapshot.get("error"):
-            st.caption(_tr(f"本地扫描告警：{snapshot.get('error')}", f"Local scan warning: {snapshot.get('error')}"))
-        _render_monitor_jump_button(jump_label)
+        # if snapshot.get("error"):
+        #     st.caption(_tr(f"本地扫描告警：{snapshot.get('error')}", f"Local scan warning: {snapshot.get('error')}"))
+        # _render_monitor_jump_button(jump_label)
         return
 
     msg = snapshot.get("error") or "unknown"
     if snapshot.get("state") == "waiting":
-        st.info(
-            _tr(
-                "正在等待数据服务响应，请稍后重试。",
-                "Waiting for data service to respond. Please retry shortly.",
-            )
-        )
+        st.info(_tr("正在等待数据服务响应，请稍后重试。", "Waiting for data service to respond. Please retry shortly."))
         st.caption(_tr(f"等待原因：{msg}", f"Wait reason: {msg}"))
     else:
         st.warning(_tr(f"未能读取 Monitor 快照：{msg}", f"Failed to load monitor snapshot: {msg}"))
@@ -395,7 +428,7 @@ def _get_nasa_bg_data_uri() -> str:
     return uri
 
 # ==============================================================================
-# SECTION A: 甯搁噺涓?HTML 妯℃澘
+# SECTION A: Core HTML Templates
 # ==============================================================================
 
 BOT_TEMPLATE = """
@@ -413,7 +446,7 @@ USER_TEMPLATE = """
 """
 
 # ==============================================================================
-# SECTION B: 鏍峰紡 (CSS) 涓?鑴氭湰 (JS) 娉ㄥ叆
+# SECTION B: 样式 (CSS) 与脚本 (JS)
 # ==============================================================================
 
 def inject_css():
@@ -813,6 +846,25 @@ def inject_css():
     [data-testid="stSidebar"] .st-key-reset_btn button span {
         color: #dce8ff !important;
     }
+    [data-testid="stSidebar"] .st-key-delete_selected_thread_inline_trigger button,
+    [data-testid="stSidebar"] .stElementContainer.st-key-delete_selected_thread_inline_trigger [data-testid="stBaseButton-secondary"] {
+        border: 1px solid rgba(255, 125, 125, 0.58) !important;
+        background: linear-gradient(180deg, rgba(67, 20, 26, 0.88), rgba(45, 16, 24, 0.90)) !important;
+        color: #ffd6d6 !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 6px 16px rgba(32, 6, 8, 0.30) !important;
+        font-weight: 700 !important;
+    }
+    [data-testid="stSidebar"] .st-key-delete_selected_thread_inline_trigger button span,
+    [data-testid="stSidebar"] .stElementContainer.st-key-delete_selected_thread_inline_trigger [data-testid="stBaseButton-secondary"] p,
+    [data-testid="stSidebar"] .stElementContainer.st-key-delete_selected_thread_inline_trigger [data-testid="stBaseButton-secondary"] span {
+        color: #ffd6d6 !important;
+        -webkit-text-fill-color: #ffd6d6 !important;
+    }
+    [data-testid="stSidebar"] .st-key-delete_selected_thread_inline_trigger button:hover,
+    [data-testid="stSidebar"] .stElementContainer.st-key-delete_selected_thread_inline_trigger [data-testid="stBaseButton-secondary"]:hover {
+        border-color: rgba(255, 156, 156, 0.78) !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 10px 18px rgba(32, 6, 8, 0.36) !important;
+    }
     [data-testid="stSidebar"] .st-key-interrupt_current_run_btn button {
         border: 1px solid rgba(255, 125, 125, 0.60) !important;
         background: linear-gradient(180deg, rgba(67, 20, 26, 0.88), rgba(45, 16, 24, 0.90)) !important;
@@ -1010,7 +1062,9 @@ def scroll_to_bottom():
             var blocks = Array.from(doc.querySelectorAll('div[data-testid="stVerticalBlock"][overflow="auto"]'));
             blocks = blocks.filter(function(el) {{
                 var r = el.getBoundingClientRect();
-                return r && r.width > 280 && r.height > 200;
+                if (!r || r.width <= 280 || r.height <= 200) return false;
+                if (el.closest('section[data-testid="stSidebar"]')) return false;
+                return true;
             }});
             blocks.sort(function(a, b) {{
                 return a.getBoundingClientRect().left - b.getBoundingClientRect().left;
@@ -1064,6 +1118,45 @@ def scroll_to_bottom():
                     frame.style.setProperty('min-height', '62px', 'important');
                     var idoc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
                     if (!idoc) return;
+                    if (!idoc.getElementById('__ntl_mm_style')) {{
+                        var st = idoc.createElement('style');
+                        st.id = '__ntl_mm_style';
+                        st.textContent = `
+                            html, body, #root {{
+                                background: transparent !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                            }}
+                            #root > div {{
+                                background: transparent !important;
+                                padding: 0 !important;
+                            }}
+                            #root > div > div {{
+                                background-color: rgba(15, 24, 48, 0.86) !important;
+                                border: 1.2px solid rgba(149, 176, 255, 0.40) !important;
+                                border-radius: 999px !important;
+                                box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06) !important;
+                                min-height: 56px !important;
+                            }}
+                            input, textarea {{
+                                color: #e8edf8 !important;
+                            }}
+                            textarea {{
+                                background: transparent !important;
+                                border: none !important;
+                                outline: none !important;
+                            }}
+                            textarea::placeholder {{
+                                color: rgba(226, 236, 255, 0.58) !important;
+                            }}
+                            button {{
+                                color: #b7cbff !important;
+                                background: transparent !important;
+                                border-radius: 999px !important;
+                            }}
+                        `;
+                        idoc.head.appendChild(st);
+                    }}
                     var root = idoc.documentElement;
                     var body = idoc.body;
                     var h = 62;
@@ -1091,7 +1184,14 @@ def scroll_to_bottom():
             if (!input) return;
             var panels = styleMainPanels(doc);
             if (!panels.length) return;
-            var chatPanel = panels[0];
+            var chatPanel = panels.reduce(function(best, panel) {{
+                if (!best) return panel;
+                var rb = best.getBoundingClientRect();
+                var rp = panel.getBoundingClientRect();
+                if (rp.width > rb.width + 8) return panel;
+                if (Math.abs(rp.width - rb.width) <= 8 && rp.left < rb.left) return panel;
+                return best;
+            }}, null);
             var chatRect = chatPanel.getBoundingClientRect();
             if (!chatRect || chatRect.width < 220 || chatRect.height < 120) return;
 
@@ -1111,15 +1211,8 @@ def scroll_to_bottom():
             input.style.setProperty('left', left + 'px', 'important');
             input.style.setProperty('width', width + 'px', 'important');
             input.style.setProperty('max-width', width + 'px', 'important');
-            var inputRect = input.getBoundingClientRect();
-            var inputH = Math.max(44, Math.round(inputRect.height || 52));
-            var viewportH = window.parent.innerHeight || doc.documentElement.clientHeight || 900;
-            var targetTop = Math.round(chatRect.bottom - inputH - 8);
-            var minTop = Math.round(chatRect.top + 8);
-            var maxTop = Math.min(Math.round(chatRect.bottom - inputH - 8), viewportH - inputH - 8);
-            targetTop = Math.max(minTop, Math.min(targetTop, maxTop));
-            input.style.setProperty('top', targetTop + 'px', 'important');
-            input.style.setProperty('bottom', 'auto', 'important');
+            input.style.setProperty('top', 'auto', 'important');
+            input.style.setProperty('bottom', '12px', 'important');
             input.style.setProperty('right', 'auto', 'important');
             input.style.setProperty('height', 'auto', 'important');
             input.style.setProperty('min-height', '0px', 'important');
@@ -1153,7 +1246,7 @@ def scroll_to_bottom():
     components.html(js, height=0)
 
 # ==============================================================================
-# SECTION C: 閫氱敤 UI 杈呭姪宸ュ叿 (搴曞眰)
+# SECTION C: UI Rendering Helpers (Reusable)
 # ==============================================================================
 
 def _extract_json(s: str):
@@ -1177,6 +1270,100 @@ def _extract_json(s: str):
     return None, s
 
 
+def _extract_all_json_chunks(s: str):
+    """Extract consecutive JSON chunks from text like '{}{}' or '{}\\n{}'."""
+    if not isinstance(s, str):
+        return [], s
+    chunks = []
+    rest = s
+    for _ in range(64):
+        obj, new_rest = _extract_json(rest)
+        if obj is None:
+            break
+        chunks.append(obj)
+        if not isinstance(new_rest, str) or new_rest == rest:
+            rest = new_rest if isinstance(new_rest, str) else ""
+            break
+        rest = new_rest
+    return chunks, rest
+
+
+def _parse_literature_records_from_text(text: str) -> list[dict]:
+    """Best-effort parser for plain literature outputs when JSON is unavailable."""
+    if not isinstance(text, str) or not text.strip():
+        return []
+    blocks = [b.strip() for b in re.split(r"(?=\\bTitle\\s*:)", text) if b.strip()]
+    records = []
+    for block in blocks:
+        title = ""
+        year = ""
+        source = ""
+        chunk = ""
+        m_title = re.search(r"Title\\s*:\\s*(.+?)(?=\\s+Year\\s*:|\\s+Source\\s*:|\\s+Chunk\\s*:|$)", block, flags=re.IGNORECASE | re.DOTALL)
+        if m_title:
+            title = m_title.group(1).strip()
+        m_year = re.search(r"Year\\s*:\\s*([0-9]{4})", block, flags=re.IGNORECASE)
+        if m_year:
+            year = m_year.group(1).strip()
+        m_source = re.search(r"Source\\s*:\\s*(.+?)(?=\\s+Chunk\\s*:|$)", block, flags=re.IGNORECASE | re.DOTALL)
+        if m_source:
+            source = m_source.group(1).strip()
+        m_chunk = re.search(r"Chunk\\s*:\\s*(.+)$", block, flags=re.IGNORECASE | re.DOTALL)
+        if m_chunk:
+            chunk = m_chunk.group(1).strip()
+        if not any([title, year, source, chunk]):
+            continue
+        rec = {}
+        if title:
+            rec["title"] = title
+        if year:
+            rec["year"] = year
+        if source:
+            rec["source"] = source
+        if chunk:
+            rec["chunk"] = chunk
+        records.append(rec)
+    return records
+
+
+def render_kb_tool_output(raw_content, tool_name: str = ""):
+    """Render KB tool outputs robustly (single JSON, multi-JSON, or plain literature text)."""
+    if isinstance(raw_content, (dict, list)):
+        st.json(_sanitize_paths_in_obj(raw_content))
+        return
+    text = str(raw_content or "")
+    if not text.strip():
+        return
+
+    parsed = None
+    try:
+        parsed = json.loads(text)
+    except Exception:
+        parsed = None
+    if parsed is not None:
+        st.json(_sanitize_paths_in_obj(parsed))
+        return
+
+    chunks, rest = _extract_all_json_chunks(text)
+    if chunks:
+        if len(chunks) == 1 and (not isinstance(rest, str) or not rest.strip()):
+            st.json(_sanitize_paths_in_obj(chunks[0]))
+        else:
+            st.json(_sanitize_paths_in_obj(chunks))
+            if isinstance(rest, str) and rest.strip():
+                st.caption(_sanitize_paths_in_text(rest))
+        return
+
+    tool_name_norm = str(tool_name or "").strip().lower()
+    if "literature_knowledge" in tool_name_norm:
+        records = _parse_literature_records_from_text(text)
+        if records:
+            st.json(_sanitize_paths_in_obj(records))
+            return
+
+    st.write(_sanitize_paths_in_text(text))
+
+
 def _normalize_kb_payload(data: dict) -> dict:
     """Normalize heterogeneous KB payloads into a render-friendly schema."""
     if not isinstance(data, dict):
@@ -1194,10 +1381,31 @@ def _normalize_kb_payload(data: dict) -> dict:
         normalized["mode"] = normalized.get("mode") or ""
         if not isinstance(normalized.get("intent"), dict):
             normalized["intent"] = {}
+        intent = normalized.get("intent") if isinstance(normalized.get("intent"), dict) else {}
+        if "proposed_task_level" not in normalized and intent.get("proposed_task_level"):
+            normalized["proposed_task_level"] = intent.get("proposed_task_level")
+        if "task_level_reason_codes" not in normalized and isinstance(intent.get("task_level_reason_codes"), list):
+            normalized["task_level_reason_codes"] = intent.get("task_level_reason_codes")
+        if "task_level_confidence" not in normalized and intent.get("task_level_confidence") is not None:
+            normalized["task_level_confidence"] = intent.get("task_level_confidence")
         if "message" not in normalized and normalized.get("reason"):
             normalized["message"] = normalized.get("reason")
         if "reason" not in normalized and normalized.get("message"):
             normalized["reason"] = normalized.get("message")
+    elif schema == "ntl.kb.subagent.response.v1":
+        intent_block = normalized.get("intent_analysis") if isinstance(normalized.get("intent_analysis"), dict) else {}
+        response_block = normalized.get("response") if isinstance(normalized.get("response"), dict) else {}
+        for key in ("task_id", "task_name", "category", "description", "steps", "output", "result"):
+            if key not in normalized and key in response_block:
+                normalized[key] = response_block.get(key)
+        if "proposed_task_level" not in normalized and intent_block.get("proposed_task_level"):
+            normalized["proposed_task_level"] = intent_block.get("proposed_task_level")
+        if "task_level_reason_codes" not in normalized and isinstance(intent_block.get("task_level_reason_codes"), list):
+            normalized["task_level_reason_codes"] = intent_block.get("task_level_reason_codes")
+        if "task_level_confidence" not in normalized and intent_block.get("task_level_confidence") is not None:
+            normalized["task_level_confidence"] = intent_block.get("task_level_confidence")
+        if "mode" not in normalized:
+            normalized["mode"] = "workflow"
 
     task_name = normalized.get("task_name") or normalized.get("task") or normalized.get("title") or normalized.get("task_id")
     if task_name:
@@ -1260,13 +1468,13 @@ def render_bot_message(msg):
 
 def render_label_ai(agent_name):
     color = "#0b5cab" if agent_name.lower() == "code_assistant" else "#0f766e"
-    st.markdown(f"<div style='color:{color};font-weight:700;font-size:16px;'>🧠 {agent_name}:</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='color:{color};font-weight:700;font-size:16px;'>AI: {agent_name}</div>", unsafe_allow_html=True)
 
 def render_label_tool(tool_name):
-    st.markdown(f"<div style='color:#0b5cab;font-weight:700;font-size:15px;'>🛠️ Tool ({tool_name}) Output:</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='color:#0b5cab;font-weight:700;font-size:15px;'>Tool ({tool_name}) Output:</div>", unsafe_allow_html=True)
 
 def render_label_function(tool_name):
-    st.markdown(f"<div style='color:#8a6f00;font-weight:700;font-size:15px;'>📌 Function Call to `{tool_name}`:</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='color:#8a6f00;font-weight:700;font-size:15px;'>Function Call to `{tool_name}`:</div>", unsafe_allow_html=True)
 
 def render_divider():
     st.markdown("<hr style='margin: 15px 0; border: 1px dashed #ccc;'>", unsafe_allow_html=True)
@@ -1275,14 +1483,14 @@ def render_event_header(index):
     st.markdown(f"""
     <div style="border: 1px solid #ccc; border-radius: 4px; padding: 10px; margin: 12px 0; background-color: #f8f9fa;">
         <div style="display: flex; align-items: center; gap: 6px;">
-            <span style="font-size: 18px; line-height: 1;">🧾</span>
+            <span style="font-size: 18px; line-height: 1;">#</span>
             <span style="color: #4a6fa5; font-size: 18px; font-weight: 600;">{_tr('推理事件', 'Reasoning Event')} {index}</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
 def render_event_human(content):
-    st.markdown("<div style='color:#8a1750;font-weight:700;font-size:16px;'>👤 Human:</div>", unsafe_allow_html=True)
+    st.markdown("<div style='color:#8a1750;font-weight:700;font-size:16px;'>Human:</div>", unsafe_allow_html=True)
     st.markdown(f"<div style='margin-left:15px;font-size:16px;'>{content}</div>", unsafe_allow_html=True)
 
 
@@ -1388,7 +1596,7 @@ def get_user_input():
     )
 
 # ==============================================================================
-# SECTION D: 鐗瑰畾涓氬姟娓叉煋鍣?(Searcher, KB)
+# SECTION D: Searcher/KB Output Rendering
 # ==============================================================================
 
 def render_data_searcher_output(raw_content):
@@ -1427,13 +1635,48 @@ def render_data_searcher_output(raw_content):
             st.markdown("### Reliable Sources")
             for i, s in enumerate(srcs, 1):
                 with st.container(border=True):
-                    st.markdown(f"**{i}. {s.get('Publisher','-')}** 路  {s.get('Domain','')}")
+                    st.markdown(f"**{i}. {s.get('Publisher','-')}** | {s.get('Domain','')}")
                     st.markdown(f"- **Title**: {s.get('Title','-')}")
                     if s.get("URL"): st.markdown(f"- **URL**: [{s['URL']}]({s['URL']})")
                     if s.get("Snippet"): st.caption(s["Snippet"])
 
         with _render_popover("View Raw JSON"): st.json(_sanitize_paths_in_obj(data))
         if isinstance(rest, str) and rest.strip(): st.write(_sanitize_paths_in_text(rest))
+        return
+
+    # Non-contract fallback: avoid rendering blank geospatial cards for guardrail/runtime payloads.
+    retrieval_schema = str(data.get("schema", "")).strip()
+    looks_like_geospatial_contract = (
+        retrieval_schema == "ntl.retrieval.contract.v1"
+        or any(
+            key in data
+            for key in (
+                "Data_source",
+                "Product",
+                "Temporal_coverage",
+                "Spatial_coverage",
+                "Storage_location",
+                "Files_name",
+                "Auxiliary_data",
+                "GEE_execution_plan",
+                "Boundary_validation",
+            )
+        )
+    )
+    if not looks_like_geospatial_contract:
+        status = str(data.get("status", "")).strip() or "unknown"
+        reason = str(
+            data.get("reason")
+            or data.get("message")
+            or data.get("guidance")
+            or ""
+        ).strip()
+        st.warning(f"Data Searcher ({status})")
+        if reason:
+            st.write(_sanitize_paths_in_text(reason))
+        with _render_popover("View Raw JSON"): st.json(_sanitize_paths_in_obj(data))
+        if isinstance(rest, str) and rest.strip():
+            st.write(_sanitize_paths_in_text(rest))
         return
 
     # SCHEMA A: Geospatial Data Retrieval
@@ -1549,6 +1792,22 @@ def render_kb_output(kb_content):
         </div>
         """, unsafe_allow_html=True)
 
+    proposed_level = str(normalized.get("proposed_task_level") or "").strip()
+    reason_codes = normalized.get("task_level_reason_codes")
+    if not isinstance(reason_codes, list):
+        reason_codes = []
+    confidence = normalized.get("task_level_confidence")
+    if proposed_level:
+        confidence_text = "-"
+        try:
+            confidence_text = f"{float(confidence):.2f}"
+        except Exception:
+            confidence_text = "-"
+        reason_text = ", ".join(str(code) for code in reason_codes) if reason_codes else "-"
+        st.markdown(
+            f"**KB preliminary level**: `{proposed_level}`  |  **reason codes**: `{reason_text}`  |  **confidence**: `{confidence_text}`"
+        )
+
     if normalized.get("description"):
         st.markdown("**Description**")
         st.write(normalized["description"])
@@ -1608,12 +1867,11 @@ def render_kb_output(kb_content):
             st.markdown(_sanitize_paths_in_text(str(normalized.get("supplementary_text"))))
 
     if isinstance(rest, str) and rest.strip(): 
-        # 浼樺寲 rest 鐨勬樉绀猴細鏀惧叆 Expander 骞堕檷浣?Markdown 鏍囬绾у埆
+        # Keep supplementary content in an expander and downgrade headings
+        # to avoid visually overriding the main response area.
         import re
-        # 灏嗚棣栫殑涓€绾ф爣棰?(# ) 鍜屼簩绾ф爣棰?(## ) 缁熶竴闄嶇骇涓哄洓绾ф爣棰?(#### )
-        # 閬垮厤鍦?UI 涓覆鏌撳嚭宸ㄥぇ鐨勬爣棰橈紝淇濇寔灞傜骇鍜岃皭
         formatted_rest = re.sub(r'^(#+)\s', r'#### ', rest, flags=re.MULTILINE)
-        
+
         st.markdown("---")
         with st.expander("Supplementary Knowledge & Code (Mixed Mode)", expanded=False):
             st.markdown(formatted_rest)
@@ -1696,7 +1954,7 @@ def render_uploaded_understanding_output(raw_content, tool_name: str = ""):
     elif status == "context_injected_no_match":
         st.info(
             _tr(
-                "文件已成功解析并注入上下文，但当前问题未命中相关片段。可换一种更具体问法（如指定文件名、页码、关键词）。",
+                "文件已成功解析并注入上下文，但当前问题未命中相关片段。可换更具体问法（文件名、页码、关键词）。",
                 "File context was parsed and injected successfully, but this query found no direct snippet match. "
                 "Try a more specific question (file name, page, or keywords).",
             )
@@ -1712,7 +1970,7 @@ def render_uploaded_understanding_output(raw_content, tool_name: str = ""):
         st.write(_sanitize_paths_in_text(rest))
 
 # ==============================================================================
-# SECTION E: 渚ц竟鏍忕粍浠?(Sidebar, Download, Upload)
+# SECTION E: Sidebar, Download, Upload
 # ==============================================================================
 
 def render_sidebar():
@@ -1731,7 +1989,7 @@ def render_sidebar():
         current_user_name = str(st.session_state.get("user_name", "") or "")
         bootstrap_anonymous = str(current_user_id).startswith("anon-")
         typed_user_name = st.text_input(
-            _tr("用户名（限英文）", "Username (only English)"),
+            _tr("用户名（仅英文）", "Username (only English)"),
             value=current_user_name,
             key="sidebar_user_name_input",
             help=_tr("用于隔离用户历史记录。", "Used to isolate per-user history."),
@@ -1754,6 +2012,8 @@ def render_sidebar():
                 )
                 st.session_state["sidebar_user_name_input"] = current_user_name
         elif normalized_typed_user != current_user_id or bootstrap_anonymous:
+            if st.session_state.get("is_running", False):
+                app_logic.request_stop_active_run()
             st.session_state["user_name"] = typed_user_name or normalized_typed_user
             st.session_state["user_id"] = normalized_typed_user
             history_store.ensure_user_profile(normalized_typed_user, typed_user_name or normalized_typed_user)
@@ -1800,17 +2060,79 @@ def render_sidebar():
                 label = f"{tid} | {q_short}" if q_short else tid
                 thread_label_map[tid] = label
             default_idx = thread_ids.index(current_tid) if current_tid in thread_ids else 0
-            selected_tid = st.selectbox(
-                _tr("历史线程", "History Threads"),
-                options=thread_ids,
-                index=default_idx,
-                format_func=lambda tid: thread_label_map.get(tid, tid),
-                key="sidebar_thread_selector",
-            )
+            thread_sel_col, thread_del_col = st.columns([0.84, 0.16], gap="small")
+            with thread_sel_col:
+                selected_tid = st.selectbox(
+                    _tr("历史线程", "History Threads"),
+                    options=thread_ids,
+                    index=default_idx,
+                    format_func=lambda tid: thread_label_map.get(tid, tid),
+                    key="sidebar_thread_selector",
+                    label_visibility="visible",
+                )
+            with thread_del_col:
+                st.markdown("<div style='height: 1.78rem;'></div>", unsafe_allow_html=True)
+                if st.button(
+                    "🗑",
+                    key="delete_selected_thread_inline_trigger",
+                    help=_tr("删除当前选中线程", "Delete selected thread"),
+                    use_container_width=True,
+                ):
+                    st.session_state["confirm_delete_selected_thread_inline"] = True
+
             if selected_tid != current_tid:
+                if st.session_state.get("is_running", False):
+                    app_logic.request_stop_active_run(thread_id=current_tid)
                 app_state.set_active_thread(selected_tid)
                 history_store.bind_thread_to_user(current_user_id, selected_tid)
                 st.rerun()
+
+            if st.session_state.get("confirm_delete_selected_thread_inline", False):
+                st.warning(
+                    _tr(
+                        f"删除线程 `{selected_tid}`？该操作会删除历史与线程文件。",
+                        f"Delete thread `{selected_tid}`? This will remove history and workspace files.",
+                    )
+                )
+                confirm_cols = st.columns([1, 1], gap="small")
+                with confirm_cols[0]:
+                    if st.button(
+                        _tr("确认删除", "Confirm Delete"),
+                        key="delete_selected_thread_inline_confirm_btn",
+                        use_container_width=True,
+                    ):
+                        if st.session_state.get("is_running", False):
+                            app_logic.request_stop_active_run(thread_id=selected_tid, detach_session=True)
+
+                        delete_result = history_store.delete_user_thread(
+                            current_user_id,
+                            selected_tid,
+                            delete_workspace=True,
+                        )
+                        remaining = history_store.list_user_threads(current_user_id, limit=100)
+                        remaining_ids = [str(row.get("thread_id")) for row in remaining if row.get("thread_id")]
+
+                        if not remaining_ids:
+                            new_thread_id = history_store.generate_thread_id(current_user_id)
+                            history_store.bind_thread_to_user(current_user_id, new_thread_id)
+                            app_state.set_active_thread(new_thread_id)
+                        else:
+                            app_state.set_active_thread(remaining_ids[0])
+
+                        st.session_state["confirm_delete_selected_thread_inline"] = False
+                        if delete_result.get("deleted"):
+                            st.success(_tr("线程已删除。", "Thread deleted."))
+                        else:
+                            st.warning(_tr("未找到可删除的线程记录。", "No thread record was deleted."))
+                        st.rerun()
+                with confirm_cols[1]:
+                    if st.button(
+                        _tr("取消", "Cancel"),
+                        key="delete_selected_thread_inline_cancel_btn",
+                        use_container_width=True,
+                    ):
+                        st.session_state["confirm_delete_selected_thread_inline"] = False
+                        st.rerun()
 
 
         # in_count = len(list((workspace / "inputs").glob("*.*"))) if (workspace / "inputs").exists() else 0
@@ -1824,7 +2146,24 @@ def render_sidebar():
             index=app_state.MODEL_OPTIONS.index(current_model),
             key="model_selector"
         )
-        st.session_state["cfg_model"] = selected_model
+        if selected_model != current_model:
+            if st.session_state.get("is_running", False):
+                st.session_state["pending_model_change"] = selected_model
+                st.session_state["model_selector"] = current_model
+                st.info(
+                    _tr(
+                        "模型变更已暂存，将在当前任务结束后生效。",
+                        "Model change queued and will apply after current run finishes.",
+                    )
+                )
+            else:
+                st.session_state["cfg_model"] = selected_model
+                st.session_state["pending_model_change"] = None
+                current_model = selected_model
+        pending_model = str(st.session_state.get("pending_model_change") or "").strip()
+        if pending_model and st.session_state.get("is_running", False):
+            st.caption(_tr(f"待生效模型: {pending_model}", f"Pending model: {pending_model}"))
+        selected_model = current_model
 
         key_label = "OpenAI API Key"
         if "qwen" in selected_model.lower():
@@ -1886,12 +2225,23 @@ def render_sidebar():
                         can_activate = False
 
                 if can_activate and effective_api_key:
-                    st.session_state["user_api_key"] = effective_api_key
-                    st.session_state["initialized"] = True
-                    
-                    app_logic.ensure_conversation_initialized()
-                    st.success(_tr("已激活！", "Activated!"))
-                    st.rerun()
+                    if st.session_state.get("is_running", False):
+                        st.session_state["pending_activate_request"] = {
+                            "user_api_key": effective_api_key,
+                            "model": selected_model,
+                        }
+                        st.info(
+                            _tr(
+                                "激活请求已暂存，将在当前任务结束后自动生效。",
+                                "Activate request queued and will apply after current run finishes.",
+                            )
+                        )
+                    else:
+                        st.session_state["user_api_key"] = effective_api_key
+                        st.session_state["initialized"] = True
+                        app_logic.ensure_conversation_initialized()
+                        st.success(_tr("已激活！", "Activated!"))
+                        st.rerun()
                 # ---------------------
 
         with action_cols[1]:
@@ -1902,6 +2252,8 @@ def render_sidebar():
                 type="secondary",
                 disabled=not username_ready,
             ):
+                if st.session_state.get("is_running", False):
+                    app_logic.request_stop_active_run()
                 st.cache_resource.clear()
                 st.session_state["initialized"] = False
                 st.session_state.chat_history = []
@@ -1933,9 +2285,31 @@ def render_sidebar():
                 help=_tr("请求立即中断当前回答。", "Request immediate interruption of the current run."),
             ):
                 if st.session_state.get("is_running", False):
-                    st.session_state["cancel_requested"] = True
-                    st.warning(_tr("已发送中断请求。", "Interrupt request sent."))
+                    # Request backend stop and immediately release UI run lock
+                    # so Activate can be applied without waiting for remote timeout.
+                    app_logic.request_stop_active_run(detach_session=True)
                     st.rerun()
+
+        if not st.session_state.get("is_running", False):
+            pending_model = str(st.session_state.get("pending_model_change") or "").strip()
+            if pending_model and pending_model in app_state.MODEL_OPTIONS:
+                st.session_state["cfg_model"] = pending_model
+                st.session_state["model_selector"] = pending_model
+                st.session_state["pending_model_change"] = None
+            pending_activate = st.session_state.get("pending_activate_request")
+            if isinstance(pending_activate, dict):
+                pending_key = str(pending_activate.get("user_api_key") or "").strip()
+                pending_model_from_activate = str(pending_activate.get("model") or "").strip()
+                if pending_model_from_activate in app_state.MODEL_OPTIONS:
+                    st.session_state["cfg_model"] = pending_model_from_activate
+                    st.session_state["model_selector"] = pending_model_from_activate
+                if pending_key:
+                    st.session_state["user_api_key"] = pending_key
+                    st.session_state["initialized"] = True
+                    app_logic.ensure_conversation_initialized()
+                st.session_state["pending_activate_request"] = None
+                st.success(_tr("已应用待生效设置。", "Queued settings applied."))
+                st.rerun()
 
         status = _tr("已激活", "Active") if st.session_state.get("initialized") else _tr("未激活", "Inactive")
         status_class = "active" if st.session_state.get("initialized") else "inactive"
@@ -1988,7 +2362,7 @@ def render_sidebar():
                                 f"<div style='color:#cfe1ff;font-size:0.95rem;line-height:1.55;'>{case['query']}</div>",
                                 unsafe_allow_html=True,
                             )
-                            if st.button(_tr(f"运行用例", f"Run Case"), key=f"run_case_{cat}_{i}", use_container_width=True):
+                            if st.button(_tr("运行用例", "Run Case"), key=f"run_case_{cat}_{i}", use_container_width=True):
                                 st.session_state["pending_question"] = case["query"]
                                 st.rerun()
             except Exception as e:
@@ -1998,45 +2372,98 @@ def render_download_center():
     """Render input/output download center in sidebar."""
     try:
         workspace = storage_manager.get_workspace(st.session_state.get("thread_id", "debug"))
+        sidecar_exts = {".dbf", ".prj", ".shx", ".cpg"}
+        shp_bundle_exts = {
+            ".shp", ".dbf", ".prj", ".shx", ".cpg",
+            ".qix", ".sbn", ".sbx", ".ain", ".aih", ".atx", ".ixs", ".mxs",
+        }
+
+        def _build_shp_bundle_zip_bytes(shp_file: Path) -> bytes:
+            stem = shp_file.stem
+            folder = shp_file.parent
+            related = [
+                p for p in folder.glob(f"{stem}.*")
+                if p.is_file() and p.suffix.lower() in shp_bundle_exts
+            ]
+            related = sorted(related, key=lambda p: (0 if p.suffix.lower() == ".shp" else 1, p.name.lower()))
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+                for p in related:
+                    zf.write(p, arcname=p.name)
+            return buf.getvalue()
+
         def get_valid_files(directory, include_py=False):
             if not directory.exists(): return []
-            return [f for f in directory.glob("*.*") 
-                    if f.suffix.lower() not in ([ ".zip", ".tmp"] + ([] if include_py else [".py"])) and not f.name.startswith('.')]
+            files = [
+                f
+                for f in directory.glob("*.*")
+                if f.suffix.lower() not in ([".zip", ".tmp"] + ([] if include_py else [".py"]))
+                and not f.name.startswith(".")
+            ]
+            shp_stems = {f.stem for f in files if f.suffix.lower() == ".shp"}
+            filtered = []
+            for f in files:
+                ext = f.suffix.lower()
+                if ext in sidecar_exts and f.stem in shp_stems:
+                    # If same-named .shp exists, hide sidecar files from list display.
+                    continue
+                filtered.append(f)
+            return filtered
 
         in_files = get_valid_files(workspace / "inputs", include_py=False)
         out_files = get_valid_files(workspace / "outputs", include_py=True)
 
         if not in_files and not out_files: return
 
-        st.sidebar.markdown("<div class='ntl-sidebar-divider-tight'></div>", unsafe_allow_html=True)
-        st.sidebar.subheader(_tr("数据中心", "Data Center"))
+        # st.sidebar.markdown("<div class='ntl-sidebar-divider-tight'></div>", unsafe_allow_html=True)
+        # st.sidebar.subheader(_tr("数据中心", "Data Center"))
         tab_in, tab_out = st.sidebar.tabs([_tr("输入", "Inputs"), _tr("输出", "Outputs")])
 
         with tab_in:
             if in_files:
                 for f in in_files:
-                    with open(f, "rb") as file_data:
+                    if f.suffix.lower() == ".shp":
                         st.download_button(
                             label=f"{f.name}",
-                            data=file_data,
-                            file_name=f.name,
+                            data=_build_shp_bundle_zip_bytes(f),
+                            file_name=f"{f.stem}.zip",
+                            mime="application/zip",
                             key=f"dl_in_{f.name}",
                             use_container_width=True,
                         )
+                    else:
+                        with open(f, "rb") as file_data:
+                            st.download_button(
+                                label=f"{f.name}",
+                                data=file_data,
+                                file_name=f.name,
+                                key=f"dl_in_{f.name}",
+                                use_container_width=True,
+                            )
             else:
                 st.caption(_tr("暂无", "Empty"))
 
         with tab_out:
             if out_files:
                 for f in out_files:
-                    with open(f, "rb") as file_data:
+                    if f.suffix.lower() == ".shp":
                         st.download_button(
                             label=f"{f.name}",
-                            data=file_data,
-                            file_name=f.name,
+                            data=_build_shp_bundle_zip_bytes(f),
+                            file_name=f"{f.stem}.zip",
+                            mime="application/zip",
                             key=f"dl_out_{f.name}",
                             use_container_width=True,
                         )
+                    else:
+                        with open(f, "rb") as file_data:
+                            st.download_button(
+                                label=f"{f.name}",
+                                data=file_data,
+                                file_name=f.name,
+                                key=f"dl_out_{f.name}",
+                                use_container_width=True,
+                            )
             else:
                 st.caption(_tr("暂无", "Empty"))
     except Exception as e:
@@ -2154,18 +2581,31 @@ def render_file_understanding_panel():
         st.sidebar.caption(_tr("当前已注入文件", "Currently Injected Files"))
         for row in current_injected[:12]:
             st.sidebar.markdown(
-                f"- `{row.get('source_file')}` · {row.get('chunks', 0)} chunks"
+                f"- `{row.get('source_file')}` | {row.get('chunks', 0)} chunks"
             )
         if st.sidebar.button(_tr("清空注入上下文", "Clear Injected Context"), use_container_width=True):
             app_logic.clear_injected_context()
             st.sidebar.success(_tr("已清空。", "Cleared."))
             st.rerun()
 
-def show_history(chat_history):
+def show_history(chat_history, *, show_running_notice_under_latest_user: bool = False):
     """Render chat history, images, and tables."""
-    for role, content in chat_history:
+    latest_user_idx = -1
+    if show_running_notice_under_latest_user:
+        for i, (role, _content) in enumerate(chat_history):
+            if role == "user":
+                latest_user_idx = i
+
+    for i, (role, content) in enumerate(chat_history):
         if role == "user":
             st.write(USER_TEMPLATE.replace("{{MSG}}", content), unsafe_allow_html=True)
+            if show_running_notice_under_latest_user and i == latest_user_idx:
+                st.caption(
+                    _tr(
+                        "后台处理中，可点击 Stop/New 中断当前任务。",
+                        "Running in background. Click Stop/New to interrupt this task.",
+                    )
+                )
         elif role == "assistant":
             st.write(BOT_TEMPLATE.replace("{{MSG}}", content), unsafe_allow_html=True)
         elif role == "assistant_img":
@@ -2185,6 +2625,12 @@ import matplotlib.colors as mcolors
 
 def render_map_view():
     """Render map view for vector/raster layers."""
+    default_map_center = [35.0, 104.0]  # China-centered default viewport
+    default_map_zoom = 4
+    thread_id = str(st.session_state.get("thread_id", "debug"))
+    opened_once_by_thread = st.session_state.setdefault("map_opened_once_by_thread", {})
+    last_layer_sig_by_thread = st.session_state.setdefault("map_last_layer_sig_by_thread", {})
+    reset_nonce_by_thread = st.session_state.setdefault("map_reset_nonce_by_thread", {})
     workspace = storage_manager.get_workspace(st.session_state.get("thread_id", "debug"))
     geo_files = []
     for folder in ["inputs", "outputs"]:
@@ -2225,17 +2671,29 @@ def render_map_view():
     )
     st.session_state["selected_layers"] = selected_layers
 
+    layer_signature = build_layer_signature(selected_layers)
+    policy_state = advance_map_view_state(
+        thread_id=thread_id,
+        layer_signature=layer_signature,
+        opened_once_by_thread=opened_once_by_thread,
+        last_layer_sig_by_thread=last_layer_sig_by_thread,
+        reset_nonce_by_thread=reset_nonce_by_thread,
+    )
+    is_first_open = bool(policy_state["is_first_open"])
+    map_nonce = int(policy_state["map_nonce"])
+    map_component_key = f"main_map_{thread_id}_{map_nonce}"
+
     if not selected_layers:
         st.warning(_tr("请至少选择一个图层进行可视化。", "Please select at least one layer to visualize."))
-        m = folium.Map(location=[31.23, 121.47], zoom_start=8, control_scale=True)
-        folium.TileLayer("CartoDB dark_matter", name="Dark Canvas").add_to(m)
-        st_folium(m, width=None, height=520, use_container_width=True)
+        m = folium.Map(location=default_map_center, zoom_start=default_map_zoom, control_scale=True, tiles=None)
+        folium.TileLayer("CartoDB dark_matter", name="Dark Canvas", show=True).add_to(m)
+        st_folium(m, width=None, height=520, use_container_width=True, key=f"{map_component_key}_empty")
         return
 
     if "layer_styles" not in st.session_state:
         st.session_state["layer_styles"] = {}
 
-    with st.expander(_tr("图层样式（配色与透明度）", "Layer Styling (Symbology & Opacity)"), expanded=False):
+    with st.expander(_tr("图层样式", "Layer Styling"), expanded=False):
         active_layer_file = st.selectbox(
             _tr("配置图层", "Configure Layer"),
             options=selected_layers,
@@ -2283,13 +2741,32 @@ def render_map_view():
 
     def _add_bound(bounds_acc, min_lat, min_lon, max_lat, max_lon):
         vals = [min_lat, min_lon, max_lat, max_lon]
-        if all(np.isfinite(v) for v in vals):
-            bounds_acc.append(vals)
+        if not all(np.isfinite(v) for v in vals):
+            return
+        # Clamp to valid geographic bounds to avoid invalid fit bounds.
+        min_lat = max(-90.0, min(90.0, float(min_lat)))
+        max_lat = max(-90.0, min(90.0, float(max_lat)))
+        min_lon = max(-180.0, min(180.0, float(min_lon)))
+        max_lon = max(-180.0, min(180.0, float(max_lon)))
+        if max_lat <= min_lat or max_lon <= min_lon:
+            return
+        lat_span = max_lat - min_lat
+        lon_span = max_lon - min_lon
+        # Guardrail: ignore accidental near-global extents (usually CRS/bounds issue)
+        # so initial map won't jump to full-world unexpectedly.
+        if lat_span >= 170.0 and lon_span >= 340.0:
+            return
+        bounds_acc.append([min_lat, min_lon, max_lat, max_lon])
 
     overall_bounds = []
-    m = folium.Map(control_scale=True)
-    folium.TileLayer("CartoDB dark_matter", name="Dark Canvas").add_to(m)
-    folium.TileLayer("https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", attr="Google", name="Satellite").add_to(m)
+    m = folium.Map(location=default_map_center, zoom_start=default_map_zoom, control_scale=True, tiles=None)
+    folium.TileLayer("CartoDB dark_matter", name="Dark Canvas", show=True).add_to(m)
+    folium.TileLayer(
+        "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+        attr="Google",
+        name="Satellite",
+        show=False,
+    ).add_to(m)
     for file_path in selected_layers:
         try:
             layer_name = file_path.name
@@ -2383,7 +2860,7 @@ def render_map_view():
         except Exception as e:
             st.error(_tr(f"图层加载失败 {file_path.name}: {e}", f"Error loading {file_path.name}: {e}"))
 
-    if overall_bounds:
+    if overall_bounds and not is_first_open:
         try:
             min_lat = min(b[0] for b in overall_bounds)
             min_lon = min(b[1] for b in overall_bounds)
@@ -2397,15 +2874,14 @@ def render_map_view():
                 min_lon -= 0.001
             m.fit_bounds([[min_lat, min_lon], [max_lat, max_lon]])
         except Exception:
-            m.location = [31.23, 121.47]
-            m.zoom_start = 9
+            m.location = default_map_center
+            m.zoom_start = default_map_zoom
     else:
-        center = st.session_state.get("map_center", [31.23, 121.47])
-        m.location = center
-        m.zoom_start = 9
+        m.location = default_map_center
+        m.zoom_start = default_map_zoom
 
     folium.LayerControl().add_to(m)
-    map_output = st_folium(m, width=None, height=540, use_container_width=True, key="main_map")
+    map_output = st_folium(m, width=None, height=540, use_container_width=True, key=map_component_key)
 
     if map_output and map_output.get("last_clicked"):
         click_lat = map_output["last_clicked"]["lat"]
@@ -2662,7 +3138,7 @@ def _infer_transfer_target_agent(tool_name: str):
 
 def _kb_phase_specs() -> list[tuple[str, str, str]]:
     return [
-        ("query_received", _tr("接收查询", "Query Received"), _tr("已进入检索流程", "Entered retrieval flow")),
+        ("query_received", _tr("已接收查询", "Query Received"), _tr("已进入检索流程", "Entered retrieval flow")),
         (
             "knowledge_retrieval",
             _tr("知识检索", "Knowledge Retrieval"),
@@ -2676,7 +3152,7 @@ def _kb_phase_specs() -> list[tuple[str, str, str]]:
         (
             "structured_output",
             _tr("结构化输出", "Structured Output"),
-            _tr("正在准备可渲染 JSON", "Preparing renderable JSON contract"),
+            _tr("正在准备可渲染 JSON 合约", "Preparing renderable JSON contract"),
         ),
     ]
 
@@ -2726,13 +3202,13 @@ def _render_kb_progress_nodes(nodes: list[dict], caption_text: str):
     st.progress(done / total if total else 0.0)
     cols = st.columns(total)
     for idx, node in enumerate(nodes):
-        icon = "⌛"
+        icon = "..."
         if node.get("error"):
-            icon = "❌"
+            icon = "x"
         elif node.get("done"):
-            icon = "✅"
+            icon = "ok"
         elif node.get("running"):
-            icon = "⏳"
+            icon = "..."
         with cols[idx]:
             st.markdown(f"**{icon} {node.get('label', '')}**")
             if node.get("error"):
@@ -2762,6 +3238,7 @@ def _build_reasoning_graph_payload(events, show_sub_steps: bool = False):
     last_ai = None
     human_idx = 0
     tool_idx = 0
+    last_tool_cluster = None
 
     def add_node(node_id: str, label: str, kind: str = "default"):
         if node_id in seen_nodes:
@@ -2773,6 +3250,13 @@ def _build_reasoning_graph_payload(events, show_sub_steps: bool = False):
             }
         )
         seen_nodes.add(node_id)
+
+    def set_node_label(node_id: str, label: str):
+        for node in nodes:
+            data = node.get("data", {})
+            if data.get("id") == node_id:
+                data["label"] = _truncate_text(label, 140)
+                return
 
     def add_edge(src: str, dst: str, cls: str = "flow"):
         edges.append(
@@ -2791,18 +3275,23 @@ def _build_reasoning_graph_payload(events, show_sub_steps: bool = False):
             add_edge(last_anchor, node_id, "flow")
             last_anchor = node_id
             last_ai = None
+            last_tool_cluster = None
             continue
 
         if kind == "ai":
             agent = str(step.get("agent") or "AI")
             node_id = _agent_node_id(agent)
             add_node(node_id, f"AI: {agent}", "ai")
+            prev_ai = last_ai
             if last_anchor.startswith("ai_") and node_id.startswith("ai_") and last_anchor != node_id:
                 add_edge(last_anchor, node_id, "handoff_edge")
             elif last_anchor != node_id:
                 add_edge(last_anchor, node_id, "flow")
             last_anchor = node_id
             last_ai = node_id
+            if prev_ai != node_id:
+                # Agent handoff or context switch: avoid cross-agent tool clustering.
+                last_tool_cluster = None
             continue
 
         if kind == "kb_progress":
@@ -2813,6 +3302,7 @@ def _build_reasoning_graph_payload(events, show_sub_steps: bool = False):
             add_edge(last_ai or last_anchor, node_id, "tool_call_edge")
             add_edge(node_id, last_ai or last_anchor, "return_edge")
             last_anchor = last_ai or last_anchor
+            last_tool_cluster = None
             continue
 
         if kind == "tool":
@@ -2833,6 +3323,29 @@ def _build_reasoning_graph_payload(events, show_sub_steps: bool = False):
                 add_edge(last_ai or last_anchor, target_node, "handoff_edge")
                 last_anchor = target_node
                 last_ai = target_node
+                last_tool_cluster = None
+                continue
+
+            caller_anchor = last_ai or last_anchor
+            normalized_tool_name = tool_name.strip().lower()
+            if (
+                isinstance(last_tool_cluster, dict)
+                and last_tool_cluster.get("tool_name") == normalized_tool_name
+                and last_tool_cluster.get("caller_anchor") == caller_anchor
+                and last_tool_cluster.get("node_id") in seen_nodes
+            ):
+                merged_start = int(last_tool_cluster.get("start_seq") or start_seq)
+                merged_count = int(last_tool_cluster.get("count") or 0) + int(call_count)
+                merged_end = int(last_tool_cluster.get("end_seq") or merged_start) + int(call_count)
+                merged_label = (
+                    f"#{merged_start}-{merged_end} {tool_name}*{merged_count}"
+                    if merged_count > 1
+                    else f"#{merged_start} {tool_name}"
+                )
+                set_node_label(str(last_tool_cluster.get("node_id")), merged_label)
+                last_tool_cluster["count"] = merged_count
+                last_tool_cluster["end_seq"] = merged_end
+                last_anchor = caller_anchor
                 continue
 
             node_id = f"tc_{start_seq}"
@@ -2845,9 +3358,17 @@ def _build_reasoning_graph_payload(events, show_sub_steps: bool = False):
                 _truncate_text(tool_label, 120),
                 "tool_kb" if tool_name.strip().lower() == "ntl_knowledge_base" else "tool",
             )
-            add_edge(last_ai or last_anchor, node_id, "tool_call_edge")
-            add_edge(node_id, last_ai or last_anchor, "return_edge")
-            last_anchor = last_ai or last_anchor
+            add_edge(caller_anchor, node_id, "tool_call_edge")
+            add_edge(node_id, caller_anchor, "return_edge")
+            last_anchor = caller_anchor
+            last_tool_cluster = {
+                "node_id": node_id,
+                "tool_name": normalized_tool_name,
+                "caller_anchor": caller_anchor,
+                "start_seq": start_seq,
+                "end_seq": end_seq,
+                "count": call_count,
+            }
 
     add_node("end", "END", "system")
     add_edge(last_anchor, "end", "flow")
@@ -2905,6 +3426,19 @@ def _build_reasoning_dot(payload: dict) -> str:
 
 def _json_for_html_script(data) -> str:
     return json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
+
+
+def _compute_reasoning_graph_signature(events) -> str:
+    """Compute a lightweight signature for graph redraw dirty-check."""
+    if not isinstance(events, list) or not events:
+        return "empty:0"
+    last_event = events[-1]
+    try:
+        last_text = json.dumps(last_event, ensure_ascii=False, sort_keys=True, default=str)
+    except Exception:
+        last_text = str(last_event)
+    last_hash = hashlib.sha1(last_text.encode("utf-8", errors="ignore")).hexdigest()[:12]
+    return f"{len(events)}:{last_hash}"
 
 
 def render_reasoning_map(events, interactive: bool = True, show_sub_steps: bool = False):
@@ -2986,16 +3520,114 @@ def _render_code_assistant_message(raw_content: str) -> None:
     st.code(raw_text, language="python")
 
 
+def _extract_todos_payload(raw_content) -> list[dict]:
+    """Best-effort extraction for write_todos outputs."""
+    todos = []
+
+    if isinstance(raw_content, list):
+        todos = raw_content
+    elif isinstance(raw_content, dict):
+        # Prefer structured runtime update payload when available.
+        update = raw_content.get("update")
+        if isinstance(update, dict) and isinstance(update.get("todos"), list):
+            todos = update.get("todos") or []
+        elif isinstance(raw_content.get("todos"), list):
+            todos = raw_content.get("todos") or []
+    else:
+        text = str(raw_content or "").strip()
+        if not text:
+            return []
+
+        parsed = None
+        try:
+            parsed = json.loads(text)
+        except Exception:
+            parsed = None
+
+        if isinstance(parsed, dict) and isinstance(parsed.get("todos"), list):
+            todos = parsed.get("todos") or []
+        elif isinstance(parsed, list):
+            todos = parsed
+        else:
+            start = text.find("[")
+            end = text.rfind("]")
+            if start != -1 and end != -1 and end > start:
+                chunk = text[start : end + 1]
+                try:
+                    maybe = ast.literal_eval(chunk)
+                    if isinstance(maybe, list):
+                        todos = maybe
+                except Exception:
+                    todos = []
+
+    def _normalize_todo_status(raw_status: str) -> str:
+        status = str(raw_status or "").strip().lower()
+        if status in {"done", "completed", "complete", "finished"}:
+            return "completed"
+        if status in {"in_progress", "in-progress", "running", "active", "working"}:
+            return "in_progress"
+        return "pending"
+
+    normalized = []
+    for item in todos:
+        if isinstance(item, dict):
+            content = str(item.get("content", "") or "").strip()
+            status = _normalize_todo_status(item.get("status", "pending"))
+        else:
+            content = str(item or "").strip()
+            status = "pending"
+        if not content:
+            continue
+        normalized.append({"content": content, "status": status})
+    return normalized
+
+
+def render_write_todos_output(raw_content) -> None:
+    todos = _extract_todos_payload(raw_content)
+    if not todos:
+        st.write(_sanitize_paths_in_text(str(raw_content)))
+        return
+
+    status_order = {"completed": 0, "in_progress": 1, "pending": 2}
+    todos = sorted(todos, key=lambda x: status_order.get(x["status"], 9))
+    total = len(todos)
+    completed = sum(1 for x in todos if x["status"] == "completed")
+    running = sum(1 for x in todos if x["status"] == "in_progress")
+    pending = total - completed - running
+
+    st.caption(
+        _tr(
+            f"Todo list: total {total} | completed {completed} | in-progress {running} | pending {pending}",
+            f"Todo list: total {total} | completed {completed} | in-progress {running} | pending {pending}",
+        )
+    )
+
+    with st.expander(_tr("View task list", "View task list"), expanded=True):
+        for i, item in enumerate(todos, start=1):
+            status = item["status"]
+            if status == "completed":
+                badge = "[completed]"
+            elif status == "in_progress":
+                badge = "[in_progress]"
+            else:
+                badge = "[pending]"
+            st.markdown(f"{i}. {badge}  {item['content']}")
+
+
 def render_reasoning_content(events):
     """Render one-round reasoning in a single panel (no Step 1/2/3)."""
     grouped = _build_reasoning_sections(events)
     if not grouped:
         st.caption(_tr("等待推理事件...", "Waiting for reasoning events..."))
         return
-    has_final_kb_tool = any(
-        step.get("kind") == "tool"
+    has_final_kb_response = any(
+        step.get("kind") == "ai"
+        and (
+            str(step.get("agent") or "").strip().lower() == "knowledge_base_searcher"
+            or str(step.get("agent") or "").strip().lower() == "knowledge_base_subagent"
+        )
         and any(
-            isinstance(msg, ToolMessage) and "NTL_Knowledge_Base" in str(getattr(msg, "name", ""))
+            str(_normalize_content_to_text(_strip_legacy_stream_marker(getattr(msg, "content", ""))) or "").strip()
             for msg in (step.get("messages") or [])
         )
         for step in grouped
@@ -3027,6 +3659,8 @@ def render_reasoning_content(events):
                     render_data_searcher_output(msg_content)
                 elif agent_name.lower() == "code_assistant":
                     _render_code_assistant_message(msg_content)
+                elif agent_name.lower() == "knowledge_base_searcher" or str(agent_name or "").strip().lower() == "knowledge_base_subagent":
+                    render_kb_output(msg_content)
                 else:
                     st.markdown(
                         f"<div style='margin-left:15px;font-size:16px;'>{msg_content}</div>",
@@ -3036,16 +3670,32 @@ def render_reasoning_content(events):
         elif step["kind"] == "tool":
             tool_messages = _dedupe_tool_messages([m for m in step["messages"] if isinstance(m, ToolMessage)])
             for msg in tool_messages:
+                if msg.name and "NTL_Knowledge_Base" in msg.name:
+                    # KB output is now rendered on Knowledge_Base_Searcher AI messages.
+                    continue
                 exp_title = _tr(f"工具输出: {msg.name}", f"Tool Output: {msg.name}")
                 with st.expander(exp_title, expanded=False):
-                    if msg.name and "NTL_Knowledge_Base" in msg.name:
-                        render_kb_output(msg.content)
-                    elif str(msg.name or "").strip().lower() in {
+                    tool_name_norm = str(msg.name or "").strip().lower()
+                    if tool_name_norm == "write_todos":
+                        render_write_todos_output(msg.content)
+                    elif tool_name_norm in {
                         "uploaded_pdf_understanding_tool",
                         "uploaded_image_understanding_tool",
                         "uploaded_file_understanding_tool",
                     }:
                         render_uploaded_understanding_output(msg.content, tool_name=str(msg.name or ""))
+                    elif any(
+                        token in str(msg.name or "").strip().lower()
+                        for token in (
+                            "ntl_solution_knowledge",
+                            "ntl_literature_knowledge",
+                            "ntl_code_knowledge",
+                            "solution_knowledge",
+                            "literature_knowledge",
+                            "code_knowledge",
+                        )
+                    ):
+                        render_kb_tool_output(msg.content, tool_name=str(msg.name or ""))
                     else:
                         try:
                             st.json(_sanitize_paths_in_obj(json.loads(msg.content)))
@@ -3053,7 +3703,7 @@ def render_reasoning_content(events):
                             st.write(_sanitize_paths_in_text(str(msg.content)))
             st.markdown("<hr style='margin: 10px 0; border: 1px dashed #64748b;'>", unsafe_allow_html=True)
         elif step["kind"] == "kb_progress":
-            if has_final_kb_tool:
+            if has_final_kb_response:
                 continue
             records = [x for x in step.get("records", []) if isinstance(x, dict)]
             if not records:
@@ -3088,7 +3738,7 @@ def render_reasoning_content(events):
                     )
                 else:
                     msg = _tr(
-                        f"已自动触发图片理解: {', '.join(files) if files else 'image'}{suffix}",
+                        f"已自动触发图像理解: {', '.join(files) if files else 'image'}{suffix}",
                         f"Auto image understanding triggered: {', '.join(files) if files else 'image'}{suffix}",
                     )
                 st.info(msg)
@@ -3115,7 +3765,7 @@ def _classify_code_assistant_stage(tool_name, tool_payload):
     status = _status_from_payload(tool_payload)
     if name == "save_geospatial_script_tool":
         return "Draft Received"
-    if name in {"geocode_cot_validation_tool", "execute_geospatial_script_tool", "final_geospatial_code_execution_tool"}:
+    if name in {"geocode_cot_validation_tool", "execute_geospatial_script_tool"}:
         if status == "success":
             return "Success"
         if status in {"needs_engineer_decision", "fail"}:
@@ -3225,7 +3875,6 @@ def _render_output_workspace_mismatch_notice():
 
 def _render_output_preview():
     workspace = storage_manager.get_workspace(st.session_state.get("thread_id", "debug"))
-    _render_output_workspace_mismatch_notice()
     output_dir = workspace / "outputs"
     files = [f for f in output_dir.glob("*.*") if f.is_file()] if output_dir.exists() else []
     if not files:
@@ -3292,9 +3941,137 @@ def _render_output_preview():
         st.caption(_tr("该文件类型暂不支持预览，请在 Data Center 下载。", "Preview is not available for this file type. Use Data Center to download."))
 
 
+def _render_chat_history_with_run_notice() -> None:
+    show_history(
+        st.session_state.get("chat_history", []),
+        show_running_notice_under_latest_user=bool(st.session_state.get("is_running", False)),
+    )
+
+
+_SUBAGENT_CARD_ORDER = [
+    "Knowledge_Base_Searcher",
+    "Data_Searcher",
+    "Code_Assistant",
+    "NTL_Engineer",
+]
+
+
+def _normalize_subagent_name(raw_name: str) -> str:
+    name = str(raw_name or "").strip().lower()
+    if not name:
+        return ""
+    if "knowledge_base" in name:
+        return "Knowledge_Base_Searcher"
+    if "data_searcher" in name:
+        return "Data_Searcher"
+    if "code_assistant" in name:
+        return "Code_Assistant"
+    if "engineer" in name or name == "ntl-gpt":
+        return "NTL_Engineer"
+    return ""
+
+
+def _extract_latest_agent_text(logs: list, target_agent: str) -> str:
+    target = str(target_agent or "").strip().lower()
+    for event in reversed(logs or []):
+        if not isinstance(event, dict):
+            continue
+        for msg in reversed(event.get("messages", []) or []):
+            if not isinstance(msg, AIMessage):
+                continue
+            msg_agent = _normalize_subagent_name(getattr(msg, "name", "") or "")
+            if str(msg_agent).strip().lower() != target:
+                continue
+            text = _normalize_content_to_text(_strip_legacy_stream_marker(getattr(msg, "content", "")))
+            text = _sanitize_paths_in_text(str(text or "")).strip()
+            if text:
+                return " ".join(text.split())[:96]
+    return ""
+
+
+def _display_agent_label(agent_name: str) -> str:
+    mapping = {
+        "Knowledge_Base_Searcher": "Knowledge Base",
+        "Data_Searcher": "Data Searcher",
+        "Code_Assistant": "Code Assistant",
+        "NTL_Engineer": "NTL Engineer",
+    }
+    return mapping.get(str(agent_name or "").strip(), str(agent_name or "").replace("_", " "))
+
+
+def _build_subagent_lifecycle_state(logs: list, is_running: bool, last_terminal_kind: str = "") -> dict:
+    state = {
+        name: {"status": "pending", "summary": ""}
+        for name in _SUBAGENT_CARD_ORDER
+    }
+
+    grouped = _build_reasoning_sections(logs or [])
+    encountered: list[str] = []
+    for step in grouped:
+        if step.get("kind") != "ai":
+            continue
+        agent = _normalize_subagent_name(step.get("agent", ""))
+        if agent and agent not in encountered:
+            encountered.append(agent)
+
+    if not encountered:
+        if is_running:
+            state["NTL_Engineer"]["status"] = "running"
+            state["NTL_Engineer"]["summary"] = _tr("任务已启动", "Run started")
+        return state
+
+    for idx, agent in enumerate(encountered):
+        # Keep cards compact: only show detail for currently active (or final) agent.
+        state[agent]["summary"] = ""
+        if idx < len(encountered) - 1:
+            state[agent]["status"] = "done"
+        else:
+            state[agent]["status"] = "running" if is_running else "done"
+            state[agent]["summary"] = _extract_latest_agent_text(logs, agent)
+
+    terminal = str(last_terminal_kind or "").strip().lower()
+    if terminal == "error":
+        state["NTL_Engineer"]["status"] = "error"
+    elif terminal == "interrupted":
+        state["NTL_Engineer"]["status"] = "interrupted"
+
+    return state
+
+
+def _render_subagent_lifecycle_cards(logs: list, is_running: bool, last_terminal_kind: str = "") -> None:
+    lifecycle = _build_subagent_lifecycle_state(logs, is_running=is_running, last_terminal_kind=last_terminal_kind)
+    status_map = {
+        "pending": ("#64748b", _tr("待命", "Pending")),
+        "running": ("#2563eb", _tr("运行中", "Running")),
+        "done": ("#059669", _tr("完成", "Done")),
+        "error": ("#dc2626", _tr("错误", "Error")),
+        "interrupted": ("#f59e0b", _tr("中断", "Interrupted")),
+    }
+    # st.markdown("<div style='margin-bottom:1px;'>", unsafe_allow_html=True)
+    cols = st.columns(len(_SUBAGENT_CARD_ORDER), gap="small")
+    for idx, name in enumerate(_SUBAGENT_CARD_ORDER):
+        item = lifecycle.get(name, {})
+        raw_status = str(item.get("status", "pending")).strip().lower()
+        color, label = status_map.get(raw_status, status_map["pending"])
+        label_name = _display_agent_label(name)
+        with cols[idx]:
+            st.markdown(
+                (
+                    "<div style='border:1px solid rgba(148,163,184,0.35);border-radius:10px;padding:5px 8px;"
+                    "background:rgba(15,23,42,0.18);min-height:38px;display:flex;flex-direction:column;gap:1px;'>"
+                    f"<div style='font-size:12px;font-weight:700;color:#dbeafe;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>{label_name}</div>"
+                    f"<div style='font-size:12px;font-weight:700;color:{color};line-height:1.1;'>● {label}</div>"
+                    "</div>"
+                ),
+                unsafe_allow_html=True,
+            )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
 def render_content_layout():
     """Render dual-column layout: chat and analysis/map/results."""
     workspace = storage_manager.get_workspace(st.session_state.get("thread_id", "debug"))
+    _ = app_logic.consume_active_run_events()
     # st.markdown(
     #     f"<div class='ntl-card'>"
     #     f"<b>{_tr('工作空间', 'Workspace')}</b><br><span style='color:#61717a;font-size:0.88rem;'>{workspace}</span></div>",
@@ -3303,10 +4080,17 @@ def render_content_layout():
 
     col_chat, col_analysis = st.columns([0.58, 0.42], gap="medium")
 
+    chat_live_placeholder = None
+    lifecycle_placeholder = None
+    reasoning_live_placeholder = None
+    reasoning_graph_live_placeholder = None
+
     with col_chat:
         chat_container = st.container(height=getattr(app_state, "CHAT_CONTAINER_HEIGHT", 640))
         with chat_container:
-            show_history(st.session_state.chat_history)
+            chat_live_placeholder = st.empty()
+            with chat_live_placeholder.container():
+                _render_chat_history_with_run_notice()
         chat_input_value = get_user_input()
         user_question, chat_files = _extract_chat_input_text_and_files(chat_input_value)
         if chat_files:
@@ -3328,7 +4112,7 @@ def render_content_layout():
                     (
                         "assistant",
                         _tr(
-                            f"已接收并保存文件到 `inputs/`：{', '.join(saved)}。请继续提问需要我如何理解或分析这些文件。",
+                            f"已接收并保存文件到 `inputs/`：{', '.join(saved)}。请继续提问我如何分析这些文件。",
                             f"Files saved to `inputs/`: {', '.join(saved)}. Ask what you want me to analyze from them.",
                         ),
                     )
@@ -3337,7 +4121,6 @@ def render_content_layout():
         pending_question = st.session_state.pop("pending_question", None) if "pending_question" in st.session_state else None
         if pending_question and not user_question:
             user_question = pending_question
-            st.info(_tr(f"已载入测试用例: {pending_question[:120]}", f"Loaded test case: {pending_question[:120]}"))
         runtime_notice = st.session_state.pop("runtime_recovered_notice", None)
         if runtime_notice:
             st.info(_tr("检测到上轮任务状态残留，已自动恢复，可继续提问。", runtime_notice))
@@ -3357,9 +4140,19 @@ def render_content_layout():
             reasoning_graph_show_sub_steps = False
             with tab_reasoning:
                 try:
-                    reasoning_placeholder = st.empty()
+                    lifecycle_placeholder = st.empty()
+                    reasoning_live_placeholder = st.empty()
+                    reasoning_placeholder = reasoning_live_placeholder
                     history = st.session_state.get("analysis_history", [])
-                    if history and not user_question:
+                    is_running_now = st.session_state.get("is_running", False)
+                    last_terminal_kind = str(st.session_state.get("run_last_terminal_kind", "") or "")
+                    with lifecycle_placeholder.container():
+                        _render_subagent_lifecycle_cards(
+                            st.session_state.get("analysis_logs", []),
+                            is_running=is_running_now,
+                            last_terminal_kind=last_terminal_kind,
+                        )
+                    if history and not user_question and not is_running_now:
                         for item in reversed(history):
                             q = str(item.get("question", "")).strip()
                             title_q = (q[:56] + "...") if len(q) > 56 else q
@@ -3379,8 +4172,10 @@ def render_content_layout():
             with tab_reasoning_graph:
                 try:
                     reasoning_graph_placeholder = st.empty()
+                    reasoning_graph_live_placeholder = reasoning_graph_placeholder
                     history = st.session_state.get("analysis_history", [])
-                    if history and not user_question:
+                    is_running_now = st.session_state.get("is_running", False)
+                    if history and not user_question and not is_running_now:
                         for item in reversed(history):
                             q = str(item.get("question", "")).strip()
                             title_q = (q[:56] + "...") if len(q) > 56 else q
@@ -3434,12 +4229,75 @@ def render_content_layout():
                 )
                 st.rerun()
                 return
-            if reasoning_placeholder is None:
-                reasoning_placeholder = st.empty()
-            app_logic.handle_userinput(
-                user_question,
-                reasoning_placeholder,
-                chat_container,
-                reasoning_graph_placeholder=reasoning_graph_placeholder,
-                reasoning_graph_show_sub_steps=reasoning_graph_show_sub_steps,
-            )
+            run_result = app_logic.start_user_run(user_question)
+            if not run_result.get("started"):
+                reason = str(run_result.get("reason") or "")
+                if reason == "thread_run_in_progress":
+                    st.info(_tr("当前线程已有运行中的任务。", "A task is already running for this thread."))
+                elif reason == "conversation_uninitialized":
+                    st.warning(
+                        _tr(
+                            "会话初始化失败，请在侧边栏点击 Activate 后重试。",
+                            "Conversation initialization failed. Please activate in sidebar and retry.",
+                        )
+                    )
+                st.rerun()
+                return
+
+        graph_force_refresh_once = bool(st.session_state.get("reasoning_graph_force_refresh_once", False))
+        if hasattr(st, "fragment") and (st.session_state.get("is_running", False) or graph_force_refresh_once):
+            @st.fragment(run_every=1.4)
+            def _streaming_live_fragment_main():
+                was_running = bool(st.session_state.get("_streaming_was_running", False))
+                app_logic.consume_active_run_events()
+                is_running_now = bool(st.session_state.get("is_running", False))
+                if was_running and not is_running_now:
+                    st.session_state["reasoning_graph_force_refresh_once"] = True
+                st.session_state["_streaming_was_running"] = is_running_now
+
+                if chat_live_placeholder is not None:
+                    with chat_live_placeholder.container():
+                        _render_chat_history_with_run_notice()
+                if lifecycle_placeholder is not None:
+                    with lifecycle_placeholder.container():
+                        _render_subagent_lifecycle_cards(
+                            st.session_state.get("analysis_logs", []),
+                            is_running=is_running_now,
+                            last_terminal_kind=str(st.session_state.get("run_last_terminal_kind", "") or ""),
+                        )
+                if reasoning_live_placeholder is not None and st.session_state.get("analysis_logs"):
+                    with reasoning_live_placeholder.container():
+                        with st.expander(_tr("本轮推理过程", "Reasoning Flow"), expanded=True):
+                            render_reasoning_content(st.session_state.analysis_logs)
+
+            @st.fragment(run_every=3.6)
+            def _streaming_live_fragment_graph():
+                if reasoning_graph_live_placeholder is None:
+                    return
+                if not bool(st.session_state.get("reasoning_graph_refresh_enabled", True)):
+                    return
+                logs = st.session_state.get("analysis_logs") or []
+                if not logs:
+                    return
+
+                current_sig = _compute_reasoning_graph_signature(logs)
+                last_sig = str(st.session_state.get("reasoning_graph_last_sig", "") or "")
+                force_refresh = bool(st.session_state.get("reasoning_graph_force_refresh_once", False))
+                if (not force_refresh) and (current_sig == last_sig):
+                    return
+
+                with reasoning_graph_live_placeholder.container():
+                    with st.expander(_tr("本轮推理图谱", "Reasoning Graph"), expanded=True):
+                        render_reasoning_map(
+                            logs,
+                            interactive=False,
+                            show_sub_steps=False,
+                        )
+                st.session_state["reasoning_graph_last_sig"] = current_sig
+                st.session_state["reasoning_graph_last_render_at"] = float(time.time())
+                if force_refresh:
+                    st.session_state["reasoning_graph_force_refresh_once"] = False
+
+            _streaming_live_fragment_main()
+            _streaming_live_fragment_graph()
+

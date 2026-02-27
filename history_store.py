@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import time
 import uuid
 from pathlib import Path
@@ -144,6 +145,48 @@ def list_user_threads(user_id: str, limit: int = 30) -> List[Dict[str, Any]]:
     if limit > 0:
         normalized = normalized[:limit]
     return normalized
+
+
+def delete_user_thread(user_id: str, thread_id: str, delete_workspace: bool = True) -> Dict[str, Any]:
+    """Delete a thread from user's index and optionally remove its workspace."""
+    uid = normalize_user_id(user_id)
+    tid = str(thread_id or "").strip()
+    result = {
+        "deleted": False,
+        "thread_id": tid,
+        "index_removed": False,
+        "workspace_removed": False,
+        "workspace_path": str((BASE_DIR / tid).as_posix()) if tid else "",
+    }
+    if not tid:
+        return result
+
+    idx_path = _threads_index_path(uid)
+    payload = _safe_read_json(idx_path, {"threads": []})
+    rows = payload.get("threads", [])
+    if not isinstance(rows, list):
+        rows = []
+    new_rows = [
+        item
+        for item in rows
+        if not (isinstance(item, dict) and str(item.get("thread_id", "")).strip() == tid)
+    ]
+    if len(new_rows) != len(rows):
+        payload["threads"] = new_rows
+        _safe_write_json(idx_path, payload)
+        result["index_removed"] = True
+
+    if delete_workspace:
+        workspace = BASE_DIR / tid
+        if workspace.exists():
+            try:
+                shutil.rmtree(workspace, ignore_errors=False)
+                result["workspace_removed"] = not workspace.exists()
+            except Exception:
+                result["workspace_removed"] = False
+
+    result["deleted"] = bool(result["index_removed"] or result["workspace_removed"])
+    return result
 
 
 def _history_dir(thread_id: str) -> Path:

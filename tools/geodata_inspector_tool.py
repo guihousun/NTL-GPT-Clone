@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from collections import defaultdict
+from collections import Counter
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
@@ -112,6 +113,15 @@ class GeoDataInspectorInput(BaseModel):
             "'stem_no_digits' groups files by filename after removing digits."
         ),
     )
+    workspace_lookup: Literal["auto", "inputs", "outputs"] = Field(
+        default="auto",
+        description=(
+            "Where logical filenames are looked up. "
+            "'auto' checks inputs then outputs; "
+            "'inputs' prefers inputs then outputs fallback; "
+            "'outputs' prefers outputs then inputs fallback."
+        ),
+    )
 
 
 class GeoDataQuickCheckInput(BaseModel):
@@ -134,6 +144,59 @@ class GeoDataQuickCheckInput(BaseModel):
             "per-year/per-month coverage counting."
         ),
     )
+    workspace_lookup: Literal["auto", "inputs", "outputs"] = Field(
+        default="auto",
+        description=(
+            "Where logical filenames are looked up. "
+            "'auto' checks inputs then outputs; "
+            "'inputs' prefers inputs then outputs fallback; "
+            "'outputs' prefers outputs then inputs fallback."
+        ),
+    )
+
+
+def _normalize_workspace_relative_path(raw_path: str) -> Tuple[Optional[str], str]:
+    normalized = str(raw_path or "").strip().replace("\\", "/")
+    if not normalized:
+        return None, ""
+    lowered = normalized.lower()
+    if lowered.startswith("inputs/"):
+        return "inputs", normalized.split("/", 1)[1].strip()
+    if lowered.startswith("outputs/"):
+        return "outputs", normalized.split("/", 1)[1].strip()
+    return None, normalized
+
+
+def _resolve_workspace_file(
+    raw_path: str,
+    *,
+    workspace_lookup: Literal["auto", "inputs", "outputs"] = "auto",
+) -> Tuple[Optional[str], Optional[str], List[str]]:
+    explicit_location, relative_path = _normalize_workspace_relative_path(raw_path)
+    if not relative_path:
+        return None, None, []
+
+    if explicit_location == "inputs":
+        search_order: List[str] = ["inputs", "outputs"]
+    elif explicit_location == "outputs":
+        search_order = ["outputs", "inputs"]
+    elif workspace_lookup == "outputs":
+        search_order = ["outputs", "inputs"]
+    else:
+        # Keep backward compatibility: default lookup still prefers inputs.
+        search_order = ["inputs", "outputs"]
+
+    attempted: List[str] = []
+    for location in search_order:
+        if location == "inputs":
+            resolved = sm.resolve_input_path(relative_path)
+        else:
+            resolved = sm.resolve_output_path(relative_path)
+        attempted.append(resolved)
+        if os.path.exists(resolved):
+            return location, resolved, attempted
+
+    return None, None, attempted
 
 
 def _raster_basic_stats(arr: np.ndarray) -> Dict[str, Any]:
@@ -385,6 +448,8 @@ def inspect_geospatial_assets(
     mode: Literal["basic", "full"] = "full",
     sample_pixels: int = 0,
     dedupe_mode: DedupeMode = "none",
+    workspace_lookup: Literal["auto", "inputs", "outputs"] = "auto",
+    include_cross_checks: bool = True,
 ) -> str:
     report: Dict[str, Any] = {
         "mode": mode,
@@ -394,24 +459,53 @@ def inspect_geospatial_assets(
         "cross_checks": [],
     }
 
-    resolved_raster_paths: List[str] = []
+    resolved_raster_paths: List[Tuple[str, str, str]] = []
     report["requested_raster_count"] = len(raster_paths or [])
     if raster_paths:
         for p in raster_paths:
-            abs_path = sm.resolve_input_path(p)
-            if not os.path.exists(abs_path):
+            resolved_location, abs_path, attempted_paths = _resolve_workspace_file(
+                p,
+                workspace_lookup=workspace_lookup,
+            )
+            if not abs_path or not resolved_location:
                 report["raster_reports"].append(
-                    {"path": p, "resolved_path": abs_path, "exists": False, "readable": False, "error": "File not found in workspace."}
+                    {
+                        "path": p,
+                        "resolved_path": None,
+                        "resolved_location": None,
+                        "attempted_paths": attempted_paths,
+                        "exists": False,
+                        "readable": False,
+                        "error": "File not found in workspace (inputs/outputs).",
+                    }
                 )
                 continue
-            resolved_raster_paths.append(abs_path)
+            resolved_raster_paths.append((p, abs_path, resolved_location))
 
         dedupe_dropped: List[Dict[str, str]] = []
         if dedupe_mode == "stem_no_digits":
-            resolved_raster_paths, dedupe_dropped = dedupe_by_name_simple(resolved_raster_paths, keep="first")
+            original_paths = [item[1] for item in resolved_raster_paths]
+            deduped_paths, dedupe_dropped = dedupe_by_name_simple(original_paths, keep="first")
+            allowed_counts = Counter(deduped_paths)
+            deduped_entries: List[Tuple[str, str, str]] = []
+            for entry in resolved_raster_paths:
+                abs_path = entry[1]
+                if allowed_counts.get(abs_path, 0) > 0:
+                    deduped_entries.append(entry)
+                    allowed_counts[abs_path] -= 1
+            resolved_raster_paths = deduped_entries
             report["dedupe_raster"] = {"policy": "by_name_no_digits_keep_first", "dropped": dedupe_dropped}
         elif dedupe_mode == "exact_path":
-            resolved_raster_paths, dedupe_dropped = dedupe_by_exact_path(resolved_raster_paths, keep="first")
+            original_paths = [item[1] for item in resolved_raster_paths]
+            deduped_paths, dedupe_dropped = dedupe_by_exact_path(original_paths, keep="first")
+            allowed_counts = Counter(deduped_paths)
+            deduped_entries = []
+            for entry in resolved_raster_paths:
+                abs_path = entry[1]
+                if allowed_counts.get(abs_path, 0) > 0:
+                    deduped_entries.append(entry)
+                    allowed_counts[abs_path] -= 1
+            resolved_raster_paths = deduped_entries
             report["dedupe_raster"] = {"policy": "exact_path_keep_first", "dropped": dedupe_dropped}
         else:
             report["dedupe_raster"] = {"policy": "none", "dropped": []}
@@ -421,34 +515,69 @@ def inspect_geospatial_assets(
         report["dedupe_applied"] = False
     report["resolved_raster_count"] = len(resolved_raster_paths)
 
-    resolved_vector_paths: List[str] = []
+    resolved_vector_paths: List[Tuple[str, str, str]] = []
     if vector_paths:
         for p in vector_paths:
-            abs_path = sm.resolve_input_path(p)
-            if not os.path.exists(abs_path):
+            resolved_location, abs_path, attempted_paths = _resolve_workspace_file(
+                p,
+                workspace_lookup=workspace_lookup,
+            )
+            if not abs_path or not resolved_location:
                 report["vector_reports"].append(
-                    {"path": p, "resolved_path": abs_path, "exists": False, "readable": False, "error": "File not found in workspace."}
+                    {
+                        "path": p,
+                        "resolved_path": None,
+                        "resolved_location": None,
+                        "attempted_paths": attempted_paths,
+                        "exists": False,
+                        "readable": False,
+                        "error": "File not found in workspace (inputs/outputs).",
+                    }
                 )
                 continue
-            resolved_vector_paths.append(abs_path)
+            resolved_vector_paths.append((p, abs_path, resolved_location))
 
-    for rp in resolved_raster_paths:
+    for requested_path, rp, resolved_location in resolved_raster_paths:
         try:
-            report["raster_reports"].append(_raster_report(rp, sample_pixels=sample_pixels, mode=mode))
+            raster_item = _raster_report(rp, sample_pixels=sample_pixels, mode=mode)
+            raster_item["requested_path"] = requested_path
+            raster_item["resolved_location"] = resolved_location
+            report["raster_reports"].append(raster_item)
         except Exception as exc:  # noqa: BLE001
-            report["raster_reports"].append({"path": rp, "exists": True, "readable": False, "error": str(exc)})
+            report["raster_reports"].append(
+                {
+                    "path": rp,
+                    "requested_path": requested_path,
+                    "resolved_location": resolved_location,
+                    "exists": True,
+                    "readable": False,
+                    "error": str(exc),
+                }
+            )
 
-    for vp in resolved_vector_paths:
+    for requested_path, vp, resolved_location in resolved_vector_paths:
         try:
-            report["vector_reports"].append(_vector_report(vp, mode=mode))
+            vector_item = _vector_report(vp, mode=mode)
+            vector_item["requested_path"] = requested_path
+            vector_item["resolved_location"] = resolved_location
+            report["vector_reports"].append(vector_item)
         except Exception as exc:  # noqa: BLE001
-            report["vector_reports"].append({"path": vp, "exists": True, "readable": False, "error": str(exc)})
+            report["vector_reports"].append(
+                {
+                    "path": vp,
+                    "requested_path": requested_path,
+                    "resolved_location": resolved_location,
+                    "exists": True,
+                    "readable": False,
+                    "error": str(exc),
+                }
+            )
 
     if gee_assets:
         for asset in gee_assets:
             report["gee_reports"].append(_gee_asset_report(asset, mode=mode))
 
-    if report["raster_reports"] and report["vector_reports"]:
+    if include_cross_checks and report["raster_reports"] and report["vector_reports"]:
         r0 = next((r for r in report["raster_reports"] if "error" not in r), None)
         if r0:
             r_bounds = r0.get("bounds")
@@ -488,6 +617,7 @@ def inspect_geospatial_assets_quick(
     vector_paths: Optional[List[str]] = None,
     gee_assets: Optional[List[str]] = None,
     dedupe_mode: DedupeMode = "none",
+    workspace_lookup: Literal["auto", "inputs", "outputs"] = "auto",
 ) -> str:
     """
     Fast availability check for Data_Searcher:
@@ -500,6 +630,8 @@ def inspect_geospatial_assets_quick(
         mode="basic",
         sample_pixels=0,
         dedupe_mode=dedupe_mode,
+        workspace_lookup=workspace_lookup,
+        include_cross_checks=False,
     )
 
 

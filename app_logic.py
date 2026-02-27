@@ -1,7 +1,9 @@
 import os
 import re
 import time
-from typing import Optional
+import threading
+import uuid
+from typing import Any, Optional
 
 import streamlit as st
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
@@ -11,6 +13,20 @@ import app_state
 import file_context_service
 import history_store
 from storage_manager import current_thread_id, storage_manager
+
+
+_RUN_REGISTRY_LOCK = threading.RLock()
+_RUN_REGISTRY: dict[str, dict[str, Any]] = {}
+_THREAD_ACTIVE_RUN: dict[str, str] = {}
+
+
+def _ensure_runtime_state_defaults() -> None:
+    st.session_state.setdefault("active_run_id", None)
+    st.session_state.setdefault("active_run_thread_id", None)
+    st.session_state.setdefault("run_last_rendered_event_seq", 0)
+    st.session_state.setdefault("pending_model_change", None)
+    st.session_state.setdefault("pending_activate_request", None)
+    st.session_state.setdefault("run_last_terminal_kind", "")
 
 
 def should_recover_stale_run(
@@ -66,9 +82,9 @@ def recover_runtime_health():
         )
 
 
-def _attach_time_cost_footer(answer_text: str, elapsed_s: float) -> str:
+def _attach_time_cost_footer(answer_text: str, elapsed_s: float, ui_lang: str = "EN") -> str:
     """Append a subtle runtime footer at the end of an assistant response."""
-    label = "本次回答耗时" if st.session_state.get("ui_lang") == "CN" else "Time cost"
+    label = "本次回答耗时" if str(ui_lang).upper() == "CN" else "Time cost"
     footer = (
         "<div style='margin-top:0.45rem;font-size:0.78rem;"
         "color:#94a3b8;line-height:1.2;'>"
@@ -90,12 +106,12 @@ def _is_timeout_error_text(text: str) -> bool:
     return any(marker in low for marker in markers)
 
 
-def _build_runtime_error_notice(err: Exception) -> str:
+def _build_runtime_error_notice(err: Exception, ui_lang: str = "EN") -> str:
     raw = str(err or "").strip()
     short = raw.split("Traceback", 1)[0].strip() if raw else "Unknown runtime error."
     if len(short) > 260:
         short = short[:260] + "..."
-    is_cn = st.session_state.get("ui_lang") == "CN"
+    is_cn = str(ui_lang).upper() == "CN"
 
     if _is_timeout_error_text(raw):
         if is_cn:
@@ -420,208 +436,300 @@ def _iter_events(conversation, state, config):
                 yield "values", item, ()
 
 
-def handle_userinput(
-    user_question,
-    reasoning_placeholder,
-    chat_container,
-    reasoning_graph_placeholder=None,
-    reasoning_graph_show_sub_steps=False,
-):
-    import app_ui
-
+def _append_analysis_history_snapshot() -> None:
     prev_logs = st.session_state.get("analysis_logs", [])
-    if prev_logs:
-        history = st.session_state.setdefault("analysis_history", [])
-        history.append(
+    if not prev_logs:
+        return
+    history = st.session_state.setdefault("analysis_history", [])
+    history.append(
+        {
+            "question": st.session_state.get("last_question", ""),
+            "logs": list(prev_logs),
+            "created_at": int(time.time()),
+        }
+    )
+    st.session_state["analysis_history"] = history[-12:]
+
+
+def _append_chat_if_new(role: str, content: str) -> None:
+    item = (role, content)
+    history = st.session_state.setdefault("chat_history", [])
+    if not history or history[-1] != item:
+        history.append(item)
+
+
+def _emit_run_event(run_id: str, kind: str, payload: dict) -> None:
+    with _RUN_REGISTRY_LOCK:
+        control = _RUN_REGISTRY.get(run_id)
+        if not control:
+            return
+        seq = int(control.get("next_seq", 1))
+        control["next_seq"] = seq + 1
+        control["events"].append(
             {
-                "question": st.session_state.get("last_question", ""),
-                "logs": list(prev_logs),
-                "created_at": int(time.time()),
+                "seq": seq,
+                "run_id": run_id,
+                "thread_id": str(control.get("thread_id")),
+                "ts": time.time(),
+                "kind": kind,
+                "payload": payload or {},
             }
         )
-        if len(history) > 12:
-            st.session_state["analysis_history"] = history[-12:]
 
-    st.session_state.analysis_logs = []
-    st.session_state["last_question"] = user_question
-    st.session_state["is_running"] = True
-    st.session_state["cancel_requested"] = False
 
-    with chat_container.container():
-        app_ui.render_label_human(user_question)
-        st.caption("Thinking and analyzing...")
+def _get_run_control(run_id: str) -> Optional[dict[str, Any]]:
+    with _RUN_REGISTRY_LOCK:
+        return _RUN_REGISTRY.get(str(run_id))
 
-    run_thread_id = str(st.session_state.get("thread_id") or "debug")
+
+def request_stop_active_run(thread_id: Optional[str] = None, detach_session: bool = False) -> bool:
+    _ensure_runtime_state_defaults()
+    tid = str(thread_id or st.session_state.get("active_run_thread_id") or st.session_state.get("thread_id") or "")
+    if not tid:
+        return False
+    requested = False
+    with _RUN_REGISTRY_LOCK:
+        run_id = _THREAD_ACTIVE_RUN.get(tid)
+        if run_id:
+            control = _RUN_REGISTRY.get(run_id)
+            if control and str(control.get("state")) == "running":
+                control["stop_requested"] = True
+                requested = True
+    if requested:
+        st.session_state["cancel_requested"] = True
+    if detach_session:
+        active_tid = str(st.session_state.get("active_run_thread_id") or "")
+        if (not active_tid) or active_tid == tid:
+            st.session_state["is_running"] = False
+            st.session_state["cancel_requested"] = False
+            st.session_state["active_run_id"] = None
+            st.session_state["active_run_thread_id"] = None
+            st.session_state["run_ended_ts"] = time.time()
+    return requested
+
+
+def _build_run_payload(user_question: str, run_thread_id: str) -> tuple[dict, dict]:
     context_system_msg = _build_injected_context_system_message(user_question, run_thread_id)
     state_messages = []
     if context_system_msg:
         state_messages.append({"role": "system", "content": context_system_msg})
     state_messages.append({"role": "user", "content": user_question})
     state = {"messages": state_messages}
-    st.session_state["active_run_thread_id"] = run_thread_id
     config = {
         "configurable": {"thread_id": run_thread_id},
         "recursion_limit": app_state.RECURSION_LIMIT,
     }
+    return state, config
 
-    start_ts = time.time()
-    st.session_state["run_started_ts"] = start_ts
-    st.session_state["run_heartbeat_ts"] = start_ts
 
-    final_answer = None
-    last_event = None
-    interrupted_reason = None
-    run_exception = None
+def start_user_run(user_question: str) -> dict[str, Any]:
+    _ensure_runtime_state_defaults()
+    question = str(user_question or "").strip()
+    if not question:
+        return {"started": False, "reason": "empty_question"}
+    conversation = st.session_state.get("conversation")
+    if conversation is None:
+        return {"started": False, "reason": "conversation_uninitialized"}
+
+    run_thread_id = str(st.session_state.get("thread_id") or "debug")
+    with _RUN_REGISTRY_LOCK:
+        active_run_id = _THREAD_ACTIVE_RUN.get(run_thread_id)
+        if active_run_id:
+            active_control = _RUN_REGISTRY.get(active_run_id)
+            if active_control and str(active_control.get("state")) == "running":
+                return {"started": False, "reason": "thread_run_in_progress", "run_id": active_run_id}
+
+    _append_analysis_history_snapshot()
+    st.session_state["analysis_logs"] = []
+    st.session_state["last_question"] = question
+    st.session_state["is_running"] = True
+    st.session_state["cancel_requested"] = False
+
+    run_id = uuid.uuid4().hex
+    state, config = _build_run_payload(question, run_thread_id)
+    now = time.time()
+    control = {
+        "run_id": run_id,
+        "thread_id": run_thread_id,
+        "user_id": str(st.session_state.get("user_id") or "guest"),
+        "question": question,
+        "conversation": conversation,
+        "state_payload": state,
+        "config": config,
+        "events": [],
+        "next_seq": 1,
+        "state": "running",
+        "stop_requested": False,
+        "start_ts": now,
+        "heartbeat_ts": now,
+        "end_ts": None,
+        "ui_lang": str(st.session_state.get("ui_lang", "EN") or "EN"),
+        "analysis_logs": [],
+    }
+    with _RUN_REGISTRY_LOCK:
+        _RUN_REGISTRY[run_id] = control
+        _THREAD_ACTIVE_RUN[run_thread_id] = run_id
+
+    st.session_state["active_run_id"] = run_id
+    st.session_state["active_run_thread_id"] = run_thread_id
+    st.session_state["run_last_rendered_event_seq"] = 0
+    st.session_state["run_started_ts"] = now
+    st.session_state["run_heartbeat_ts"] = now
+    st.session_state["run_ended_ts"] = None
+    st.session_state["run_last_terminal_kind"] = ""
+
     try:
-        history_store.append_chat_record(run_thread_id, role="user", content=user_question, kind="text")
-        history_store.touch_thread_activity(st.session_state.get("user_id", "guest"), run_thread_id, last_question=user_question)
+        history_store.append_chat_record(run_thread_id, role="user", content=question, kind="text")
+        history_store.touch_thread_activity(control["user_id"], run_thread_id, last_question=question)
     except Exception:
         pass
 
+    worker = threading.Thread(target=_worker_run_main, args=(run_id,), daemon=True, name=f"ntl-run-{run_id[:8]}")
+    control["worker_thread"] = worker
+    worker.start()
+    return {"started": True, "run_id": run_id}
+
+
+def poll_user_run(run_id: str, after_seq: int = 0) -> tuple[list[dict], str]:
+    with _RUN_REGISTRY_LOCK:
+        control = _RUN_REGISTRY.get(str(run_id))
+        if not control:
+            return [], "missing"
+        events = [e for e in control.get("events", []) if int(e.get("seq", 0)) > int(after_seq)]
+        return events, str(control.get("state") or "unknown")
+
+
+def _worker_run_main(run_id: str) -> None:
+    control = _get_run_control(run_id)
+    if not control:
+        return
+
+    run_thread_id = str(control.get("thread_id") or "debug")
+    question = str(control.get("question") or "")
+    conversation = control.get("conversation")
+    state = control.get("state_payload") or {}
+    config = control.get("config") or {}
+    ui_lang = str(control.get("ui_lang") or "EN")
+
+    final_answer: Optional[str] = None
+    last_event = None
+    interrupted_reason = None
+    run_exception = None
+    start_ts = float(control.get("start_ts") or time.time())
+
+    _emit_run_event(run_id, "status", {"state": "running"})
     token = current_thread_id.set(run_thread_id)
     try:
-        with reasoning_placeholder.container():
-            with st.container(height=600):
-                with st.expander("Reasoning Flow", expanded=False):
-                    timeline_placeholder = st.empty()
-                    map_placeholder = st.empty()
-                    seen_message_fingerprints: set[str] = set()
-                    for existing_msg in _get_state_messages(st.session_state.conversation, config):
-                        if isinstance(existing_msg, BaseMessage):
-                            seen_message_fingerprints.add(_message_fingerprint(existing_msg))
+        seen_message_fingerprints: set[str] = set()
+        for existing_msg in _get_state_messages(conversation, config):
+            if isinstance(existing_msg, BaseMessage):
+                seen_message_fingerprints.add(_message_fingerprint(existing_msg))
 
-                    try:
-                        for mode, payload, namespace in _iter_events(st.session_state.conversation, state, config):
-                            now = time.time()
-                            st.session_state["run_heartbeat_ts"] = now
-                            if st.session_state.get("cancel_requested", False):
-                                st.warning("Run interrupted by user request.")
-                                interrupted_reason = "user_cancel"
-                                break
+        for mode, payload, namespace in _iter_events(conversation, state, config):
+            now = time.time()
+            with _RUN_REGISTRY_LOCK:
+                inner = _RUN_REGISTRY.get(run_id)
+                if not inner:
+                    interrupted_reason = "run_lost"
+                    break
+                inner["heartbeat_ts"] = now
+                if bool(inner.get("stop_requested")):
+                    interrupted_reason = "user_cancel"
+                    break
 
-                            if mode == "messages":
-                                if isinstance(payload, tuple) and len(payload) == 2:
-                                    chunk, metadata = payload
-                                    text_piece = _chunk_to_text(chunk)
-                                    if text_piece:
-                                        st.session_state["run_heartbeat_ts"] = now
+            if mode == "messages":
+                continue
 
-                            elif mode == "custom":
-                                st.session_state["run_heartbeat_ts"] = now
-                                if isinstance(payload, dict):
-                                    if payload.get("event_type") == "kb_progress":
-                                        st.session_state.analysis_logs.append({"kb_progress": [payload]})
-                                    else:
-                                        st.session_state.analysis_logs.append({"custom": [payload]})
-                                    with timeline_placeholder.container():
-                                        app_ui.render_reasoning_content(st.session_state.analysis_logs)
-                                    if reasoning_graph_placeholder is not None:
-                                        with reasoning_graph_placeholder.container():
-                                            with st.expander("Reasoning Graph", expanded=True):
-                                                app_ui.render_reasoning_map(
-                                                    st.session_state.analysis_logs,
-                                                    interactive=False,
-                                                    show_sub_steps=reasoning_graph_show_sub_steps,
-                                                )
+            if mode == "custom":
+                if isinstance(payload, dict):
+                    if payload.get("event_type") == "kb_progress":
+                        log_event = {"kb_progress": [payload]}
+                    else:
+                        log_event = {"custom": [payload]}
+                    with _RUN_REGISTRY_LOCK:
+                        inner = _RUN_REGISTRY.get(run_id)
+                        if inner is not None:
+                            inner["analysis_logs"].append(log_event)
+                    _emit_run_event(run_id, "reasoning_custom", {"log_event": log_event})
+                continue
 
-                            else:
-                                delta_messages = _collect_new_messages(payload, seen_message_fingerprints)
-                                if delta_messages:
-                                    st.session_state["run_heartbeat_ts"] = now
-                                    delta_event = {"messages": delta_messages}
-                                    st.session_state.analysis_logs.append(delta_event)
-                                    with timeline_placeholder.container():
-                                        app_ui.render_reasoning_content(st.session_state.analysis_logs)
-                                    if reasoning_graph_placeholder is not None:
-                                        with reasoning_graph_placeholder.container():
-                                            with st.expander("Reasoning Graph", expanded=True):
-                                                app_ui.render_reasoning_map(
-                                                    st.session_state.analysis_logs,
-                                                    interactive=False,
-                                                    show_sub_steps=reasoning_graph_show_sub_steps,
-                                                )
-                                    last_event = delta_event
-                                    candidate = _extract_meaningful_ai_text(delta_messages)
-                                    if candidate:
-                                        final_answer = candidate
-                    except Exception as err:
-                        run_exception = err
-                        st.error(f"Run failed: {err}")
+            delta_messages = _collect_new_messages(payload, seen_message_fingerprints)
+            if not delta_messages:
+                continue
+            delta_event = {"messages": delta_messages}
+            with _RUN_REGISTRY_LOCK:
+                inner = _RUN_REGISTRY.get(run_id)
+                if inner is not None:
+                    inner["analysis_logs"].append(delta_event)
+            _emit_run_event(run_id, "reasoning_delta", {"log_event": delta_event})
+            last_event = delta_event
+            candidate = _extract_meaningful_ai_text(delta_messages)
+            if candidate:
+                final_answer = candidate
+    except Exception as err:  # noqa: BLE001
+        run_exception = err
     finally:
         current_thread_id.reset(token)
-        st.session_state["is_running"] = False
-        st.session_state["cancel_requested"] = False
-        st.session_state["run_ended_ts"] = time.time()
 
     preferred_agents = ["NTL_Engineer"]
     if not final_answer and last_event and "messages" in last_event:
-        final_answer = _extract_meaningful_ai_text(
-            last_event.get("messages"), preferred_agents=preferred_agents
-        )
+        final_answer = _extract_meaningful_ai_text(last_event.get("messages"), preferred_agents=preferred_agents)
 
-    state_messages = _get_state_messages(st.session_state.conversation, config)
-    preferred_from_state = _extract_meaningful_ai_text(
-        state_messages, preferred_agents=preferred_agents
-    )
+    state_messages = _get_state_messages(conversation, config)
+    preferred_from_state = _extract_meaningful_ai_text(state_messages, preferred_agents=preferred_agents)
     if preferred_from_state:
         final_answer = preferred_from_state
     elif not final_answer:
         final_answer = _extract_meaningful_ai_text(state_messages)
 
     elapsed_s = max(0.0, time.time() - start_ts)
+    assistant_text = None
+    status = "partial"
 
     if final_answer:
-        final_with_footer = _attach_time_cost_footer(final_answer, elapsed_s)
-        st.session_state.chat_history.append(("assistant", final_with_footer))
-        try:
-            history_store.append_chat_record(run_thread_id, role="assistant", content=final_with_footer, kind="text")
-        except Exception:
-            pass
-        _collect_recent_outputs(seconds=120, thread_id=run_thread_id)
+        assistant_text = _attach_time_cost_footer(final_answer, elapsed_s, ui_lang=ui_lang)
+        _emit_run_event(run_id, "final_answer", {"text": assistant_text, "elapsed_s": elapsed_s})
+        status = "success"
         if run_exception:
-            err_text = _attach_time_cost_footer(_build_runtime_error_notice(run_exception), elapsed_s)
-            st.session_state.chat_history.append(("assistant", err_text))
-            try:
-                history_store.append_chat_record(run_thread_id, role="assistant", content=err_text, kind="text")
-            except Exception:
-                pass
+            err_text = _attach_time_cost_footer(_build_runtime_error_notice(run_exception, ui_lang=ui_lang), elapsed_s, ui_lang=ui_lang)
+            _emit_run_event(run_id, "error", {"text": err_text, "elapsed_s": elapsed_s})
     elif run_exception:
-        err_text = _attach_time_cost_footer(_build_runtime_error_notice(run_exception), elapsed_s)
-        st.session_state.chat_history.append(("assistant", err_text))
-        try:
-            history_store.append_chat_record(run_thread_id, role="assistant", content=err_text, kind="text")
-        except Exception:
-            pass
+        assistant_text = _attach_time_cost_footer(_build_runtime_error_notice(run_exception, ui_lang=ui_lang), elapsed_s, ui_lang=ui_lang)
+        _emit_run_event(run_id, "error", {"text": assistant_text, "elapsed_s": elapsed_s})
+        status = "error"
     elif interrupted_reason:
-        interrupted_text = _attach_time_cost_footer(
+        assistant_text = _attach_time_cost_footer(
             f"Run interrupted ({interrupted_reason}). Please refine the task or retry.",
             elapsed_s,
+            ui_lang=ui_lang,
         )
-        st.session_state.chat_history.append(("assistant", interrupted_text))
-        try:
-            history_store.append_chat_record(run_thread_id, role="assistant", content=interrupted_text, kind="text")
-        except Exception:
-            pass
+        _emit_run_event(run_id, "interrupted", {"text": assistant_text, "elapsed_s": elapsed_s})
+        status = "interrupted"
     elif last_event and "messages" in last_event:
-        no_final_text = _attach_time_cost_footer(
+        assistant_text = _attach_time_cost_footer(
             "Run finished without a final answer from the main agent. Please retry.",
             elapsed_s,
+            ui_lang=ui_lang,
         )
-        st.session_state.chat_history.append(("assistant", no_final_text))
-        try:
-            history_store.append_chat_record(run_thread_id, role="assistant", content=no_final_text, kind="text")
-        except Exception:
-            pass
+        _emit_run_event(run_id, "no_final", {"text": assistant_text, "elapsed_s": elapsed_s})
+        status = "partial"
 
     try:
-        sequence, counts = _extract_tool_usage(st.session_state.get("analysis_logs", []))
-        status = "success" if final_answer else ("error" if run_exception else ("interrupted" if interrupted_reason else "partial"))
+        if assistant_text:
+            history_store.append_chat_record(run_thread_id, role="assistant", content=assistant_text, kind="text")
+    except Exception:
+        pass
+
+    try:
+        with _RUN_REGISTRY_LOCK:
+            logs = list((_RUN_REGISTRY.get(run_id) or {}).get("analysis_logs", []))
+        sequence, counts = _extract_tool_usage(logs)
         history_store.append_turn_summary(
             run_thread_id,
             {
-                "user_id": st.session_state.get("user_id", "guest"),
+                "user_id": str(control.get("user_id") or "guest"),
                 "thread_id": run_thread_id,
-                "question": user_question,
+                "question": question,
                 "final_answer_excerpt": str(final_answer or "")[:300],
                 "tool_sequence": sequence,
                 "tool_calls_by_name": counts,
@@ -630,12 +738,88 @@ def handle_userinput(
             },
         )
         history_store.touch_thread_activity(
-            st.session_state.get("user_id", "guest"),
+            str(control.get("user_id") or "guest"),
             run_thread_id,
-            last_question=user_question,
+            last_question=question,
             last_answer_excerpt=str(final_answer or "")[:240],
         )
     except Exception:
         pass
 
-    st.rerun()
+    with _RUN_REGISTRY_LOCK:
+        inner = _RUN_REGISTRY.get(run_id)
+        if inner is not None:
+            inner["state"] = status
+            inner["end_ts"] = time.time()
+    _emit_run_event(
+        run_id,
+        "done",
+        {
+            "status": status,
+            "thread_id": run_thread_id,
+            "elapsed_s": elapsed_s,
+        },
+    )
+    with _RUN_REGISTRY_LOCK:
+        _THREAD_ACTIVE_RUN.pop(run_thread_id, None)
+
+
+def consume_active_run_events() -> bool:
+    _ensure_runtime_state_defaults()
+    run_id = str(st.session_state.get("active_run_id") or "").strip()
+    if not run_id:
+        return False
+
+    after_seq = int(st.session_state.get("run_last_rendered_event_seq", 0) or 0)
+    events, state = poll_user_run(run_id, after_seq=after_seq)
+    consumed = False
+    for event in events:
+        consumed = True
+        seq = int(event.get("seq", 0))
+        st.session_state["run_last_rendered_event_seq"] = seq
+        kind = str(event.get("kind") or "")
+        payload = event.get("payload") or {}
+        if kind in {"reasoning_delta", "reasoning_custom"}:
+            log_event = payload.get("log_event")
+            if isinstance(log_event, dict):
+                st.session_state.setdefault("analysis_logs", []).append(log_event)
+            heartbeat = float(event.get("ts") or time.time())
+            st.session_state["run_heartbeat_ts"] = heartbeat
+            continue
+        if kind in {"final_answer", "error", "interrupted", "no_final"}:
+            text = str(payload.get("text") or "").strip()
+            st.session_state["run_last_terminal_kind"] = kind
+            if text:
+                _append_chat_if_new("assistant", text)
+            continue
+        if kind == "done":
+            run_thread = str(payload.get("thread_id") or st.session_state.get("active_run_thread_id") or "")
+            if run_thread and run_thread == str(st.session_state.get("thread_id") or ""):
+                _collect_recent_outputs(seconds=120, thread_id=run_thread)
+            st.session_state["run_ended_ts"] = time.time()
+            st.session_state["is_running"] = False
+            st.session_state["cancel_requested"] = False
+            st.session_state["active_run_id"] = None
+            st.session_state["active_run_thread_id"] = None
+
+    if not events and state in {"success", "error", "interrupted", "partial", "missing"}:
+        st.session_state["is_running"] = False
+        st.session_state["cancel_requested"] = False
+        st.session_state["active_run_id"] = None
+        st.session_state["active_run_thread_id"] = None
+    return consumed
+
+
+def handle_userinput(
+    user_question,
+    reasoning_placeholder,
+    chat_container,
+    reasoning_graph_placeholder=None,
+    reasoning_graph_show_sub_steps=False,
+):
+    # Backward-compatible wrapper. New flow is start + consume.
+    _ = (reasoning_placeholder, chat_container, reasoning_graph_placeholder, reasoning_graph_show_sub_steps)
+    result = start_user_run(user_question)
+    consume_active_run_events()
+    return result
+

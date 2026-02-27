@@ -8,26 +8,46 @@ import pandas as pd
 import rasterio
 import rasterio.mask
 from langchain_core.tools import StructuredTool
+from langchain_core.runnables import RunnableConfig
+from langchain_core.runnables.config import var_child_runnable_config
 from pydantic.v1 import BaseModel, Field
 from rasterio.errors import RasterioIOError
 from shapely.geometry import mapping
 from shapely.ops import unary_union
 from tqdm import tqdm
 
-from storage_manager import storage_manager
+from storage_manager import storage_manager, current_thread_id
 
 
 class NTL_raster_statistics_input(BaseModel):
     ntl_tif_path: Optional[str] = Field(
         default=None,
-        description="Single NTL GeoTIFF filename in 'inputs/' (e.g. 'ntl_2023.tif').",
+        description=(
+            "Single NTL GeoTIFF input. Supports local workspace filename in 'inputs/' "
+            "(e.g. 'ntl_2023.tif') or shared virtual path (e.g. '/shared/Q11/inputs/ntl_2023.tif')."
+        ),
     )
     ntl_tif_paths: Optional[List[str]] = Field(
         default=None,
-        description="Optional batch input: multiple NTL GeoTIFF filenames in 'inputs/' for multi-year processing.",
+        description=(
+            "Optional batch input list. Each item supports local 'inputs/' filename "
+            "or shared virtual path '/shared/...'."
+        ),
     )
-    shapefile_path: str = Field(..., description="Filename of the boundary Shapefile in 'inputs/' (e.g. 'city.shp')")
-    output_csv_path: str = Field(..., description="Target filename for results in 'outputs/' (e.g. 'stats.csv')")
+    shapefile_path: str = Field(
+        ...,
+        description=(
+            "Boundary Shapefile input. Supports local 'inputs/' filename "
+            "or shared virtual path (e.g. '/shared/Q11/inputs/city.shp')."
+        ),
+    )
+    output_csv_path: str = Field(
+        ...,
+        description=(
+            "Target output filename in current-thread workspace 'outputs/' (e.g. 'stats.csv'). "
+            "Do not use '/shared/...'; shared paths are read-only."
+        ),
+    )
     selected_indices: Optional[List[str]] = Field(
         default=None,
         description="Optional list of indices to calculate: ['TNTL', 'LArea', 'ANTL', '3DPLand', '3DED', '3DLPI', 'MaxNTL', 'MinNTL', 'SDNTL']",
@@ -142,6 +162,38 @@ def _extract_year_from_filename(name: str) -> Optional[int]:
         return None
 
 
+def _resolve_thread_id_from_config(config: Optional[RunnableConfig] = None) -> str:
+    runtime_config: Optional[RunnableConfig] = None
+    if isinstance(config, dict):
+        runtime_config = config
+    else:
+        inherited = var_child_runnable_config.get()
+        if isinstance(inherited, dict):
+            runtime_config = inherited
+
+    try:
+        configurable = runtime_config.get("configurable", {}) if isinstance(runtime_config, dict) else {}
+        thread_id = str(configurable.get("thread_id", "") or "").strip()
+        if thread_id:
+            return thread_id
+    except Exception:
+        pass
+
+    try:
+        context_tid = str(current_thread_id.get() or "").strip()
+        if context_tid:
+            return context_tid
+    except Exception:
+        pass
+
+    return "debug"
+
+
+def _normalized_output_reference(output_csv_path: str) -> str:
+    name = os.path.basename(str(output_csv_path or "").strip())
+    return f"outputs/{name}" if name else "outputs/result.csv"
+
+
 def _compute_for_single_raster(
     abs_ntl_path: str,
     ntl_label: str,
@@ -201,13 +253,16 @@ def NTL_raster_statistics(
     ntl_tif_paths=None,
     selected_indices=None,
     only_global=False,
+    config: Optional[RunnableConfig] = None,
 ):
     ntl_inputs = _collect_ntl_inputs(ntl_tif_path=ntl_tif_path, ntl_tif_paths=ntl_tif_paths)
     if not ntl_inputs:
         return "Error: Provide 'ntl_tif_path' or 'ntl_tif_paths' with at least one raster filename."
 
-    abs_shp_path = storage_manager.resolve_input_path(shapefile_path)
-    abs_out_path = storage_manager.resolve_output_path(output_csv_path)
+    thread_id = _resolve_thread_id_from_config(config)
+    abs_shp_path = storage_manager.resolve_input_path(shapefile_path, thread_id=thread_id)
+    abs_out_path = storage_manager.resolve_output_path(output_csv_path, thread_id=thread_id)
+    output_ref = _normalized_output_reference(output_csv_path)
 
     if not os.path.exists(abs_shp_path):
         return f"Error: Shapefile not found at {abs_shp_path}"
@@ -216,7 +271,7 @@ def NTL_raster_statistics(
     global_summaries: List[Tuple[str, Dict[str, float]]] = []
 
     for tif_name in ntl_inputs:
-        abs_ntl_path = storage_manager.resolve_input_path(tif_name)
+        abs_ntl_path = storage_manager.resolve_input_path(tif_name, thread_id=thread_id)
         if not os.path.exists(abs_ntl_path):
             return f"Error: Raster file not found at {abs_ntl_path}"
 
@@ -248,13 +303,13 @@ def NTL_raster_statistics(
     if len(ntl_inputs) == 1:
         if total_feature_rows <= 0:
             return (
-                f"Results saved to: {output_csv_path}\n\n"
+                f"Results saved to: {output_ref}\n\n"
                 f"**Global Summary (Total ROI):**\n{summary_str}\n"
                 "Note: Detailed statistics for each sub-region are available in the generated CSV file."
             )
         return (
             f"Success: Analysis completed for {total_feature_rows} region rows.\n"
-            f"Results saved to: {output_csv_path}\n\n"
+            f"Results saved to: {output_ref}\n\n"
             f"**Global Summary (Total ROI):**\n{summary_str}\n"
             "Note: Detailed statistics for each sub-region are available in the generated CSV file."
         )
@@ -262,7 +317,7 @@ def NTL_raster_statistics(
     return (
         f"Success: Batch analysis completed for {len(ntl_inputs)} rasters.\n"
         f"Feature rows: {total_feature_rows}\n"
-        f"Results saved to: {output_csv_path}\n\n"
+        f"Results saved to: {output_ref}\n\n"
         f"**Global Summary (Per Raster):**\n{summary_str}"
     )
 

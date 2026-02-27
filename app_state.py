@@ -4,7 +4,7 @@ import history_store
 from storage_manager import storage_manager
 
 MODEL_OPTIONS = ["qwen3.5-plus", "gpt-5-mini", "gpt-5.1"]
-RECURSION_LIMIT = 51
+RECURSION_LIMIT = 61
 CHAT_CONTAINER_HEIGHT = 600
 ANALYSIS_CONTAINER_HEIGHT = 600
 LLM_REQUEST_TIMEOUT_S = 120
@@ -86,6 +86,11 @@ def init_app():
     st.session_state.setdefault("run_heartbeat_ts", None)
     st.session_state.setdefault("run_ended_ts", None)
     st.session_state.setdefault("runtime_recovered_notice", None)
+    st.session_state.setdefault("active_run_id", None)
+    st.session_state.setdefault("active_run_thread_id", None)
+    st.session_state.setdefault("run_last_rendered_event_seq", 0)
+    st.session_state.setdefault("pending_model_change", None)
+    st.session_state.setdefault("pending_activate_request", None)
 
 
 def reset_chat():
@@ -96,3 +101,6 @@ def reset_chat():
     st.session_state.run_heartbeat_ts = None
     st.session_state.run_ended_ts = None
     st.session_state.runtime_recovered_notice = None
+    st.session_state.active_run_id = None
+    st.session_state.active_run_thread_id = None
+    st.session_state.run_last_rendered_event_seq = 0

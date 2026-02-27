@@ -19,8 +19,8 @@ from .China_official_stats import China_Official_GDP_tool
 from .geodata_inspector_tool import geodata_inspector_tool, geodata_quick_check_tool
 from .NTL_Code_generation import (
     GeoCode_COT_Validation_tool,
-    final_geospatial_code_execution_tool,
-    save_geospatial_script_tool,
+    # save_geospatial_script_tool,
+    # read_workspace_file_tool,
     execute_geospatial_script_tool,
 )
 from .geocode_knowledge_tool import GeoCode_Knowledge_Recipes_tool
@@ -37,35 +37,50 @@ from .uploaded_file_understanding_tool import (
     uploaded_pdf_understanding_tool,
     uploaded_image_understanding_tool,
 )
+from .NTL_VLM_benchmark_tools import (
+    ntl_vlm_fetch_event_registry_tool,
+    ntl_vlm_build_scene_manifest_tool,
+    ntl_vlm_generate_tasks_tool,
+    ntl_vlm_generate_jobs_tool,
+    ntl_vlm_qc_tool,
+    ntl_vlm_evaluate_tool,
+)
 
 data_searcher_tools = [reverse_geocode_tool, geocode_tool, NTL_download_tool, 
          get_administrative_division_tool, poi_search_tool, get_administrative_division_osm_tool,
            NDVI_download_tool, LandScan_download_tool,
-           China_Official_GDP_tool, Tavily_search, google_bigquery_search, geodata_quick_check_tool,
+           China_Official_GDP_tool, Tavily_search, google_bigquery_search, 
            GEE_dataset_router_tool, GEE_script_blueprint_tool, GEE_catalog_discovery_tool, GEE_dataset_metadata_tool]
 
 
 Code_tools = [
     geodata_inspector_tool,
     GeoCode_Knowledge_Recipes_tool,
-    save_geospatial_script_tool,
+    # save_geospatial_script_tool,
+    # read_workspace_file_tool,
     execute_geospatial_script_tool,
     GeoCode_COT_Validation_tool,
-    final_geospatial_code_execution_tool,
 ]
 
 Engineer_tools = [
-    NTL_Knowledge_Base, SDGSAT1_strip_removal_tool, SDGSAT1_radiometric_calibration_tool,
+    # NTL_Knowledge_Base, 
+    SDGSAT1_strip_removal_tool, SDGSAT1_radiometric_calibration_tool,
     noaa20_sdr_preprocess_tool, VNP46A2_angular_correction_tool, dmsp_evi_preprocess_tool,
     urban_extraction_by_thresholding_tool, svm_urban_extraction_tool, electrified_detection_tool, otsu_road_extraction_tool,detect_urban_centres_tool,
     NTL_Trend_Analysis, detect_ntl_anomaly_tool, NTL_composite_local_tool,
-    geodata_quick_check_tool,
     NTL_raster_statistics_tool,
     NTL_estimate_indicator_provincial_tool, DEI_estimate_city_tool,
     SDGSAT1_index_tool, vnci_index_tool,
-    save_geospatial_script_tool,
-    uploaded_file_understanding_tool,
-    uploaded_pdf_understanding_tool,
-    uploaded_image_understanding_tool,
+    # save_geospatial_script_tool,
+    # read_workspace_file_tool,
+    # uploaded_file_understanding_tool,
+    # uploaded_pdf_understanding_tool,
+    # uploaded_image_understanding_tool,
+    # ntl_vlm_fetch_event_registry_tool,
+    # ntl_vlm_build_scene_manifest_tool,
+    # ntl_vlm_generate_tasks_tool,
+    # ntl_vlm_generate_jobs_tool,
+    # ntl_vlm_qc_tool,
+    # ntl_vlm_evaluate_tool,
 ]
     

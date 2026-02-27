@@ -123,16 +123,24 @@ def _extract_latest_user_query(messages: list) -> str:
 
 
 def _build_searcher_llm() -> ChatOpenAI:
-    api_key = os.getenv("DASHSCOPE_API_KEY") or os.getenv("QWEN_API_KEY")
+    api_key = (
+        os.getenv("DOUBAO_API_KEY")
+        or os.getenv("DASHSCOPE_API_KEY")
+    )
     if not api_key:
         raise RuntimeError(
-            "DASHSCOPE_API_KEY (or QWEN_API_KEY) is required for "
-            "NTL_Knowledge_Base_Searcher qwen3.5-plus model."
+            "DOUBAO_API_KEY (or DASHSCOPE_API_KEY / QWEN_API_KEY) is required for "
+            "NTL_Knowledge_Base_Searcher doubao-seed-2.0-code model."
         )
+    base_url = (
+        os.getenv("DOUBAO_BASE_URL")
+        or os.getenv("ARK_OPENAI_BASE_URL")
+        or "https://ark.cn-beijing.volces.com/api/v3"
+    )
     return ChatOpenAI(
         api_key=api_key,
-        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-        model="qwen3.5-plus"
+        base_url=base_url,
+        model="kimi-k2.5"
     )
 
 
@@ -250,9 +258,84 @@ def _fallback_intent_profile(query: str, mode: str = "auto") -> dict:
     }
 
 
+def _propose_task_level_fallback(query: str, intent_profile: dict | None = None, mode: str = "auto") -> dict:
+    # Minimal default only (non-rule fallback). Normal path is LLM classification.
+    _ = (query, intent_profile, mode)
+    return {
+        "proposed_task_level": "L2",
+        "task_level_reason_codes": ["low_confidence_match"],
+        "task_level_confidence": 0.5,
+    }
+
+
+def _normalize_task_level_payload(payload: dict | None, fallback: dict) -> dict:
+    allowed_levels = {"L1", "L2", "L3"}
+    allowed_reason_codes = {
+        "built_in_tool_matched",
+        "download_only",
+        "analysis_with_tool",
+        "no_tool_custom_code",
+        "algorithm_gap",
+        "low_confidence_match",
+    }
+    data = dict(payload or {})
+    level = str(data.get("proposed_task_level") or "").upper().strip()
+    if level not in allowed_levels:
+        level = str(fallback.get("proposed_task_level", "L2")).upper()
+    reason_codes = data.get("task_level_reason_codes")
+    if not isinstance(reason_codes, list):
+        reason_codes = fallback.get("task_level_reason_codes", [])
+    reason_codes = [str(code).strip() for code in reason_codes if str(code).strip() in allowed_reason_codes]
+    if not reason_codes:
+        reason_codes = fallback.get("task_level_reason_codes", ["low_confidence_match"])
+    confidence_raw = data.get("task_level_confidence", fallback.get("task_level_confidence", 0.5))
+    try:
+        confidence = float(confidence_raw)
+    except Exception:
+        confidence = float(fallback.get("task_level_confidence", 0.5))
+    confidence = max(0.0, min(1.0, confidence))
+    return {
+        "proposed_task_level": level,
+        "task_level_reason_codes": reason_codes,
+        "task_level_confidence": confidence,
+    }
+
+
+def _classify_task_level_with_fallback(query: str, intent_profile: dict | None = None, mode: str = "auto") -> dict:
+    """已禁用：task_level 分类已合并到 _repair_and_augment_output 中"""
+    return _propose_task_level_fallback(query=query, intent_profile=intent_profile, mode=mode)
+
+
+def _augment_intent_with_task_level(intent_profile: dict, query: str, mode: str = "auto") -> dict:
+    intent = dict(intent_profile or {})
+    fallback = _propose_task_level_fallback(query=query, intent_profile=intent, mode=mode)
+    existing_payload = {
+        "proposed_task_level": intent.get("proposed_task_level"),
+        "task_level_reason_codes": intent.get("task_level_reason_codes"),
+        "task_level_confidence": intent.get("task_level_confidence"),
+    }
+    proposal = _normalize_task_level_payload(existing_payload, fallback)
+    if not intent.get("proposed_task_level"):
+        if "_classify_task_level_with_fallback" in globals():
+            proposal = _classify_task_level_with_fallback(query=query, intent_profile=intent, mode=mode)
+        else:
+            proposal = fallback
+    intent["proposed_task_level"] = proposal.get("proposed_task_level", "L2")
+    reason_codes = proposal.get("task_level_reason_codes", [])
+    intent["task_level_reason_codes"] = reason_codes if isinstance(reason_codes, list) else []
+    try:
+        intent["task_level_confidence"] = float(proposal.get("task_level_confidence", 0.5))
+    except Exception:
+        intent["task_level_confidence"] = 0.5
+    intent["task_level_proposal_source"] = "NTL_Knowledge_Base_Searcher"
+    return intent
+
+
 def _normalize_intent_payload(payload, mode: str, query: str) -> dict:
     fallback = _fallback_intent_profile(query, mode)
     if not isinstance(payload, dict):
+        if "_augment_intent_with_task_level" in globals():
+            return _augment_intent_with_task_level(fallback, query, mode)
         return fallback
 
     normalized = dict(fallback)
@@ -274,6 +357,8 @@ def _normalize_intent_payload(payload, mode: str, query: str) -> dict:
     if not intent_type:
         intent_type = fallback["intent_type"]
     normalized["intent_type"] = intent_type
+    if "_augment_intent_with_task_level" in globals():
+        return _augment_intent_with_task_level(normalized, query, mode)
     return normalized
 
 
@@ -281,6 +366,8 @@ def _classify_query_intent_with_fallback(query: str, mode: str = "auto") -> dict
     import os
 
     fallback = _fallback_intent_profile(query, mode)
+    if "_augment_intent_with_task_level" in globals():
+        fallback = _augment_intent_with_task_level(fallback, query, mode)
     api_key = os.getenv("DASHSCOPE_API_KEY") or os.getenv("QWEN_API_KEY")
     if not api_key:
         return fallback
@@ -438,6 +525,87 @@ def _build_force_json_fallback_payload(
     }
 
 
+def _repair_and_augment_output(
+    raw_content: str,
+    *,
+    user_query: str,
+    mode: str,
+    intent_profile: dict | None,
+    valid_tools: set[str],
+) -> dict | None:
+    """修复非 JSON 输出并同时添加 task_level（合并版，一次 LLM 调用）"""
+    if not isinstance(raw_content, str):
+        return None
+    text = raw_content.strip()
+    if not text:
+        return None
+
+    tool_list = ", ".join(sorted(valid_tools))
+    intent_type = str((intent_profile or {}).get("intent_type", "")).strip().lower()
+    
+    prompt = (
+        "You are an NTL workflow parser. Rewrite the raw assistant output into a valid JSON object.\n"
+        "Return JSON only. No markdown.\n\n"
+        
+        "=== Required JSON Structure ===\n"
+        "1. Workflow fields (if mode is workflow/auto/mixed):\n"
+        "   task_id, task_name, category, description, steps(list), output\n"
+        "2. Task Level fields:\n"
+        "   proposed_task_level: L1|L2|L3\n"
+        "   task_level_reason_codes: array from [built_in_tool_matched, download_only, analysis_with_tool, no_tool_custom_code, algorithm_gap, low_confidence_match]\n"
+        "   task_level_confidence: number in [0,1]\n\n"
+        
+        "=== Task Level Definitions ===\n"
+        "- L1: download/retrieval only with built-in tools (single-step data fetch)\n"
+        "- L2: analysis/statistics/comparison with direct built-in tool support (1-2 steps)\n"
+        "- L3: complex multi-step workflows requiring coordination, external data sources, event analysis, or custom algorithms\n\n"
+        "=== L3 Indicators (any of these → L3) ===\n"
+        "- Event impact assessment (earthquake, flood, wildfire, etc.)\n"
+        "- Multi-source data integration (USGS, ReliefWeb, etc.)\n"
+        "- Multiple time period comparisons (pre/post event, baseline, etc.)\n"
+        "- More than 3 workflow steps\n"
+        "- Custom damage assessment or impact summary\n"
+        "- Pixel-level analysis or custom algorithms\n"
+        "- Requires GEE script generation for Code Assistant execution\n"
+        "- Server-side processing with custom code (not direct tool call)\n\n"
+        
+        "=== Tool Registry ===\n"
+        f"Use only: {tool_list}\n"
+        "If a step has no executable tool, use {\"type\":\"instruction\",\"description\":\"...\"}\n"
+        "If unrecoverable, return {\"status\":\"no_valid_tool\",\"reason\":\"...\",\"sources\":[]}\n\n"
+        
+        f"mode: {mode}\n"
+        f"intent_type: {intent_type}\n"
+        f"user_query: {user_query}\n"
+        f"intent_profile: {json.dumps(intent_profile or {}, ensure_ascii=False)}\n\n"
+        f"raw_output: {text}"
+    )
+    try:
+        llm = _build_searcher_llm()
+        response = llm.invoke(prompt)
+        content = getattr(response, "content", response)
+        if isinstance(content, list):
+            parts: list[str] = []
+            for item in content:
+                if isinstance(item, str):
+                    parts.append(item)
+                elif isinstance(item, dict):
+                    txt = item.get("text")
+                    if txt:
+                        parts.append(str(txt))
+            content = "\n".join(parts)
+        elif not isinstance(content, str):
+            content = str(content)
+        parsed = _safe_json_loads(content)
+        if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict):
+            parsed = parsed[0]
+        if isinstance(parsed, dict):
+            return parsed
+    except Exception:
+        return None
+    return None
+
+
 def _build_kb_response_contract(
     payload: dict,
     mode: str = "workflow",
@@ -479,6 +647,16 @@ def _build_kb_response_contract(
         "sources": sources,
         "workflow": workflow,
     }
+    proposed_level = intent.get("proposed_task_level")
+    if proposed_level:
+        contract["proposed_task_level"] = proposed_level
+    reason_codes = intent.get("task_level_reason_codes")
+    if isinstance(reason_codes, list):
+        contract["task_level_reason_codes"] = reason_codes
+    if "task_level_confidence" in intent:
+        contract["task_level_confidence"] = intent.get("task_level_confidence")
+    if "task_level_proposal_source" in intent:
+        contract["task_level_proposal_source"] = intent.get("task_level_proposal_source")
 
     for key in ("task_id", "task_name", "category", "description", "steps", "output"):
         value = workflow.get(key)
@@ -575,6 +753,8 @@ def _validate_and_normalize_workflow_output(
 
     # Use the provided intent_profile, or fall back to rule-based intent.
     intent = intent_profile if isinstance(intent_profile, dict) else _fallback_intent_profile(user_query, response_mode)
+    if "_augment_intent_with_task_level" in globals():
+        intent = _augment_intent_with_task_level(intent, user_query, response_mode)
 
     # 鎻愬彇 JSON
     data, rest = _extract_first_json_dict(content)
@@ -590,12 +770,25 @@ def _validate_and_normalize_workflow_output(
 
     if not isinstance(data, dict):
         if force_json:
-            data = _build_force_json_fallback_payload(
-                user_query,
-                valid_tools,
-                intent_profile=intent,
+            repaired = _repair_and_augment_output(
+                content,
+                user_query=user_query,
                 mode=response_mode,
+                intent_profile=intent,
+                valid_tools=valid_tools,
             )
+            if isinstance(repaired, dict):
+                data = repaired
+                if "intent_analysis" in data and isinstance(data.get("intent_analysis"), dict):
+                    intent.update(data.get("intent_analysis", {}))
+                    data = data.get("response", data)
+            if not isinstance(data, dict):
+                data = _build_force_json_fallback_payload(
+                    user_query,
+                    valid_tools,
+                    intent_profile=intent,
+                    mode=response_mode,
+                )
         else:
             data = {
                 "status": "error",
@@ -603,16 +796,16 @@ def _validate_and_normalize_workflow_output(
                 "message": "workflow payload unavailable for this request",
                 "sources": [],
             }
-        return json.dumps(
-            _build_kb_response_contract(
-                data,
-                mode=response_mode,
-                intent_profile=intent,
-                supplementary_text=rest if allow_trailing_text and rest else "",
-            ),
-            ensure_ascii=False,
-            indent=2,
-        )
+            return json.dumps(
+                _build_kb_response_contract(
+                    data,
+                    mode=response_mode,
+                    intent_profile=intent,
+                    supplementary_text=rest if allow_trailing_text and rest else "",
+                ),
+                ensure_ascii=False,
+                indent=2,
+            )
     if data.get("status") == "no_valid_tool":
         return json.dumps(
             _build_kb_response_contract(
@@ -737,7 +930,10 @@ Analyze the query and output:
     "needs_server_side_execution": true/false,
     "prefer_literature": true/false,
     "prefer_code": true/false,
-    "prefer_solution": true/false
+    "prefer_solution": true/false,
+    "proposed_task_level": "L1|L2|L3",
+    "task_level_reason_codes": ["built_in_tool_matched|download_only|analysis_with_tool|no_tool_custom_code|algorithm_gap|low_confidence_match"],
+    "task_level_confidence": 0.0
   }}
 }}
 ```
@@ -786,7 +982,10 @@ Your response MUST be a valid JSON object with this structure:
     "needs_server_side_execution": true/false,
     "prefer_literature": true/false,
     "prefer_code": true/false,
-    "prefer_solution": true/false
+    "prefer_solution": true/false,
+    "proposed_task_level": "L1|L2|L3",
+    "task_level_reason_codes": ["..."],
+    "task_level_confidence": 0.0
   }},
   "response": {{
     // For workflow mode:
@@ -962,6 +1161,7 @@ def _NTL_Knowledge_Searcher(
 
         if not intent_profile:
             intent_profile = _fallback_intent_profile(query, mode)
+        intent_profile = _augment_intent_with_task_level(intent_profile, query, mode)
 
         empty_store_payload = _extract_empty_store_status(final_answer)
         if empty_store_payload and empty_store_payload.get("store") == "Code_RAG":

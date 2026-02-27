@@ -8,10 +8,12 @@ from typing import Optional, Literal
 
 import ee
 import geemap
+from langchain_core.runnables import RunnableConfig
+from langchain_core.runnables.config import var_child_runnable_config
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
-from storage_manager import storage_manager
+from storage_manager import current_thread_id, storage_manager
 
 _PROJECT_ID = "empyrean-caster-430308-m2"
 
@@ -23,6 +25,26 @@ def _ensure_ee_initialized() -> None:
         # If credentials are not available, caller will receive this as tool error.
         ee.Authenticate()
         ee.Initialize(project=_PROJECT_ID)
+
+
+def _resolve_thread_id_from_config(config: Optional[RunnableConfig] = None) -> str:
+    runtime_config: Optional[RunnableConfig] = None
+    if isinstance(config, dict):
+        runtime_config = config
+    else:
+        inherited = var_child_runnable_config.get()
+        if isinstance(inherited, dict):
+            runtime_config = inherited
+
+    if isinstance(runtime_config, dict):
+        try:
+            tid = str(storage_manager.get_thread_id_from_config(runtime_config) or "").strip()
+            if tid:
+                return tid
+        except Exception:
+            pass
+
+    return str(current_thread_id.get() or "debug").strip() or "debug"
 
 
 def _contains_cjk(text: str) -> bool:
@@ -125,6 +147,38 @@ def _ensure_tif_suffix(filename: str) -> str:
     return f"{base}.tif" if base else "output.tif"
 
 
+def _normalize_batch_base_name(base: str, temporal_resolution: str) -> str:
+    """
+    Remove trailing range suffix in batch exports to avoid names like:
+    shanghai_ntl_2013_2022_2013.tif
+    """
+    name = (base or "").strip()
+    if not name:
+        return name
+
+    patterns = []
+    if temporal_resolution == "annual":
+        patterns = [
+            r"[_-](19\d{2}|20\d{2})[_-](19\d{2}|20\d{2})$",
+            r"(19\d{2}|20\d{2})to(19\d{2}|20\d{2})$",
+        ]
+    elif temporal_resolution == "monthly":
+        patterns = [
+            r"[_-](19\d{2}|20\d{2})-(0[1-9]|1[0-2])[_-](19\d{2}|20\d{2})-(0[1-9]|1[0-2])$",
+            r"(19\d{2}|20\d{2})-(0[1-9]|1[0-2])to(19\d{2}|20\d{2})-(0[1-9]|1[0-2])$",
+        ]
+    elif temporal_resolution == "daily":
+        patterns = [
+            r"[_-](19\d{2}|20\d{2})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])[_-](19\d{2}|20\d{2})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$",
+            r"(19\d{2}|20\d{2})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])to(19\d{2}|20\d{2})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$",
+        ]
+
+    trimmed = name
+    for pat in patterns:
+        trimmed = re.sub(pat, "", trimmed).rstrip("_-")
+    return trimmed or name
+
+
 def _parse_time_range(time_range_input: str, temporal_resolution: str) -> tuple[str, str]:
     tr = (time_range_input or "").replace(" ", "")
     if "to" in tr:
@@ -181,9 +235,11 @@ def ntl_download_tool(
     dataset_name: Optional[str] = None,
     collection_name: Optional[str] = None,
     is_in_China: Optional[bool] = None,
+    config: Optional[RunnableConfig] = None,
     **kwargs,
 ):
     try:
+        thread_id = _resolve_thread_id_from_config(config)
         _ensure_ee_initialized()
 
         # Backward-compatible aliases from legacy callers.
@@ -352,9 +408,10 @@ def ntl_download_tool(
                 else:
                     image_date = image.date().format("YYYY-MM-dd").getInfo()
                 base, ext = os.path.splitext(out_name)
-                filename = f"{base}_{image_date}{ext}"
+                normalized_base = _normalize_batch_base_name(base, temporal_resolution)
+                filename = f"{normalized_base}_{image_date}{ext}"
 
-            abs_input = storage_manager.resolve_input_path(filename)
+            abs_input = storage_manager.resolve_input_path(filename, thread_id=thread_id)
             os.makedirs(os.path.dirname(abs_input), exist_ok=True)
 
             try:

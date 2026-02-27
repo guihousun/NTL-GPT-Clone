@@ -82,8 +82,8 @@ NTL_Literature_Knowledge = _build_retriever_tool(
         "scientific definitions."
     ),
     embeddings=_EMBEDDINGS,
-    k=3,
-    score_threshold=0.3,
+    k=2,
+    score_threshold=0.33,
 )
 
 
