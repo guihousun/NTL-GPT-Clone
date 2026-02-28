@@ -35,6 +35,13 @@ This changelog is intentionally lightweight:
 - Registered the new benchmark tools in `Engineer_tools` via `tools/__init__.py` without changing prompt/graph architecture.
 
 ### Changed
+- Unified workflow evolution authority model:
+  - `NTL_Engineer` is now the single decision + landing role for formal workflow mutations.
+  - `Code_Assistant` is restricted to proposal-only outputs via `ntl.workflow.evolution.proposal.v1`.
+- Updated prompt/skill contracts to align authority split:
+  - `agents/NTL_Engineer.py` now enforces proposal review + completion-gate checks before formal writeback.
+  - `agents/NTL_Code_Assistant.py` now explicitly forbids direct workflow/log file edits.
+  - `.ntl-gpt/skills/workflow-intent-router/SKILL.md` now documents mandatory role split (Engineer write, Code proposal).
 - Updated `graph_factory.py` to register `Knowledge_Base_Searcher` as a third subagent, wired to the `NTL_Knowledge_Base` tool for supervisor-level delegated KB planning.
 - Streamed run UX improvements in `app_ui.py`:
   - running-state hint moved below chat input,
@@ -89,6 +96,10 @@ This changelog is intentionally lightweight:
 - Data_Searcher reasoning rendering fallback:
   - non-contract JSON payloads are now shown as status/reason cards instead of blank
     “Geospatial Data Acquisition” cards with empty fields.
+
+### Removed
+- Removed legacy runtime auto-learning module `utils/workflow_intent_learning.py`.
+- Removed obsolete test file tied to deleted auto-learning module: `tests/test_workflow_intent_router_learning.py`.
 
 ## [2026-02-25]
 

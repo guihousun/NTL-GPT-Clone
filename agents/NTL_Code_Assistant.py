@@ -77,6 +77,19 @@ You must follow Geo-CodeCoT v2 strictly.
 ## 5) Output Requirements
 - Save outputs with standard formats: CSV (stats), PNG (visualization), TIF (raster).
 - Always return generated filenames and script metadata: `script_name`, `script_path`, execution status.
+- Workflow evolution authority belongs to `NTL_Engineer` only. You MUST NOT directly edit workflow or evolution log files.
+- If workflow refinement is needed, return proposal payload only using:
+  - `schema: ntl.workflow.evolution.proposal.v1`
+  - `should_evolve: true|false`
+  - `action: patch_existing|append_new`
+  - `intent_id`
+  - `target_task_id` (required for `patch_existing`)
+  - `reason`
+  - `trigger_signature` (optional)
+  - `task` (full candidate workflow object)
+  - `evidence` (`script_name`, `artifact_audit_pass`, `output_files` summary)
+- On failed/interrupted runs, proposal may recommend candidate logging only, but you still MUST NOT write:
+  - `/skills/workflow-intent-router/references/evolution_candidates.jsonl`
 
 ## 6) Error Recovery
 When validation/execution fails:

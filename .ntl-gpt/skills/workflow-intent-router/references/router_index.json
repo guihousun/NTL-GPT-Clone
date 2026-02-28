@@ -1,0 +1,71 @@
+{
+  "schema": "ntl.workflow.intent.router.v1",
+  "updated_at": "2026-02-27T18:50:50Z",
+  "intents": [
+    {
+      "intent_id": "data_retrieval_preprocessing",
+      "intent_name": "data retrieval preprocessing",
+      "workflow_file": "/skills/workflow-intent-router/references/workflows/data_retrieval_preprocessing.json",
+      "priority": 1,
+      "source_categories": [
+        "Data Retrieval and Preprocessing"
+      ]
+    },
+    {
+      "intent_id": "statistical_analysis",
+      "intent_name": "statistical analysis",
+      "workflow_file": "/skills/workflow-intent-router/references/workflows/statistical_analysis.json",
+      "priority": 2,
+      "source_categories": [
+        "NTL statistics"
+      ]
+    },
+    {
+      "intent_id": "trend_change_detection",
+      "intent_name": "trend change detection",
+      "workflow_file": "/skills/workflow-intent-router/references/workflows/trend_change_detection.json",
+      "priority": 3,
+      "source_categories": [
+        "NTL statistics"
+      ]
+    },
+    {
+      "intent_id": "regression_indicator_estimation",
+      "intent_name": "regression indicator estimation",
+      "workflow_file": "/skills/workflow-intent-router/references/workflows/regression_indicator_estimation.json",
+      "priority": 4,
+      "source_categories": [
+        "Application and Modeling > Socio-economic indicator modeling",
+        "Application and Modeling > Socio-economic indicator estimation"
+      ]
+    },
+    {
+      "intent_id": "event_impact_assessment",
+      "intent_name": "event impact assessment",
+      "workflow_file": "/skills/workflow-intent-router/references/workflows/event_impact_assessment.json",
+      "priority": 5,
+      "source_categories": [
+        "Application and Modeling > Disaster monitoring"
+      ]
+    },
+    {
+      "intent_id": "urban_extraction_structure",
+      "intent_name": "urban extraction structure",
+      "workflow_file": "/skills/workflow-intent-router/references/workflows/urban_extraction_structure.json",
+      "priority": 6,
+      "source_categories": [
+        "Application and Modeling > Urban spatial structure analyses",
+        "Application and Modeling > Urban spatial structure extraction"
+      ]
+    },
+    {
+      "intent_id": "quality_validation_misc",
+      "intent_name": "quality validation misc",
+      "workflow_file": "/skills/workflow-intent-router/references/workflows/quality_validation_misc.json",
+      "priority": 7,
+      "source_categories": [
+        "Data Preprocessing > Cross-sensor harmonization"
+      ]
+    }
+  ]
+}

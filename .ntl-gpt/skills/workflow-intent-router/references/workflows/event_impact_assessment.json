@@ -1,0 +1,30 @@
+[
+  {
+    "task_id": "Q20",
+    "task_name": "Earthquake Impact Assessment in Myanmar using Daily NTL (2025)",
+    "category": "Application and Modeling > Disaster monitoring",
+    "description": "Assess the impact of the 2025 Mw7.7 Mandalay earthquake on urban power infrastructure. The workflow retrieves official earthquake parameters (USGS/ReliefWeb), defines multi-scale epicenter buffers (25 km, 50 km, and 100 km), and utilizes the GEE Python API to compare daily VNP46A2 radiance across three critical periods: pre-event baseline, the first post-event overpass night, and the post-disaster recovery phase.",
+    "steps": [
+      {
+        "type": "builtin_tool",
+        "name": "tavily_search",
+        "input": {
+          "query": "2025 Myanmar earthquake official USGS ReliefWeb epicenter magnitude event time"
+        }
+      },
+      {
+        "type": "geospatial_code",
+        "language": "Python",
+        "description": "1. Parse event date/time (UTC), epicenter coordinates, and magnitude from Step 1 official sources. 2. Convert event time to epicenter local time and determine the first post-event overpass night for VNP46A2 (typical local overpass ~01:30). If the event occurs after that nightly overpass on day D, use day D+1 as the first post-event night (not day D). 3. Initialize GEE and define three epicenter buffers: 25 km, 50 km, and 100 km. 4. Load 'NASA/VIIRS/002/VNP46A2' daily radiance data and compute spatial mean ANTL for each buffer across three windows: pre-event baseline (event-14d to event-7d), first post-event overpass night, and post-event recovery (event+7d to event+14d). 5. Save period-level statistics to 'outputs/Myanmar_Earthquake_ANTL_2025.csv' with fields: buffer_km, period, start_date, end_date, mean_antl.",
+        "name": "geospatial_code_step_2"
+      },
+      {
+        "type": "geospatial_code",
+        "language": "Python",
+        "description": "Read 'outputs/Myanmar_Earthquake_ANTL_2025.csv' and compute blackout impact metrics dynamically for each buffer (e.g., drop_pct = (event_night - baseline) / baseline * 100). In the report, explicitly document the first-night selection rule and the actual first post-event overpass date/time used. Generate a structured JSON impact report in 'outputs/Impact_Assessment_Report.json' including assumptions, formulas, per-buffer computed values (25/50/100 km), cross-buffer comparisons, and cited official event metadata from Step 1.",
+        "name": "geospatial_code_step_3"
+      }
+    ],
+    "output": "outputs/Impact_Assessment_Report.json"
+  }
+]
