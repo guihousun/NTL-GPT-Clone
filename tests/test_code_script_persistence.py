@@ -55,15 +55,26 @@ def test_execute_geospatial_script_tool_executes_by_script_name():
     assert "thread_script_exec" in exec_json["script_path"]
 
 
-def test_final_execution_auto_persists_script_file():
+def test_execute_tool_uses_saved_script_file():
     mod = _load_module()
-    result = mod.final_geospatial_code_execution_tool.invoke(
-        {"final_geospatial_code": "print('final_execution_ok')", "strict_mode": True},
+    save_result = mod.save_geospatial_script_tool.invoke(
+        {
+            "script_content": "print('final_execution_ok')\n",
+            "script_name": "final_execution_ok.py",
+            "overwrite": True,
+        },
+        config={"configurable": {"thread_id": "thread_final_save"}},
+    )
+    save_data = json.loads(save_result)
+    assert save_data["status"] == "success"
+
+    result = mod.execute_geospatial_script_tool.invoke(
+        {"script_name": "final_execution_ok.py", "strict_mode": True},
         config={"configurable": {"thread_id": "thread_final_save"}},
     )
     data = json.loads(result)
     assert data["status"] == "success"
-    assert data["script_name"].endswith(".py")
+    assert data["script_name"] == "final_execution_ok.py"
     assert "thread_final_save" in data["script_path"]
     saved_path = Path(data["script_path"])
     assert saved_path.exists()
@@ -75,8 +86,15 @@ def test_success_execution_auto_archives_into_code_guide_runtime(monkeypatch, tm
     runtime_dir = tmp_path / "RAG" / "code_guide" / "tools_latest_runtime"
     monkeypatch.setenv("NTL_CODE_GUIDE_RUNTIME_DIR", str(runtime_dir))
 
-    result = mod.final_geospatial_code_execution_tool.invoke(
-        {"final_geospatial_code": "print('archive_me')", "strict_mode": True},
+    save_result = mod.save_geospatial_script_tool.invoke(
+        {"script_content": "print('archive_me')\n", "script_name": "archive_me.py", "overwrite": True},
+        config={"configurable": {"thread_id": "thread_archive_case"}},
+    )
+    save_data = json.loads(save_result)
+    assert save_data["status"] == "success"
+
+    result = mod.execute_geospatial_script_tool.invoke(
+        {"script_name": "archive_me.py", "strict_mode": True},
         config={"configurable": {"thread_id": "thread_archive_case"}},
     )
     data = json.loads(result)

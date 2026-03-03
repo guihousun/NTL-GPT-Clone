@@ -2,11 +2,15 @@ from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.tools import Tool
 from langchain_experimental.utilities import PythonREPL
 import os
+from pathlib import Path
 from langchain_core.documents import Document
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "C:/NTL_Agent/tool/bigquery/ee-guihousun-f062ac4ad3a3.json"
-os.environ["RIZA_API_KEY"] = "riza_01JAGAHR1XSD9G7T3FFZ7NBVA2_01JAQK95F7463W3WD4Z74NCBSF"
-os.environ["EXA_API_KEY"] = "f2a2c764-dda5-4207-97c5-f5715be969f4"
-os.environ["SERPER_API_KEY"] = "02c7e5622679e5e0dff090dd034a6a651cd90c1b"
+# Keep credential injection path-agnostic.
+# Prefer externally provided env vars; only set a relative fallback when missing.
+if not os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
+    repo_root = Path(__file__).resolve().parents[1]
+    fallback_cred = repo_root / "tools" / "bigquery" / "ee-guihousun-f062ac4ad3a3.json"
+    if fallback_cred.exists():
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(fallback_cred)
 # 创建 BigQuery 客户端
 from langchain_core.tools import StructuredTool
 from langchain_google_community import BigQueryLoader

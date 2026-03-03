@@ -1,4 +1,6 @@
 from experiments.official_daily_ntl_fastpath.cmr_client import (
+    HDF5_SIGNATURE,
+    download_file_with_curl,
     extract_download_link,
     parse_granules_payload,
     resolve_token,
@@ -62,3 +64,40 @@ def test_resolve_token_does_not_fallback_to_generic_access_token(tmp_path, monke
     monkeypatch.delenv("EARTHDATA_BEARER_TOKEN", raising=False)
     monkeypatch.delenv("EDL_TOKEN", raising=False)
     assert resolve_token("EARTHDATA_TOKEN") is None
+
+
+def test_download_accepts_valid_payload_even_if_curl_nonzero(tmp_path, monkeypatch):
+    out = tmp_path / "granule.h5"
+    out.write_bytes(HDF5_SIGNATURE + b"\x00" * 64)
+
+    class _Proc:
+        returncode = 35
+        stderr = "curl: (35) Recv failure: Connection was reset"
+        stdout = ""
+
+    monkeypatch.setattr("experiments.official_daily_ntl_fastpath.cmr_client._require_curl", lambda: "curl")
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: _Proc())
+
+    ok, msg = download_file_with_curl("https://example.com/f.h5", out, earthdata_token="tok", timeout=30)
+    assert ok is True
+    assert "curl_nonzero_but_payload_valid" in msg
+    assert out.exists()
+
+
+def test_download_error_hint_is_sanitized_for_binary_payload(tmp_path, monkeypatch):
+    out = tmp_path / "bad.bin"
+    out.write_bytes(b"\x00\xff\x01\x02\x03\x04\x05\x06" * 16)
+
+    class _Proc:
+        returncode = 35
+        stderr = "curl: (35) Recv failure: Connection was reset"
+        stdout = ""
+
+    monkeypatch.setattr("experiments.official_daily_ntl_fastpath.cmr_client._require_curl", lambda: "curl")
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: _Proc())
+
+    ok, msg = download_file_with_curl("https://example.com/f.bin", out, earthdata_token="tok", timeout=30)
+    assert ok is False
+    assert "binary_payload_head_hex=" in msg
+    assert "\x00" not in msg
+    assert not out.exists()

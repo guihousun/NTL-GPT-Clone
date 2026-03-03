@@ -1,4 +1,4 @@
-# CHANGELOG
+﻿# CHANGELOG
 
 All notable engineering changes for this repository are documented here.
 
@@ -10,6 +10,17 @@ This changelog is intentionally lightweight:
 ## [Unreleased]
 
 ### Added
+- Added `experiments/official_daily_ntl_fastpath/convert_vnp46a1_to_tif.py` for local VNP46A1 batch conversion (`.h5 -> GeoTIFF`), including auto variable-path compatibility, tile mosaic, EPSG:4326 output, and optional bbox clipping.
+- Added `experiments/official_daily_ntl_fastpath/convert_vj102dnb_to_tif.py` for VJ102DNB batch conversion (`.nc -> GeoTIFF`), with date filtering, optional DNB quality-flag masking, mosaic, and optional bbox clipping.
+- Added `experiments/official_daily_ntl_fastpath/convert_vj102_vj103_precise_to_tif.py` for paired precise preprocessing (`VJ102DNB + VJ103DNB`) using per-pixel geolocation and daily composites.
+- Added `experiments/official_daily_ntl_fastpath/redownload_vj103_from_query.py` to safely re-download VJ103DNB files from LAADS query JSON with token-based auth validation.
+- Added `tools/query_vj_dnb_laads_json.py` to generate LAADS-style download JSON lists for `VJ102DNB`/`VJ103DNB` by bbox and date range.
+- Added a clean UTF-8 `tools/download_vj_dnb_README.md` with validated Windows/Conda usage examples for tokenized LAADS downloads.
+- Added `tools/official_vj_dnb_pipeline_tool.py` with LangChain `StructuredTool` registration (`official_vj_dnb_fullchain_tool`) to orchestrate official-source VJ102/VJ103 query + download + preprocessing in one callable tool.
+- Added workflow/code references under `.ntl-gpt/skills/NTL-workflow-guidance` for the new official VJ full-chain path:
+  - workflow task `Q25` in `references/workflows/data_retrieval_preprocessing.json`
+  - code index entry in `references/code/code_index.json`
+  - executable reference script `references/code/data_retrieval_preprocessing/Q25_official_vj_dnb_fullchain_iran.py`
 - Added `agents/NTL_Knowledge_Subagent.py` as a dedicated Deep Agents subagent prompt for KB routing, with strict JSON response contract (`ntl.kb.subagent.response.v1`).
 - Added `docs/NTL-GPT版本介绍.md` as the consolidated product/version overview document.
 - Added explicit policy in `AGENTS.md`: complex tasks should prioritize `using-superpowers`.
@@ -35,13 +46,42 @@ This changelog is intentionally lightweight:
 - Registered the new benchmark tools in `Engineer_tools` via `tools/__init__.py` without changing prompt/graph architecture.
 
 ### Changed
+- Reworked `tools/download_vj_dnb.py` for robust production download behavior:
+  - auto-loads `.env` (including repo-root `.env`) for `EARTHDATA_TOKEN`,
+  - applies Windows Schannel workaround (`curl --ssl-no-revoke`) for revocation/TLS failures,
+  - hardens file validation (HDF5/netCDF signature + HTML error-page rejection),
+  - removes non-ASCII/emoji console output to avoid GBK terminal crashes,
+  - preserves resumable behavior by skipping existing valid files.
+- Updated `experiments/official_daily_ntl_fastpath/convert_vj102_vj103_precise_to_tif.py`:
+  - default radiance scaling is now `1e9` (W to nW) for DNB value magnitude consistency with existing NOAA preprocess pipeline,
+  - default output grid now targets `500m` via new `--resolution-m` (with optional `--resolution-deg` override),
+  - summary metadata now records raw units, scale attributes, applied radiance scale, and resolved output resolution.
+- Registered `official_vj_dnb_fullchain_tool` in `tools/__init__.py` and exposed it to both `data_searcher_tools` and `Engineer_tools`.
+- Enhanced NTL workflow router keywords in `.ntl-gpt/skills/NTL-workflow-guidance/references/router_index.json` to include official-source terms (`laads`, `VJ102DNB`, `VJ103DNB`).
+- Updated `experiments/official_daily_ntl_fastpath/convert_vnp46a1_to_tif.py` to support date filtering via `--date` and `--start-date/--end-date`, with file-date parsing from `Ayyyyddd` granule names and filter metadata in summary output.
+- Documented VJ102DNB geolocation handling in conversion summaries as `approx_granule_bbox_from_global_attrs` and explicit recommendation to pair with VJ103DNB for precise per-pixel geolocation.
+- Enhanced `experiments/official_daily_ntl_fastpath/convert_vj102_vj103_precise_to_tif.py` with NOAA20-style QC controls: edge-of-swath mask, solar zenith mask, lunar zenith mask, observation/geolocation quality-flag masks, and per-mask ratio diagnostics in summary metadata.
+- Path protocol policy in `tools/NTL_Code_generation.py` switched to sandbox-first:
+  - added `NTL_PATH_PROTOCOL_MODE` (`sandbox` default; optional `hybrid`/`resolver`),
+  - removed resolver-only preflight pressure in sandbox mode for both `execute_geospatial_script_tool` and `GeoCode_COT_Validation_tool`,
+  - kept hard safety boundaries (absolute-path risk, repo source/config writes, forbidden commands, cross-workspace audit),
+  - changed `strict_mode` defaults to `False` for `ExecuteScriptInput` and `GeoCodeCOTBlockInput`,
+  - added response metadata fields: `path_protocol_mode`, `path_protocol_enforcement`.
+- Hardened shared-path runtime behavior for script execution:
+  - added runtime virtual-path rewrite in `tools/NTL_Code_generation.py` so string literals like `/shared/...` and `/data/raw/...` are resolved to thread-bound local filesystem paths before execution,
+  - added structured execution metadata `runtime_path_rewrite` to report mapping details,
+  - added preflight blocking for any detected write target under `/shared/...` (read-only boundary),
+  - updated `storage_manager.resolve_deepagents_path` to avoid creating parent directories for `/shared/...` resolution.
+- Prompt alignment for path policy:
+  - `agents/NTL_Code_Assistant.py` now allows sandbox-relative `inputs/...` and `outputs/...` (resolver remains compatible option),
+  - `agents/NTL_Engineer.py` now explicitly states sandbox-first mapping with resolver as optional compatibility path.
 - Unified workflow evolution authority model:
   - `NTL_Engineer` is now the single decision + landing role for formal workflow mutations.
   - `Code_Assistant` is restricted to proposal-only outputs via `ntl.workflow.evolution.proposal.v1`.
 - Updated prompt/skill contracts to align authority split:
   - `agents/NTL_Engineer.py` now enforces proposal review + completion-gate checks before formal writeback.
   - `agents/NTL_Code_Assistant.py` now explicitly forbids direct workflow/log file edits.
-  - `.ntl-gpt/skills/workflow-intent-router/SKILL.md` now documents mandatory role split (Engineer write, Code proposal).
+  - `.ntl-gpt/skills/NTL-workflow-guidance/SKILL.md` now documents mandatory role split (Engineer write, Code proposal).
 - Updated `graph_factory.py` to register `Knowledge_Base_Searcher` as a third subagent, wired to the `NTL_Knowledge_Base` tool for supervisor-level delegated KB planning.
 - Streamed run UX improvements in `app_ui.py`:
   - running-state hint moved below chat input,
@@ -99,7 +139,7 @@ This changelog is intentionally lightweight:
 
 ### Removed
 - Removed legacy runtime auto-learning module `utils/workflow_intent_learning.py`.
-- Removed obsolete test file tied to deleted auto-learning module: `tests/test_workflow_intent_router_learning.py`.
+- Removed obsolete test file tied to deleted auto-learning module: `tests/test_ntl_workflow_guidance_learning.py`.
 
 ## [2026-02-25]
 

@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ntl.retrieval.contract.v1.schema.json",
+  "title": "NTL Retrieval Contract v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "task_level",
+    "files",
+    "coverage_check",
+    "boundary",
+    "GEE_execution_plan"
+  ],
+  "properties": {
+    "schema": {
+      "const": "ntl.retrieval.contract.v1"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "partial",
+        "failed"
+      ]
+    },
+    "task_level": {
+      "type": "string",
+      "enum": [
+        "L1",
+        "L2",
+        "L3"
+      ]
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "year": {
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "product": {
+            "type": "string"
+          },
+          "crs": {
+            "type": "string"
+          },
+          "band_names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nodata_value": {
+            "type": [
+              "number",
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "coverage_check": {
+      "type": "object",
+      "required": [
+        "expected_count",
+        "actual_count",
+        "missing_items"
+      ],
+      "properties": {
+        "expected_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "actual_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missing_items": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "boundary": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "confirmed",
+            "pending",
+            "not_required"
+          ]
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "GEE_execution_plan": {
+      "type": "object",
+      "required": [
+        "execution_mode"
+      ],
+      "properties": {
+        "execution_mode": {
+          "type": "string",
+          "enum": [
+            "direct_download",
+            "gee_server_side"
+          ]
+        },
+        "dataset_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "band": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "metadata_validation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "python_blueprint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "error": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "suggestion": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "complete"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "coverage_check": {
+            "type": "object",
+            "properties": {
+              "missing_items": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": true
+}

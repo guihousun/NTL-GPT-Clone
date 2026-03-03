@@ -179,13 +179,13 @@ def sdr_radiance_filter(SDR_GEO_path, SDR_names, SDR_GEO_names, sdr_out_dir):
         del fill_value, sdr_proj_scn, sdr_lon_data, sdr_lat_data, sdr_swath_def, sdr_metadata_dict
         gc.collect()
 
-# input_dir代表存放需要处理的sdr文件的文件夹路径
+# input_dir 代表需要处理的 sdr 文件的文件夹路径
 def batch_pro(sdr_input_dir, SDR_out_dir):
     file_list = os.listdir(sdr_input_dir)
     h5_file_list = []
-    # 防止出现非h5文件，所以对读出来的文件过滤一下
+    # 防止出现非 h5 文件，所以对读出来的文件过滤一下（支持.h5 和.nc 格式）
     for temp_file in file_list:
-        if temp_file.endswith('.h5'):
+        if temp_file.endswith('.h5') or temp_file.endswith('.nc'):
             h5_file_list.append(sdr_input_dir + "\\" + temp_file)
 
     # 用于在h5文件中提取相应数据的关键字

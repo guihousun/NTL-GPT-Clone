@@ -184,6 +184,7 @@ const I18N = {
     queryBtn: "查询可用性",
     autoRefresh: "每 3 分钟自动刷新",
     downloadSection: "数据下载",
+    testingPhase: "测试阶段",
     downloadProvider: "下载通道",
     providerGee: "GEE",
     providerOfficial: "官方源",
@@ -271,6 +272,7 @@ const I18N = {
     queryBtn: "Query Availability",
     autoRefresh: "Auto refresh every 3 minutes",
     downloadSection: "Data Download",
+    testingPhase: "Testing",
     downloadProvider: "Provider",
     providerGee: "GEE",
     providerOfficial: "Official",
@@ -876,6 +878,7 @@ function _applyViewModeLayout() {
   qs("renderModeWrap")?.classList.toggle("hidden", is3d);
   qs("regionPresetWrap")?.classList.toggle("hidden", is3d);
   qs("layerWrap")?.classList.toggle("hidden", is3d);
+  qs("mapDateWrap")?.classList.toggle("hidden", is3d);
   qs("snapshotSizeWrap")?.classList.toggle("hidden", is3d);
   qs("opacityWrap")?.classList.toggle("hidden", is3d);
   qs("applyLayerWrap")?.classList.toggle("hidden", is3d);
@@ -966,8 +969,8 @@ function getDownloadDateRange() {
 }
 
 function getMapDate() {
-  const start = (qs("downloadStartDate")?.value || todayIso()).trim();
-  return start || todayIso();
+  const value = (qs("mapDate")?.value || todayIso()).trim();
+  return value || todayIso();
 }
 
 function populateDownloadSources() {
@@ -1317,6 +1320,7 @@ function setupEvents() {
     markLayerDirty();
   });
   qs("downloadEndDate").addEventListener("change", markDirtyHandler);
+  qs("mapDate").addEventListener("change", markDirtyHandler);
   qs("snapshotSize").addEventListener("change", markDirtyHandler);
   qs("bbox").addEventListener("change", () => {
     if (qs("regionPreset").value === "custom") markLayerDirty("layerDirtyCustomBbox");
@@ -1355,6 +1359,7 @@ function setupEvents() {
 function init() {
   qs("downloadStartDate").value = todayIso();
   qs("downloadEndDate").value = todayIso();
+  qs("mapDate").value = todayIso();
   qs("viewMode").value = "2d";
 
   const savedLang = localStorage.getItem("ntl_fast_monitor_lang");

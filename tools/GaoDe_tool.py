@@ -8,7 +8,9 @@ from shapely.geometry import Point, LineString, Polygon, MultiPoint, MultiLineSt
 from typing import List, Optional
 from geopy.geocoders import Nominatim
 import numpy as np
-from storage_manager import storage_manager
+from langchain_core.runnables import RunnableConfig
+from langchain_core.runnables.config import var_child_runnable_config
+from storage_manager import current_thread_id, storage_manager
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -17,6 +19,25 @@ load_dotenv()
 # Set up URLs for API requests
 DISTRICT_URL = 'https://restapi.amap.com/v3/config/district?keywords={city}&key={api_key}'
 GEO_JSON_URL = 'https://geo.datav.aliyun.com/areas/bound/{city_code}_full.json'
+
+
+def _resolve_thread_id_from_config(config: Optional[RunnableConfig] = None) -> str:
+    runtime_config: Optional[RunnableConfig] = None
+    if isinstance(config, dict):
+        runtime_config = config
+    else:
+        inherited = var_child_runnable_config.get()
+        if isinstance(inherited, dict):
+            runtime_config = inherited
+
+    if isinstance(runtime_config, dict):
+        try:
+            tid = str(storage_manager.get_thread_id_from_config(runtime_config) or "").strip()
+            if tid:
+                return tid
+        except Exception:
+            pass
+    return str(current_thread_id.get() or "debug").strip() or "debug"
 
 
 def _safe_response_json(response: requests.Response):
@@ -132,7 +153,7 @@ class GetAdministrativeDivisionInput(BaseModel):
     city: str = Field(..., description="Name of the administrative division (e.g., 'Shanghai'). Chinese names are also accepted.")
     input_name: str = Field(..., description="input filename for the Shapefile (e.g., 'shanghai_boundary.shp').")
 
-def get_administrative_division_data(city: str, input_name: str) -> str:
+def get_administrative_division_data(city: str, input_name: str, config: Optional[RunnableConfig] = None) -> str:
     """
     Fetches administrative boundary, converts to WGS-84, and saves as a Shapefile.
     """
@@ -141,7 +162,8 @@ def get_administrative_division_data(city: str, input_name: str) -> str:
         return "Error: Amap API key is missing in environment variables."
 
     # 1. Resolve input path via storage_manager
-    abs_input_path = storage_manager.resolve_input_path(input_name)
+    thread_id = _resolve_thread_id_from_config(config)
+    abs_input_path = storage_manager.resolve_input_path(input_name, thread_id=thread_id)
 
     try:
         # Step 1: Get adcode
@@ -234,7 +256,11 @@ import os
 import geopandas as gpd
 import osmnx as ox
 
-def get_administrative_division_osm(place_name: str, input_name: str = None) -> str:
+def get_administrative_division_osm(
+    place_name: str,
+    input_name: str = None,
+    config: Optional[RunnableConfig] = None,
+) -> str:
     """
     Fetch administrative boundary data for a given place from OSM using geocode_to_gdf
     and save as Shapefile.
@@ -246,7 +272,8 @@ def get_administrative_division_osm(place_name: str, input_name: str = None) -> 
     Returns:
     - str: Message indicating the success or failure of the operation and the save location.
     """
-    abs_input_path = storage_manager.resolve_input_path(input_name)
+    thread_id = _resolve_thread_id_from_config(config)
+    abs_input_path = storage_manager.resolve_input_path(input_name, thread_id=thread_id)
     os.makedirs(os.path.dirname(abs_input_path), exist_ok=True)
 
     try:
@@ -280,15 +307,9 @@ get_administrative_division_osm_tool = StructuredTool.from_function(
     get_administrative_division_osm,
     name="get_administrative_division_osm_tool",
     description=(
-        "Fetches administrative division boundaries (country, province, city) from OpenStreetMap"
-        "using OSMnx's geocode_to_gdf function, which queries Nominatim for the specified place "
-        "and retrieves its administrative boundary geometry. Saves the result as an ESRI Shapefile "
-        "in WGS-84 coordinate system. If no save path is provided, the file will be saved to the "
-        "default directory './NTL_Agent/report/shp/shape_files'.\n\n"
-        "Note: For administrative division boundaries within China, please use 'get_administrative_division_Amap_tool'."
-        "### Example Usage:\n"
-        "- place_name: 'Myanmar'\n"
-        "- input_name: 'Myanmar_boundary.shp'\n\n"
+        "[Deprecated] Fetches administrative boundaries from OSM/Nominatim and saves ESRI Shapefile in WGS-84. "
+        "Prefer `get_administrative_division_geoboundaries_tool` for global boundaries (ADM0-ADM4) with optional "
+        "GeoJSON-to-SHP conversion."
     ),
     input_type=GetAdministrativeDivisionOSMInput,
 )
@@ -304,7 +325,8 @@ def reverse_geocode(
     latitudes: List[float],
     longitudes: List[float],
     input_name: Optional[str] = None,
-    region: str = "China"
+    region: str = "China",
+    config: Optional[RunnableConfig] = None,
 ) -> str:
     """
     Performs reverse geocoding for a list of latitude and longitude pairs.
@@ -318,7 +340,8 @@ def reverse_geocode(
     - str: Message indicating the success of the operation and the save location.
     """
     addresses = []
-    abs_input_path = storage_manager.resolve_input_path(input_name)
+    thread_id = _resolve_thread_id_from_config(config)
+    abs_input_path = storage_manager.resolve_input_path(input_name, thread_id=thread_id)
     os.makedirs(os.path.dirname(abs_input_path), exist_ok=True)
     amap_api_key = os.environ.get("amap_api_key")
 
@@ -383,6 +406,7 @@ def search_poi_nearby(
     radius: int = 500,
     types: str = None,
     input_name: str = None,
+    config: Optional[RunnableConfig] = None,
 ) -> str:
     """
     Search for Points of Interest around a coordinate and saves the results to user's inputs folder as CSV.
@@ -391,7 +415,8 @@ def search_poi_nearby(
         input_name = "poi_results.csv"
 
 
-    abs_in_path = storage_manager.resolve_input_path(input_name)
+    thread_id = _resolve_thread_id_from_config(config)
+    abs_in_path = storage_manager.resolve_input_path(input_name, thread_id=thread_id)
     os.makedirs(os.path.dirname(abs_in_path), exist_ok=True)
 
     amap_api_key = os.environ.get("amap_api_key")
@@ -459,7 +484,8 @@ class GeocodeInput(BaseModel):
 
 def geocode_address(
     address: str,
-    input_name: Optional[str] = None
+    input_name: Optional[str] = None,
+    config: Optional[RunnableConfig] = None,
 ) -> str:
     """
     Geocodes an address using the Amap API, returning latitude and longitude.
@@ -472,7 +498,8 @@ def geocode_address(
     - str: Message indicating the success of the operation and the save location.
     """
     input_name = input_name or "geocode_results.csv"
-    abs_input_path = storage_manager.resolve_input_path(input_name)
+    thread_id = _resolve_thread_id_from_config(config)
+    abs_input_path = storage_manager.resolve_input_path(input_name, thread_id=thread_id)
     os.makedirs(os.path.dirname(abs_input_path), exist_ok=True)
     amap_api_key = os.environ.get("amap_api_key")
     if not amap_api_key:

@@ -4,7 +4,7 @@ import history_store
 from storage_manager import storage_manager
 
 MODEL_OPTIONS = ["qwen3.5-plus", "gpt-5-mini", "gpt-5.1"]
-RECURSION_LIMIT = 61
+RECURSION_LIMIT = 101
 CHAT_CONTAINER_HEIGHT = 600
 ANALYSIS_CONTAINER_HEIGHT = 600
 LLM_REQUEST_TIMEOUT_S = 120
@@ -81,6 +81,7 @@ def init_app():
     st.session_state.setdefault("analysis_history", [])
     st.session_state.setdefault("last_question", "")
     st.session_state.setdefault("is_running", False)
+    st.session_state.setdefault("stopping", False)
     st.session_state.setdefault("cancel_requested", False)
     st.session_state.setdefault("run_started_ts", None)
     st.session_state.setdefault("run_heartbeat_ts", None)
@@ -97,6 +98,7 @@ def reset_chat():
     st.session_state.chat_history = []
     st.session_state.run_counter = 0
     st.session_state.cancel_requested = False
+    st.session_state.stopping = False
     st.session_state.run_started_ts = None
     st.session_state.run_heartbeat_ts = None
     st.session_state.run_ended_ts = None

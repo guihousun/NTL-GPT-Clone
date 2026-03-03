@@ -9,10 +9,42 @@ current_thread_id = contextvars.ContextVar("thread_id", default="debug")
 
 class StorageManager:
     def __init__(self, base_dir: str = "user_data", shared_dir: str = "base_data"):
-        self.base_dir = Path(base_dir).resolve()
-        self.shared_dir = Path(shared_dir).resolve()
+        self.base_dir = self._resolve_root_dir(
+            configured=base_dir,
+            env_key="NTL_USER_DATA_DIR",
+            default_name="user_data",
+        )
+        self.shared_dir = self._resolve_root_dir(
+            configured=shared_dir,
+            env_key="NTL_SHARED_DATA_DIR",
+            default_name="base_data",
+        )
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.shared_dir.mkdir(parents=True, exist_ok=True)
+
+    @staticmethod
+    def _resolve_root_dir(*, configured: str, env_key: str, default_name: str) -> Path:
+        """
+        Resolve stable storage roots across environments.
+
+        Priority:
+        1) Environment variable override (recommended for deployment).
+        2) Explicit non-default constructor argument.
+        3) Existing user-home default folder (e.g. C:\\Users\\<user>\\user_data).
+        4) Repository/runtime relative default (resolved current path).
+        """
+        env_value = str(os.getenv(env_key, "") or "").strip()
+        if env_value:
+            return Path(env_value).resolve()
+
+        if configured != default_name:
+            return Path(configured).resolve()
+
+        home_candidate = (Path.home() / default_name).resolve()
+        if home_candidate.exists():
+            return home_candidate
+
+        return Path(configured).resolve()
 
     def get_workspace(self, thread_id: Optional[str] = None) -> Path:
         if thread_id is None:
@@ -21,12 +53,29 @@ class StorageManager:
             raise ValueError("No valid thread_id available in context or argument.")
 
         tid = str(thread_id).strip()
-        workspace = self.base_dir / tid
+        # Some deployment shells accidentally point NTL_USER_DATA_DIR at a thread workspace
+        # (e.g. .../user_data/<tid>) instead of user_data root. In that case, appending tid
+        # again causes duplicated paths like .../user_data/<tid>/user_data/<tid>/inputs.
+        if self._is_thread_workspace_dir(self.base_dir, tid):
+            workspace = self.base_dir
+        else:
+            workspace = self.base_dir / tid
         workspace.mkdir(parents=True, exist_ok=True)
         (workspace / "inputs").mkdir(exist_ok=True)
         (workspace / "outputs").mkdir(exist_ok=True)
         (workspace / "memory").mkdir(exist_ok=True)
         return workspace
+
+    @staticmethod
+    def _is_thread_workspace_dir(path_obj: Path, tid: str) -> bool:
+        """Best-effort detection for misconfigured base_dir that already equals a thread workspace."""
+        try:
+            p = path_obj.resolve()
+        except Exception:
+            p = path_obj
+        if p.name != str(tid).strip():
+            return False
+        return all((p / d).exists() for d in ("inputs", "outputs", "memory"))
 
     @staticmethod
     def _is_deepagents_virtual_path(path_value: str) -> bool:
@@ -44,6 +93,7 @@ class StorageManager:
 
     def resolve_deepagents_path(self, deep_path: str, thread_id: Optional[str] = None) -> Path:
         workspace = self.get_workspace(thread_id)
+        should_create_parent = True
         if deep_path.startswith("/data/raw/"):
             rel = self._safe_virtual_tail(deep_path, "/data/raw/")
             target = workspace / "inputs" / Path(*rel.parts)
@@ -56,9 +106,11 @@ class StorageManager:
         elif deep_path.startswith("/shared/"):
             rel = self._safe_virtual_tail(deep_path, "/shared/")
             target = self.shared_dir / Path(*rel.parts)
+            should_create_parent = False
         else:
             raise ValueError(f"Unknown Deep Agents virtual path: {deep_path}")
-        target.parent.mkdir(parents=True, exist_ok=True)
+        if should_create_parent:
+            target.parent.mkdir(parents=True, exist_ok=True)
         return target.resolve()
 
     @staticmethod

@@ -519,6 +519,8 @@ def inject_css():
         box-shadow: none !important;
         outline: none !important;
         width: 100% !important;
+        min-height: 96px !important;
+        overflow: visible !important;
     }
     .st-key-main_chat_input_mm,
     .st-key-main_chat_input_mm > div,
@@ -529,6 +531,7 @@ def inject_css():
         box-shadow: none !important;
         outline: none !important;
         padding: 0 !important;
+        overflow: visible !important;
     }
     [data-testid="stBottom"],
     [data-testid="stBottomBlockContainer"] {
@@ -550,11 +553,42 @@ def inject_css():
         margin-bottom: 0.7rem;
         color: #fff;
         box-shadow: 0 8px 20px rgba(16,24,40,0.08);
+        max-width: 100%;
+        overflow: hidden;
+        min-width: 0;
     }
     .chat-message.user { background: linear-gradient(120deg, var(--ntl-chat-user), #1a5f95); }
     .chat-message.bot { background: linear-gradient(120deg, var(--ntl-chat-bot), #0d5f59); }
     .chat-message .avatar { font-size: 1.25rem; line-height: 1.4; }
-    .chat-message .message { font-size: 0.97rem; line-height: 1.55; word-break: break-word; }
+    .chat-message .message {
+        font-size: 0.97rem;
+        line-height: 1.55;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+        max-width: 100%;
+        min-width: 0;
+    }
+    .chat-message .message pre,
+    .chat-message .message code,
+    .chat-message .message table {
+        max-width: 100% !important;
+        box-sizing: border-box;
+    }
+    .chat-message .message pre {
+        overflow-x: auto !important;
+        white-space: pre-wrap !important;
+        word-break: break-word !important;
+        overflow-wrap: anywhere !important;
+    }
+    .chat-message .message code {
+        white-space: pre-wrap !important;
+        word-break: break-word !important;
+        overflow-wrap: anywhere !important;
+    }
+    .chat-message .message table {
+        display: block;
+        overflow-x: auto;
+    }
     .bot-badge, .user-badge {
         display: inline-flex;
         width: 1.45rem;
@@ -1115,7 +1149,18 @@ def scroll_to_bottom():
                     frame.style.setProperty('border-radius', '0px', 'important');
                     frame.style.setProperty('box-shadow', 'none', 'important');
                     frame.style.setProperty('outline', 'none', 'important');
-                    frame.style.setProperty('min-height', '62px', 'important');
+                    // Do not force a small fixed iframe height. Let component expand
+                    // when file chips/preview rows are present, otherwise typing/sending
+                    // can be clipped after paste.
+                    frame.style.setProperty('min-height', '96px', 'important');
+                    frame.style.setProperty('height', 'auto', 'important');
+                    frame.style.setProperty('overflow', 'visible', 'important');
+                    if (host) {{
+                        host.style.setProperty('overflow', 'visible', 'important');
+                    }}
+                    if (parent) {{
+                        parent.style.setProperty('overflow', 'visible', 'important');
+                    }}
                     var idoc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
                     if (!idoc) return;
                     if (!idoc.getElementById('__ntl_mm_style')) {{
@@ -1157,12 +1202,6 @@ def scroll_to_bottom():
                         `;
                         idoc.head.appendChild(st);
                     }}
-                    var root = idoc.documentElement;
-                    var body = idoc.body;
-                    var h = 62;
-                    if (root && root.scrollHeight) h = Math.max(h, root.scrollHeight);
-                    if (body && body.scrollHeight) h = Math.max(h, body.scrollHeight);
-                    frame.style.setProperty('height', Math.min(h, 220) + 'px', 'important');
                 }} catch (e) {{}}
             }}
 
@@ -1575,12 +1614,13 @@ def _save_chat_input_files_to_workspace(files, thread_id: str) -> dict:
     return {"saved": saved, "errors": errors}
 
 
-def get_user_input():
+def get_user_input(*, disabled: bool = False):
     placeholder = _tr(
         "Query",
         "Query",
     )
-    if multimodal_chat_input is not None:
+    force_native = str(os.getenv("NTL_FORCE_NATIVE_CHAT_INPUT", "0")).strip().lower() in {"1", "true", "yes", "on"}
+    if multimodal_chat_input is not None and not force_native and not disabled:
         return multimodal_chat_input(
             placeholder=placeholder,
             accepted_file_types=_CHAT_INPUT_FILE_TYPES,
@@ -1593,7 +1633,20 @@ def get_user_input():
         accept_file="multiple",
         file_type=_CHAT_INPUT_FILE_TYPES,
         key="main_chat_input",
+        disabled=bool(disabled),
     )
+
+
+def _is_current_thread_running() -> bool:
+    current_tid = str(st.session_state.get("thread_id") or "")
+    active_tid = str(st.session_state.get("active_run_thread_id") or "")
+    return bool(st.session_state.get("is_running", False)) and bool(current_tid) and (current_tid == active_tid)
+
+
+def _is_current_thread_stopping() -> bool:
+    current_tid = str(st.session_state.get("thread_id") or "")
+    active_tid = str(st.session_state.get("active_run_thread_id") or "")
+    return bool(st.session_state.get("stopping", False)) and bool(current_tid) and (current_tid == active_tid)
 
 # ==============================================================================
 # SECTION D: Searcher/KB Output Rendering
@@ -2146,8 +2199,10 @@ def render_sidebar():
             index=app_state.MODEL_OPTIONS.index(current_model),
             key="model_selector"
         )
+        current_thread_running = _is_current_thread_running()
+        current_thread_stopping = _is_current_thread_stopping()
         if selected_model != current_model:
-            if st.session_state.get("is_running", False):
+            if current_thread_running and not current_thread_stopping:
                 st.session_state["pending_model_change"] = selected_model
                 st.session_state["model_selector"] = current_model
                 st.info(
@@ -2161,7 +2216,7 @@ def render_sidebar():
                 st.session_state["pending_model_change"] = None
                 current_model = selected_model
         pending_model = str(st.session_state.get("pending_model_change") or "").strip()
-        if pending_model and st.session_state.get("is_running", False):
+        if pending_model and current_thread_running and not current_thread_stopping:
             st.caption(_tr(f"待生效模型: {pending_model}", f"Pending model: {pending_model}"))
         selected_model = current_model
 
@@ -2225,7 +2280,7 @@ def render_sidebar():
                         can_activate = False
 
                 if can_activate and effective_api_key:
-                    if st.session_state.get("is_running", False):
+                    if current_thread_running and not current_thread_stopping:
                         st.session_state["pending_activate_request"] = {
                             "user_api_key": effective_api_key,
                             "model": selected_model,
@@ -2261,6 +2316,7 @@ def render_sidebar():
                 st.session_state.analysis_history = []
                 st.session_state.last_question = ""
                 st.session_state["cancel_requested"] = False
+                st.session_state["stopping"] = False
 
                 if "user_api_key" in st.session_state:
                     del st.session_state["user_api_key"]
@@ -2290,7 +2346,7 @@ def render_sidebar():
                     app_logic.request_stop_active_run(detach_session=True)
                     st.rerun()
 
-        if not st.session_state.get("is_running", False):
+        if (not current_thread_running) or current_thread_stopping:
             pending_model = str(st.session_state.get("pending_model_change") or "").strip()
             if pending_model and pending_model in app_state.MODEL_OPTIONS:
                 st.session_state["cfg_model"] = pending_model
@@ -2588,7 +2644,12 @@ def render_file_understanding_panel():
             st.sidebar.success(_tr("已清空。", "Cleared."))
             st.rerun()
 
-def show_history(chat_history, *, show_running_notice_under_latest_user: bool = False):
+def show_history(
+    chat_history,
+    *,
+    show_running_notice_under_latest_user: bool = False,
+    show_stopping_notice_under_latest_user: bool = False,
+):
     """Render chat history, images, and tables."""
     latest_user_idx = -1
     if show_running_notice_under_latest_user:
@@ -2599,13 +2660,21 @@ def show_history(chat_history, *, show_running_notice_under_latest_user: bool = 
     for i, (role, content) in enumerate(chat_history):
         if role == "user":
             st.write(USER_TEMPLATE.replace("{{MSG}}", content), unsafe_allow_html=True)
-            if show_running_notice_under_latest_user and i == latest_user_idx:
-                st.caption(
-                    _tr(
-                        "后台处理中，可点击 Stop/New 中断当前任务。",
-                        "Running in background. Click Stop/New to interrupt this task.",
+            if i == latest_user_idx and (show_running_notice_under_latest_user or show_stopping_notice_under_latest_user):
+                if show_stopping_notice_under_latest_user:
+                    st.caption(
+                        _tr(
+                            "正在停止当前任务，请等待中断确认。",
+                            "Stopping current task... Please wait until interruption is confirmed.",
+                        )
                     )
-                )
+                else:
+                    st.caption(
+                        _tr(
+                            "后台处理中，可点击 Stop/New 中断当前任务。",
+                            "Running in background. Click Stop/New to interrupt this task.",
+                        )
+                    )
         elif role == "assistant":
             st.write(BOT_TEMPLATE.replace("{{MSG}}", content), unsafe_allow_html=True)
         elif role == "assistant_img":
@@ -3889,11 +3958,34 @@ def _render_output_preview():
             st.dataframe(df, use_container_width=True, height=360)
         except Exception as e:
             st.error(_tr(f"预览失败 {selected.name}: {e}", f"Failed to preview {selected.name}: {e}"))
-    elif suffix in [".png", ".jpg", ".jpeg"]:
+    elif suffix in [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"]:
         st.image(str(selected), use_container_width=True)
     elif suffix in [".tif", ".tiff"]:
         with rasterio.open(selected) as src:
             st.caption(f"CRS: {src.crs} | Size: {src.width} x {src.height} | Bands: {src.count}")
+    elif suffix == ".shp":
+        try:
+            gdf = gpd.read_file(selected)
+            st.caption(
+                _tr(
+                    f"要素数: {len(gdf)} | CRS: {gdf.crs}",
+                    f"Features: {len(gdf)} | CRS: {gdf.crs}",
+                )
+            )
+            table_df = gdf.drop(columns=["geometry"], errors="ignore")
+            if table_df.empty:
+                st.info(_tr("属性表为空（仅几何列）。", "Attribute table is empty (geometry-only)."))
+            else:
+                preview_rows = min(500, len(table_df))
+                st.caption(
+                    _tr(
+                        f"属性表预览（前 {preview_rows} 行）",
+                        f"Attribute table preview (first {preview_rows} rows)",
+                    )
+                )
+                st.dataframe(table_df.head(preview_rows), use_container_width=True, height=360)
+        except Exception as e:
+            st.error(_tr(f"预览失败 {selected.name}: {e}", f"Failed to preview {selected.name}: {e}"))
     elif suffix == ".py":
         try:
             code_text = selected.read_text(encoding="utf-8")
@@ -3902,6 +3994,16 @@ def _render_output_preview():
             try:
                 code_text = selected.read_text(encoding="gbk")
                 st.code(code_text, language="python")
+            except Exception as e:
+                st.error(_tr(f"预览失败 {selected.name}: {e}", f"Failed to preview {selected.name}: {e}"))
+    elif suffix in [".json", ".geojson"]:
+        try:
+            payload = json.loads(selected.read_text(encoding="utf-8"))
+            st.json(payload)
+        except Exception:
+            try:
+                text = selected.read_text(encoding="utf-8", errors="replace")
+                st.code(text, language="json")
             except Exception as e:
                 st.error(_tr(f"预览失败 {selected.name}: {e}", f"Failed to preview {selected.name}: {e}"))
     elif suffix in [".jsonl", ".ndjson"]:
@@ -3937,14 +4039,48 @@ def _render_output_preview():
                 st.info(_tr("JSONL 文件为空。", "JSONL file is empty."))
         except Exception as e:
             st.error(_tr(f"预览失败 {selected.name}: {e}", f"Failed to preview {selected.name}: {e}"))
+    elif suffix in [".txt", ".log", ".md"]:
+        preview_limit_chars = 20000
+        try:
+            text = selected.read_text(encoding="utf-8", errors="replace")
+            if len(text) > preview_limit_chars:
+                st.caption(
+                    _tr(
+                        f"文本过长，仅显示前 {preview_limit_chars} 个字符。",
+                        f"Text is long. Showing first {preview_limit_chars} characters only.",
+                    )
+                )
+                text = text[:preview_limit_chars]
+            st.text(text)
+        except Exception as e:
+            st.error(_tr(f"预览失败 {selected.name}: {e}", f"Failed to preview {selected.name}: {e}"))
+    elif suffix == ".zip":
+        try:
+            with zipfile.ZipFile(selected, "r") as zf:
+                names = zf.namelist()
+            if not names:
+                st.info(_tr("ZIP 文件为空。", "ZIP file is empty."))
+            else:
+                st.caption(_tr(f"ZIP 内文件数: {len(names)}", f"ZIP entries: {len(names)}"))
+                st.dataframe(
+                    pd.DataFrame({"file": names}),
+                    use_container_width=True,
+                    height=360,
+                    hide_index=True,
+                )
+        except Exception as e:
+            st.error(_tr(f"预览失败 {selected.name}: {e}", f"Failed to preview {selected.name}: {e}"))
     else:
         st.caption(_tr("该文件类型暂不支持预览，请在 Data Center 下载。", "Preview is not available for this file type. Use Data Center to download."))
 
 
 def _render_chat_history_with_run_notice() -> None:
+    current_thread_running = _is_current_thread_running()
+    current_thread_stopping = _is_current_thread_stopping()
     show_history(
         st.session_state.get("chat_history", []),
-        show_running_notice_under_latest_user=bool(st.session_state.get("is_running", False)),
+        show_running_notice_under_latest_user=current_thread_running and not current_thread_stopping,
+        show_stopping_notice_under_latest_user=current_thread_stopping,
     )
 
 
@@ -4091,7 +4227,7 @@ def render_content_layout():
             chat_live_placeholder = st.empty()
             with chat_live_placeholder.container():
                 _render_chat_history_with_run_notice()
-        chat_input_value = get_user_input()
+        chat_input_value = get_user_input(disabled=_is_current_thread_stopping())
         user_question, chat_files = _extract_chat_input_text_and_files(chat_input_value)
         if chat_files:
             thread_id = str(st.session_state.get("thread_id", "debug"))

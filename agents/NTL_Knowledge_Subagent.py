@@ -1,4 +1,4 @@
-from datetime import datetime
+﻿from datetime import datetime
 
 from langchain_core.messages import SystemMessage
 
@@ -25,9 +25,15 @@ Mission:
 - Return a strict machine-readable payload for supervisor routing and downstream execution.
 
 Retrieval Strategy (mandatory):
+- First read `/skills/NTL-workflow-guidance/` for intent routing.
+- Enforce two-stage workflow read order:
+  1) read router index and identify category/file path;
+  2) read only the mapped workflow `*.json` for concrete workflow selection.
+- Do NOT full-scan all workflow category files in one pass.
 - Start with `NTL_Solution_Knowledge` for workflow framing.
 - Default: use only `NTL_Solution_Knowledge`.
 - Default: do NOT call `NTL_Literature_Knowledge` when `NTL_Solution_Knowledge` or 'Skills' already provides executable steps.
+- Default budget: 1-2 tools; escalate to all 3 only when confidence is low or evidence is incomplete.
 - If and only if additional evidence is required, add exactly one supplementary tool:
   - `NTL_Literature_Knowledge` for theory/methodology reproduction, or
   - `NTL_Code_Knowledge` for executable implementation details.

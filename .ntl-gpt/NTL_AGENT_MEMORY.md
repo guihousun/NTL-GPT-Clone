@@ -9,9 +9,10 @@ This file is dedicated to NTL-GPT runtime memory and must not be mixed with Code
 ## Workspace Protocol
 - Read inputs from `/inputs/` (thread-scoped workspace).
 - Write artifacts to `/outputs/` (thread-scoped workspace).
-- Use `storage_manager.resolve_input_path(...)` and `storage_manager.resolve_output_path(...)`.
+- Path protocol is sandbox-first: use relative `inputs/...` and `outputs/...` in thread workspace.
+- `storage_manager.resolve_input_path(...)` and `storage_manager.resolve_output_path(...)` are compatible alternatives when portability is needed.
 - Never use hardcoded absolute local paths.
-- `/shared/...` is read-only: it can be used as input via `resolve_input_path`, but all generated outputs must go to thread `/outputs/`.
+- `/shared/...` is read-only input source; all generated outputs must go to thread `/outputs/`.
 
 ## Execution Policy
 - Prefer built-in tools when they fully satisfy intent.
@@ -23,3 +24,41 @@ This file is dedicated to NTL-GPT runtime memory and must not be mixed with Code
 - Keep all artifacts thread-scoped.
 - Do not emit host absolute paths in user-facing UI.
 - On file mismatch, report actionable recovery steps with logical paths.
+
+---
+
+## CRITICAL: Workflow Router Protocol (MANDATORY)
+
+**Lesson from 2026-02-28**: Myanmar earthquake analysis failed because NTL_Engineer skipped NTL-workflow-guidance. Always query router FIRST.
+
+### Router Priority
+```
+FIRST:  NTL-workflow-guidance (ALWAYS query first)
+SECOND: gee-routing-blueprint-strategy (for GEE routing)
+LAST:   Knowledge_Base_Searcher (only if no workflow match)
+```
+
+### Pre-Execution Checklist
+```
+□ [ ] 1. Query NTL-workflow-guidance → identify matching workflow JSON
+□ [ ] 2. Read workflow JSON → confirm steps, outputs, task_level
+□ [ ] 3. After execution, ask user whether to run self-evolution for this run
+```
+
+**REMEMBER**: Skipping NTL-workflow-guidance = Protocol Violation = Systemic Failure
+
+For detailed workflow specs, see `/skills/NTL-workflow-guidance/references/workflows/`.
+For event impact (Q20), see `event_impact_assessment.json` for multi-scale buffer requirements.
+
+---
+
+## Self-Evolution Policy (USER-GATED)
+- Self-evolution is **not mandatory** for every run.
+- After task completion (success/failure), `NTL_Engineer` should ask user whether to perform self-evolution.
+- If user confirms:
+  - update `/skills/workflow-self-evolution/references/metrics.json`,
+  - append failures/learning records as needed,
+  - and execute workflow mutation protocol when applicable.
+- If user declines:
+  - skip self-evolution writes for that run and return normal task outputs only.
+

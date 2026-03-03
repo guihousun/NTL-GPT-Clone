@@ -13,7 +13,7 @@ import sys
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple
 from uuid import uuid4
 
 from langchain_core.runnables import RunnableConfig
@@ -52,10 +52,7 @@ KNOWN_GEE_PUBLIC_COLLECTION_PREFIXES = (
     "MODIS/",
 )
 
-ABSOLUTE_PATH_PATTERNS = [
-    re.compile(r"[A-Za-z]:[\\/]"),
-    re.compile(r"/(?:home|Users|mnt|tmp)/"),
-]
+PATH_PROTOCOL_MODES = {"sandbox", "hybrid", "resolver"}
 
 URI_SCHEME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9+.\-]*://")
 WINDOWS_ABS_LITERAL_PATTERN = re.compile(r"^[A-Za-z]:[\\/](?![\\/])")
@@ -108,6 +105,9 @@ READABLE_WORKSPACE_EXTENSIONS = {
     ".xlsm",
 }
 
+VIRTUAL_INPUT_PREFIXES = ("/shared/", "/data/raw/", "/memories/")
+VIRTUAL_OUTPUT_PREFIXES = ("/data/processed/",)
+
 
 class GeoCodeCOTBlockInput(BaseModel):
     code_block: str = Field(
@@ -119,10 +119,9 @@ class GeoCodeCOTBlockInput(BaseModel):
         ),
     )
     strict_mode: bool = Field(
-        default=True,
+        default=False,
         description=(
-            "If True, block execution when protocol violations are detected (e.g., absolute paths, "
-            "missing storage_manager path resolution)."
+            "If True, block execution when preflight finds hard safety violations."
         ),
     )
 
@@ -147,9 +146,17 @@ class ExecuteScriptInput(BaseModel):
         ...,
         description="Script filename previously saved by save_geospatial_script_tool (for example analysis_plan.py).",
     )
+    script_location: str = Field(
+        default="auto",
+        description="Script lookup location: auto|outputs|inputs. auto prefers outputs first, then inputs.",
+    )
     strict_mode: bool = Field(
-        default=True,
-        description="If True, block execution when preflight finds hard protocol violations.",
+        default=False,
+        description="If True, block execution when preflight finds hard safety violations.",
+    )
+    force_execute: bool = Field(
+        default=False,
+        description="If True, bypass dedupe skip and force re-execution even if script content is unchanged.",
     )
 
 
@@ -248,6 +255,125 @@ def _dedupe_ordered(items: List[str]) -> List[str]:
     return out
 
 
+def _empty_runtime_path_rewrite_report() -> Dict[str, Any]:
+    return {
+        "applied": False,
+        "mapping_count": 0,
+        "mappings": [],
+    }
+
+
+def _resolve_virtual_path_for_runtime(path_value: str, thread_id: str) -> Optional[str]:
+    raw = str(path_value or "").strip()
+    if not raw:
+        return None
+    if any(raw.startswith(prefix) for prefix in VIRTUAL_INPUT_PREFIXES):
+        return str(storage_manager.resolve_input_path(raw, thread_id=thread_id))
+    if any(raw.startswith(prefix) for prefix in VIRTUAL_OUTPUT_PREFIXES):
+        return str(storage_manager.resolve_output_path(raw, thread_id=thread_id))
+    return None
+
+
+def _rewrite_virtual_paths_for_runtime(code: str, thread_id: str) -> Tuple[str, Dict[str, Any]]:
+    report = _empty_runtime_path_rewrite_report()
+    if not code or not code.strip():
+        return code, report
+
+    try:
+        tree = ast.parse(code)
+    except Exception:
+        return code, report
+
+    mappings: List[Dict[str, str]] = []
+    seen_pairs: set[tuple[str, str]] = set()
+
+    class _VirtualPathRewriter(ast.NodeTransformer):
+        def visit_Constant(self, node: ast.Constant) -> ast.AST:  # noqa: N802
+            if not isinstance(node.value, str):
+                return node
+            resolved = _resolve_virtual_path_for_runtime(node.value, thread_id=thread_id)
+            if not resolved or resolved == node.value:
+                return node
+            pair = (node.value, resolved)
+            if pair not in seen_pairs:
+                seen_pairs.add(pair)
+                mappings.append({"from": node.value, "to": resolved})
+            return ast.copy_location(ast.Constant(value=resolved), node)
+
+    rewritten = _VirtualPathRewriter().visit(tree)
+    ast.fix_missing_locations(rewritten)
+    rewritten_code = ast.unparse(rewritten)
+    if rewritten_code != code:
+        report = {
+            "applied": bool(mappings),
+            "mapping_count": len(mappings),
+            "mappings": mappings,
+        }
+    return rewritten_code, report
+
+
+def _extract_shared_write_targets(code: str) -> List[str]:
+    targets: List[str] = []
+    seen: set[str] = set()
+    try:
+        tree = ast.parse(code)
+    except Exception:
+        return targets
+
+    def _const_str(node: Optional[ast.AST]) -> Optional[str]:
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return node.value
+        return None
+
+    def _mark_if_shared(path_value: Optional[str]) -> None:
+        p = str(path_value or "").strip()
+        if p.startswith("/shared/") and p not in seen:
+            seen.add(p)
+            targets.append(p)
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+
+        func = node.func
+        if isinstance(func, ast.Name) and func.id == "open":
+            path_arg = _const_str(node.args[0]) if node.args else None
+            mode_arg = _const_str(node.args[1]) if len(node.args) > 1 else None
+            for kw in node.keywords:
+                if kw.arg == "mode":
+                    mode_arg = _const_str(kw.value) or mode_arg
+            mode = str(mode_arg or "r").lower()
+            if any(flag in mode for flag in ("w", "a", "x")):
+                _mark_if_shared(path_arg)
+            continue
+
+        if isinstance(func, ast.Attribute):
+            attr = func.attr
+            if attr in {"to_csv", "to_file", "savefig", "write_text", "write_bytes"}:
+                path_arg = _const_str(node.args[0]) if node.args else None
+                if not path_arg:
+                    for kw in node.keywords:
+                        if kw.arg in {"path", "path_or_buf", "fname", "filename"}:
+                            path_arg = _const_str(kw.value)
+                            if path_arg:
+                                break
+                _mark_if_shared(path_arg)
+                continue
+
+            if attr == "open":
+                path_arg = _const_str(node.args[0]) if node.args else None
+                mode_arg = _const_str(node.args[1]) if len(node.args) > 1 else None
+                for kw in node.keywords:
+                    if kw.arg == "mode":
+                        mode_arg = _const_str(kw.value) or mode_arg
+                mode = str(mode_arg or "").lower()
+                if any(flag in mode for flag in ("w", "a", "x")):
+                    _mark_if_shared(path_arg)
+                continue
+
+    return targets
+
+
 
 def _build_artifact_audit(stdout: str, thread_id: Optional[str] = None) -> Dict[str, Any]:
     tid = str(thread_id or current_thread_id.get() or "debug").strip() or "debug"
@@ -304,6 +430,23 @@ def _thread_bound_storage_paths(thread_id: str):
     finally:
         storage_manager.resolve_output_path = original_resolve_output_path
         storage_manager.resolve_input_path = original_resolve_input_path
+
+
+@contextlib.contextmanager
+def _thread_workspace_cwd(thread_id: str):
+    """
+    Temporarily switch CWD to current thread workspace.
+
+    This provides backward compatibility for legacy scripts using relative
+    paths like `inputs/...` and `outputs/...` while keeping thread isolation.
+    """
+    workspace = storage_manager.get_workspace(thread_id)
+    previous = Path.cwd()
+    os.chdir(workspace)
+    try:
+        yield workspace
+    finally:
+        os.chdir(previous)
 
 
 def _auto_migrate_cross_workspace_outputs(
@@ -467,6 +610,21 @@ def _normalize_whitespace(text: str) -> str:
     return re.sub(r"\s+", " ", text or "").strip()
 
 
+def _path_protocol_mode() -> Literal["sandbox", "hybrid", "resolver"]:
+    mode = str(os.getenv("NTL_PATH_PROTOCOL_MODE", "sandbox")).strip().lower()
+    if mode not in PATH_PROTOCOL_MODES:
+        return "sandbox"
+    return mode  # type: ignore[return-value]
+
+
+def _is_resolver_required(mode: str) -> bool:
+    return mode == "resolver"
+
+
+def _path_protocol_enforcement(mode: str) -> str:
+    return "resolver_strict" if _is_resolver_required(mode) else "security_only"
+
+
 def _detect_mode(code: str) -> str:
     has_gee = "import ee" in code or "ee." in code
     has_local = any(token in code for token in ("rasterio", "geopandas", "gpd.", "shapely"))
@@ -477,10 +635,6 @@ def _detect_mode(code: str) -> str:
     if has_local:
         return "local"
     return "general"
-
-
-def _find_regex_matches(pattern: str, text: str) -> List[str]:
-    return [m.group(0) for m in re.finditer(pattern, text)]
 
 
 def _extract_gee_assets(code: str) -> List[str]:
@@ -532,14 +686,23 @@ def _preflight_checks(code: str, strict_mode: bool) -> Dict[str, Any]:
     except SyntaxError as exc:
         blocking_errors.append(f"SyntaxError at line {exc.lineno}: {exc.msg}")
 
+    path_mode = _path_protocol_mode()
+    resolver_required = _is_resolver_required(path_mode)
+
     # Path protocol checks (non-blocking unless true security boundary is crossed).
     abs_literal_hits = _detect_absolute_path_literals(code)
     if abs_literal_hits:
-        warnings.append(
-            "Detected absolute path literal(s). Prefer storage_manager.resolve_input_path/resolve_output_path for portability."
-        )
+        if resolver_required:
+            warnings.append(
+                "Detected absolute path literal(s). Prefer storage_manager.resolve_input_path/resolve_output_path for portability."
+            )
+        else:
+            warnings.append(
+                "Detected absolute path literal(s). Use sandbox-relative paths like inputs/... and outputs/... in thread workspace."
+            )
 
-    if re.search(r"['\"](?:inputs|outputs)/", code):
+    has_io_relative_literals = bool(re.search(r"['\"](?:inputs|outputs)/", code))
+    if has_io_relative_literals and resolver_required:
         msg = "Detected hardcoded 'inputs/' or 'outputs/' path literal. Use storage_manager path resolvers instead."
         warnings.append(msg)
 
@@ -550,22 +713,37 @@ def _preflight_checks(code: str, strict_mode: bool) -> Dict[str, Any]:
     uses_read_ops = any(re.search(p, code) for p in READ_PATTERNS)
     uses_write_ops = any(re.search(p, code) for p in WRITE_PATTERNS)
 
-    if (uses_read_ops or uses_write_ops) and not has_storage_manager_import:
-        msg = "File I/O detected but missing `from storage_manager import storage_manager` import."
-        warnings.append(msg)
+    if resolver_required:
+        if (uses_read_ops or uses_write_ops) and not has_storage_manager_import:
+            msg = "File I/O detected but missing `from storage_manager import storage_manager` import."
+            warnings.append(msg)
 
-    if uses_read_ops and not (has_resolve_input or has_resolve_output):
-        msg = "Read operations detected but no resolve_input_path()/resolve_output_path() usage found."
-        warnings.append(msg)
+        if uses_read_ops and not (has_resolve_input or has_resolve_output):
+            msg = "Read operations detected but no resolve_input_path()/resolve_output_path() usage found."
+            warnings.append(msg)
 
-    if uses_write_ops and not has_resolve_output:
-        msg = "Write operations detected but no resolve_output_path() usage found."
-        warnings.append(msg)
+        if uses_write_ops and not has_resolve_output:
+            msg = "Write operations detected but no resolve_output_path() usage found."
+            warnings.append(msg)
+    elif uses_read_ops or uses_write_ops:
+        recommendations.append(
+            "Sandbox path protocol active: relative inputs/... and outputs/... are allowed in current thread workspace."
+        )
+        recommendations.append(
+            "Use storage_manager.resolve_* when you explicitly need shared/cross-thread portability."
+        )
 
     has_source_write_target = any(p.search(code) for p in FORBIDDEN_SOURCE_TARGET_PATTERNS)
     if uses_write_ops and has_source_write_target:
         blocking_errors.append(
             "Detected attempt to write repository source/config files. Code_Assistant may only write analysis outputs."
+        )
+
+    shared_write_targets = _extract_shared_write_targets(code)
+    if shared_write_targets:
+        blocking_errors.append(
+            "Detected write target under read-only /shared path. "
+            f"Use workspace outputs/ or storage_manager.resolve_output_path(...). Targets: {shared_write_targets}"
         )
 
     if any(p.search(code) for p in FORBIDDEN_COMMAND_PATTERNS):
@@ -582,8 +760,12 @@ def _preflight_checks(code: str, strict_mode: bool) -> Dict[str, Any]:
             token in code
             for token in (
                 "get_administrative_division",
-                "get_administrative_division_osm",
-                "FAO/GAUL/2015/level1",
+                "get_administrative_division_geoboundaries",
+                "WM/geoLab/geoBoundaries/600/ADM0",
+                "WM/geoLab/geoBoundaries/600/ADM1",
+                "WM/geoLab/geoBoundaries/600/ADM2",
+                "WM/geoLab/geoBoundaries/600/ADM3",
+                "WM/geoLab/geoBoundaries/600/ADM4",
                 "projects/empyrean-caster-430308-m2/assets/province",
                 "projects/empyrean-caster-430308-m2/assets/city",
                 "projects/empyrean-caster-430308-m2/assets/county",
@@ -645,6 +827,8 @@ def _preflight_checks(code: str, strict_mode: bool) -> Dict[str, Any]:
     score = max(0, 100 - 30 * len(blocking_errors) - 8 * len(warnings))
     return {
         "mode": mode,
+        "path_protocol_mode": path_mode,
+        "path_protocol_enforcement": _path_protocol_enforcement(path_mode),
         "strict_mode": strict_mode,
         "score": score,
         "blocking_errors": blocking_errors,
@@ -664,10 +848,15 @@ def _derive_fix_suggestions(error_type: Optional[str], error_message: Optional[s
     msg = (error_message or "").lower()
     et = (error_type or "").lower()
     fixes: List[str] = []
+    path_mode = _path_protocol_mode()
 
     if "filenotfounderror" in et or "no such file" in msg:
-        fixes.append("Use storage_manager.resolve_input_path() for existing input files.")
-        fixes.append("For files generated in this session, read via storage_manager.resolve_output_path().")
+        if _is_resolver_required(path_mode):
+            fixes.append("Use storage_manager.resolve_input_path() for existing input files.")
+            fixes.append("For files generated in this session, read via storage_manager.resolve_output_path().")
+        else:
+            fixes.append("Use sandbox-relative paths from workspace root, e.g. inputs/xxx and outputs/yyy.")
+            fixes.append("If portability is needed, switch to storage_manager.resolve_input_path/resolve_output_path.")
 
     if "eeexception" in et or "earth engine" in msg:
         fixes.append(f"Ensure ee.Initialize(project='{REQUIRED_GEE_PROJECT}') is called before GEE operations.")
@@ -823,9 +1012,10 @@ def _execute_code(code_block: str) -> Tuple[bool, str, Optional[str], Optional[s
     buf = io.StringIO()
     try:
         with _thread_bound_storage_paths(str(current_thread_id.get() or "debug")):
-            with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
-                exec(bootstrap, user_globals)
-                exec(code_block, user_globals)
+            with _thread_workspace_cwd(str(current_thread_id.get() or "debug")):
+                with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+                    exec(bootstrap, user_globals)
+                    exec(code_block, user_globals)
         logs = _sanitize_ansi(buf.getvalue())
         return True, logs, None, None, None
     except Exception as exc:  # noqa: BLE001
@@ -947,7 +1137,9 @@ def _execute_code_in_subprocess_sandbox(
         env = _build_sandbox_env(thread_id, code_path)
         completed = subprocess.run(
             [sys.executable, str(runner_path)],
-            cwd=str(repo_root),
+            # Run from thread workspace so legacy relative paths (inputs/outputs)
+            # resolve into thread-isolated directories.
+            cwd=str(workspace),
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -974,11 +1166,15 @@ def _execute_code_in_subprocess_sandbox(
 
 def GEE_GeoCode_COT_Validation(
     code_block: str,
-    strict_mode: bool = True,
+    strict_mode: bool = False,
     config: Optional[RunnableConfig] = None,
 ) -> str:
     token = _bind_thread_from_config(config)
     try:
+        path_mode = _path_protocol_mode()
+        path_protocol_enforcement = _path_protocol_enforcement(path_mode)
+        thread_id = str(current_thread_id.get() or "debug").strip() or "debug"
+        runtime_path_rewrite = _empty_runtime_path_rewrite_report()
         try:
             block_script_name, block_script_path = _persist_script(
                 code_block,
@@ -1000,16 +1196,21 @@ def GEE_GeoCode_COT_Validation(
                     "error_message": str(exc),
                     "traceback": traceback.format_exc(),
                     "code_block": code_block,
+                    "path_protocol_mode": path_mode,
+                    "path_protocol_enforcement": path_protocol_enforcement,
                     "error_handling_policy": policy,
                     "execution_skipped": True,
+                    "runtime_path_rewrite": runtime_path_rewrite,
                 },
                 indent=2,
                 ensure_ascii=False,
             )
 
         preflight = _preflight_checks(code_block, strict_mode=strict_mode)
+        # Security and integrity blocking errors are always enforced.
+        preflight_blocking_enabled = bool(preflight.get("blocking_errors"))
 
-        if preflight["blocking_errors"]:
+        if preflight["blocking_errors"] and preflight_blocking_enabled:
             policy = _build_error_handling_policy(
                 "PreflightError",
                 preflight["blocking_errors"][0],
@@ -1028,7 +1229,10 @@ def GEE_GeoCode_COT_Validation(
                 "preflight": preflight,
                 "fix_suggestions": preflight["recommendations"],
                 "error_handling_policy": policy,
+                "path_protocol_mode": path_mode,
+                "path_protocol_enforcement": path_protocol_enforcement,
                 "execution_skipped": True,
+                "runtime_path_rewrite": runtime_path_rewrite,
             }
             _append_run_history(
                 {
@@ -1042,8 +1246,8 @@ def GEE_GeoCode_COT_Validation(
                 }
             )
             return json.dumps(report, indent=2, ensure_ascii=False)
-
-        ok, logs, etype, emsg, tb = _execute_code(code_block)
+        runtime_code, runtime_path_rewrite = _rewrite_virtual_paths_for_runtime(code_block, thread_id=thread_id)
+        ok, logs, etype, emsg, tb = _execute_code(runtime_code)
         fix_suggestions = _derive_fix_suggestions(etype, emsg) + preflight["recommendations"]
         report = {
             "status": "pass" if ok else "fail",
@@ -1056,12 +1260,15 @@ def GEE_GeoCode_COT_Validation(
             "script_path": block_script_path,
             "preflight": preflight,
             "fix_suggestions": fix_suggestions,
+            "path_protocol_mode": path_mode,
+            "path_protocol_enforcement": path_protocol_enforcement,
             "error_handling_policy": (
                 _build_error_handling_policy(etype, emsg, preflight=preflight, fix_suggestions=fix_suggestions)
                 if not ok
                 else None
             ),
             "execution_skipped": False,
+            "runtime_path_rewrite": runtime_path_rewrite,
         }
         _append_run_history(
             {
@@ -1406,22 +1613,20 @@ def read_workspace_file(
 
 def execute_geospatial_script(
     script_name: str,
-    strict_mode: bool = True,
+    script_location: str = "auto",
+    strict_mode: bool = False,
+    force_execute: bool = False,
     config: Optional[RunnableConfig] = None,
 ) -> str:
     token = _bind_thread_from_config(config)
     try:
-        # Preflight should assist execution by default, not block it.
-        # Keep strict checks in report, but do not hard-stop normal runs unless explicitly enabled.
+        path_mode = _path_protocol_mode()
+        path_protocol_enforcement = _path_protocol_enforcement(path_mode)
+        # strict_mode controls audit strictness; hard safety boundaries are always blocked.
         enforced_strict_mode = bool(strict_mode)
-        preflight_blocking_enabled = str(os.getenv("NTL_PREFLIGHT_BLOCKING", "0")).strip().lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }
         thread_id = str(current_thread_id.get() or "debug").strip() or "debug"
         empty_audit = _build_artifact_audit("", thread_id=thread_id)
+        no_runtime_rewrite = _empty_runtime_path_rewrite_report()
 
         if not script_name or not script_name.strip():
             policy = _build_error_handling_policy(
@@ -1436,25 +1641,57 @@ def execute_geospatial_script(
                     "error_type": "InvalidScriptName",
                     "error_message": "script_name is required.",
                     "error_handling_policy": policy,
+                    "path_protocol_mode": path_mode,
+                    "path_protocol_enforcement": path_protocol_enforcement,
                     "artifact_audit": empty_audit,
+                    "runtime_path_rewrite": no_runtime_rewrite,
                 },
                 indent=2,
                 ensure_ascii=False,
             )
-        safe_name = os.path.basename(script_name.strip())
+        requested_script = str(script_name or "").strip()
+        normalized_request = requested_script.replace("\\", "/").lstrip("/")
+        explicit_location = ""
+        if normalized_request.lower().startswith("inputs/"):
+            explicit_location = "inputs"
+            normalized_request = normalized_request[len("inputs/") :]
+        elif normalized_request.lower().startswith("outputs/"):
+            explicit_location = "outputs"
+            normalized_request = normalized_request[len("outputs/") :]
+
+        safe_name = os.path.basename(normalized_request.strip() or requested_script)
         if not safe_name.lower().endswith(".py"):
             safe_name = f"{safe_name}.py"
         safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", safe_name)
+        requested_location = str(script_location or "auto").strip().lower()
+        if requested_location not in {"auto", "inputs", "outputs"}:
+            requested_location = "auto"
+        effective_location = explicit_location or requested_location
         thread_ctx = _get_thread_context()
 
         output_script_path = Path(storage_manager.resolve_output_path(safe_name))
         input_script_path = Path(storage_manager.resolve_input_path(safe_name))
-
-        if output_script_path.exists():
-            script_path = output_script_path
-        elif input_script_path.exists():
-            script_path = input_script_path
+        candidates = {
+            "outputs": output_script_path,
+            "inputs": input_script_path,
+        }
+        if effective_location == "outputs":
+            ordered_locations = ["outputs"]
+        elif effective_location == "inputs":
+            ordered_locations = ["inputs"]
         else:
+            ordered_locations = ["outputs", "inputs"]
+
+        script_path: Optional[Path] = None
+        resolved_location = ""
+        for loc in ordered_locations:
+            candidate = candidates.get(loc)
+            if candidate is not None and candidate.exists():
+                script_path = candidate
+                resolved_location = loc
+                break
+
+        if script_path is None:
             workspace = storage_manager.get_workspace(thread_id)
             available_scripts = [p.name for p in sorted((workspace / "outputs").glob("*.py"))]
             available_scripts.extend([p.name for p in sorted((workspace / "inputs").glob("*.py"))])
@@ -1471,13 +1708,18 @@ def execute_geospatial_script(
                     "error_type": "ScriptNotFoundError",
                     "error_message": f"Script '{safe_name}' was not found in current workspace inputs/outputs.",
                     "script_name": safe_name,
+                    "script_location": effective_location,
                     "available_scripts": available_scripts,
+                    "resolved_candidates": {k: str(v) for k, v in candidates.items()},
                     "last_saved_script_name": last_saved_script_name,
                     "recovery_suggestion": (
                         "Persist the draft script first (write/save tool), then execute by exact saved filename."
                     ),
                     "error_handling_policy": policy,
+                    "path_protocol_mode": path_mode,
+                    "path_protocol_enforcement": path_protocol_enforcement,
                     "artifact_audit": empty_audit,
+                    "runtime_path_rewrite": no_runtime_rewrite,
                 },
                 indent=2,
                 ensure_ascii=False,
@@ -1485,9 +1727,14 @@ def execute_geospatial_script(
 
         script_content = script_path.read_text(encoding="utf-8")
         preflight = _preflight_checks(script_content, strict_mode=enforced_strict_mode)
+        # Security and integrity blocking errors are always enforced.
+        preflight_blocking_enabled = bool(preflight.get("blocking_errors"))
         normalized_script_hash = hashlib.sha256(_normalize_whitespace(script_content).encode("utf-8")).hexdigest()
 
         if (
+            (not bool(force_execute))
+            and resolved_location in {"outputs", "inputs"}
+            and
             thread_ctx.get("__ntl_last_executed_success_hash") == normalized_script_hash
             and thread_ctx.get("__ntl_last_executed_success_script_path") == str(script_path)
         ):
@@ -1497,12 +1744,16 @@ def execute_geospatial_script(
                 "stdout": "[dedupe] Identical script already executed successfully in this thread. Skipped re-execution.",
                 "script_name": safe_name,
                 "script_path": str(script_path),
+                "script_location": resolved_location or effective_location,
                 "already_executed": True,
                 "execution_skipped": True,
                 "code": script_content,
                 "preflight": preflight,
                 "next_action_hint": "return_to_supervisor_auto",
+                "path_protocol_mode": path_mode,
+                "path_protocol_enforcement": path_protocol_enforcement,
                 "artifact_audit": empty_audit,
+                "runtime_path_rewrite": no_runtime_rewrite,
             }
             _append_run_history(
                 {
@@ -1531,12 +1782,16 @@ def execute_geospatial_script(
                 "traceback": None,
                 "script_name": safe_name,
                 "script_path": str(script_path),
+                "script_location": resolved_location or effective_location,
                 "code": script_content,
                 "preflight": preflight,
                 "fix_suggestions": preflight["recommendations"],
                 "error_handling_policy": policy,
+                "path_protocol_mode": path_mode,
+                "path_protocol_enforcement": path_protocol_enforcement,
                 "execution_skipped": True,
                 "artifact_audit": empty_audit,
+                "runtime_path_rewrite": no_runtime_rewrite,
             }
             _append_run_history(
                 {
@@ -1551,14 +1806,12 @@ def execute_geospatial_script(
             )
             return json.dumps(result, indent=2, ensure_ascii=False)
 
-        if preflight["blocking_errors"] and not preflight_blocking_enabled:
-            preflight["warnings"] = list(preflight.get("warnings") or []) + [
-                f"[preflight-bypass] {msg}" for msg in (preflight.get("blocking_errors") or [])
-            ]
-
-        ok, logs, etype, emsg, tb = _execute_code(script_content)
+        runtime_code, runtime_path_rewrite = _rewrite_virtual_paths_for_runtime(script_content, thread_id=thread_id)
+        ok, logs, etype, emsg, tb = _execute_code(runtime_code)
         artifact_audit = _build_artifact_audit(logs, thread_id=thread_id)
         if ok:
+            warning_messages: List[str] = []
+            warning_policy: Optional[Dict[str, Any]] = None
             if not artifact_audit.get("pass", True):
                 out_paths = artifact_audit.get("out_of_workspace_paths") or []
                 migrated_paths, migration_failures = _auto_migrate_cross_workspace_outputs(out_paths, thread_id)
@@ -1571,50 +1824,25 @@ def execute_geospatial_script(
                 else:
                     message = (
                         "Detected output paths outside current thread workspace outputs and auto-migration failed. "
-                        "Use storage_manager.resolve_output_path(...) for every generated file."
+                        "Use sandbox-relative outputs/<filename> or storage_manager.resolve_output_path(...) for every generated file."
                     )
                     if out_paths:
                         message = f"{message} Offending paths: {out_paths}"
                     fix_suggestions = [
-                        "Replace hardcoded absolute output paths with storage_manager.resolve_output_path('filename').",
+                        "Replace hardcoded absolute output paths with sandbox-relative outputs/<filename>.",
+                        "Or use storage_manager.resolve_output_path('filename') when portability is required.",
                         "Do not write to other thread folders such as user_data/debug/outputs.",
                     ]
-                    policy = _build_error_handling_policy(
-                        "CrossWorkspaceOutputError",
+                    warning_policy = _build_error_handling_policy(
+                        "CrossWorkspaceOutputWarning",
                         message,
                         preflight=preflight,
                         fix_suggestions=fix_suggestions,
                     )
-                    result = {
-                        "status": "fail",
-                        "stdout": logs,
-                        "error_type": "CrossWorkspaceOutputError",
-                        "error_message": message,
-                        "traceback": None,
-                        "script_name": safe_name,
-                        "script_path": str(script_path),
-                        "code": script_content,
-                        "preflight": preflight,
-                        "fix_suggestions": fix_suggestions,
-                        "error_handling_policy": policy,
-                        "execution_skipped": False,
-                        "cross_workspace_recovered": False,
-                        "auto_migrated_files": migrated_paths,
-                        "recovery_note": "Auto-migration failed for one or more files.",
-                        "artifact_audit": artifact_audit,
-                    }
-                    _append_run_history(
-                        {
-                            "timestamp": _timestamp(),
-                            "tool": "execute_geospatial_script_tool",
-                            "status": "fail",
-                            "reason": "cross_workspace_output",
-                            "script_name": safe_name,
-                            "script_path": str(script_path),
-                            "thread_id": current_thread_id.get(),
-                        }
+                    warning_messages.append(
+                        "Execution succeeded, but detected output paths outside current workspace and auto-migration failed."
                     )
-                    return json.dumps(result, indent=2, ensure_ascii=False)
+                    warning_messages.append(message)
 
             thread_ctx["__ntl_last_executed_success_hash"] = normalized_script_hash
             thread_ctx["__ntl_last_executed_success_script_name"] = safe_name
@@ -1631,14 +1859,17 @@ def execute_geospatial_script(
                 stdout=logs,
             )
             result = {
-                "status": "success",
+                "status": "success_with_warnings" if warning_messages else "success",
                 "stdout": logs,
                 "script_name": safe_name,
                 "script_path": str(script_path),
+                "script_location": resolved_location or effective_location,
                 "code_guide_archive": archive_info,
                 "code": script_content,
                 "preflight": preflight,
                 "execution_skipped": False,
+                "path_protocol_mode": path_mode,
+                "path_protocol_enforcement": path_protocol_enforcement,
                 "cross_workspace_recovered": bool(artifact_audit.get("auto_migration_success")),
                 "auto_migrated_files": list(artifact_audit.get("migrated_paths") or []),
                 "recovery_note": (
@@ -1647,12 +1878,22 @@ def execute_geospatial_script(
                     else ""
                 ),
                 "artifact_audit": artifact_audit,
+                "runtime_path_rewrite": runtime_path_rewrite,
             }
+            if warning_messages:
+                result["warnings"] = warning_messages
+                result["warning_type"] = "CrossWorkspaceOutputWarning"
+                if warning_policy:
+                    result["warning_handling_policy"] = warning_policy
             _append_run_history(
                 {
                     "timestamp": _timestamp(),
                     "tool": "execute_geospatial_script_tool",
-                    "status": "success_recovered" if artifact_audit.get("auto_migration_success") else "success",
+                    "status": (
+                        "success_recovered"
+                        if artifact_audit.get("auto_migration_success")
+                        else ("success_warning" if warning_messages else "success")
+                    ),
                     "script_name": safe_name,
                     "script_path": str(script_path),
                     "code_guide_archive": archive_info,
@@ -1696,13 +1937,17 @@ def execute_geospatial_script(
             "traceback": tb,
             "script_name": safe_name,
             "script_path": str(script_path),
+            "script_location": resolved_location or effective_location,
             "code": script_content,
             "preflight": preflight,
             "fix_suggestions": fix_suggestions,
             "error_handling_policy": policy,
+            "path_protocol_mode": path_mode,
+            "path_protocol_enforcement": path_protocol_enforcement,
             "repeated_failure_signature_count": repeated_failure_count,
             "execution_skipped": False,
             "artifact_audit": artifact_audit,
+            "runtime_path_rewrite": runtime_path_rewrite,
         }
         _append_run_history(
             {
@@ -1726,7 +1971,7 @@ GeoCode_COT_Validation_tool = StructuredTool.from_function(
     name="GeoCode_COT_Validation_tool",
     description=(
         "Enhanced Geo-CodeCoT validator for geospatial Python. Performs preflight static checks "
-        "(syntax, path protocol, GEE initialization, dataset/band and CRS risk checks), then executes "
+        "(syntax, sandbox-first path protocol, GEE initialization, dataset/band and CRS risk checks), then executes "
         "one minimal code block and returns structured JSON with pass/fail, logs, traceback, and fix suggestions."
     ),
     args_schema=GeoCodeCOTBlockInput,
@@ -1760,7 +2005,7 @@ execute_geospatial_script_tool = StructuredTool.from_function(
     execute_geospatial_script,
     name="execute_geospatial_script_tool",
     description=(
-        "Execute a previously saved .py geospatial script by filename. "
+        "Execute a previously saved .py geospatial script by filename under thread workspace sandbox. "
         "Returns structured JSON with status, logs, script metadata, and traceback when failed."
     ),
     args_schema=ExecuteScriptInput,

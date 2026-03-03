@@ -122,7 +122,7 @@ def test_router_zonal_stats_daily_six_days_prefers_direct_download_non_target_va
     assert data["recommended_execution_mode"] == "direct_download"
 
 
-def test_router_zonal_stats_daily_seven_days_uses_server_side():
+def test_router_zonal_stats_daily_seven_days_prefers_direct_download_after_threshold_unification():
     mod = _load_module()
     payload = mod.GEE_dataset_router_tool.invoke(
         {
@@ -135,6 +135,22 @@ def test_router_zonal_stats_daily_seven_days_uses_server_side():
     )
     data = json.loads(payload)
     assert data["estimated_image_count"] == 7
+    assert data["recommended_execution_mode"] == "direct_download"
+
+
+def test_router_zonal_stats_daily_fifteen_days_uses_server_side():
+    mod = _load_module()
+    payload = mod.GEE_dataset_router_tool.invoke(
+        {
+            "query": "Flood impact zonal stats for a fifteen-day window around event date",
+            "temporal_resolution": "daily",
+            "start_date": "2025-07-01",
+            "end_date": "2025-07-15",
+            "analysis_intent": "zonal_stats",
+        }
+    )
+    data = json.loads(payload)
+    assert data["estimated_image_count"] == 15
     assert data["recommended_execution_mode"] == "gee_server_side"
 
 

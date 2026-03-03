@@ -4,7 +4,7 @@ import os
 # Add root to sys.path
 sys.path.append(os.getcwd())
 
-from tools.NTL_Code_generation import final_geospatial_code_execution
+from tools.NTL_Code_generation import execute_geospatial_script, save_geospatial_script
 from storage_manager import current_thread_id
 
 # Set a thread ID for this execution
@@ -130,7 +130,14 @@ else:
     pd.DataFrame({'Error': ['No data']}).to_csv(output_path, index=False)
 """
 
-print("Executing code via tool...")
-result = final_geospatial_code_execution(geospatial_code)
+print("Saving and executing code via tools...")
+save_res = save_geospatial_script(
+    script_content=geospatial_code,
+    script_name="execute_via_tool_case.py",
+    overwrite=True,
+)
+print("Save Result:")
+print(save_res)
+result = execute_geospatial_script(script_name="execute_via_tool_case.py")
 print("Execution Result:")
 print(result)

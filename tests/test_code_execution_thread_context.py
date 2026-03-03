@@ -31,14 +31,20 @@ def test_validation_tool_uses_thread_id_from_config():
     assert "debug" not in data.get("stdout", "")
 
 
-def test_final_execution_tool_uses_thread_id_from_config():
+def test_execute_tool_uses_thread_id_from_config():
     mod = _load_module()
     code = (
         "from storage_manager import storage_manager\n"
-        "print(storage_manager.resolve_output_path('ctx_check_final.txt'))\n"
+        "print(storage_manager.resolve_output_path('ctx_check_exec.txt'))\n"
     )
-    result = mod.final_geospatial_code_execution_tool.invoke(
-        {"final_geospatial_code": code, "strict_mode": True},
+    save_result = mod.save_geospatial_script_tool.invoke(
+        {"script_content": code, "script_name": "ctx_exec_case.py", "overwrite": True},
+        config={"configurable": {"thread_id": "thread_ctx_final"}},
+    )
+    save_data = json.loads(save_result)
+    assert save_data["status"] == "success"
+    result = mod.execute_geospatial_script_tool.invoke(
+        {"script_name": "ctx_exec_case.py", "strict_mode": True},
         config={"configurable": {"thread_id": "thread_ctx_final"}},
     )
     data = json.loads(result)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 from typing import Callable
 
 from dotenv import load_dotenv
@@ -13,6 +14,22 @@ from langchain_openai import OpenAIEmbeddings
 
 
 load_dotenv()
+
+
+def _resolve_rag_persist_dir(store_name: str) -> str:
+    """
+    Resolve RAG store path in a cwd-independent way.
+
+    Priority:
+    1) NTL_RAG_ROOT env (absolute recommended), e.g. D:\\NTL-GPT\\NTL-GPT-Clone\\RAG
+    2) repository-root/RAG (derived from this file location)
+    """
+    env_root = str(os.getenv("NTL_RAG_ROOT", "") or "").strip()
+    if env_root:
+        root = Path(env_root).expanduser().resolve()
+    else:
+        root = Path(__file__).resolve().parents[1] / "RAG"
+    return str((root / store_name).resolve())
 
 
 def _ensure_openai_api_key() -> None:
@@ -74,7 +91,7 @@ _EMBEDDINGS = OpenAIEmbeddings(model="text-embedding-3-small")
 
 NTL_Literature_Knowledge = _build_retriever_tool(
     collection_name="Literature_RAG",
-    persist_directory=r".\RAG\Literature_RAG",
+    persist_directory=_resolve_rag_persist_dir("Literature_RAG"),
     tool_name="NTL_Literature_Knowledge",
     description=(
         "Use this tool to retrieve peer-reviewed academic literature related to "
@@ -89,7 +106,7 @@ NTL_Literature_Knowledge = _build_retriever_tool(
 
 NTL_Solution_Knowledge = _build_retriever_tool(
     collection_name="Solution_RAG",
-    persist_directory=r".\RAG\Solution_RAG",
+    persist_directory=_resolve_rag_persist_dir("Solution_RAG"),
     tool_name="NTL_Solution_Knowledge",
     description=(
         "Use this tool to retrieve structured workflows, tool usage guides, "
@@ -103,7 +120,7 @@ NTL_Solution_Knowledge = _build_retriever_tool(
 
 NTL_Code_Knowledge = _build_retriever_tool(
     collection_name="Code_RAG",
-    persist_directory=r".\RAG\Code_RAG",
+    persist_directory=_resolve_rag_persist_dir("Code_RAG"),
     tool_name="NTL_Code_Knowledge",
     description=(
         "Use this tool to retrieve Python and GEE code snippets relevant to NTL tasks. "

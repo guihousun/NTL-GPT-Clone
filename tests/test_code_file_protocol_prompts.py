@@ -4,8 +4,6 @@ from agents.NTL_Engineer import system_prompt_text
 
 def test_code_assistant_prompt_requires_file_based_execution_tools():
     prompt = Code_Assistant_system_prompt_text.content
-    assert "save_geospatial_script_tool" in prompt
-    assert "read_workspace_file_tool" in prompt
     assert "execute_geospatial_script_tool" in prompt
     assert "method owner" in prompt
     assert "Engineer-first trust rule (mandatory)" in prompt
@@ -37,13 +35,17 @@ def test_code_assistant_prompt_is_proposal_only_for_workflow_evolution():
     assert "artifact_audit_pass" in prompt
 
 
+def test_code_assistant_prompt_prefers_geoboundaries_for_global_gee_boundaries():
+    prompt = Code_Assistant_system_prompt_text.content
+    assert "WM/geoLab/geoBoundaries/600/ADM0-ADM4" in prompt
+    assert "Do NOT introduce legacy GAUL dataset paths" in prompt
+
+
 def test_engineer_prompt_requires_script_metadata_review():
     prompt = system_prompt_text.content
-    assert "script_name" in prompt
-    assert "script_path" in prompt
+    assert "draft_script_name" in prompt
     assert "file-first execution protocol" in prompt
     assert "initial script design" in prompt
-    assert "revised script draft" in prompt
+    assert "execution_objective" in prompt
     assert "save before handoff" in prompt
-    assert "saved_script_name" in prompt
-    assert "saved_script_path" in prompt
+    assert "exact saved filename" in prompt

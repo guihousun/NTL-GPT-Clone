@@ -627,3 +627,272 @@
 - Improves readability for successful Code_Assistant JSON outputs without coupling UI to internal keys.
 - Maintains backward compatibility for non-JSON code responses.
 - Preserves Data_Searcher / NTL_Engineer and tool-output rendering paths.
+
+
+## [2026-02-25] Process Update: Multimodal Chat Input Theme Recovery
+### Process Change
+- Reintroduced controlled in-iframe theme styling for `st_chat_input_multimodal` to match NTL dark UI.
+- Limited changes to visual CSS only (root transparency + shell/theme colors), without modifying component interaction structure.
+
+### Outcome
+- Restores visual consistency of chat input after cross-branch style drift.
+- Avoids prior typing/send regressions caused by aggressive structural overrides.
+
+
+## [2026-02-25] Process Update: Map Defaults Standardized to China-Centered Dark Basemap
+### Process Change
+- Standardized map initialization in UI to explicit `tiles=None` + dark basemap layer, avoiding implicit Folium light OSM default.
+- Unified default viewport to a China-centered extent (`[35.0, 104.0]`, zoom `4`) for both regular map initialization and no-layer fallback.
+- Preserved optional satellite basemap as a selectable layer.
+
+### Outcome
+- Map view now opens with consistent dark style and expected geographic focus in first paint.
+- Prevents regressions where implicit default tiles override dark visual direction.
+
+
+## [2026-02-25] Process Update: Engineer-First Saved Script + Read-Before-Execute Loop
+### Process Change
+- Standardized cross-agent execution protocol to file-first handoff:
+  - Engineer must save draft script before transfer.
+  - Handoff packet includes saved script metadata (`saved_script_name`, `saved_script_path`).
+  - Code_Assistant must read saved script before first execution.
+- Added explicit failure chain policy:
+  - first execution failure must enter validation chain,
+  - one light fix retry max,
+  - hard failure escalates to Engineer decision path.
+
+### Outcome
+- Reduces blind execution risk and improves script traceability across agent boundaries.
+- Keeps runtime architecture unchanged (prompt + tool contract hardening only).
+- Preserves generalization-first behavior with dedicated tests for non-target file variants (`.json`, `.md`).
+
+
+## [2026-02-25] Process Update: MapView Stateful Policy for First-Open and Layer-Switch Reset
+### Process Change
+- Added a dedicated policy layer (`map_view_policy.py`) to centralize map interaction decisions:
+  - deterministic layer signature generation,
+  - per-thread first-open detection,
+  - per-thread switch nonce progression.
+- Updated MapView rendering contract:
+  - first open: force China-centered dark viewport,
+  - layer switch: allow `fit_bounds`,
+  - layer switch also resets map component key so basemap reverts to dark by default.
+- Explicitly set basemap visibility flags instead of relying on implicit Folium defaults:
+  - dark `show=True`, satellite `show=False`.
+
+### Outcome
+- Eliminates unstable basemap carry-over across reruns/switches.
+- Makes viewport behavior predictable and testable.
+- Keeps behavior generalized across raster-only, vector-only, and mixed layer scenarios.
+
+## [2026-02-25] Process Update: Streaming Run Isolation and Deferred Control Apply
+### Process Change
+- Streaming execution is now treated as a background run with event-bus consumption on UI reruns.
+- Interaction policy during running:
+  - `Stop` / `New` / runtime error can interrupt active run.
+  - user/thread switch interrupts before switching context.
+  - model/activate updates are queued and applied when current run ends.
+- Enforced per-thread single-flight to avoid concurrent runs in the same thread.
+
+### Outcome
+- Map/Outputs and other non-stop rerun operations no longer break the active chat task.
+- Streaming continuity is preserved across Streamlit reruns.
+- Runtime control behavior is deterministic and easier to test.
+
+## [2026-02-25] Process Update: Stop Interaction Immediate Frontend Unlock
+### Process Change
+- Refined run interruption policy for sidebar `Stop`:
+  - keep backend stop request,
+  - immediately detach frontend run-lock state (`is_running/active_run_id`) to unblock control actions like `Activate`.
+- This is a UI control-plane optimization only; backend worker still exits via stop signal and preserves single-flight registry behavior.
+
+### Outcome
+- Users can click `Activate` immediately after `Stop`, without waiting for remote model/tool timeout to finish.
+- Prevents “Stop looks ineffective” UX during long-running or delayed downstream calls.
+
+## [2026-02-25] Process Update: Streaming UI Non-Interrupt Hint + Flicker-Reduced Analysis Rendering
+### Process Change
+- During active runs, analysis panel now shows a concise non-interrupt hint clarifying runtime isolation policy.
+- Previous history cards are not re-painted in every streaming tick while run is active; only current-round logs/graph remain live.
+- Streaming rerun cadence is adaptive (fast on new events, slower when idle) to reduce visible flicker.
+
+### Outcome
+- Right panel appears more stable during long runs.
+- Users get explicit feedback that common panel interactions continue without interrupting current task.
+
+
+## [2026-02-25] Process Update: Sub-agent Summarization Prompt Specialization
+### Process Change
+- Added an NTL-oriented summarization prompt contract for sub-agents using `SummarizationMiddleware`.
+- Standardized middleware construction as provider-aware:
+  - Qwen sessions summarize via DashScope-compatible chat model,
+  - OpenAI sessions summarize via `gpt-4o-mini`.
+
+### Outcome
+- Better retention of high-value geospatial runtime context (dataset IDs, AOI/boundary, CRS, file artifacts, and next actions).
+- Lower risk of losing execution-critical state in long-running multi-agent tasks.
+
+## [2026-02-25] Process Update: Version Documentation Consolidation
+### Process Change
+- Added a product-facing version overview doc: `docs/NTL-GPT版本介绍.md`.
+- Recommended release documentation split:
+  - product overview doc (low-frequency),
+  - GitHub Releases (per release),
+  - `CHANGELOG.md` (engineering-level details).
+
+### Outcome
+- Current capabilities and historical updates are readable from one concise onboarding document.
+- Release communication can follow a standard GitHub workflow with clearer audience separation.
+
+## [2026-02-25] Process Update: Lightweight Changelog Policy
+### Process Change
+- Introduced repository-level `CHANGELOG.md` as the primary engineering delta ledger.
+- Updated `AGENTS.md` documentation policy to keep logging lightweight:
+  - `CHANGELOG.md` for high-impact changes,
+  - `docs/NTL-GPT*.md` for milestone/product summary,
+  - `docs/Skill_*.md` only when process/skill norms materially change.
+
+### Outcome
+- Lower maintenance burden while preserving traceability.
+- Cleaner separation between product-facing summary and engineering change history.
+
+
+## [2026-02-25] Process Update: Invalid Transfer/Handoff Immediate Auto-Return Guard
+### Process Change
+- Added a reusable sub-agent runtime middleware guard that suppresses hallucinated `transfer_*` / `handoff_*` calls to engineer/supervisor.
+- Standardized convergence behavior:
+  - invalid-handoff-only turn -> immediate auto-return terminal message,
+  - mixed tool calls -> drop invalid handoff calls, continue with valid tools.
+- Prompt contracts for Data_Searcher and Code_Assistant now explicitly ban transfer/handoff variants to engineer/supervisor.
+
+### Outcome
+- Eliminates repeated "invalid transfer tool" loops and reduces wasted retries/tokens.
+- Preserves normal tool-call execution path and keeps supervisor auto-return architecture intact.
+
+## [2026-02-26] Process Update: L1/L2/L3 Routing and Retrieval-Contract Discipline
+### Process Change
+- Introduced unified task-level routing semantics across agents:
+  - `L1`: download-only,
+  - `L2`: single-file local analysis,
+  - `L3`: complex multi-step analysis.
+- Standardized retrieval handoff/return contract alignment:
+  - engineer handoff requires `contract_version: ntl.retrieval.contract.v1`,
+  - data return requires envelope (`schema/status/task_level`) and completion consistency checks.
+  - added canonical schema artifact: `docs/contracts/ntl.retrieval.contract.v1.schema.json`.
+- Standardized code self-healing scope:
+  - one-shot light-fix whitelist/blacklist explicitly defined to prevent uncontrolled retry behavior.
+- Reinforced sub-agent loop prevention:
+  - repeated handoff-like calls are now suppressed by middleware loop guard.
+
+### Outcome
+- Reduced ambiguity in sub-agent dispatch conditions.
+- Improved determinism of retrieval payload quality before execution handoff.
+- Lowered risk of infinite/low-value handoff loops and retry churn.
+
+## [2026-02-26] Process Update: Quick Geodata Validation Uses Workspace-Aware Lookup
+### Process Change
+- Updated quick geodata validation policy from `inputs-only` lookup to workspace-aware resolution:
+  - supports `auto|inputs|outputs` lookup preference,
+  - supports explicit `inputs/...` or `outputs/...` hints in filenames.
+- Simplified quick mode behavior:
+  - quick-check now skips cross-check synthesis by default,
+  - focuses on fast availability/readability checks and basic metadata.
+
+### Outcome
+- Prevents false negatives when upstream files are produced in `outputs/`.
+- Reduces low-value complexity/noise in quick verification stage while preserving compatibility.
+
+## [2026-02-26] Process Update: Uploaded Image/PDF Understanding Supports outputs/
+### Process Change
+- Updated uploaded-file understanding process boundary from `inputs-only` to workspace-aware lookup:
+  - supports `workspace_lookup` (`auto|inputs|outputs`),
+  - default keeps compatibility (`inputs` first, then `outputs` fallback).
+- Applied the same lookup semantics to context-injection path resolution in `file_context_service`.
+
+### Outcome
+- Agent can understand generated artifacts (e.g., output PNG/TIF previews) without requiring manual file moves to `inputs/`.
+- Reduces mismatch between tool description, runtime behavior, and user expectation in analysis loops.
+
+## [2026-02-25] Process Update: Subagent Handoff Guard Success-First Repair Path
+### Process Change
+- Subagent handoff guard keeps the success-first strategy for invalid `transfer_*` / `handoff_*` calls:
+  - mixed calls: remove invalid handoff calls and keep valid tool calls,
+  - invalid-only calls: retry with repair instruction under bounded budget.
+- Hardened repair prompt injection for both string-based and block-based system messages.
+- Added exhausted-path observability metadata in middleware terminal response:
+  - `handoff_guard_status=exhausted`
+  - `handoff_guard_repair_attempts`
+  - `suppressed_invalid_handoff_tool_calls`
+
+### Outcome
+- Reduced silent failure risk when system-message format varies by provider/runtime wrapper.
+- Better LangSmith observability for suppressed/repair/exhausted decisions without changing tool APIs.
+
+## [2026-02-25] Process Update: Unavailable Transfer/Handoff Suppression + Data_Searcher UI Fallback
+### Process Change
+- Expanded sub-agent handoff guard from target-only suppression to capability-aware suppression:
+  - any `transfer_*` / `handoff_*` call not present in the current agent toolset is now treated as invalid and enters repair flow.
+- Added UI rendering fallback for Data_Searcher:
+  - non-retrieval-contract JSON now renders as status/reason + raw JSON, avoiding empty geospatial cards.
+
+### Outcome
+- Prevents repeated invalid transfer loops when sub-agents hallucinate unavailable handoff tools.
+- Improves observability and operator trust by removing blank-card false impressions.
+
+## [2026-02-26] Process Update: KB Preliminary Task-Level Proposal + Engineer Final Arbitration
+### Process Change
+- Added a two-stage routing decision protocol:
+  - Stage 1 (`NTL_Knowledge_Base_Searcher`): emit preliminary task level (`L1|L2|L3`) with reason codes and confidence.
+  - Stage 2 (`NTL_Engineer`): must explicitly confirm/override this proposal before downstream handoff.
+- Task-level proposal generation policy is now LLM-first with strict normalization and bounded fallback.
+- Engineer prompt now treats KB proposal as input evidence, not final truth.
+
+### Outcome
+- Reduced ambiguity in early routing decisions while keeping supervisor authority centralized.
+- Improved consistency of `task_level` semantics across handoff packets and downstream execution flow.
+
+## [2026-02-26] Process Update: Pixel-Level L2/L3 Boundary Hardening + Explicit Engineer Confirmation
+### Process Change
+- Tightened task-level boundary policy for routing:
+  - pixel-level extremum tasks (brightest/darkest pixel, per-pixel search) should be treated as L3 unless explicit built-in tool coverage exists,
+  - district/city-level zonal-stat tasks with direct tool support remain L2.
+- Reduced fallback policy for task-level proposal:
+  - removed rule/keyword-based fallback classification,
+  - retained only minimal default payload for runtime resilience.
+- Added explicit engineer confirmation protocol before first subagent handoff:
+  - `TASK_LEVEL_CONFIRMATION: level=<L1|L2|L3>; reasons=[...]`.
+
+### Outcome
+- Lowered risk of under-classifying pixel-level tasks as L2.
+- Improved auditability and consistency of handoff-level decisions.
+
+## [2026-02-26] Process Update: Deep Agents Virtual Path Alias + Canonical Workspace Protocol
+### Process Change
+- Unified runtime storage policy across classic tools and Deep Agents:
+  - canonical protocol remains `inputs/` (read) + `outputs/` (write),
+  - virtual aliases accepted for Deep Agents compatibility:
+    - `/data/raw/*` -> `inputs/*`
+    - `/data/processed/*` -> `outputs/*`
+    - `/memories/*` -> `memory/*`
+    - `/shared/*` -> `base_data/*`
+- Added traversal guard for virtual-path tails to prevent path-escape behavior.
+- Updated Deep Agents supervisor prompt so it no longer instructs unsupported pseudo-actions (`write_todos`, fixed memory filename writes).
+
+### Outcome
+- Preserves existing tool contracts while enabling low-friction Deep Agents path compatibility.
+- Reduces path-protocol drift between prompt guidance and executable tool behavior.
+
+## [2026-02-26] Process Update: Event-Shape-Agnostic Stream Dedupe for Subproject UI
+### Process Change
+- Standardized subproject streaming UI handling to follow the same anti-duplication principle as main runtime:
+  - initialize seen-message fingerprints from existing graph state before processing new stream events,
+  - treat stream payloads as nested containers and extract only unseen `BaseMessage` deltas.
+- Added explicit fallback hierarchy for final answer resolution:
+  1) current-run engineer delta,
+  2) current-run AI delta,
+  3) snapshot state AI messages (engineer-preferred).
+- Added additional event-log capture for AI `tool_calls` names in addition to `ToolMessage` payloads.
+
+### Outcome
+- Prevents stale first-answer replay in follow-up turns.
+- Improves right-panel observability even when provider/event mode emits sparse tool payload text.

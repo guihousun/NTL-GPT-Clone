@@ -78,7 +78,7 @@ def build_extraction_jobs(scene_df: pd.DataFrame) -> List[Dict]:
                 "tool_chain": [
                     "GeoCode_Knowledge_Recipes_tool",
                     "GeoCode_COT_Validation_tool",
-                    "final_geospatial_code_execution_tool",
+                    "execute_geospatial_script_tool",
                 ],
                 "input": {
                     "scene_id": scene_id,

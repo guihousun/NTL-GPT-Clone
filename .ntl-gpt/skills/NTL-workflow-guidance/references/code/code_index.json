@@ -1,0 +1,50 @@
+{
+  "schema": "ntl.workflow.code.index.v1",
+  "updated_at": "2026-03-02T00:00:00Z",
+  "notes": "Curated successful workflow code references. Use as guidance and re-validate for each run.",
+  "items": [
+    {
+      "intent_id": "data_retrieval_preprocessing",
+      "task_id": "Q24",
+      "case_id": "Q24_fuding_daily_ntl_animation_v2",
+      "title": "Fuding daily NTL animation with georeferenced scale bar",
+      "path": "/skills/NTL-workflow-guidance/references/code/data_retrieval_preprocessing/Q24_fuding_daily_ntl_animation_v2.py",
+      "status": "verified_success",
+      "tags": [
+        "vnp46a2",
+        "daily-animation",
+        "matplotlib",
+        "gif",
+        "sandbox-paths"
+      ],
+      "quality_notes": [
+        "Uses sandbox-relative inputs/outputs paths",
+        "Uses unified brightness range across all frames",
+        "Scale bar computed from georeferenced bounds (not fixed literal)",
+        "North arrow explicitly marked as north-up georeference indicator"
+      ]
+    },
+    {
+      "intent_id": "data_retrieval_preprocessing",
+      "task_id": "Q25",
+      "case_id": "Q25_official_vj_dnb_fullchain_iran",
+      "title": "Official VJ102/VJ103 full chain for Iran",
+      "path": "/skills/NTL-workflow-guidance/references/code/data_retrieval_preprocessing/Q25_official_vj_dnb_fullchain_iran.py",
+      "status": "verified_success",
+      "tags": [
+        "official-source",
+        "vj102dnb",
+        "vj103dnb",
+        "laads",
+        "download",
+        "preprocess",
+        "iran"
+      ],
+      "quality_notes": [
+        "Runs query-download-preprocess in one callable tool.",
+        "Default output resolution is 500m equivalent.",
+        "Radiance scaled by 1e9 for nW/cm^2/sr consistency."
+      ]
+    }
+  ]
+}

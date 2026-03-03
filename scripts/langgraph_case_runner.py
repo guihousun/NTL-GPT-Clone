@@ -412,7 +412,7 @@ def evaluate_assertions(
         router_mode = analysis.get("router_recommended_mode")
         tools = analysis.get("tool_calls_by_name", {})
         has_download = int(tools.get("NTL_download_tool", 0)) > 0
-        has_code_exec = int(tools.get("final_geospatial_code_execution_tool", 0)) > 0 or int(
+        has_code_exec = int(tools.get("execute_geospatial_script_tool", 0)) > 0 or int(
             tools.get("transfer_to_code_assistant", 0)
         ) > 0
         ok = router_mode == "direct_download" and has_download and not has_code_exec

@@ -29,5 +29,5 @@ def test_stage_classifier_maps_escalation_variants():
     classify = _load_function("_classify_code_assistant_stage")
 
     assert classify("execute_geospatial_script_tool", '{"status":"fail"}') == "Escalate"
-    assert classify("final_geospatial_code_execution_tool", {"status": "needs_engineer_decision"}) == "Escalate"
+    assert classify("GeoCode_COT_Validation_tool", '{"status":"fail"}') == "Escalate"
     assert classify("transfer_back_to_ntl_engineer", "") == "Escalate"

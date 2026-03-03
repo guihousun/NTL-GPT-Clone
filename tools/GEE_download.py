@@ -109,6 +109,16 @@ def _normalize_study_area(study_area: str, scale_level: str) -> str:
     return raw
 
 
+def _split_admin_and_country(study_area: str) -> tuple[str, Optional[str]]:
+    raw = (study_area or "").strip()
+    if not raw:
+        return "", None
+    parts = [p.strip() for p in raw.split(",") if p.strip()]
+    if len(parts) >= 2:
+        return parts[0], parts[-1]
+    return raw, None
+
+
 def _filter_region_with_fallback(admin_boundary, name_property: str, study_area: str):
     # exact
     region = admin_boundary.filter(ee.Filter.eq(name_property, study_area))
@@ -131,6 +141,19 @@ def _filter_region_with_fallback(admin_boundary, name_property: str, study_area:
             return region
 
     return None
+
+
+def _resolve_geoboundaries_country_group(country_collection, country_name: str) -> Optional[str]:
+    if not country_name:
+        return None
+    region = _filter_region_with_fallback(country_collection, "shapeName", country_name)
+    if region is None:
+        return None
+    count = int(region.size().getInfo())
+    if count <= 0:
+        return None
+    first_feature = ee.Feature(region.first())
+    return str(first_feature.get("shapeGroup").getInfo() or "").strip() or None
 
 
 def _error_result(message: str) -> dict:
@@ -216,8 +239,17 @@ def _parse_time_range(time_range_input: str, temporal_resolution: str) -> tuple[
 
 
 class NightlightDataInput(BaseModel):
-    study_area: str = Field(..., description="Name of the study area. Example: 'Nanjing' or '南京市'.")
-    scale_level: Literal["country", "province", "city", "county"] = Field(..., description="Administrative scale level.")
+    study_area: str = Field(
+        ...,
+        description=(
+            "Name of the study area. China examples: '南京市'. "
+            "Outside China, for province/city/county levels use 'admin_name, country' "
+            "(e.g., 'Tehran, Iran')."
+        ),
+    )
+    scale_level: Literal["country", "province", "city", "county", "district"] = Field(
+        ..., description="Administrative scale level."
+    )
     temporal_resolution: Literal["annual", "monthly", "daily"] = Field(..., description="Temporal resolution.")
     time_range_input: str = Field(..., description="Annual: YYYY to YYYY; Monthly: YYYY-MM to YYYY-MM; Daily: YYYY-MM-DD to YYYY-MM-DD")
     out_name: str = Field(..., description="Output filename only, e.g. 'ntl_shanghai_2020.tif'")
@@ -263,8 +295,12 @@ def ntl_download_tool(
         province_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/province")
         city_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/city")
         county_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/county")
-        intl_country_collection = ee.FeatureCollection("FAO/GAUL/2015/level0")
-        intl_province_collection = ee.FeatureCollection("FAO/GAUL/2015/level1")
+        # Global administrative boundaries from geoBoundaries (GEE catalog).
+        intl_country_collection = ee.FeatureCollection("WM/geoLab/geoBoundaries/600/ADM0")
+        intl_province_collection = ee.FeatureCollection("WM/geoLab/geoBoundaries/600/ADM1")
+        intl_city_collection = ee.FeatureCollection("WM/geoLab/geoBoundaries/600/ADM2")
+        intl_county_collection = ee.FeatureCollection("WM/geoLab/geoBoundaries/600/ADM3")
+        intl_district_collection = ee.FeatureCollection("WM/geoLab/geoBoundaries/600/ADM4")
 
         def get_administrative_boundaries(level: str, in_china: bool):
             directly_governed = {"北京市", "天津市", "上海市", "重庆市", "Beijing", "Tianjin", "Shanghai", "Chongqing"}
@@ -279,19 +315,44 @@ def ntl_download_tool(
                     return county_collection, "name"
                 raise ValueError("Unknown scale level. Options: country/province/city/county")
 
-            # global mode
+            # Global mode (geoBoundaries on GEE): ADM0..ADM4.
             if level == "country":
-                return intl_country_collection, "ADM0_NAME"
+                return intl_country_collection, "shapeName", None
             if level == "province":
-                return intl_province_collection, "ADM1_NAME"
-            raise ValueError("Global mode only supports country/province.")
+                return intl_province_collection, "shapeName", "ADM1"
+            if level == "city":
+                return intl_city_collection, "shapeName", "ADM2"
+            if level == "county":
+                return intl_county_collection, "shapeName", "ADM3"
+            if level == "district":
+                return intl_district_collection, "shapeName", "ADM4"
+            raise ValueError("Unknown scale level. Options: country/province/city/county/district")
 
-        admin_boundary, name_property = get_administrative_boundaries(scale_level, is_in_China)
-        region = _filter_region_with_fallback(admin_boundary, name_property, study_area)
+        admin_boundary, name_property, _ = get_administrative_boundaries(scale_level, is_in_China)
+        query_name = study_area
+        if not is_in_China and scale_level != "country":
+            admin_name, country_name = _split_admin_and_country(study_area)
+            query_name = admin_name
+            shape_group = _resolve_geoboundaries_country_group(intl_country_collection, country_name or "")
+            if shape_group:
+                admin_boundary = admin_boundary.filter(ee.Filter.eq("shapeGroup", shape_group))
+            elif country_name:
+                return _error_result(
+                    f"Country '{country_name}' not found in GEE geoBoundaries ADM0. "
+                    "Use study_area like 'Tehran, Iran' or a valid country alias."
+                )
+
+        region = _filter_region_with_fallback(admin_boundary, name_property, query_name)
         if region is None:
+            if not is_in_China and scale_level in {"city", "county", "district"}:
+                tip = (
+                    "Global matching uses geoBoundaries ADM2/ADM3/ADM4 for city/county/district. "
+                    "Try input format 'city_or_county, country' (e.g., 'Tehran, Iran')."
+                )
+            else:
+                tip = "Try an alias, or specify 'admin_name, country' for non-China regions."
             return _error_result(
-                f"No area named '{study_area}' found under scale level '{scale_level}'. "
-                "Try an alias or call get_administrative_division_osm_tool first."
+                f"No area named '{query_name}' found under scale level '{scale_level}'. {tip}"
             )
 
         start_date, end_date = _parse_time_range(time_range_input, temporal_resolution)
@@ -442,6 +503,7 @@ NTL_download_tool = StructuredTool.from_function(
     description=(
         "Download nighttime light (NTL) imagery from Google Earth Engine. "
         "Use output filename only (saved to workspace inputs/). "
+        "Outside China, administrative matching uses GEE geoBoundaries (WM/geoLab/geoBoundaries/600, ADM0-ADM4). "
         "Annual datasets: NPP-VIIRS-Like/NPP-VIIRS/DMSP-OLS; monthly fixed NOAA_VCMSLCFG; daily VNP46A2/VNP46A1. "
         "For long daily ranges, switch to server-side GEE script mode."
     ),

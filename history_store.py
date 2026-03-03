@@ -9,8 +9,9 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from storage_manager import storage_manager
 
-BASE_DIR = Path("user_data")
+BASE_DIR = storage_manager.base_dir
 USERS_DIR = BASE_DIR / "_users"
 RESERVED_USER_IDS = {"guest", "debug", "default", "anonymous"}
 

@@ -61,7 +61,10 @@
       </form>
 
       <section class="download-panel">
-        <h2 class="section-title" data-i18n="downloadSection">Data Download</h2>
+        <h2 class="section-title">
+          <span data-i18n="downloadSection">Data Download</span>
+          <span class="tag-testing" data-i18n="testingPhase">测试阶段</span>
+        </h2>
         <div class="form-grid form-grid-download">
           <label>
             <span data-i18n="timeStart">开始日期</span>
@@ -150,6 +153,10 @@
         </div>
       </div>
       <div class="map-controls map-controls-secondary">
+        <label id="mapDateWrap">
+          <span data-i18n="date">Date</span>
+          <input id="mapDate" type="date">
+        </label>
         <label id="opacityWrap">
           <span data-i18n="opacity">Opacity</span>
           <input id="opacity" type="range" value="80" min="0" max="100">

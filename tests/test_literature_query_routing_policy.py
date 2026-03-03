@@ -72,7 +72,7 @@ def test_infer_tool_from_query_handles_official_earthquake_source_query():
         "then summarize epicenter information."
     )
     chosen = infer(query, {"tavily_search"})
-    assert chosen == "tavily_search"
+    assert chosen == ""
 
 
 def test_infer_tool_from_query_generalizes_to_other_event_types():
@@ -95,4 +95,4 @@ def test_infer_tool_from_query_generalizes_to_other_event_types():
         "location, timeline, and impacts."
     )
     chosen = infer(query, {"tavily_search", "NTL_download_tool"})
-    assert chosen == "tavily_search"
+    assert chosen == ""

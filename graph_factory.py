@@ -23,6 +23,11 @@ from tools.NTL_Knowledge_Base import (
     NTL_Solution_Knowledge,
 )
 
+from langgraph.checkpoint.memory import MemorySaver  # For testing
+# Or: from langgraph.checkpoint.postgres import PostgresSaver  # For production
+
+checkpointer = MemorySaver()
+
 SKILLS_ROOT = Path(__file__).resolve().parent / ".ntl-gpt" / "skills"
 SKILLS_SOURCE = "/skills/"
 
@@ -179,6 +184,7 @@ Workspace protocol (canonical):
 - Always resolve paths via `storage_manager.resolve_input_path(...)` and `storage_manager.resolve_output_path(...)`.
 - Never use absolute local paths.
 - Treat `/shared/...` as read-only source data: read is allowed, write/overwrite is forbidden.
+- Runtime note: `/shared/...` is a virtual Deep Agents path and is runtime-mapped to local `base_data/...` during script execution.
 - For data discovery, prefer file tools first (for example `glob`) on virtual paths such as `/inputs/*` and `/shared/*` before asking for re-upload or re-download.
 
 Deep Agents virtual-path compatibility (alias mapping):
@@ -206,6 +212,7 @@ Delegation policy:
         store=store,
         backend=_backend_factory,
         name=graph_name,
+        checkpointer=checkpointer, 
     )
 
     return ntl_agent

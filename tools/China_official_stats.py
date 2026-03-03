@@ -5,15 +5,35 @@ from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 import requests
+from langchain_core.runnables import RunnableConfig
+from langchain_core.runnables.config import var_child_runnable_config
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
-from storage_manager import storage_manager
+from storage_manager import current_thread_id, storage_manager
 
 
 _NBS_ENDPOINT = "https://data.stats.gov.cn/easyquery.htm"
 _NBS_REFERER = "https://data.stats.gov.cn/easyquery.htm?cn=E0103"
 _GDP_INDICATOR_CODE = "A020101"  # Regional GDP (100 million CNY)
+
+
+def _resolve_thread_id_from_config(config: Optional[RunnableConfig] = None) -> str:
+    runtime_config: Optional[RunnableConfig] = None
+    if isinstance(config, dict):
+        runtime_config = config
+    else:
+        inherited = var_child_runnable_config.get()
+        if isinstance(inherited, dict):
+            runtime_config = inherited
+    if isinstance(runtime_config, dict):
+        try:
+            tid = str(storage_manager.get_thread_id_from_config(runtime_config) or "").strip()
+            if tid:
+                return tid
+        except Exception:
+            pass
+    return str(current_thread_id.get() or "debug").strip() or "debug"
 
 
 _REGION_CODE_MAP: Dict[str, str] = {
@@ -212,6 +232,7 @@ def china_official_gdp_tool(
     end_year: int,
     indicator: str = "GDP",
     output_csv_filename: Optional[str] = None,
+    config: Optional[RunnableConfig] = None,
 ) -> str:
     if start_year > end_year:
         return json.dumps(
@@ -252,7 +273,8 @@ def china_official_gdp_tool(
             rows.append({"year": year, "value_100m_cny": None, "error": str(exc)})
 
     output_name = output_csv_filename or _default_output_name(region, start_year, end_year)
-    workspace = storage_manager.get_workspace()
+    thread_id = _resolve_thread_id_from_config(config)
+    workspace = storage_manager.get_workspace(thread_id)
     input_dir = workspace / "inputs"
     input_dir.mkdir(parents=True, exist_ok=True)
     out_path = input_dir / Path(output_name).name
@@ -281,4 +303,3 @@ China_Official_GDP_tool = StructuredTool.from_function(
     ),
     args_schema=ChinaOfficialGDPInput,
 )
-

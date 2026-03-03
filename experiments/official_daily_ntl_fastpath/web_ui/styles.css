@@ -65,6 +65,20 @@ h1 {
   color: var(--muted);
   letter-spacing: 0.02em;
   text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tag-testing {
+  border: 1px solid #90631b;
+  background: #352811;
+  color: #ffd27a;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .download-panel {

@@ -18,15 +18,17 @@ You must follow Geo-CodeCoT v2 strictly.
 - Skill instructions override ad-hoc workflow habits.
 
 ## 1) Workspace Protocol (Mandatory)
-- Always import: `from storage_manager import storage_manager`
-- For user/searcher inputs, always resolve with `storage_manager.resolve_input_path('filename.ext')`
-- For generated files, always resolve with `storage_manager.resolve_output_path('filename.ext')`
-- Shared data `/shared/...` is read-only input source (via `resolve_input_path`) and must never be used as output target.
-- Never hardcode absolute paths or literals like `inputs/xxx` and `outputs/xxx`
+- Path protocol is sandbox-first:
+  - Preferred: workspace-relative paths like `inputs/xxx` and `outputs/xxx`.
+  - Compatible alternative: `storage_manager.resolve_input_path(...)` / `storage_manager.resolve_output_path(...)`.
+- Shared data `/shared/...` is read-only input source and must never be used as output target.
+- Never hardcode absolute paths (for example `C:/...`, `/home/...`).
 - Never modify repository source/config files. Your writable scope is analysis outputs only (workspace `outputs/`).
 
 ## 1.1) Boundary Guardrail (Mandatory)
 - For named administrative study areas (e.g., Shanghai/Wuhan), do NOT replace with self-invented bbox.
+- For outside-China GEE administrative boundaries, use geoBoundaries collections on GEE (`WM/geoLab/geoBoundaries/600/ADM0-ADM4`).
+- Do NOT introduce legacy GAUL dataset paths when geoBoundaries coverage is available.
 - If verified boundary file/asset is missing, stop and report a boundary-missing error to NTL_Engineer.
 - Bbox is allowed only when user explicitly provides coordinates.
 
@@ -49,7 +51,7 @@ You must follow Geo-CodeCoT v2 strictly.
      3) execute using the exact saved filename.
 7. On first execution failure, enforce `first failure -> validation chain` by running `GeoCode_COT_Validation_tool` once.
 8. Apply minimal patch and re-run at most once (`max one light fix retry`).
-   - If the failure is preflight/path-protocol style (absolute path, hardcoded `inputs/`/`outputs/`, missing resolver),
+   - If the failure is preflight/path-protocol style (absolute path or workspace-external writes),
      patch in memory and re-save with the SAME `script_name` using `overwrite=true` (do not create redundant v2/v3 names by default).
 9. **Convergence rule (mandatory)**:
    - After `execute_geospatial_script_tool` returns `status == "success"`, immediately return a final structured success payload.
@@ -89,7 +91,7 @@ You must follow Geo-CodeCoT v2 strictly.
   - `task` (full candidate workflow object)
   - `evidence` (`script_name`, `artifact_audit_pass`, `output_files` summary)
 - On failed/interrupted runs, proposal may recommend candidate logging only, but you still MUST NOT write:
-  - `/skills/workflow-intent-router/references/evolution_candidates.jsonl`
+  - `/skills/NTL-workflow-guidance/references/evolution_candidates.jsonl`
 
 ## 6) Error Recovery
 When validation/execution fails:
@@ -103,7 +105,7 @@ When validation/execution fails:
 Allowed light-fix categories (at most one retry):
 - Syntax/format issues: indentation, missing bracket/quote/comma.
 - Missing trivial imports for already-used modules.
-- Path protocol fixes: replace absolute paths or hardcoded `inputs/`/`outputs/` with storage_manager resolvers.
+- Path protocol fixes: replace absolute paths with sandbox-relative `inputs/` or `outputs/` (or resolver APIs when portability is required).
 - Minor filename typo correction when an obvious same-directory candidate exists.
 
 Disallowed for light-fix (escalate to NTL_Engineer directly):

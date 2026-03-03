@@ -17,6 +17,7 @@ def _load_module():
 
 def _stub_environment(mod, monkeypatch):
     monkeypatch.setattr(mod.sm, "resolve_input_path", lambda p: f"E:/fake_workspace/inputs/{p}")
+    monkeypatch.setattr(mod.sm, "resolve_output_path", lambda p: f"E:/fake_workspace/outputs/{p}")
     monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
     monkeypatch.setattr(
         mod,
@@ -73,3 +74,59 @@ def test_dedupe_modes_are_explicit_and_predictable(monkeypatch):
     assert stem_data["resolved_raster_count"] == 1
     assert stem_data["summary"]["raster_ok"] == 1
     assert stem_data["dedupe_raster"]["policy"] == "by_name_no_digits_keep_first"
+
+
+def test_quick_check_can_resolve_outputs_when_requested(monkeypatch):
+    mod = _load_module()
+    monkeypatch.setattr(mod.sm, "resolve_input_path", lambda p: f"E:/fake_workspace/inputs/{p}")
+    monkeypatch.setattr(mod.sm, "resolve_output_path", lambda p: f"E:/fake_workspace/outputs/{p}")
+    monkeypatch.setattr(mod.os.path, "exists", lambda p: str(p).startswith("E:/fake_workspace/outputs/"))
+    monkeypatch.setattr(
+        mod,
+        "_raster_report",
+        lambda path, sample_pixels=0, mode="full": {"path": path, "exists": True, "readable": True},
+    )
+
+    payload = mod.inspect_geospatial_assets_quick(
+        raster_paths=["result_2022.tif"],
+        workspace_lookup="outputs",
+    )
+    data = json.loads(payload)
+    assert data["resolved_raster_count"] == 1
+    assert data["summary"]["raster_ok"] == 1
+    assert data["raster_reports"][0]["resolved_location"] == "outputs"
+    assert data["raster_reports"][0]["path"].endswith("outputs/result_2022.tif")
+
+
+def test_quick_check_skips_cross_checks_by_default(monkeypatch):
+    mod = _load_module()
+    _stub_environment(mod, monkeypatch)
+    monkeypatch.setattr(
+        mod,
+        "_raster_report",
+        lambda path, sample_pixels=0, mode="full": {
+            "path": path,
+            "exists": True,
+            "readable": True,
+            "crs": "EPSG:4326",
+            "bounds": {"left": 0, "right": 1, "bottom": 0, "top": 1},
+        },
+    )
+    monkeypatch.setattr(
+        mod,
+        "_vector_report",
+        lambda path, mode="full": {
+            "path": path,
+            "exists": True,
+            "readable": True,
+            "crs": "EPSG:4326",
+            "bounds": {"minx": 0, "maxx": 1, "miny": 0, "maxy": 1},
+        },
+    )
+
+    payload = mod.inspect_geospatial_assets_quick(
+        raster_paths=["r.tif"],
+        vector_paths=["b.shp"],
+    )
+    data = json.loads(payload)
+    assert data["cross_checks"] == []

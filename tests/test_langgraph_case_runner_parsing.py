@@ -76,3 +76,29 @@ def test_analyze_messages_tracks_ordered_tool_calls():
     assert analysis["ordered_tool_calls"][0]["tool"] == "transfer_to_data_searcher"
     assert analysis["ordered_tool_calls"][1]["tool"] == "NTL_download_tool"
     assert analysis["detected_years"] == [2015, 2016, 2017, 2018, 2019, 2020]
+
+
+def test_analyze_messages_ignores_synthetic_handoff_back_messages():
+    mod = _load_module()
+    messages = [
+        {
+            "type": "ai",
+            "name": "Data_Searcher",
+            "response_metadata": {"__is_handoff_back": True},
+            "tool_calls": [{"name": "transfer_back_to_ntl_engineer", "args": {}}],
+        },
+        {
+            "type": "tool",
+            "name": "transfer_back_to_ntl_engineer",
+            "response_metadata": {"__is_handoff_back": True},
+            "content": '{"status":"ok"}',
+        },
+        {
+            "type": "ai",
+            "name": "Data_Searcher",
+            "tool_calls": [{"name": "NTL_download_tool", "args": {}}],
+        },
+    ]
+    analysis = mod.analyze_messages(messages)
+    assert analysis["tool_calls_by_name"].get("transfer_back_to_ntl_engineer", 0) == 0
+    assert analysis["tool_calls_by_name"].get("NTL_download_tool", 0) == 1

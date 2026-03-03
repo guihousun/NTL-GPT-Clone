@@ -25,7 +25,8 @@ try:
         os.path.join(os.path.dirname(__file__), "..", "tools", "geocode_knowledge_tool.py"),
     )
     GeoCode_COT_Validation_tool = code_gen_mod.GeoCode_COT_Validation_tool
-    final_geospatial_code_execution_tool = code_gen_mod.final_geospatial_code_execution_tool
+    execute_geospatial_script_tool = code_gen_mod.execute_geospatial_script_tool
+    save_geospatial_script_tool = code_gen_mod.save_geospatial_script_tool
     GeoCode_Knowledge_Recipes_tool = knowledge_mod.GeoCode_Knowledge_Recipes_tool
 except Exception as e:
     print(f"ImportError: {e}")
@@ -77,13 +78,17 @@ def test_geocode_cot_validation():
     except Exception as e:
         print(f"  -> Exception: {e}")
 
-def test_final_code_execution():
-    print("\nTesting final_geospatial_code_execution_tool...")
+def test_execute_tool():
+    print("\nTesting execute_geospatial_script_tool...")
     
-    # Test case 1: Simple execution
+    # Test case 1: Save then execute
     code_exec = "x = 10\ny = 20\nprint(f'Sum is {x+y}')"
     try:
-        result = final_geospatial_code_execution_tool.invoke({"final_geospatial_code": code_exec})
+        save_result = save_geospatial_script_tool.invoke(
+            {"script_content": code_exec, "script_name": "ntl_tools_execute.py", "overwrite": True}
+        )
+        print(f"Save Result: {save_result}")
+        result = execute_geospatial_script_tool.invoke({"script_name": "ntl_tools_execute.py"})
         print(f"Result: {result}")
         res_json = json.loads(result)
         if res_json['status'] == 'success':
@@ -146,7 +151,7 @@ if __name__ == "__main__":
         print("WARNING: IPython not installed.")
 
     test_geocode_cot_validation()
-    test_final_code_execution()
+    test_execute_tool()
     test_preflight_path_protocol()
     test_geocode_recipe_tool()
     print("\nTests completed.")

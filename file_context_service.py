@@ -248,11 +248,52 @@ def _pdf_chunks(path: Path, max_pages: int = 120) -> Tuple[List[Dict[str, Any]],
 
 
 def _resolve_existing_input_file(filename: str, thread_id: str) -> Optional[Path]:
-    abs_path = storage_manager.resolve_input_path(filename, thread_id=thread_id)
-    p = Path(abs_path)
-    if not p.exists() or not p.is_file():
+    return _resolve_existing_workspace_file(filename, thread_id=thread_id, workspace_lookup="inputs")
+
+
+def _resolve_existing_workspace_file(
+    filename: str,
+    thread_id: str,
+    workspace_lookup: str = "auto",
+) -> Optional[Path]:
+    raw = str(filename or "").strip().replace("\\", "/")
+    if not raw:
         return None
-    return p
+
+    explicit: Optional[str] = None
+    relative = raw
+    lowered = raw.lower()
+    if lowered.startswith("inputs/"):
+        explicit = "inputs"
+        relative = raw.split("/", 1)[1]
+    elif lowered.startswith("outputs/"):
+        explicit = "outputs"
+        relative = raw.split("/", 1)[1]
+
+    # Logical filename protocol: keep basename only to prevent traversal/nested absolute usage.
+    safe_name = os.path.basename(relative.strip())
+    if not safe_name:
+        return None
+
+    if explicit == "inputs":
+        lookup_order = ("inputs", "outputs")
+    elif explicit == "outputs":
+        lookup_order = ("outputs", "inputs")
+    elif str(workspace_lookup or "auto").strip().lower() == "outputs":
+        lookup_order = ("outputs", "inputs")
+    else:
+        # Backward-compatible default: prefer inputs.
+        lookup_order = ("inputs", "outputs")
+
+    for loc in lookup_order:
+        if loc == "inputs":
+            abs_path = storage_manager.resolve_input_path(safe_name, thread_id=thread_id)
+        else:
+            abs_path = storage_manager.resolve_output_path(safe_name, thread_id=thread_id)
+        p = Path(abs_path)
+        if p.exists() and p.is_file():
+            return p
+    return None
 
 
 def build_context_items_for_files(
@@ -261,6 +302,7 @@ def build_context_items_for_files(
     max_pages: int = 120,
     vlm_model_name: str = "qwen3.5-plus",
     vlm_timeout_s: int = 90,
+    workspace_lookup: str = "auto",
 ) -> Dict[str, Any]:
     items: List[Dict[str, Any]] = []
     warnings: List[str] = []
@@ -273,7 +315,7 @@ def build_context_items_for_files(
         name = os.path.basename(str(raw_name or "").strip())
         if not name:
             continue
-        p = _resolve_existing_input_file(name, thread_id=thread_id)
+        p = _resolve_existing_workspace_file(name, thread_id=thread_id, workspace_lookup=workspace_lookup)
         if p is None:
             missing_files.append(name)
             continue

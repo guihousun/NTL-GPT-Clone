@@ -17,8 +17,14 @@ def _load_module():
 
 def test_simple_error_policy_for_local_type_error():
     mod = _load_module()
-    result = mod.final_geospatial_code_execution_tool.invoke(
-        {"final_geospatial_code": "raise TypeError('bad args')", "strict_mode": True},
+    save_result = mod.save_geospatial_script_tool.invoke(
+        {"script_content": "raise TypeError('bad args')\n", "script_name": "type_error_case.py", "overwrite": True},
+        config={"configurable": {"thread_id": "thread_policy_simple"}},
+    )
+    save_data = json.loads(save_result)
+    assert save_data["status"] == "success"
+    result = mod.execute_geospatial_script_tool.invoke(
+        {"script_name": "type_error_case.py", "strict_mode": True},
         config={"configurable": {"thread_id": "thread_policy_simple"}},
     )
     data = json.loads(result)

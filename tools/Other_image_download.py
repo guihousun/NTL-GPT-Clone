@@ -3,12 +3,16 @@
 import os
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import Optional, Tuple
 
 import ee
 import geemap
+from langchain_core.runnables import RunnableConfig
+from langchain_core.runnables.config import var_child_runnable_config
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
+from storage_manager import current_thread_id, storage_manager
 
 _PROJECT_ID = "empyrean-caster-430308-m2"
 
@@ -19,6 +23,32 @@ def _ensure_ee_initialized() -> None:
     except Exception:
         ee.Authenticate()
         ee.Initialize(project=_PROJECT_ID)
+
+
+def _resolve_thread_id_from_config(config: Optional[RunnableConfig] = None) -> str:
+    runtime_config: Optional[RunnableConfig] = None
+    if isinstance(config, dict):
+        runtime_config = config
+    else:
+        inherited = var_child_runnable_config.get()
+        if isinstance(inherited, dict):
+            runtime_config = inherited
+
+    if isinstance(runtime_config, dict):
+        try:
+            tid = str(storage_manager.get_thread_id_from_config(runtime_config) or "").strip()
+            if tid:
+                return tid
+        except Exception:
+            pass
+    return str(current_thread_id.get() or "debug").strip() or "debug"
+
+
+def _resolve_workspace_export_dir(out_name: str, thread_id: str) -> Path:
+    folder = Path(str(out_name or "").strip()).name or "downloads"
+    folder_path = Path(storage_manager.resolve_input_path(folder, thread_id=thread_id))
+    folder_path.mkdir(parents=True, exist_ok=True)
+    return folder_path
 
 
 def _contains_cjk(text: str) -> bool:
@@ -163,9 +193,11 @@ def NDVI_download_tool(
     out_name: str,
     is_in_China: Optional[bool] = None,
     country_name: Optional[str] = None,
+    config: Optional[RunnableConfig] = None,
     **kwargs,
 ):
     try:
+        thread_id = _resolve_thread_id_from_config(config)
         _ensure_ee_initialized()
         scale_level = (scale_level or "").strip().lower()
         if is_in_China is None and "is_in_china" in kwargs:
@@ -192,7 +224,7 @@ def NDVI_download_tool(
             )
 
         start_year, end_year = _parse_year_range(time_range_input)
-        os.makedirs(out_name, exist_ok=True)
+        export_dir = _resolve_workspace_export_dir(out_name, thread_id=thread_id)
         exported_files = []
 
         for year in range(start_year, end_year + 1):
@@ -203,7 +235,7 @@ def NDVI_download_tool(
                 .map(lambda img: img.multiply(0.0001).set(img.toDictionary(img.propertyNames())))
             )
             image = collection.filterBounds(region.geometry()).map(lambda img: img.clip(region)).mean()
-            export_path = os.path.join(out_name, f"NDVI_{study_area}_{year}.tif")
+            export_path = str(export_dir / f"NDVI_{study_area}_{year}.tif")
             geemap.ee_export_image(
                 ee_object=image,
                 filename=export_path,
@@ -235,9 +267,11 @@ def landscan_download_tool(
     out_name: str,
     is_in_China: Optional[bool] = None,
     country_name: Optional[str] = None,
+    config: Optional[RunnableConfig] = None,
     **kwargs,
 ):
     try:
+        thread_id = _resolve_thread_id_from_config(config)
         _ensure_ee_initialized()
         scale_level = (scale_level or "").strip().lower()
         if is_in_China is None and "is_in_china" in kwargs:
@@ -264,7 +298,7 @@ def landscan_download_tool(
             )
 
         start_year, end_year = _parse_year_range(time_range_input)
-        os.makedirs(out_name, exist_ok=True)
+        export_dir = _resolve_workspace_export_dir(out_name, thread_id=thread_id)
         exported_files = []
 
         for year in range(start_year, end_year + 1):
@@ -274,7 +308,7 @@ def landscan_download_tool(
                 .first()
             )
             image = ee.Image(image).clip(region.geometry())
-            export_path = os.path.join(out_name, f"LandScan_{study_area}_{year}.tif")
+            export_path = str(export_dir / f"LandScan_{study_area}_{year}.tif")
             geemap.ee_export_image(
                 ee_object=image,
                 filename=export_path,
@@ -306,9 +340,11 @@ def worldpop_download_tool(
     out_name: str,
     is_in_China: Optional[bool] = None,
     country_name: Optional[str] = None,
+    config: Optional[RunnableConfig] = None,
     **kwargs,
 ):
     try:
+        thread_id = _resolve_thread_id_from_config(config)
         _ensure_ee_initialized()
         scale_level = (scale_level or "").strip().lower()
         if is_in_China is None and "is_in_china" in kwargs:
@@ -335,12 +371,12 @@ def worldpop_download_tool(
             )
 
         start_year, end_year = _parse_year_range(time_range_input)
-        os.makedirs(out_name, exist_ok=True)
+        export_dir = _resolve_workspace_export_dir(out_name, thread_id=thread_id)
         exported_files = []
 
         for year in range(start_year, end_year + 1):
             image = ee.Image(f"WorldPop/GP/100m/pop/{year}").clip(region.geometry())
-            export_path = os.path.join(out_name, f"WorldPop_{study_area}_{year}.tif")
+            export_path = str(export_dir / f"WorldPop_{study_area}_{year}.tif")
             geemap.ee_export_image(
                 ee_object=image,
                 filename=export_path,

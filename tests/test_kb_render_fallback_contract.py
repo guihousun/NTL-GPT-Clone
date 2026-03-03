@@ -59,6 +59,8 @@ def _load_functions():
         "st": dummy_st,
         "_extract_json": lambda s: (None, s),
         "_render_popover": lambda title: _DummyContext(),
+        "_sanitize_paths_in_text": lambda s: s,
+        "_sanitize_paths_in_obj": lambda o: o,
     }
     exec(needed["_normalize_kb_payload"], namespace)
     exec(needed["render_kb_output"], namespace)

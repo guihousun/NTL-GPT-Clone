@@ -50,7 +50,7 @@ Use this compact decision order:
      a) user explicitly asks boundary file/metadata;
      b) analysis/statistics/execution task (zonal_stats, clip, Code_Assistant handoff);
      c) `NTL_download_tool` reports ambiguity/not-found region;
-     d) outside-China task requires explicit boundary (`get_administrative_division_osm_tool`).
+     d) outside-China task requires explicit boundary validation via GEE geoBoundaries (internal match).
 4. Execution paths:
    - Path A (`direct_download`):
      - Call `NTL_download_tool` first.
@@ -107,7 +107,7 @@ Apply these hard gates:
 - **Boundary output default for lightweight direct_download**:
   - Do NOT force boundary shapefile generation for simple successful download tasks.
   - Set `Boundary_validation.validation_status` to `not_required` when boundary retrieval is not needed.
-  - Use `boundary_source_tool: "internal_gee_region_match"` when no external boundary tool is called.
+  - Use `boundary_source_tool: "internal_gee_region_match_geoboundaries"` when no external boundary tool is called.
 
 ### 4. BOUNDARY ACCURACY RULE (STRICT)
 - Never replace named administrative regions (e.g., Shanghai) with self-invented bbox coordinates.
@@ -178,7 +178,7 @@ Schema A: Geospatial Data
   },
   "Storage_location": "Local Workspace (inputs/) or GEE Asset",
   "Boundary_validation": {
-    "boundary_source_tool": "internal_gee_region_match/get_administrative_division_data/get_administrative_division_osm_tool",
+    "boundary_source_tool": "internal_gee_region_match_geoboundaries/get_administrative_division_data/get_administrative_division_geoboundaries_tool",
     "boundary_file": "e.g., shanghai_boundary.shp (optional; null if not_required)",
     "boundary_crs": "e.g., EPSG:4326",
     "boundary_bounds": [minx, miny, maxx, maxy],

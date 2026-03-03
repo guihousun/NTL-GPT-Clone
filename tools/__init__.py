@@ -12,6 +12,7 @@ from .NTL_anomaly_detection_tool import detect_ntl_anomaly_tool
 from .NTL_Knowledge_Base_Searcher import NTL_Knowledge_Base
 from .GaoDe_tool import (get_administrative_division_tool, poi_search_tool, reverse_geocode_tool, geocode_tool, get_administrative_division_osm_tool)
 from .GEE_download import NTL_download_tool
+from .global_admin_boundary_fetch import get_administrative_division_geoboundaries_tool
 from .Other_image_download import NDVI_download_tool, LandScan_download_tool
 from .Google_Bigquery import google_bigquery_search
 from .TavilySearch import Tavily_search
@@ -32,23 +33,23 @@ from .GEE_specialist_toolkit import (
 )
 # from .NTL_Knowledge_Base import NTL_Code_Knowledge
 from .NTL_estimate_indicator import NTL_estimate_indicator_provincial_tool, DEI_estimate_city_tool
+from .official_vj_dnb_pipeline_tool import official_vj_dnb_fullchain_tool
 from .uploaded_file_understanding_tool import (
-    uploaded_file_understanding_tool,
     uploaded_pdf_understanding_tool,
-    uploaded_image_understanding_tool,
 )
-from .NTL_VLM_benchmark_tools import (
-    ntl_vlm_fetch_event_registry_tool,
-    ntl_vlm_build_scene_manifest_tool,
-    ntl_vlm_generate_tasks_tool,
-    ntl_vlm_generate_jobs_tool,
-    ntl_vlm_qc_tool,
-    ntl_vlm_evaluate_tool,
-)
+# from .NTL_VLM_benchmark_tools import (
+#     ntl_vlm_fetch_event_registry_tool,
+#     ntl_vlm_build_scene_manifest_tool,
+#     ntl_vlm_generate_tasks_tool,
+#     ntl_vlm_generate_jobs_tool,
+#     ntl_vlm_qc_tool,
+#     ntl_vlm_evaluate_tool,
+# )
 
 data_searcher_tools = [reverse_geocode_tool, geocode_tool, NTL_download_tool, 
-         get_administrative_division_tool, poi_search_tool, get_administrative_division_osm_tool,
+         get_administrative_division_tool, poi_search_tool, get_administrative_division_geoboundaries_tool,
            NDVI_download_tool, LandScan_download_tool,
+           official_vj_dnb_fullchain_tool,
            China_Official_GDP_tool, Tavily_search, google_bigquery_search, 
            GEE_dataset_router_tool, GEE_script_blueprint_tool, GEE_catalog_discovery_tool, GEE_dataset_metadata_tool]
 
@@ -70,7 +71,9 @@ Engineer_tools = [
     NTL_Trend_Analysis, detect_ntl_anomaly_tool, NTL_composite_local_tool,
     NTL_raster_statistics_tool,
     NTL_estimate_indicator_provincial_tool, DEI_estimate_city_tool,
+    official_vj_dnb_fullchain_tool,
     SDGSAT1_index_tool, vnci_index_tool,
+    uploaded_pdf_understanding_tool,
     # save_geospatial_script_tool,
     # read_workspace_file_tool,
     # uploaded_file_understanding_tool,

@@ -10,9 +10,12 @@ This repository prefers robust, reusable capability upgrades over query-specific
 - Any bugfix in a specific scenario must include at least one non-target variation test.
   Example: earthquake fix should also be validated on wildfire/conflict/flood style prompts.
 - When adding heuristics, keep them centralized and documented; do not scatter ad-hoc keyword checks across files.
-- Update both records after landing changes:
-  - `docs/Codex_变更记录.md`
-  - `docs/Skill_演进记录.md` (if a skill/process changed)
+- For complex tasks, prioritize the `using-superpowers` skill first to choose the right process/implementation skills before coding.
+- Keep documentation lightweight but consistent:
+  - `CHANGELOG.md` (high-impact engineering changes; batch minor tweaks)
+  - `docs/NTL-GPT*.md` (product capability/version summary; milestone-level updates)
+  - `docs/Skill_*.md` (optional; update only when process/skill norms materially change)
+  - `docs/Codex_变更记录.md` is no longer a required maintenance target.
 
 ## Project Addendum: Encoding Integrity
 
@@ -28,7 +31,7 @@ This repository prefers robust, reusable capability upgrades over query-specific
 ```bash
 python - << 'PY'
 from pathlib import Path
-p = next(Path('docs').glob('Codex_*.md'))
+p = next(Path('docs').glob('NTL-GPT*.md'))
 b = p.read_bytes()
 print('bom', b.startswith(b'\\xef\\xbb\\xbf'))
 b.decode('utf-8')
@@ -38,7 +41,7 @@ PY
 python - << 'PY'
 from pathlib import Path
 bad_points = [0x9359, 0x7481, 0x951b, 0x9286, 0x9225, 0x20ac]
-text = next(Path('docs').glob('Codex_*.md')).read_text(encoding='utf-8')
+text = next(Path('docs').glob('NTL-GPT*.md')).read_text(encoding='utf-8')
 hits = [(hex(cp), chr(cp)) for cp in bad_points if chr(cp) in text]
 print('mojibake_hits', hits)
 PY
@@ -48,7 +51,7 @@ PY
 1. Is this fix capability-level or only case-level?
 2. What neighboring tasks should also pass?
 3. Do tests include at least one variation scenario?
-4. Are change logs updated append-only?
+4. Are version docs/release notes updated?
 5. Did we confirm encoding via Python UTF-8 parsing before declaring mojibake?
 
 ## Project Addendum: Result Bus Isolation Policy

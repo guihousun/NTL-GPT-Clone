@@ -52,7 +52,88 @@ def to_exclusive_end(date_str: str) -> str:
 # filterDate("2025-03-29", to_exclusive_end("2025-03-29"))
 ```
 
-### 2) Safe collection builder
+### 2) Timezone-aware first-night calculation
+```python
+from datetime import datetime, timedelta
+try:
+    from zoneinfo import ZoneInfo  # Python 3.9+
+except ImportError:
+    from backports.zoneinfo import ZoneInfo  # Python < 3.9
+
+def get_first_night_date(event_date_str: str, event_time_local: str, 
+                         timezone_str: str, overpass_hour: int = 1, overpass_minute: int = 30):
+    """
+    Determine first-night image date based on VIIRS overpass timing.
+    
+    VIIRS overpass time: ~01:30 local time (varies by latitude)
+    
+    Rule: If event occurs AFTER local overpass on day D, first-night = D+1
+          If event occurs BEFORE local overpass on day D, first-night = D
+    
+    Parameters:
+    - event_date_str: 'YYYY-MM-DD'
+    - event_time_local: 'HH:MM' (24-hour format, local time)
+    - timezone_str: e.g., 'Asia/Shanghai', 'America/New_York'
+    - overpass_hour, overpass_minute: VIIRS overpass time (default 01:30)
+    
+    Returns:
+    - first_night_date: 'YYYY-MM-DD'
+    """
+    tz = ZoneInfo(timezone_str)
+    event_date = datetime.strptime(event_date_str, "%Y-%m-%d").date()
+    event_time = datetime.strptime(event_time_local, "%H:%M").time()
+    
+    # Event datetime in local timezone
+    event_dt = datetime.combine(event_date, event_time, tzinfo=tz)
+    
+    # Overpass time on the same calendar day
+    overpass_dt = datetime.combine(event_date, 
+                                    datetime.strptime(f"{overpass_hour:02d}:{overpass_minute:02d}", "%H:%M").time(),
+                                    tzinfo=tz)
+    
+    # If event is after overpass, first night is next day
+    if event_dt > overpass_dt:
+        first_night = event_date + timedelta(days=1)
+    else:
+        first_night = event_date
+    
+    return first_night.strftime("%Y-%m-%d")
+
+# Example: Myanmar earthquake 2025-03-29 15:30 (Asia/Yangon)
+# overpass at 01:30, event at 15:30 -> after overpass -> first_night = 2025-03-30
+# first_night = get_first_night_date("2025-03-29", "15:30", "Asia/Yangon")
+# print(first_night)  # Output: 2025-03-30
+```
+
+### 3) Timezone conversion helper
+```python
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+def convert_timezone(datetime_str: str, from_tz: str, to_tz: str, 
+                     fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
+    """
+    Convert datetime from one timezone to another.
+    
+    Parameters:
+    - datetime_str: datetime string in from_tz
+    - from_tz: source timezone (e.g., 'Asia/Shanghai')
+    - to_tz: target timezone (e.g., 'UTC')
+    - fmt: datetime format string
+    
+    Returns:
+    - Converted datetime string in to_tz
+    """
+    dt_naive = datetime.strptime(datetime_str, fmt)
+    dt_from = dt_naive.replace(tzinfo=ZoneInfo(from_tz))
+    dt_to = dt_from.astimezone(ZoneInfo(to_tz))
+    return dt_to.strftime(fmt)
+
+# Example: Convert local event time to UTC for GEE filter
+# utc_time = convert_timezone("2025-03-29 15:30:00", "Asia/Yangon", "UTC")
+```
+
+### 4) Safe collection builder
 ```python
 def load_vnp46a2(start_date: str, end_date_inclusive: str, geom):
     end_exclusive = to_exclusive_end(end_date_inclusive)
@@ -64,7 +145,7 @@ def load_vnp46a2(start_date: str, end_date_inclusive: str, geom):
     )
 ```
 
-### 3) Robust reduction
+### 5) Robust reduction
 ```python
 def mean_antl(image, geom):
     stats = image.reduceRegion(
@@ -78,7 +159,7 @@ def mean_antl(image, geom):
     return stats.get("Gap_Filled_DNB_BRDF_Corrected_NTL")
 ```
 
-### 4) No-data guard
+### 6) No-data guard
 ```python
 collection = load_vnp46a2(start_date, end_date, geom)
 count = collection.size().getInfo()

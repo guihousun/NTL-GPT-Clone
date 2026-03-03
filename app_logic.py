@@ -23,6 +23,7 @@ _THREAD_ACTIVE_RUN: dict[str, str] = {}
 def _ensure_runtime_state_defaults() -> None:
     st.session_state.setdefault("active_run_id", None)
     st.session_state.setdefault("active_run_thread_id", None)
+    st.session_state.setdefault("stopping", False)
     st.session_state.setdefault("run_last_rendered_event_seq", 0)
     st.session_state.setdefault("pending_model_change", None)
     st.session_state.setdefault("pending_activate_request", None)
@@ -75,6 +76,7 @@ def recover_runtime_health():
         grace_s=grace_s,
     ):
         st.session_state["is_running"] = False
+        st.session_state["stopping"] = False
         st.session_state["cancel_requested"] = False
         st.session_state["runtime_recovered_notice"] = (
             "Detected stale run state after a long task. "
@@ -497,10 +499,13 @@ def request_stop_active_run(thread_id: Optional[str] = None, detach_session: boo
                 requested = True
     if requested:
         st.session_state["cancel_requested"] = True
-    if detach_session:
+        st.session_state["stopping"] = True
+    if detach_session and not requested:
+        # Keep backward-safe behavior only when no active run is found.
         active_tid = str(st.session_state.get("active_run_thread_id") or "")
         if (not active_tid) or active_tid == tid:
             st.session_state["is_running"] = False
+            st.session_state["stopping"] = False
             st.session_state["cancel_requested"] = False
             st.session_state["active_run_id"] = None
             st.session_state["active_run_thread_id"] = None
@@ -543,6 +548,7 @@ def start_user_run(user_question: str) -> dict[str, Any]:
     st.session_state["analysis_logs"] = []
     st.session_state["last_question"] = question
     st.session_state["is_running"] = True
+    st.session_state["stopping"] = False
     st.session_state["cancel_requested"] = False
 
     run_id = uuid.uuid4().hex
@@ -743,6 +749,7 @@ def _worker_run_main(run_id: str) -> None:
             last_question=question,
             last_answer_excerpt=str(final_answer or "")[:240],
         )
+
     except Exception:
         pass
 
@@ -798,12 +805,14 @@ def consume_active_run_events() -> bool:
                 _collect_recent_outputs(seconds=120, thread_id=run_thread)
             st.session_state["run_ended_ts"] = time.time()
             st.session_state["is_running"] = False
+            st.session_state["stopping"] = False
             st.session_state["cancel_requested"] = False
             st.session_state["active_run_id"] = None
             st.session_state["active_run_thread_id"] = None
 
     if not events and state in {"success", "error", "interrupted", "partial", "missing"}:
         st.session_state["is_running"] = False
+        st.session_state["stopping"] = False
         st.session_state["cancel_requested"] = False
         st.session_state["active_run_id"] = None
         st.session_state["active_run_thread_id"] = None

@@ -95,9 +95,150 @@ import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
-from sklearn.metrics import r2_score, mean_squared_error, aic, bic
+from sklearn.metrics import r2_score, mean_squared_error
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
+
+# Step 1: Load data
+df = pd.read_csv('shanghai_antl_stats.csv')
+gdp_df = pd.read_csv('shanghai_gdp.csv')
+data = pd.merge(df, gdp_df, on='year')
+
+# Step 2: Prepare variables
+X = data['ANTL'].values.reshape(-1, 1)
+y = data['GDP'].values
+
+# Step 3: Define models
+models = {
+    'Linear': LinearRegression(),
+    'Log-Linear': LinearRegression(),  # log(GDP) ~ ANTL
+    'Quadratic': LinearRegression(),   # GDP ~ ANTL + ANTL^2
+    'Power': LinearRegression(),       # log(GDP) ~ log(ANTL)
+    'Exponential': LinearRegression()  # log(GDP) ~ ANTL
+}
+
+# Step 4: Fit and evaluate
+results = []
+for name, model in models.items():
+    if name == 'Log-Linear':
+        X_fit, y_fit = X, np.log(y)
+    elif name == 'Quadratic':
+        X_fit = np.column_stack([X, X**2])
+        y_fit = y
+    elif name == 'Power':
+        X_fit, y_fit = np.log(X), np.log(y)
+    elif name == 'Exponential':
+        X_fit, y_fit = X, np.log(y)
+    else:
+        X_fit, y_fit = X, y
+    
+    model.fit(X_fit, y_fit)
+    y_pred = model.predict(X_fit)
+    
+    # Calculate metrics
+    r2 = r2_score(y_fit, y_pred)
+    rmse = np.sqrt(mean_squared_error(y_fit, y_pred))
+    n = len(y)
+    k = X_fit.shape[1] if len(X_fit.shape) > 1 else 1
+    rss = np.sum((y_fit - y_pred)**2)
+    aic = n * np.log(rss/n) + 2*k
+    bic = n * np.log(rss/n) + k*np.log(n)
+    
+    results.append({
+        'model': name,
+        'r2': r2,
+        'rmse': rmse,
+        'aic': aic,
+        'bic': bic,
+        'coefficients': model.coef_.tolist()
+    })
+
+# Step 5: Select best model
+results_df = pd.DataFrame(results)
+best_model = results_df.loc[results_df['aic'].idxmin()]
+print(f"Best model: {best_model['model']} (AIC={best_model['aic']:.2f}, R²={best_model['r2']:.4f})")
+
+# Step 6: Visualization
+plt.figure(figsize=(10, 6))
+plt.scatter(X, y, alpha=0.6, label='Observed')
+# Plot best fit line
+if best_model['model'] == 'Linear':
+    plt.plot(X, models['Linear'].predict(X), 'r-', label='Best Fit')
+plt.xlabel('ANTL')
+plt.ylabel('GDP')
+plt.legend()
+plt.savefig('gdp_ntl_regression.png', dpi=300)
+```
+
+#### 4.2 Model Diagnostics
+
+After fitting, validate:
+- **Residual analysis**: Check for homoscedasticity and normality
+- **Multicollinearity**: VIF < 5 for multi-variable models
+- **Outlier detection**: Cook's distance > 4/n
+- **Cross-validation**: k-fold (k=5) for small samples
+
+#### 4.3 Output Specification
+
+Save results to `outputs/shanghai_gdp_ntl_regression_results.csv`:
+```csv
+model,r2,rmse,aic,bic,coefficients,selected
+Linear,0.85,1234.5,123.4,128.9,False
+Log-Linear,0.88,0.15,118.2,123.7,False
+Quadratic,0.87,1156.3,120.5,127.1,False
+Power,0.89,0.14,115.8,121.3,True
+Exponential,0.86,0.16,119.4,124.9,False
+```
+
+Generate diagnostic plots:
+- `outputs/residual_plot.png`: Residuals vs Fitted
+- `outputs/qq_plot.png`: Q-Q plot for normality
+- `outputs/gdp_ntl_regression.png`: Scatter plot with best fit line
+
+### Step 5: Final Indicator Estimation
+
+Use the selected model to estimate GDP from ANTL:
+- For new ANTL values, apply the best model's transformation
+- Report confidence intervals (95%)
+- Compare with official statistics if available
+
+### Step 6: Integration with Built-in Tools
+
+For simple GDP estimation without full regression analysis, use:
+```python
+NTL_Estimate_Indicator_Provincial(
+    tntl=12345.67,
+    indicator='GDP',
+    province='上海市'  # Required for CO2, optional for GDP
+)
+```
+
+**Note**: The regression workflow (Steps 1-5) is for custom analysis and model comparison.
+The built-in tool (Step 6) uses pre-trained models for quick estimation.
+
+## Output Contract
+
+### Required Outputs
+1. **Regression results CSV**: `outputs/<region>_gdp_ntl_regression_results.csv`
+   - All models compared with R², RMSE, AIC, BIC
+   - Best model flagged
+
+2. **Diagnostic plots**:
+   - `outputs/residual_plot.png`
+   - `outputs/qq_plot.png`
+   - `outputs/<region>_gdp_ntl_scatter.png`
+
+3. **Summary report** (optional): `outputs/<region>_gdp_ntl_summary.txt`
+   - Best model selection rationale
+   - Model assumptions validation
+   - Comparison with official statistics
+
+## Guardrails
+- Minimum 5 years of data required for reliable regression
+- Check for structural breaks (e.g., policy changes, economic crises)
+- For China regions, always prefer official GDP data from statistical yearbooks
+- Do not extrapolate beyond observed ANTL range
+- Report uncertainty (confidence intervals) for all estimates
 
 # === INPUTS ===
 # ANTL data: shanghai_antl_stats.csv (from NTL_raster_statistics)

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Optional
 from langchain_core.tools import StructuredTool
 from pydantic.v1 import BaseModel, Field
+from storage_manager import storage_manager
 
 # 1. 定义输入 Schema (保持不变)
 class NTL_Estimate_Indicator_Input(BaseModel):
@@ -23,9 +24,11 @@ def NTL_estimate_indicator_provincial(tntl: float, indicator: str, province: Opt
     current_dir = Path(os.getcwd())
     # 尝试多种路径策略以适应不同的运行环境
     possible_paths = [
+        # Preferred: unified shared base from storage manager (stable across E:/D: copies)
+        storage_manager.shared_dir / "Model",
+        # Backward-compatible fallbacks
         current_dir / "base_data" / "Model",
         Path(__file__).parent.parent / "base_data" / "Model",
-        Path("D:/NTL-GPT/NTL-GPT-Clone/base_data/Model") # 你的本地绝对路径备用
     ]
     
     model_dir = None
@@ -167,7 +170,11 @@ def DEI_estimate_city(antl: float, year: Optional[int] = None):
     Returns a structured dict with prediction or an informative error message.
     """
     # Candidate paths (adjust if your files live elsewhere)
-    yearly_path = r'base_data/Model/yearly_dei_models.pkl'
+    yearly_candidates = [
+        storage_manager.shared_dir / "Model" / "yearly_dei_models.pkl",
+        Path("base_data/Model/yearly_dei_models.pkl"),
+    ]
+    yearly_path = next((str(p) for p in yearly_candidates if Path(p).exists()), str(yearly_candidates[0]))
 
     saved = None
     used_path = None
