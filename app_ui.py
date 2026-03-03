@@ -4208,6 +4208,8 @@ def render_content_layout():
     """Render dual-column layout: chat and analysis/map/results."""
     workspace = storage_manager.get_workspace(st.session_state.get("thread_id", "debug"))
     _ = app_logic.consume_active_run_events()
+    if bool(st.session_state.pop("ui_force_refresh_once", False)):
+        st.rerun()
     # st.markdown(
     #     f"<div class='ntl-card'>"
     #     f"<b>{_tr('工作空间', 'Workspace')}</b><br><span style='color:#61717a;font-size:0.88rem;'>{workspace}</span></div>",

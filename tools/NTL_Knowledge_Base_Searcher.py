@@ -124,23 +124,26 @@ def _extract_latest_user_query(messages: list) -> str:
 
 def _build_searcher_llm() -> ChatOpenAI:
     api_key = (
-        os.getenv("DOUBAO_API_KEY")
+        os.getenv("DASHSCOPE_Qwen_plus_KEY")
         or os.getenv("DASHSCOPE_API_KEY")
+        or os.getenv("DOUBAO_API_KEY")
     )
     if not api_key:
         raise RuntimeError(
-            "DOUBAO_API_KEY (or DASHSCOPE_API_KEY / QWEN_API_KEY) is required for "
-            "NTL_Knowledge_Base_Searcher doubao-seed-2.0-code model."
+            "DASHSCOPE_Qwen_plus_KEY (or DASHSCOPE_API_KEY / DOUBAO_API_KEY) is required for "
+            "NTL_Knowledge_Base_Searcher qwen-plus model."
         )
     base_url = (
-        os.getenv("DOUBAO_BASE_URL")
+        os.getenv("DASHSCOPE_Qwen_plus_URL")
+        or os.getenv("DASHSCOPE_Coding_URL")
+        or os.getenv("DOUBAO_BASE_URL")
         or os.getenv("ARK_OPENAI_BASE_URL")
         or "https://ark.cn-beijing.volces.com/api/v3"
     )
     return ChatOpenAI(
         api_key=api_key,
         base_url=base_url,
-        model="kimi-k2.5"
+        model="qwen-plus"
     )
 
 

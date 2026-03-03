@@ -28,6 +28,7 @@ def _ensure_runtime_state_defaults() -> None:
     st.session_state.setdefault("pending_model_change", None)
     st.session_state.setdefault("pending_activate_request", None)
     st.session_state.setdefault("run_last_terminal_kind", "")
+    st.session_state.setdefault("ui_force_refresh_once", False)
 
 
 def should_recover_stale_run(
@@ -803,6 +804,8 @@ def consume_active_run_events() -> bool:
             run_thread = str(payload.get("thread_id") or st.session_state.get("active_run_thread_id") or "")
             if run_thread and run_thread == str(st.session_state.get("thread_id") or ""):
                 _collect_recent_outputs(seconds=120, thread_id=run_thread)
+                # Trigger one full-page rerun so map/output preview can pick up new artifacts.
+                st.session_state["ui_force_refresh_once"] = True
             st.session_state["run_ended_ts"] = time.time()
             st.session_state["is_running"] = False
             st.session_state["stopping"] = False
@@ -816,6 +819,7 @@ def consume_active_run_events() -> bool:
         st.session_state["cancel_requested"] = False
         st.session_state["active_run_id"] = None
         st.session_state["active_run_thread_id"] = None
+        st.session_state["ui_force_refresh_once"] = True
     return consumed
 
 

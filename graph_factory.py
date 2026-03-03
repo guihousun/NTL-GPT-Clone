@@ -86,7 +86,7 @@ def build_ntl_graph(
     model_name: str,
     api_key: str,
     request_timeout_s: int = 120,
-    graph_name: str = "NTL-GPT",
+    graph_name: str = "NTL_Engineer",
     postgres_url: str | None = None,
 ):
     if postgres_url:
@@ -172,7 +172,7 @@ def build_ntl_graph(
 
     engineer_prompt = getattr(system_prompt_text, "content", str(system_prompt_text))
 
-    NTL_SYSTEM_PROMPT = f"""NTL-GPT: nighttime light analysis supervisor.
+    NTL_SYSTEM_PROMPT = f"""NTL Engineer: nighttime light analysis supervisor.
 
 Workspace protocol (canonical):
 - Read input data from `/inputs/` in the current thread workspace.
