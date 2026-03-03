@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 
@@ -17,11 +17,7 @@ from agents.NTL_Engineer import system_prompt_text
 from agents.NTL_Knowledge_Subagent import system_prompt_kb_searcher
 from storage_manager import current_thread_id, storage_manager
 from tools import Code_tools, Engineer_tools, data_searcher_tools
-from tools.NTL_Knowledge_Base import (
-    NTL_Code_Knowledge,
-    NTL_Literature_Knowledge,
-    NTL_Solution_Knowledge,
-)
+from tools.NTL_Knowledge_Base_Searcher import NTL_Knowledge_Base
 
 from langgraph.checkpoint.memory import MemorySaver  # For testing
 # Or: from langgraph.checkpoint.postgres import PostgresSaver  # For production
@@ -161,7 +157,7 @@ def build_ntl_graph(
         "description": "NTL domain knowledge specialist: grounded methods, workflow planning, and task-level JSON intent.",
         "system_prompt": system_prompt_kb_searcher,
         "model": knowledge_base_llm,
-        "tools": [NTL_Literature_Knowledge, NTL_Solution_Knowledge, NTL_Code_Knowledge],
+        "tools": [NTL_Knowledge_Base],
         "skills": [SKILLS_SOURCE],
     }
 

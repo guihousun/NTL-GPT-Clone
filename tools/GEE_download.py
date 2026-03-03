@@ -306,13 +306,13 @@ def ntl_download_tool(
             directly_governed = {"北京市", "天津市", "上海市", "重庆市", "Beijing", "Tianjin", "Shanghai", "Chongqing"}
             if in_china:
                 if level == "country":
-                    return national_collection, "NAME"
+                    return national_collection, "NAME", None
                 if level == "province" or (level == "city" and study_area in directly_governed):
-                    return province_collection, "name"
+                    return province_collection, "name", None
                 if level == "city":
-                    return city_collection, "name"
+                    return city_collection, "name", None
                 if level == "county":
-                    return county_collection, "name"
+                    return county_collection, "name", None
                 raise ValueError("Unknown scale level. Options: country/province/city/county")
 
             # Global mode (geoBoundaries on GEE): ADM0..ADM4.
