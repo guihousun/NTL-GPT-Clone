@@ -16,7 +16,7 @@ from storage_manager import current_thread_id, storage_manager
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-GIF_SCRIPT = REPO_ROOT / "experiments" / "official_daily_ntl_fastpath" / "make_ntl_daily_gif.py"
+GIF_SCRIPT = REPO_ROOT / "tools" / "official_vj_dnb_map_renderer.py"
 
 
 class OfficialVJDNBGifInput(BaseModel):
@@ -31,6 +31,10 @@ class OfficialVJDNBGifInput(BaseModel):
     overlay_vector: str = Field(default="", description="Optional vector data path (GeoJSON/SHP/GPKG) for event points.")
     overlay_label_field: str = Field(default="", description="Optional field name used for overlay text labels.")
     overlay_point_class_field: str = Field(default="", description="Optional point class field for legend categories.")
+    point_style_map: str = Field(
+        default="",
+        description="Optional JSON string or JSON file path mapping point classes to styles (marker/color/size/glow).",
+    )
     point_legend_label: str = Field(default="事件点", description="Single-style point legend label.")
     point_legend_title: str = Field(default="事件类型", description="Point legend title when class field is used.")
     show_point_legend: bool = Field(default=True, description="Whether to display point legend.")
@@ -38,12 +42,34 @@ class OfficialVJDNBGifInput(BaseModel):
     boundary_edge_color: str = Field(default="#3dd3ff", description="Boundary line color.")
     boundary_linewidth: float = Field(default=1.1, description="Boundary line width.")
     boundary_alpha: float = Field(default=0.95, description="Boundary line alpha.")
+    view_bbox: str = Field(default="", description="Optional display bbox: minx,miny,maxx,maxy.")
+    point_size: float = Field(default=5.0, description="Point size.")
+    point_color: str = Field(default="#ff3b30", description="Single-style point fill color.")
+    point_edge: str = Field(default="#ffffff", description="Single-style point edge color.")
     duration_ms: int = Field(default=900, description="GIF frame duration in milliseconds.")
     fps: float = Field(default=0.0, description="Optional FPS; overrides duration_ms when >0.")
     percentile_min: float = Field(default=2.0, description="Visualization lower percentile.")
     percentile_max: float = Field(default=98.0, description="Visualization upper percentile.")
     cmap: str = Field(default="inferno", description="Matplotlib colormap name.")
     title_prefix: str = Field(default="Nighttime Light", description="Frame title prefix.")
+    basemap_style: str = Field(default="dark", description="Basemap style: dark | light | none.")
+    basemap_provider: str = Field(
+        default="",
+        description="Optional dotted xyzservices provider path, e.g. CartoDB.DarkMatter or Stadia.StamenTonerBlacklite.",
+    )
+    basemap_alpha: float = Field(default=0.92, description="Basemap alpha.")
+    ntl_alpha: float = Field(default=0.65, description="Nighttime light raster alpha.")
+    transparent_below: float = Field(
+        default=float("-inf"),
+        description="Mask nighttime light pixels below this value so they render transparent.",
+    )
+    classification_mode: str = Field(
+        default="continuous",
+        description="Classification mode: continuous | equal_interval | quantile | stddev.",
+    )
+    class_bins: int = Field(default=8, description="Class bin count for classified rendering.")
+    stddev_range: float = Field(default=2.0, description="Stddev range used by stddev classification.")
+    show_colorbar: bool = Field(default=True, description="Whether to render colorbar.")
     ask_user_for_params: bool = Field(
         default=False,
         description="If true, do not execute; return parameter questions so agent can ask user first.",
@@ -128,6 +154,7 @@ def run_official_vj_dnb_gif(
     overlay_vector: str = "",
     overlay_label_field: str = "",
     overlay_point_class_field: str = "",
+    point_style_map: str = "",
     point_legend_label: str = "事件点",
     point_legend_title: str = "事件类型",
     show_point_legend: bool = True,
@@ -135,12 +162,25 @@ def run_official_vj_dnb_gif(
     boundary_edge_color: str = "#3dd3ff",
     boundary_linewidth: float = 1.1,
     boundary_alpha: float = 0.95,
+    view_bbox: str = "",
+    point_size: float = 5.0,
+    point_color: str = "#ff3b30",
+    point_edge: str = "#ffffff",
     duration_ms: int = 900,
     fps: float = 0.0,
     percentile_min: float = 2.0,
     percentile_max: float = 98.0,
     cmap: str = "inferno",
     title_prefix: str = "Nighttime Light",
+    basemap_style: str = "dark",
+    basemap_provider: str = "",
+    basemap_alpha: float = 0.92,
+    ntl_alpha: float = 0.65,
+    transparent_below: float = float("-inf"),
+    classification_mode: str = "continuous",
+    class_bins: int = 8,
+    stddev_range: float = 2.0,
+    show_colorbar: bool = True,
     ask_user_for_params: bool = False,
     config: Optional[RunnableConfig] = None,
     **kwargs,
@@ -153,12 +193,17 @@ def run_official_vj_dnb_gif(
                 "请确认 style_palette：report_dark / night_blue / mono_gray / impact_hot。",
                 "是否叠加事件点？如是，请提供 overlay_vector 路径与 overlay_label_field。",
                 "点图例是否按字段分类？如是，请提供 overlay_point_class_field。",
+                "如需差异化符号，请提供 point_style_map（JSON 文本或 JSON 文件路径）。",
                 "是否叠加行政区边界？如是，请提供 boundary_vector。",
+                "是否需要指定 view_bbox、basemap_style/provider、transparent_below？",
+                "渲染偏好：classification_mode、class_bins、cmap、ntl_alpha、show_colorbar。",
                 "动画速度偏好：duration_ms（每帧毫秒）或 fps（二选一）。",
             ],
             "recommended_defaults": {
                 "style_palette": "report_dark",
                 "show_point_legend": True,
+                "basemap_style": "dark",
+                "ntl_alpha": 0.65,
                 "duration_ms": 900,
                 "percentile_min": 2.0,
                 "percentile_max": 98.0,
@@ -198,7 +243,31 @@ def run_official_vj_dnb_gif(
         str(cmap),
         "--title-prefix",
         str(title_prefix),
+        "--point-size",
+        str(float(point_size)),
+        "--point-color",
+        str(point_color),
+        "--point-edge",
+        str(point_edge),
+        "--basemap-style",
+        str(basemap_style),
+        "--basemap-provider",
+        str(basemap_provider),
+        "--basemap-alpha",
+        str(float(basemap_alpha)),
+        "--ntl-alpha",
+        str(float(ntl_alpha)),
+        "--transparent-below",
+        str(float(transparent_below)),
+        "--classification-mode",
+        str(classification_mode),
+        "--class-bins",
+        str(int(class_bins)),
+        "--stddev-range",
+        str(float(stddev_range)),
     ]
+    if not bool(show_colorbar):
+        cmd += ["--no-colorbar"]
     if str(overlay_vector).strip():
         resolved_vector = _resolve_workspace_path(overlay_vector, thread_id, writable=False)
         if not resolved_vector.exists():
@@ -208,12 +277,20 @@ def run_official_vj_dnb_gif(
             cmd += ["--label-field", str(overlay_label_field).strip()]
     if str(overlay_point_class_field).strip():
         cmd += ["--point-class-field", str(overlay_point_class_field).strip()]
+    if str(point_style_map).strip():
+        resolved_style_map = _resolve_workspace_path(point_style_map, thread_id, writable=False)
+        if resolved_style_map.exists():
+            cmd += ["--point-style-map", str(resolved_style_map)]
+        else:
+            cmd += ["--point-style-map", str(point_style_map).strip()]
     if str(point_legend_label).strip():
         cmd += ["--point-legend-label", str(point_legend_label).strip()]
     if str(point_legend_title).strip():
         cmd += ["--point-legend-title", str(point_legend_title).strip()]
     if bool(show_point_legend):
         cmd += ["--show-point-legend"]
+    if str(view_bbox).strip():
+        cmd += ["--view-bbox", str(view_bbox).strip()]
     if str(boundary_vector).strip():
         resolved_boundary = _resolve_workspace_path(boundary_vector, thread_id, writable=False)
         if not resolved_boundary.exists():
@@ -257,7 +334,9 @@ official_vj_dnb_gif_tool = StructuredTool.from_function(
     func=run_official_vj_dnb_gif,
     name="official_vj_dnb_gif_tool",
     description=(
-        "Generate animated GIF from daily VJ102DNB/VJ103DNB GeoTIFF series, with optional GeoJSON/SHP event overlay."
+        "Generate complete nighttime-light cartography and animated GIF from daily GeoTIFF series, "
+        "supporting basemap provider selection, bbox view, transparency threshold, classified rendering, "
+        "event/port overlays, custom point symbol mapping, and optional boundary overlay."
     ),
     args_schema=OfficialVJDNBGifInput,
 )

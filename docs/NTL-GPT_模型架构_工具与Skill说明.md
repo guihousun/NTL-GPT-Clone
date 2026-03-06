@@ -199,7 +199,7 @@
 | 城市结构与道路提取 | `urban_extraction_by_thresholding_tool`、`svm_urban_extraction_tool`、`electrified_detection_tool`、`detect_urban_centres_tool`、`otsu_road_extraction_tool` | `tools/NTL_urban_structure_extract.py`、`tools/main_road.py` |
 | 指数、统计、趋势与异常分析 | `SDGSAT1_index_tool`、`vnci_index_tool`、`NTL_raster_statistics_tool`、`NTL_Trend_Analysis`、`detect_ntl_anomaly_tool` | `tools/SDGSAT1_INDEX.py`、`tools/NPP_viirs_index_tool.py`、`tools/NTL_raster_stats.py`、`tools/NTL_trend_detection_tool.py`、`tools/NTL_anomaly_detection_tool.py` |
 | 指标估算与经济建模 | `NTL_estimate_indicator_provincial_tool`、`DEI_estimate_city_tool`、`China_Official_GDP_tool` | `tools/NTL_estimate_indicator.py`、`tools/China_official_stats.py` |
-| 官方 VJ DNB 工作流 | `official_vj_dnb_fullchain_tool`、`official_vj_dnb_preprocess_tool`、`convert_vj102_vj103_precise_to_tif_tool`、`official_vj_dnb_gif_tool` | `tools/official_vj_dnb_pipeline_tool.py`、`tools/official_vj_dnb_preprocess_tool.py`、`tools/official_vj_dnb_gif_tool.py` |
+| 官方 VJ DNB 工作流 | `official_vj_dnb_fullchain_tool`、`official_vj_dnb_preprocess_tool`、`convert_vj102_vj103_precise_to_tif_tool`、`official_vj_dnb_gif_tool` | `tools/official_vj_dnb_pipeline_tool.py`、`tools/official_vj_dnb_preprocess_tool.py`、`tools/official_vj_dnb_gif_tool.py`、`tools/official_vj_dnb_map_renderer.py` |
 | 融合分析与专题工具 | `official_ntl_ais_fusion_tool` | `tools/official_ntl_ais_fusion_tool.py` |
 | 知识与文档理解 | `NTL_Knowledge_Base`、`uploaded_pdf_understanding_tool` | `tools/NTL_Knowledge_Base_Searcher.py`、`tools/uploaded_file_understanding_tool.py` |
 
@@ -252,7 +252,7 @@
 | `official_vj_dnb_fullchain_tool` | `official_vj_dnb_pipeline_tool.py` | `tools/official_vj_dnb_pipeline_tool.py` | `data_searcher_tools`, `Engineer_tools` | 官方 VJ DNB 全链路流水线 |
 | `official_vj_dnb_preprocess_tool` | `official_vj_dnb_preprocess_tool.py` | `tools/official_vj_dnb_preprocess_tool.py` | `data_searcher_tools`, `Engineer_tools` | 官方 VJ DNB 预处理 |
 | `convert_vj102_vj103_precise_to_tif_tool` | `official_vj_dnb_preprocess_tool.py` | `tools/official_vj_dnb_preprocess_tool.py` | `data_searcher_tools`, `Engineer_tools` | VJ102/VJ103 精确产品转 TIF |
-| `official_vj_dnb_gif_tool` | `official_vj_dnb_gif_tool.py` | `tools/official_vj_dnb_gif_tool.py` | `data_searcher_tools`, `Engineer_tools` | 官方 VJ DNB GIF 生成 |
+| `official_vj_dnb_gif_tool` | `official_vj_dnb_gif_tool.py` | `tools/official_vj_dnb_gif_tool.py` | `data_searcher_tools`, `Engineer_tools` | 官方 VJ DNB 完整制图与 GIF 生成；底层正式渲染脚本为 `tools/official_vj_dnb_map_renderer.py` |
 | `official_ntl_ais_fusion_tool` | `official_ntl_ais_fusion_tool.py` | `tools/official_ntl_ais_fusion_tool.py` | `data_searcher_tools`, `Engineer_tools` | 官方夜光-AIS 融合分析 |
 | `uploaded_pdf_understanding_tool` | `uploaded_file_understanding_tool.py` | `tools/uploaded_file_understanding_tool.py` | `Engineer_tools` | 上传 PDF 理解 |
 
@@ -260,6 +260,41 @@
 
 - `wrap_tool_json_safe` 位于 `tools/tool_json_safety.py`，是内部包装器，不是面向代理规划的业务工具，因此未放入上表主清单。
 - `NTL_Daily_ANTL_Statistics`、`get_administrative_division_osm_tool`、`geodata_quick_check_tool`、`NTL_Knowledge_Base` 当前虽然在 `_EXPORTS` 中，但不在三大主工具组里，属于可导出但未直接纳入当前主代理工具组的能力。
+- `experiments/official_daily_ntl_fastpath/make_ntl_daily_gif.py` 现已降级为兼容转发器，实际正式实现位于 `tools/official_vj_dnb_map_renderer.py`。
+
+### 6.1 `official_vj_dnb_gif_tool` 当前完整制图能力
+
+当前 `official_vj_dnb_gif_tool` 已不再只是“简单 GIF 导出器”，而是官方 VJ DNB 制图入口。其底层调用：
+
+- `tools/official_vj_dnb_map_renderer.py`
+
+当前支持的核心能力包括：
+
+- 日尺度 GeoTIFF 序列渲染为 GIF
+- 夜光设色控制：`cmap`
+- 夜光透明度控制：`ntl_alpha`
+- 低亮度像元透明：`transparent_below`
+- 分类渲染：`continuous`、`equal_interval`、`quantile`、`stddev`
+- 分类参数：`class_bins`、`stddev_range`
+- 视图范围裁剪：`view_bbox`
+- 底图开关与样式：`basemap_style`
+- 指定在线瓦片 provider：`basemap_provider`
+- 底图透明度：`basemap_alpha`
+- 点图层叠加：`overlay_vector`
+- 点标签字段：`overlay_label_field`
+- 点分类字段：`overlay_point_class_field`
+- 点样式映射：`point_style_map`
+- 单样式点控制：`point_size`、`point_color`、`point_edge`
+- 边界叠加：`boundary_vector`、`boundary_edge_color`、`boundary_linewidth`、`boundary_alpha`
+- 色标开关：`show_colorbar`
+
+典型制图场景包括：
+
+- 夜光变化动画
+- 冲突点 / 港口点 / 地震点叠加
+- 行政区边界或研究区边界叠加
+- 深色或浅色在线底图专题图
+- 霍尔木兹海峡、城市战损区、港口活动区等局部窗口专题图
 
 ## 7. Skill 系统设计
 
