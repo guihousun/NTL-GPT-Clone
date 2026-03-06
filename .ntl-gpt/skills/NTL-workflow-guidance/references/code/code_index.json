@@ -1,6 +1,6 @@
 {
   "schema": "ntl.workflow.code.index.v1",
-  "updated_at": "2026-03-02T00:00:00Z",
+  "updated_at": "2026-03-04T00:00:00Z",
   "notes": "Curated successful workflow code references. Use as guidance and re-validate for each run.",
   "items": [
     {
@@ -44,6 +44,48 @@
         "Runs query-download-preprocess in one callable tool.",
         "Default output resolution is 500m equivalent.",
         "Radiance scaled by 1e9 for nW/cm^2/sr consistency."
+      ]
+    },
+    {
+      "intent_id": "data_retrieval_preprocessing",
+      "task_id": "Q26",
+      "case_id": "Q26_vj102_vj103_preprocess_storage_paths",
+      "title": "VJ102/VJ103 preprocess-only flow with storage-manager paths",
+      "path": "/skills/NTL-workflow-guidance/references/code/data_retrieval_preprocessing/Q26_vj102_vj103_preprocess_storage_paths.py",
+      "status": "verified_success",
+      "tags": [
+        "official-source",
+        "vj102dnb",
+        "vj103dnb",
+        "preprocess-only",
+        "storage-manager",
+        "virtual-path"
+      ],
+      "quality_notes": [
+        "Uses /data/processed virtual paths resolved by storage_manager.",
+        "Reuses convert_vj102_vj103_precise_to_tif preprocessing engine.",
+        "Keeps output under thread-scoped workspace outputs."
+      ]
+    },
+    {
+      "intent_id": "event_impact_assessment",
+      "task_id": "Q21",
+      "case_id": "Q21_iran_conflict_official_vj_workflow",
+      "title": "Iran conflict assessment with official VJ102/VJ103 + INSS + report rebuild",
+      "path": "/skills/NTL-workflow-guidance/references/code/event_impact_assessment/Q21_iran_conflict_official_vj_workflow.py",
+      "status": "verified_success",
+      "tags": [
+        "event-impact",
+        "conflict",
+        "vj102dnb",
+        "vj103dnb",
+        "inss",
+        "report-rebuild"
+      ],
+      "quality_notes": [
+        "Chains official fullchain preprocessing, strike refresh, and report rebuild.",
+        "Keeps official-source raster preprocessing and event-point refresh decoupled.",
+        "Provides reproducible event-window outputs for report regeneration."
       ]
     }
   ]

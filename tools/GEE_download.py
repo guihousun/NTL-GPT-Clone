@@ -2,6 +2,8 @@
 
 import os
 import re
+import json
+import math
 import calendar
 from datetime import datetime, timedelta
 from typing import Optional, Literal
@@ -16,6 +18,7 @@ from pydantic import BaseModel, Field
 from storage_manager import current_thread_id, storage_manager
 
 _PROJECT_ID = "empyrean-caster-430308-m2"
+BBoxLike = str | list[float] | tuple[float, float, float, float] | dict[str, float]
 
 
 def _ensure_ee_initialized() -> None:
@@ -238,17 +241,91 @@ def _parse_time_range(time_range_input: str, temporal_resolution: str) -> tuple[
     return start_date, end_date
 
 
+def _parse_bbox_input(raw_bbox: Optional[BBoxLike]) -> Optional[tuple[float, float, float, float]]:
+    if raw_bbox is None:
+        return None
+
+    values: list[object]
+    payload: object = raw_bbox
+    if isinstance(payload, str):
+        text = payload.strip()
+        if not text:
+            return None
+        if text.startswith("[") or text.startswith("{"):
+            try:
+                payload = json.loads(text)
+            except Exception as exc:
+                raise ValueError("bbox JSON format is invalid. Use minx,miny,maxx,maxy.") from exc
+        else:
+            payload = [x.strip() for x in text.split(",")]
+
+    if isinstance(payload, dict):
+        required_keys = ("minx", "miny", "maxx", "maxy")
+        if any(k not in payload for k in required_keys):
+            raise ValueError("bbox dict must include keys: minx,miny,maxx,maxy")
+        values = [payload["minx"], payload["miny"], payload["maxx"], payload["maxy"]]
+    elif isinstance(payload, (list, tuple)):
+        if len(payload) != 4:
+            raise ValueError("bbox/box must contain 4 numbers: minx,miny,maxx,maxy")
+        values = list(payload)
+    else:
+        raise ValueError("bbox/box must be a CSV string, JSON array, or dict with minx,miny,maxx,maxy")
+
+    try:
+        minx, miny, maxx, maxy = [float(v) for v in values]
+    except (TypeError, ValueError) as exc:
+        raise ValueError("bbox/box values must be numeric.") from exc
+
+    for v in (minx, miny, maxx, maxy):
+        if not math.isfinite(v):
+            raise ValueError("bbox/box values must be finite numbers.")
+
+    if minx < -180 or maxx > 180:
+        raise ValueError("bbox longitude must be within [-180, 180].")
+    if miny < -90 or maxy > 90:
+        raise ValueError("bbox latitude must be within [-90, 90].")
+    if maxx <= minx or maxy <= miny:
+        raise ValueError("Invalid bbox/box: require maxx > minx and maxy > miny.")
+
+    return minx, miny, maxx, maxy
+
+
+def _build_bbox_region(bbox: tuple[float, float, float, float]):
+    minx, miny, maxx, maxy = bbox
+    geom = ee.Geometry.Rectangle([minx, miny, maxx, maxy], None, False)
+    return ee.FeatureCollection([ee.Feature(geom)])
+
+
+def _coalesce_bbox_input(
+    bbox: Optional[BBoxLike],
+    box: Optional[BBoxLike],
+    kwargs: dict,
+) -> Optional[BBoxLike]:
+    if bbox not in (None, ""):
+        return bbox
+    if box not in (None, ""):
+        return box
+
+    legacy_bbox = kwargs.get("bbox")
+    if legacy_bbox not in (None, ""):
+        return legacy_bbox
+    legacy_box = kwargs.get("box")
+    if legacy_box not in (None, ""):
+        return legacy_box
+    return None
+
+
 class NightlightDataInput(BaseModel):
-    study_area: str = Field(
-        ...,
+    study_area: Optional[str] = Field(
+        None,
         description=(
-            "Name of the study area. China examples: '南京市'. "
+            "Name of the study area. Required when bbox/box is not provided. China examples: '南京市'. "
             "Outside China, for province/city/county levels use 'admin_name, country' "
             "(e.g., 'Tehran, Iran')."
         ),
     )
-    scale_level: Literal["country", "province", "city", "county", "district"] = Field(
-        ..., description="Administrative scale level."
+    scale_level: Optional[Literal["country", "province", "city", "county", "district"]] = Field(
+        None, description="Administrative scale level. Required when bbox/box is not provided."
     )
     temporal_resolution: Literal["annual", "monthly", "daily"] = Field(..., description="Temporal resolution.")
     time_range_input: str = Field(..., description="Annual: YYYY to YYYY; Monthly: YYYY-MM to YYYY-MM; Daily: YYYY-MM-DD to YYYY-MM-DD")
@@ -256,17 +333,27 @@ class NightlightDataInput(BaseModel):
     dataset_name: Optional[str] = Field(None, description="Annual: NPP-VIIRS-Like/NPP-VIIRS/DMSP-OLS; Monthly fixed; Daily: VNP46A2/VNP46A1")
     collection_name: Optional[str] = Field(None, description="Reserved optional field.")
     is_in_China: Optional[bool] = Field(None, description="Whether study area is in China. If omitted, inferred from study_area.")
+    bbox: Optional[BBoxLike] = Field(
+        None,
+        description="Optional bounding box in lon/lat (WGS84): minx,miny,maxx,maxy. If provided, takes priority over study_area/scale_level.",
+    )
+    box: Optional[BBoxLike] = Field(
+        None,
+        description="Alias of bbox. Format: minx,miny,maxx,maxy.",
+    )
 
 
 def ntl_download_tool(
-    study_area: str,
-    scale_level: str,
+    study_area: Optional[str],
+    scale_level: Optional[str],
     temporal_resolution: str,
     time_range_input: str,
     out_name: str,
     dataset_name: Optional[str] = None,
     collection_name: Optional[str] = None,
     is_in_China: Optional[bool] = None,
+    bbox: Optional[BBoxLike] = None,
+    box: Optional[BBoxLike] = None,
     config: Optional[RunnableConfig] = None,
     **kwargs,
 ):
@@ -282,14 +369,10 @@ def ntl_download_tool(
 
         scale_level = str(scale_level or "").strip().lower()
         temporal_resolution = str(temporal_resolution or "").strip().lower()
-        is_in_China = _guess_is_in_china(study_area, is_in_China)
-        study_area = _normalize_study_area(study_area, scale_level)
         dataset_name = _normalize_dataset_name(dataset_name, temporal_resolution)
         out_name = _ensure_tif_suffix(out_name)
-
-        # If caller uses province for "China", auto-correct to country.
-        if scale_level == "province" and study_area.lower() == "china":
-            scale_level = "country"
+        bbox_input = _coalesce_bbox_input(bbox, box, kwargs)
+        bbox_values = _parse_bbox_input(bbox_input)
 
         national_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/World_countries")
         province_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/province")
@@ -301,13 +384,14 @@ def ntl_download_tool(
         intl_city_collection = ee.FeatureCollection("WM/geoLab/geoBoundaries/600/ADM2")
         intl_county_collection = ee.FeatureCollection("WM/geoLab/geoBoundaries/600/ADM3")
         intl_district_collection = ee.FeatureCollection("WM/geoLab/geoBoundaries/600/ADM4")
+        resolved_study_area = (study_area or "").strip()
 
         def get_administrative_boundaries(level: str, in_china: bool):
             directly_governed = {"北京市", "天津市", "上海市", "重庆市", "Beijing", "Tianjin", "Shanghai", "Chongqing"}
             if in_china:
                 if level == "country":
                     return national_collection, "NAME", None
-                if level == "province" or (level == "city" and study_area in directly_governed):
+                if level == "province" or (level == "city" and resolved_study_area in directly_governed):
                     return province_collection, "name", None
                 if level == "city":
                     return city_collection, "name", None
@@ -328,32 +412,47 @@ def ntl_download_tool(
                 return intl_district_collection, "shapeName", "ADM4"
             raise ValueError("Unknown scale level. Options: country/province/city/county/district")
 
-        admin_boundary, name_property, _ = get_administrative_boundaries(scale_level, is_in_China)
-        query_name = study_area
-        if not is_in_China and scale_level != "country":
-            admin_name, country_name = _split_admin_and_country(study_area)
-            query_name = admin_name
-            shape_group = _resolve_geoboundaries_country_group(intl_country_collection, country_name or "")
-            if shape_group:
-                admin_boundary = admin_boundary.filter(ee.Filter.eq("shapeGroup", shape_group))
-            elif country_name:
-                return _error_result(
-                    f"Country '{country_name}' not found in GEE geoBoundaries ADM0. "
-                    "Use study_area like 'Tehran, Iran' or a valid country alias."
-                )
+        if bbox_values is not None:
+            region = _build_bbox_region(bbox_values)
+        else:
+            if not resolved_study_area:
+                return _error_result("study_area is required when bbox/box is not provided.")
+            if not scale_level:
+                return _error_result("scale_level is required when bbox/box is not provided.")
 
-        region = _filter_region_with_fallback(admin_boundary, name_property, query_name)
-        if region is None:
-            if not is_in_China and scale_level in {"city", "county", "district"}:
-                tip = (
-                    "Global matching uses geoBoundaries ADM2/ADM3/ADM4 for city/county/district. "
-                    "Try input format 'city_or_county, country' (e.g., 'Tehran, Iran')."
+            is_in_China = _guess_is_in_china(resolved_study_area, is_in_China)
+            resolved_study_area = _normalize_study_area(resolved_study_area, scale_level)
+
+            # If caller uses province for "China", auto-correct to country.
+            if scale_level == "province" and resolved_study_area.lower() == "china":
+                scale_level = "country"
+
+            admin_boundary, name_property, _ = get_administrative_boundaries(scale_level, is_in_China)
+            query_name = resolved_study_area
+            if not is_in_China and scale_level != "country":
+                admin_name, country_name = _split_admin_and_country(resolved_study_area)
+                query_name = admin_name
+                shape_group = _resolve_geoboundaries_country_group(intl_country_collection, country_name or "")
+                if shape_group:
+                    admin_boundary = admin_boundary.filter(ee.Filter.eq("shapeGroup", shape_group))
+                elif country_name:
+                    return _error_result(
+                        f"Country '{country_name}' not found in GEE geoBoundaries ADM0. "
+                        "Use study_area like 'Tehran, Iran' or a valid country alias."
+                    )
+
+            region = _filter_region_with_fallback(admin_boundary, name_property, query_name)
+            if region is None:
+                if not is_in_China and scale_level in {"city", "county", "district"}:
+                    tip = (
+                        "Global matching uses geoBoundaries ADM2/ADM3/ADM4 for city/county/district. "
+                        "Try input format 'city_or_county, country' (e.g., 'Tehran, Iran')."
+                    )
+                else:
+                    tip = "Try an alias, or specify 'admin_name, country' for non-China regions."
+                return _error_result(
+                    f"No area named '{query_name}' found under scale level '{scale_level}'. {tip}"
                 )
-            else:
-                tip = "Try an alias, or specify 'admin_name, country' for non-China regions."
-            return _error_result(
-                f"No area named '{query_name}' found under scale level '{scale_level}'. {tip}"
-            )
 
         start_date, end_date = _parse_time_range(time_range_input, temporal_resolution)
 
@@ -503,6 +602,7 @@ NTL_download_tool = StructuredTool.from_function(
     description=(
         "Download nighttime light (NTL) imagery from Google Earth Engine. "
         "Use output filename only (saved to workspace inputs/). "
+        "Supports either administrative region matching (study_area + scale_level) or direct bbox/box AOI (minx,miny,maxx,maxy). "
         "Outside China, administrative matching uses GEE geoBoundaries (WM/geoLab/geoBoundaries/600, ADM0-ADM4). "
         "Annual datasets: NPP-VIIRS-Like/NPP-VIIRS/DMSP-OLS; monthly fixed NOAA_VCMSLCFG; daily VNP46A2/VNP46A1. "
         "For long daily ranges, switch to server-side GEE script mode."

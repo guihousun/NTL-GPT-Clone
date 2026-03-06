@@ -122,20 +122,31 @@
   },
   {
     "task_id": "Q7",
-    "task_name": "Preprocess NOAA-20 VIIRS imagery",
+    "task_name": "Preprocess official VJ102/VJ103 DNB imagery",
     "category": "Data Retrieval and Preprocessing",
-    "description": "Transform raw NOAA-20 HDF5 granules into georeferenced GeoTIFFs by suppressing stray light and noise. Data is read from and saved to specific subfolders.",
+    "description": "Run official VJ102DNB/VJ103DNB preprocess workflow to generate daily georeferenced GeoTIFFs. This replaces the deprecated NOAA-20 SDR preprocessing path.",
     "steps": [
       {
         "type": "builtin_tool",
-        "name": "Noaa20_VIIRS_Preprocess",
+        "name": "convert_vj102_vj103_precise_to_tif_tool",
         "input": {
-          "input_subfolder": "NOAA20_raw",
-          "output_subfolder": "NOAA20_processed"
+          "input_dir": "/data/processed/official_vj_dnb_pipeline_runs/iran_20260222_20260301/raw_nc",
+          "output_root": "/data/processed/official_vj_dnb_preprocess_runs",
+          "run_label": "iran_preprocess_only_q7",
+          "start_date": "2026-02-22",
+          "end_date": "2026-03-01",
+          "bbox": "44.03,25.08,63.33,39.77",
+          "composite": "mean",
+          "resolution_m": 500.0,
+          "radius_m": 2000.0,
+          "radiance_scale": 1000000000.0
         }
       }
     ],
-    "output": "outputs/NOAA20_processed/"
+    "output": [
+      "outputs/official_vj_dnb_preprocess_runs/<run_label>/processed_tif/daily_4326/*.tif",
+      "outputs/official_vj_dnb_preprocess_runs/<run_label>/preprocess_manifest.json"
+    ]
   },
   {
     "task_id": "Q8",
@@ -424,6 +435,48 @@
       "capability_scope": "generalized_official_vj102_vj103_retrieval_download_preprocess",
       "updated_at": "2026-03-02",
       "update_reason": "Align official VJ full-chain workflow outputs with storage_manager thread workspace outputs/ policy."
+    }
+  },
+  {
+    "task_id": "Q26",
+    "task_name": "Preprocess local VJ102/VJ103 NC files with storage-manager paths",
+    "category": "Data Retrieval and Preprocessing",
+    "description": "Run preprocess-only official VJ workflow on already-downloaded VJ102DNB/VJ103DNB files. This task uses storage_manager-compatible paths (workspace-relative or /data/processed virtual paths) and outputs daily GeoTIFF products.",
+    "steps": [
+      {
+        "type": "builtin_tool",
+        "name": "convert_vj102_vj103_precise_to_tif_tool",
+        "input": {
+          "input_dir": "/data/processed/official_vj_dnb_pipeline_runs/iran_20260222_20260301/raw_nc",
+          "output_root": "/data/processed/official_vj_dnb_preprocess_runs",
+          "run_label": "iran_20260222_20260301_preprocess_only",
+          "start_date": "2026-02-22",
+          "end_date": "2026-03-01",
+          "bbox": "44.03,25.08,63.33,39.77",
+          "composite": "mean",
+          "resolution_m": 500.0,
+          "radius_m": 2000.0,
+          "radiance_scale": 1000000000.0
+        }
+      }
+    ],
+    "output": [
+      "outputs/official_vj_dnb_preprocess_runs/<run_label>/processed_tif/daily_4326/*.tif",
+      "outputs/official_vj_dnb_preprocess_runs/<run_label>/processed_tif/precise_preprocess_summary.json",
+      "outputs/official_vj_dnb_preprocess_runs/<run_label>/preprocess_manifest.json"
+    ],
+    "code_examples": [
+      {
+        "case_id": "Q26_vj102_vj103_preprocess_storage_paths",
+        "path": "/skills/NTL-workflow-guidance/references/code/data_retrieval_preprocessing/Q26_vj102_vj103_preprocess_storage_paths.py",
+        "status": "verified_success",
+        "usage": "reference_implementation"
+      }
+    ],
+    "_evolution": {
+      "added_at": "2026-03-04",
+      "reason": "Add preprocess-only reusable workflow using storage_manager path protocol.",
+      "capability_scope": "official_vj102_vj103_preprocess_only_generalized"
     }
   }
 ]

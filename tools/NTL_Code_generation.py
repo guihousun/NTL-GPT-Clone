@@ -12,7 +12,7 @@ import subprocess
 import sys
 import traceback
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Dict, List, Literal, Optional, Tuple
 from uuid import uuid4
 
@@ -486,16 +486,58 @@ def _timestamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
-def _safe_script_name(script_name: Optional[str], prefix: str) -> str:
-    if script_name and script_name.strip():
-        basename = os.path.basename(script_name.strip())
-        if not basename.lower().endswith(".py"):
-            basename = f"{basename}.py"
-        basename = re.sub(r"[^A-Za-z0-9._-]", "_", basename)
-        basename = basename.strip("._")
-        if basename and basename != "py":
-            return basename
-    return f"{prefix}_{_timestamp()}_{uuid4().hex[:8]}.py"
+def _sanitize_workspace_path_parts(parts: Tuple[str, ...]) -> List[str]:
+    sanitized: List[str] = []
+    for raw_part in parts:
+        part = re.sub(r"[^A-Za-z0-9._-]", "_", str(raw_part or "")).strip("._")
+        if part:
+            sanitized.append(part)
+    return sanitized
+
+
+def _normalize_workspace_logical_path(
+    path_value: Optional[str],
+    *,
+    default_root: str,
+    auto_name_prefix: Optional[str] = None,
+    required_suffix: Optional[str] = None,
+    allow_roots: Tuple[str, ...] = ("inputs", "outputs"),
+) -> str:
+    raw = str(path_value or "").strip().replace("\\", "/")
+    if not raw:
+        if not auto_name_prefix:
+            raise ValueError("Path is required.")
+        raw = f"{auto_name_prefix}_{_timestamp()}_{uuid4().hex[:8]}{required_suffix or ''}"
+
+    rel = storage_manager._safe_workspace_relative_path(raw.lstrip("/"))
+    parts = list(rel.parts)
+    root = default_root
+    if parts and parts[0] in {"inputs", "outputs", "memory"}:
+        root = parts[0]
+        parts = parts[1:]
+    if root not in allow_roots:
+        raise PermissionError(f"Path root '{root}' is not allowed in this context.")
+
+    sanitized_parts = _sanitize_workspace_path_parts(tuple(parts))
+    if not sanitized_parts:
+        if not auto_name_prefix:
+            raise ValueError("Path is invalid after sanitization.")
+        sanitized_parts = [f"{auto_name_prefix}_{_timestamp()}_{uuid4().hex[:8]}"]
+
+    if required_suffix and not sanitized_parts[-1].lower().endswith(required_suffix.lower()):
+        sanitized_parts[-1] = f"{sanitized_parts[-1]}{required_suffix}"
+
+    return "/".join([root, *sanitized_parts])
+
+
+def _workspace_logical_name(resolved_path: Path, *, thread_id: str, root: str) -> str:
+    workspace = storage_manager.get_workspace(thread_id)
+    root_dir = (workspace / root).resolve()
+    try:
+        relative = resolved_path.resolve().relative_to(root_dir)
+    except Exception:
+        return resolved_path.name
+    return str(relative).replace("\\", "/")
 
 
 def _persist_script(
@@ -505,16 +547,41 @@ def _persist_script(
     prefix: str,
     overwrite: bool = False,
 ) -> Tuple[str, str]:
-    safe_name = _safe_script_name(script_name, prefix=prefix)
-    script_path = Path(storage_manager.resolve_output_path(safe_name))
+    thread_id = str(current_thread_id.get() or "debug").strip() or "debug"
+    logical_path = _normalize_workspace_logical_path(
+        script_name,
+        default_root="outputs",
+        auto_name_prefix=prefix,
+        required_suffix=".py",
+        allow_roots=("outputs",),
+    )
+    script_path = storage_manager.resolve_workspace_relative_path(
+        logical_path,
+        thread_id=thread_id,
+        default_root="outputs",
+        create_parent=True,
+        allow_memory=False,
+    )
 
     if script_path.exists() and not overwrite and script_name:
-        safe_name = _safe_script_name(None, prefix=prefix)
-        script_path = Path(storage_manager.resolve_output_path(safe_name))
+        logical_path = _normalize_workspace_logical_path(
+            None,
+            default_root="outputs",
+            auto_name_prefix=prefix,
+            required_suffix=".py",
+            allow_roots=("outputs",),
+        )
+        script_path = storage_manager.resolve_workspace_relative_path(
+            logical_path,
+            thread_id=thread_id,
+            default_root="outputs",
+            create_parent=True,
+            allow_memory=False,
+        )
 
     script_path.parent.mkdir(parents=True, exist_ok=True)
     script_path.write_text(script_content, encoding="utf-8")
-    return safe_name, str(script_path)
+    return _workspace_logical_name(script_path, thread_id=thread_id, root="outputs"), str(script_path)
 
 
 def _append_run_history(event: Dict[str, Any]) -> None:
@@ -1452,7 +1519,7 @@ def read_workspace_file(
         if re.match(r"^[A-Za-z]:[\\/]", raw_name) or raw_name.startswith(("/", "\\")):
             policy = _build_error_handling_policy(
                 "InvalidFileNameError",
-                "Absolute paths are not allowed. Provide logical filename only.",
+                "Absolute paths are not allowed. Provide a workspace-relative path only.",
                 preflight=None,
                 fix_suggestions=None,
             )
@@ -1460,18 +1527,17 @@ def read_workspace_file(
                 {
                     "status": "fail",
                     "error_type": "InvalidFileNameError",
-                    "error_message": "Absolute paths are not allowed. Provide logical filename only.",
+                    "error_message": "Absolute paths are not allowed. Provide a workspace-relative path only.",
                     "error_handling_policy": policy,
                 },
                 indent=2,
                 ensure_ascii=False,
             )
 
-        safe_name = os.path.basename(raw_name)
-        if safe_name != raw_name or ".." in raw_name.replace("\\", "/"):
+        if ".." in raw_name.replace("\\", "/"):
             policy = _build_error_handling_policy(
                 "InvalidFileNameError",
-                "Parent traversal or nested paths are not allowed. Provide logical filename only.",
+                "Parent traversal is not allowed in workspace-relative paths.",
                 preflight=None,
                 fix_suggestions=None,
             )
@@ -1479,18 +1545,21 @@ def read_workspace_file(
                 {
                     "status": "fail",
                     "error_type": "InvalidFileNameError",
-                    "error_message": "Parent traversal or nested paths are not allowed. Provide logical filename only.",
+                    "error_message": "Parent traversal is not allowed in workspace-relative paths.",
                     "error_handling_policy": policy,
                 },
                 indent=2,
                 ensure_ascii=False,
             )
 
-        safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", safe_name).strip("._")
-        if not safe_name:
+        thread_id = str(current_thread_id.get() or "debug").strip() or "debug"
+        try:
+            requested_rel = storage_manager._safe_workspace_relative_path(raw_name.lstrip("/"))
+            effective_name = str(requested_rel).replace("\\", "/")
+        except Exception as exc:  # noqa: BLE001
             policy = _build_error_handling_policy(
                 "InvalidFileNameError",
-                "file_name is invalid after sanitization.",
+                str(exc),
                 preflight=None,
                 fix_suggestions=None,
             )
@@ -1498,14 +1567,14 @@ def read_workspace_file(
                 {
                     "status": "fail",
                     "error_type": "InvalidFileNameError",
-                    "error_message": "file_name is invalid after sanitization.",
+                    "error_message": str(exc),
                     "error_handling_policy": policy,
                 },
                 indent=2,
                 ensure_ascii=False,
             )
 
-        ext = Path(safe_name).suffix.lower()
+        ext = Path(effective_name).suffix.lower()
         if ext not in READABLE_WORKSPACE_EXTENSIONS:
             allowed = ", ".join(sorted(READABLE_WORKSPACE_EXTENSIONS))
             policy = _build_error_handling_policy(
@@ -1519,7 +1588,7 @@ def read_workspace_file(
                     "status": "fail",
                     "error_type": "UnsupportedFileTypeError",
                     "error_message": f"Unsupported extension '{ext}'. Allowed extensions: {allowed}",
-                    "file_name": safe_name,
+                    "file_name": effective_name,
                     "error_handling_policy": policy,
                 },
                 indent=2,
@@ -1528,9 +1597,29 @@ def read_workspace_file(
 
         candidate_paths: List[Tuple[str, Path]] = []
         if normalized_location in {"auto", "outputs"}:
-            candidate_paths.append(("outputs", Path(storage_manager.resolve_output_path(safe_name))))
+            candidate_paths.append(
+                (
+                    "outputs",
+                    storage_manager.resolve_workspace_relative_path(
+                        effective_name,
+                        thread_id=thread_id,
+                        default_root="outputs",
+                        allow_memory=False,
+                    ),
+                )
+            )
         if normalized_location in {"auto", "inputs"}:
-            candidate_paths.append(("inputs", Path(storage_manager.resolve_input_path(safe_name))))
+            candidate_paths.append(
+                (
+                    "inputs",
+                    storage_manager.resolve_workspace_relative_path(
+                        effective_name,
+                        thread_id=thread_id,
+                        default_root="inputs",
+                        allow_memory=False,
+                    ),
+                )
+            )
 
         resolved_location: Optional[str] = None
         resolved_path: Optional[Path] = None
@@ -1543,7 +1632,7 @@ def read_workspace_file(
         if resolved_path is None or resolved_location is None:
             policy = _build_error_handling_policy(
                 "FileNotFoundError",
-                f"File '{safe_name}' not found in current workspace ({normalized_location}).",
+                f"File '{effective_name}' not found in current workspace ({normalized_location}).",
                 preflight=None,
                 fix_suggestions=None,
             )
@@ -1551,8 +1640,8 @@ def read_workspace_file(
                 {
                     "status": "fail",
                     "error_type": "FileNotFoundError",
-                    "error_message": f"File '{safe_name}' not found in current workspace ({normalized_location}).",
-                    "file_name": safe_name,
+                    "error_message": f"File '{effective_name}' not found in current workspace ({normalized_location}).",
+                    "file_name": effective_name,
                     "location": normalized_location,
                     "error_handling_policy": policy,
                 },
@@ -1574,7 +1663,7 @@ def read_workspace_file(
                     "status": "fail",
                     "error_type": type(exc).__name__,
                     "error_message": str(exc),
-                    "file_name": safe_name,
+                    "file_name": effective_name,
                     "resolved_path": str(resolved_path),
                     "location": resolved_location,
                     "error_handling_policy": policy,
@@ -1585,7 +1674,7 @@ def read_workspace_file(
 
         payload = {
             "status": "success",
-            "file_name": safe_name,
+            "file_name": effective_name,
             "resolved_path": str(resolved_path),
             "location": resolved_location,
             "bytes": len(content.encode("utf-8")),
@@ -1599,7 +1688,7 @@ def read_workspace_file(
                 "timestamp": _timestamp(),
                 "tool": "read_workspace_file_tool",
                 "status": "success",
-                "file_name": safe_name,
+                "file_name": effective_name,
                 "resolved_path": str(resolved_path),
                 "location": resolved_location,
                 "thread_id": current_thread_id.get(),
@@ -1650,27 +1739,54 @@ def execute_geospatial_script(
                 ensure_ascii=False,
             )
         requested_script = str(script_name or "").strip()
-        normalized_request = requested_script.replace("\\", "/").lstrip("/")
-        explicit_location = ""
-        if normalized_request.lower().startswith("inputs/"):
-            explicit_location = "inputs"
-            normalized_request = normalized_request[len("inputs/") :]
-        elif normalized_request.lower().startswith("outputs/"):
-            explicit_location = "outputs"
-            normalized_request = normalized_request[len("outputs/") :]
+        try:
+            normalized_request = _normalize_workspace_logical_path(
+                requested_script,
+                default_root="outputs",
+                required_suffix=".py",
+                allow_roots=("inputs", "outputs"),
+            )
+        except Exception as exc:  # noqa: BLE001
+            policy = _build_error_handling_policy(
+                "InvalidScriptName",
+                str(exc),
+                preflight=None,
+                fix_suggestions=None,
+            )
+            return json.dumps(
+                {
+                    "status": "fail",
+                    "error_type": "InvalidScriptName",
+                    "error_message": str(exc),
+                    "error_handling_policy": policy,
+                    "path_protocol_mode": path_mode,
+                    "path_protocol_enforcement": path_protocol_enforcement,
+                    "artifact_audit": empty_audit,
+                    "runtime_path_rewrite": no_runtime_rewrite,
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
 
-        safe_name = os.path.basename(normalized_request.strip() or requested_script)
-        if not safe_name.lower().endswith(".py"):
-            safe_name = f"{safe_name}.py"
-        safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", safe_name)
+        requested_root, _, logical_script_name = normalized_request.partition("/")
         requested_location = str(script_location or "auto").strip().lower()
         if requested_location not in {"auto", "inputs", "outputs"}:
             requested_location = "auto"
-        effective_location = explicit_location or requested_location
+        effective_location = requested_root if requested_root in {"inputs", "outputs"} else requested_location
         thread_ctx = _get_thread_context()
 
-        output_script_path = Path(storage_manager.resolve_output_path(safe_name))
-        input_script_path = Path(storage_manager.resolve_input_path(safe_name))
+        output_script_path = storage_manager.resolve_workspace_relative_path(
+            logical_script_name,
+            thread_id=thread_id,
+            default_root="outputs",
+            allow_memory=False,
+        )
+        input_script_path = storage_manager.resolve_workspace_relative_path(
+            logical_script_name,
+            thread_id=thread_id,
+            default_root="inputs",
+            allow_memory=False,
+        )
         candidates = {
             "outputs": output_script_path,
             "inputs": input_script_path,
@@ -1693,12 +1809,20 @@ def execute_geospatial_script(
 
         if script_path is None:
             workspace = storage_manager.get_workspace(thread_id)
-            available_scripts = [p.name for p in sorted((workspace / "outputs").glob("*.py"))]
-            available_scripts.extend([p.name for p in sorted((workspace / "inputs").glob("*.py"))])
+            available_scripts = [
+                str(p.relative_to(workspace / "outputs")).replace("\\", "/")
+                for p in sorted((workspace / "outputs").rglob("*.py"))
+            ]
+            available_scripts.extend(
+                [
+                    str(p.relative_to(workspace / "inputs")).replace("\\", "/")
+                    for p in sorted((workspace / "inputs").rglob("*.py"))
+                ]
+            )
             last_saved_script_name = str(thread_ctx.get("__ntl_last_saved_script_name") or "").strip() or None
             policy = _build_error_handling_policy(
                 "ScriptNotFoundError",
-                f"Script '{safe_name}' was not found in current workspace inputs/outputs.",
+                f"Script '{logical_script_name}' was not found in current workspace inputs/outputs.",
                 preflight=None,
                 fix_suggestions=None,
             )
@@ -1706,8 +1830,8 @@ def execute_geospatial_script(
                 {
                     "status": "fail",
                     "error_type": "ScriptNotFoundError",
-                    "error_message": f"Script '{safe_name}' was not found in current workspace inputs/outputs.",
-                    "script_name": safe_name,
+                    "error_message": f"Script '{logical_script_name}' was not found in current workspace inputs/outputs.",
+                    "script_name": logical_script_name,
                     "script_location": effective_location,
                     "available_scripts": available_scripts,
                     "resolved_candidates": {k: str(v) for k, v in candidates.items()},
@@ -1742,7 +1866,7 @@ def execute_geospatial_script(
             result = {
                 "status": "success",
                 "stdout": "[dedupe] Identical script already executed successfully in this thread. Skipped re-execution.",
-                "script_name": safe_name,
+                "script_name": logical_script_name,
                 "script_path": str(script_path),
                 "script_location": resolved_location or effective_location,
                 "already_executed": True,
@@ -1760,7 +1884,7 @@ def execute_geospatial_script(
                     "timestamp": _timestamp(),
                     "tool": "execute_geospatial_script_tool",
                     "status": "success_cached",
-                    "script_name": safe_name,
+                    "script_name": logical_script_name,
                     "script_path": str(script_path),
                     "thread_id": current_thread_id.get(),
                 }
@@ -1780,7 +1904,7 @@ def execute_geospatial_script(
                 "error_type": "PreflightError",
                 "error_message": preflight["blocking_errors"][0],
                 "traceback": None,
-                "script_name": safe_name,
+                "script_name": logical_script_name,
                 "script_path": str(script_path),
                 "script_location": resolved_location or effective_location,
                 "code": script_content,
@@ -1799,7 +1923,7 @@ def execute_geospatial_script(
                     "tool": "execute_geospatial_script_tool",
                     "status": "fail",
                     "reason": "preflight",
-                    "script_name": safe_name,
+                    "script_name": logical_script_name,
                     "script_path": str(script_path),
                     "thread_id": current_thread_id.get(),
                 }
@@ -1845,7 +1969,7 @@ def execute_geospatial_script(
                     warning_messages.append(message)
 
             thread_ctx["__ntl_last_executed_success_hash"] = normalized_script_hash
-            thread_ctx["__ntl_last_executed_success_script_name"] = safe_name
+            thread_ctx["__ntl_last_executed_success_script_name"] = logical_script_name
             thread_ctx["__ntl_last_executed_success_script_path"] = str(script_path)
             fail_counts = thread_ctx.setdefault("__ntl_execute_failure_signature_counts", {})
             for sig in list(fail_counts.keys()):
@@ -1854,14 +1978,14 @@ def execute_geospatial_script(
             archive_info = _archive_success_script(
                 script_content,
                 source_tool="execute_geospatial_script_tool",
-                script_name=safe_name,
+                script_name=logical_script_name,
                 script_path=str(script_path),
                 stdout=logs,
             )
             result = {
                 "status": "success_with_warnings" if warning_messages else "success",
                 "stdout": logs,
-                "script_name": safe_name,
+                "script_name": logical_script_name,
                 "script_path": str(script_path),
                 "script_location": resolved_location or effective_location,
                 "code_guide_archive": archive_info,
@@ -1894,7 +2018,7 @@ def execute_geospatial_script(
                         if artifact_audit.get("auto_migration_success")
                         else ("success_warning" if warning_messages else "success")
                     ),
-                    "script_name": safe_name,
+                    "script_name": logical_script_name,
                     "script_path": str(script_path),
                     "code_guide_archive": archive_info,
                     "thread_id": current_thread_id.get(),
@@ -1935,7 +2059,7 @@ def execute_geospatial_script(
             "error_type": etype,
             "error_message": emsg,
             "traceback": tb,
-            "script_name": safe_name,
+            "script_name": logical_script_name,
             "script_path": str(script_path),
             "script_location": resolved_location or effective_location,
             "code": script_content,
@@ -1954,7 +2078,7 @@ def execute_geospatial_script(
                 "timestamp": _timestamp(),
                 "tool": "execute_geospatial_script_tool",
                 "status": "fail",
-                "script_name": safe_name,
+                "script_name": logical_script_name,
                 "script_path": str(script_path),
                 "thread_id": current_thread_id.get(),
                 "error_type": etype,

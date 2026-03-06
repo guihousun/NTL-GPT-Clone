@@ -26,5 +26,52 @@
       }
     ],
     "output": "outputs/Impact_Assessment_Report.json"
+  },
+  {
+    "task_id": "Q21",
+    "task_name": "Iran conflict nightlight impact assessment using official VJ102/VJ103",
+    "category": "Application and Modeling > Disaster monitoring",
+    "description": "Assess conflict-related nighttime light changes in Iran with official-source VJ102DNB/VJ103DNB daily products. The workflow runs official full-chain preprocessing, refreshes INSS strike points, and rebuilds the analysis report.",
+    "steps": [
+      {
+        "type": "builtin_tool",
+        "name": "official_vj_dnb_fullchain_tool",
+        "input": {
+          "start_date": "2026-02-28",
+          "end_date": "2026-03-02",
+          "bbox": "44.03,25.08,63.33,39.77",
+          "output_root": "official_vj_dnb_pipeline_runs",
+          "run_label": "iran_conflict_20260228_20260302",
+          "sources": "VJ102DNB,VJ103DNB",
+          "composite": "mean",
+          "resolution_m": 500.0,
+          "radius_m": 2000.0,
+          "radiance_scale": 1000000000.0,
+          "token_env": "EARTHDATA_TOKEN"
+        }
+      },
+      {
+        "type": "geospatial_code",
+        "language": "Python",
+        "description": "Run tools/fetch_inss_arcgis_strikes.py with --end-date aligned to analysis window to refresh latest strike points and spatial summaries.",
+        "name": "refresh_inss_points"
+      },
+      {
+        "type": "geospatial_code",
+        "language": "Python",
+        "description": "Run base_data/Iran_War/analysis/scripts/modular_refactor/rebuild_iran_event_report.py to regenerate combined report with updated rasters and strike points.",
+        "name": "rebuild_conflict_report"
+      }
+    ],
+    "output": [
+      "outputs/official_vj_dnb_pipeline_runs/<run_label>/processed_tif/daily_4326/*.tif",
+      "base_data/Iran_War/analysis/inss_arcgis_strikes_latest/inss_arcgis_strikes_merged.geojson",
+      "base_data/Iran_War/analysis/results/ntl_combined_report.html"
+    ],
+    "_evolution": {
+      "added_at": "2026-03-04",
+      "reason": "Add reusable event-impact workflow for official VJ102/VJ103 conflict analysis and report rebuild.",
+      "capability_scope": "conflict_event_assessment_official_viirs_daily"
+    }
   }
 ]

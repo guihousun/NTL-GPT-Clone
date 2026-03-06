@@ -1,11 +1,11 @@
 """
-Download VJ102DNB/VJ103DNB files from a LAADS-style query JSON.
+Download VIIRS files from a LAADS-style query JSON.
 
 Expected input JSON format:
 {
   "query": "...",
-  "123456": {"url": "https://.../VJ102DNB....nc", "size": 123},
-  "123457": {"url": "https://.../VJ103DNB....nc", "size": 456}
+  "123456": {"url": "https://.../VJ102DNB....nc", "size": 123, "source": "VJ102DNB"},
+  "123457": {"url": "https://.../VJ146A1....h5", "size": 456, "source": "VJ146A1"}
 }
 """
 
@@ -15,6 +15,7 @@ import argparse
 import json
 import os
 import platform
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -29,11 +30,22 @@ def _load_env() -> None:
     load_dotenv(override=False)
 
 
+def _infer_source_from_url(url: str) -> str:
+    name = url.split("/")[-1]
+    m = re.match(r"^([A-Za-z0-9_]+)\.", name)
+    if m:
+        return m.group(1).upper()
+    m2 = re.match(r"^([A-Za-z0-9_]+)[._-]", name)
+    if m2:
+        return m2.group(1).upper()
+    return "UNKNOWN"
+
+
 def _extract_urls_from_json(json_file: Path) -> Dict[str, List[str]]:
     with json_file.open("r", encoding="utf-8") as f:
         data = json.load(f)
 
-    urls = {"VJ102DNB": [], "VJ103DNB": []}
+    urls: Dict[str, List[str]] = {}
     for key, value in data.items():
         if key == "query":
             continue
@@ -42,13 +54,11 @@ def _extract_urls_from_json(json_file: Path) -> Dict[str, List[str]]:
         url = str(value.get("url", "")).strip()
         if not url:
             continue
-        if "VJ102DNB" in url:
-            urls["VJ102DNB"].append(url)
-        elif "VJ103DNB" in url:
-            urls["VJ103DNB"].append(url)
+        src = str(value.get("source", "")).strip().upper() or _infer_source_from_url(url)
+        urls.setdefault(src, []).append(url)
 
     # Preserve order while de-duplicating.
-    for k in ("VJ102DNB", "VJ103DNB"):
+    for k in list(urls.keys()):
         seen = set()
         deduped = []
         for u in urls[k]:
@@ -58,6 +68,15 @@ def _extract_urls_from_json(json_file: Path) -> Dict[str, List[str]]:
             deduped.append(u)
         urls[k] = deduped
     return urls
+
+
+def _parse_source_filter(raw: str) -> set[str]:
+    out: set[str] = set()
+    for part in (raw or "").split(","):
+        s = part.strip().upper()
+        if s:
+            out.add(s)
+    return out
 
 
 def _check_curl_available() -> str:
@@ -204,7 +223,7 @@ def _download_group(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Download VJ102DNB/VJ103DNB from LAADS query JSON."
+        description="Download VIIRS files from LAADS query JSON."
     )
     parser.add_argument("--input", type=Path, required=True, help="Query JSON path")
     parser.add_argument("--output", type=Path, required=True, help="Output folder")
@@ -213,6 +232,12 @@ def main() -> None:
         type=str,
         default="EARTHDATA_TOKEN",
         help="Environment variable name for Earthdata token",
+    )
+    parser.add_argument(
+        "--sources",
+        type=str,
+        default="",
+        help="Optional comma list of sources to download, e.g. VJ146A1,VJ102DNB",
     )
     args = parser.parse_args()
 
@@ -234,28 +259,41 @@ def main() -> None:
         print(f"warning: {args.token_env} is empty; authenticated download may fail")
 
     urls = _extract_urls_from_json(args.input)
+    source_filter = _parse_source_filter(args.sources)
+    if source_filter:
+        urls = {k: v for k, v in urls.items() if k in source_filter}
+
     print("VIIRS DNB downloader")
     print("=" * 80)
     print(f"input : {args.input}")
     print(f"output: {args.output}")
     print(f"curl  : {curl_bin}")
     print(f"token : {'configured' if token else 'missing'}")
-    print(f"VJ102DNB urls: {len(urls['VJ102DNB'])}")
-    print(f"VJ103DNB urls: {len(urls['VJ103DNB'])}")
+    if not urls:
+        print("No matching URLs found in input JSON (after source filter).")
+        sys.exit(1)
+    for src in sorted(urls.keys()):
+        print(f"{src} urls: {len(urls[src])}")
 
-    stats_vj102 = _download_group(curl_bin, urls["VJ102DNB"], args.output, token, "VJ102DNB")
-    stats_vj103 = _download_group(curl_bin, urls["VJ103DNB"], args.output, token, "VJ103DNB")
-
-    total_downloaded = stats_vj102["downloaded"] + stats_vj103["downloaded"]
-    total_failed = stats_vj102["failed"] + stats_vj103["failed"]
+    per_source_stats: Dict[str, Dict[str, int]] = {}
+    total_downloaded = 0
+    total_failed = 0
+    total_skipped = 0
+    for src in sorted(urls.keys()):
+        stats = _download_group(curl_bin, urls[src], args.output, token, src)
+        per_source_stats[src] = stats
+        total_downloaded += stats["downloaded"]
+        total_failed += stats["failed"]
+        total_skipped += stats["skipped"]
 
     manifest = {
         "input_json": str(args.input),
         "output_dir": str(args.output),
         "token_env": args.token_env,
-        "vj102_stats": stats_vj102,
-        "vj103_stats": stats_vj103,
+        "source_filter": sorted(source_filter),
+        "per_source_stats": per_source_stats,
         "total_downloaded": total_downloaded,
+        "total_skipped": total_skipped,
         "total_failed": total_failed,
     }
     manifest_path = args.output / "download_manifest.json"
@@ -266,8 +304,8 @@ def main() -> None:
 
     print("\nSummary")
     print("=" * 80)
-    print(f"VJ102DNB: {stats_vj102}")
-    print(f"VJ103DNB: {stats_vj103}")
+    for src in sorted(per_source_stats.keys()):
+        print(f"{src}: {per_source_stats[src]}")
     print(f"manifest: {manifest_path}")
 
     if total_failed > 0:

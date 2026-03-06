@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -20,6 +21,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 QUERY_SCRIPT = REPO_ROOT / "tools" / "query_vj_dnb_laads_json.py"
 DOWNLOAD_SCRIPT = REPO_ROOT / "tools" / "download_vj_dnb.py"
 PREPROCESS_SCRIPT = REPO_ROOT / "experiments" / "official_daily_ntl_fastpath" / "convert_vj102_vj103_precise_to_tif.py"
+GIF_SCRIPT = REPO_ROOT / "experiments" / "official_daily_ntl_fastpath" / "make_ntl_daily_gif.py"
 
 
 class OfficialVJDNBPipelineInput(BaseModel):
@@ -48,6 +50,30 @@ class OfficialVJDNBPipelineInput(BaseModel):
     token_env: str = Field(default="EARTHDATA_TOKEN", description="Earthdata token env var name")
     page_size: int = Field(default=200, description="CMR query page size")
     skip_preprocess: bool = Field(default=False, description="If true, only query+download without preprocessing")
+    generate_gif: bool = Field(default=True, description="If true, render daily tif series to GIF (step 4).")
+    gif_style_palette: str = Field(
+        default="report_dark",
+        description="GIF style preset: report_dark | night_blue | mono_gray | impact_hot",
+    )
+    overlay_vector: str = Field(default="", description="Optional event vector file (GeoJSON/SHP/GPKG) for GIF overlay.")
+    overlay_label_field: str = Field(default="", description="Optional overlay field used for labels in GIF frames.")
+    overlay_point_class_field: str = Field(default="", description="Optional point class field for legend categories.")
+    point_legend_label: str = Field(default="事件点", description="Single-style point legend label.")
+    point_legend_title: str = Field(default="事件类型", description="Point legend title when class field is used.")
+    show_point_legend: bool = Field(default=True, description="Whether to display point legend in GIF.")
+    boundary_vector: str = Field(default="", description="Optional boundary vector file (GeoJSON/SHP/GPKG).")
+    boundary_edge_color: str = Field(default="#3dd3ff", description="Boundary line color in GIF.")
+    boundary_linewidth: float = Field(default=1.1, description="Boundary line width in GIF.")
+    boundary_alpha: float = Field(default=0.95, description="Boundary line alpha in GIF.")
+    gif_duration_ms: int = Field(default=900, description="GIF frame duration in milliseconds.")
+    gif_fps: float = Field(default=0.0, description="Optional FPS for GIF; overrides duration when >0.")
+    gif_percentile_min: float = Field(default=2.0, description="GIF display lower percentile.")
+    gif_percentile_max: float = Field(default=98.0, description="GIF display upper percentile.")
+    gif_cmap: str = Field(default="inferno", description="GIF colormap name.")
+    ask_user_for_params: bool = Field(
+        default=False,
+        description="If true, do not execute; return a checklist of questions for user parameter confirmation.",
+    )
 
 
 def _resolve_thread_id_from_config(config: Optional[RunnableConfig] = None) -> str:
@@ -71,7 +97,7 @@ def _resolve_thread_id_from_config(config: Optional[RunnableConfig] = None) -> s
 
 def _resolve_output_root(output_root: str, thread_id: str) -> tuple[Path, str]:
     workspace = storage_manager.get_workspace(thread_id=thread_id)
-    outputs_root = workspace / "outputs"
+    outputs_root = (workspace / "outputs").resolve()
     raw = (output_root or "").strip()
     if not raw:
         raw = "official_vj_dnb_pipeline_runs"
@@ -80,6 +106,8 @@ def _resolve_output_root(output_root: str, thread_id: str) -> tuple[Path, str]:
         return Path(storage_manager.resolve_deepagents_path(raw, thread_id=thread_id)), "deepagents_virtual"
     if raw.startswith("/shared/"):
         raise PermissionError("output_root under /shared/ is not allowed for writing.")
+    if raw.startswith("/data/raw/") or raw.startswith("/memories/"):
+        raise PermissionError("output_root must be under /data/processed/ or workspace outputs, not /data/raw or /memories.")
 
     p = Path(raw)
     if p.is_absolute():
@@ -87,7 +115,36 @@ def _resolve_output_root(output_root: str, thread_id: str) -> tuple[Path, str]:
     if ".." in p.parts:
         raise ValueError("output_root must not contain '..'.")
 
-    return (outputs_root / p).resolve(), "workspace_outputs_relative"
+    if p.parts and p.parts[0] == "outputs":
+        target = (workspace / p).resolve()
+        mode = "workspace_relative_outputs_prefix"
+    elif p.parts and p.parts[0] in {"inputs", "memory"}:
+        raise PermissionError("output_root must be under outputs/, not inputs/ or memory/.")
+    else:
+        target = (outputs_root / p).resolve()
+        mode = "workspace_outputs_relative"
+    if not str(target).startswith(str(outputs_root)):
+        raise PermissionError("output_root resolved outside workspace outputs root.")
+    return target, mode
+
+
+def _resolve_read_path(path_text: str, thread_id: str) -> Path:
+    workspace = storage_manager.get_workspace(thread_id=thread_id)
+    outputs_root = (workspace / "outputs").resolve()
+    raw = (path_text or "").strip()
+    if not raw:
+        raise ValueError("Path is required.")
+    if raw.startswith(("/data/raw/", "/data/processed/", "/memories/", "/shared/")):
+        return Path(storage_manager.resolve_deepagents_path(raw, thread_id=thread_id))
+    p = Path(raw)
+    if p.is_absolute():
+        raise ValueError("Read path must be workspace-relative (absolute path not allowed).")
+    if ".." in p.parts:
+        raise ValueError("Read path must not contain '..'.")
+    direct = (workspace / p).resolve()
+    if direct.exists():
+        return direct
+    return (outputs_root / p).resolve()
 
 
 def _run_cmd(cmd: list[str], cwd: Path) -> dict[str, Any]:
@@ -110,6 +167,28 @@ def _run_cmd(cmd: list[str], cwd: Path) -> dict[str, Any]:
         "ended_utc": ended.isoformat() + "Z",
         "duration_sec": max(0.0, (ended - started).total_seconds()),
     }
+
+
+def _reset_dir(path: Path) -> None:
+    if path.exists():
+        shutil.rmtree(path)
+    path.mkdir(parents=True, exist_ok=True)
+
+
+def _load_daily_valid_ratios(summary_path: Path) -> list[float]:
+    if not summary_path.exists():
+        return []
+    try:
+        payload = json.loads(summary_path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    out: list[float] = []
+    for row in payload.get("daily_outputs", []):
+        try:
+            out.append(float(row.get("valid_ratio", 0.0)))
+        except Exception:
+            out.append(0.0)
+    return out
 
 
 def _ensure_date(v: str, name: str) -> str:
@@ -140,6 +219,24 @@ def run_official_vj_dnb_fullchain(
     token_env: str = "EARTHDATA_TOKEN",
     page_size: int = 200,
     skip_preprocess: bool = False,
+    generate_gif: bool = True,
+    gif_style_palette: str = "report_dark",
+    overlay_vector: str = "",
+    overlay_label_field: str = "",
+    overlay_point_class_field: str = "",
+    point_legend_label: str = "事件点",
+    point_legend_title: str = "事件类型",
+    show_point_legend: bool = True,
+    boundary_vector: str = "",
+    boundary_edge_color: str = "#3dd3ff",
+    boundary_linewidth: float = 1.1,
+    boundary_alpha: float = 0.95,
+    gif_duration_ms: int = 900,
+    gif_fps: float = 0.0,
+    gif_percentile_min: float = 2.0,
+    gif_percentile_max: float = 98.0,
+    gif_cmap: str = "inferno",
+    ask_user_for_params: bool = False,
     config: Optional[RunnableConfig] = None,
     **kwargs,
 ) -> Dict[str, Any]:
@@ -149,6 +246,27 @@ def run_official_vj_dnb_fullchain(
     2) Download VJ102DNB/VJ103DNB
     3) Precise preprocessing to daily GeoTIFF
     """
+    if ask_user_for_params:
+        return {
+            "status": "need_user_input",
+            "tool": "official_vj_dnb_fullchain_tool",
+            "questions": [
+                "请确认时空范围：start_date/end_date 与 bbox(minx,miny,maxx,maxy)。",
+                "请确认数据源：默认 VJ102DNB,VJ103DNB 是否保持不变？",
+                "预处理参数是否使用默认：composite=mean, resolution_m=500, radius_m=2000？",
+                "是否生成 GIF？如是，请选择 gif_style_palette（report_dark/night_blue/mono_gray/impact_hot）。",
+                "是否叠加事件点与行政区边界？如是请提供 overlay_vector 与 boundary_vector 路径。",
+            ],
+            "recommended_defaults": {
+                "sources": "VJ102DNB,VJ103DNB",
+                "composite": "mean",
+                "resolution_m": 500.0,
+                "radius_m": 2000.0,
+                "generate_gif": True,
+                "gif_style_palette": "report_dark",
+            },
+        }
+
     start_date = _ensure_date(start_date, "start_date")
     end_date = _ensure_date(end_date, "end_date")
     if end_date < start_date:
@@ -163,9 +281,11 @@ def run_official_vj_dnb_fullchain(
     query_dir = run_dir / "query"
     raw_dir = run_dir / "raw_nc"
     processed_dir = run_dir / "processed_tif"
-    query_dir.mkdir(parents=True, exist_ok=True)
-    raw_dir.mkdir(parents=True, exist_ok=True)
-    processed_dir.mkdir(parents=True, exist_ok=True)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    # Deterministic rerun behavior for fixed run_label: avoid stale files from older runs.
+    _reset_dir(query_dir)
+    _reset_dir(raw_dir)
+    _reset_dir(processed_dir)
 
     query_json = query_dir / f"LAADS_query_{start_date}_{end_date}.json"
 
@@ -216,8 +336,11 @@ def run_official_vj_dnb_fullchain(
             f"stderr={download_result['stderr'][-1600:]}\n"
             f"stdout={download_result['stdout'][-1600:]}"
         )
+    if not token_present:
+        token_present = "token : configured" in (download_result.get("stdout", "").lower())
 
     preprocess_result: Optional[dict[str, Any]] = None
+    preprocess_fallback: Optional[dict[str, Any]] = None
     if not skip_preprocess:
         preprocess_cmd = [
             sys.executable,
@@ -249,10 +372,99 @@ def run_official_vj_dnb_fullchain(
                 f"stderr={preprocess_result['stderr'][-1600:]}\n"
                 f"stdout={preprocess_result['stdout'][-1600:]}"
             )
+        summary_path = processed_dir / "precise_preprocess_summary.json"
+        daily_valid_ratios = _load_daily_valid_ratios(summary_path)
+        all_empty = bool(daily_valid_ratios) and all(v <= 0.0 for v in daily_valid_ratios)
+        # Practical fallback: strict lunar mask can wipe all nighttime pixels in bright-moon windows.
+        if all_empty:
+            preprocess_cmd_fallback = preprocess_cmd + ["--disable-lunar-mask"]
+            preprocess_fallback = _run_cmd(preprocess_cmd_fallback, REPO_ROOT)
+            if preprocess_fallback["returncode"] != 0:
+                raise RuntimeError(
+                    "Preprocess fallback step failed.\n"
+                    f"cmd={' '.join(preprocess_cmd_fallback)}\n"
+                    f"stderr={preprocess_fallback['stderr'][-1600:]}\n"
+                    f"stdout={preprocess_fallback['stdout'][-1600:]}"
+                )
 
     daily_outputs: list[str] = []
     if processed_dir.exists():
         daily_outputs = sorted(str(p) for p in (processed_dir / "daily_4326").glob("*.tif"))
+
+    gif_result: Optional[dict[str, Any]] = None
+    gif_path: Optional[str] = None
+    if generate_gif and (not skip_preprocess) and daily_outputs:
+        gif_dir = run_dir / "visualization"
+        gif_dir.mkdir(parents=True, exist_ok=True)
+        gif_cmd = [
+            sys.executable,
+            str(GIF_SCRIPT),
+            "--input-dir",
+            str(processed_dir / "daily_4326"),
+            "--output-dir",
+            str(gif_dir),
+            "--pattern",
+            "*.tif",
+            "--style-palette",
+            str(gif_style_palette),
+            "--duration-ms",
+            str(int(gif_duration_ms)),
+            "--fps",
+            str(float(gif_fps)),
+            "--percentile-min",
+            str(float(gif_percentile_min)),
+            "--percentile-max",
+            str(float(gif_percentile_max)),
+            "--cmap",
+            str(gif_cmap),
+            "--title-prefix",
+            f"VJ102DNB+VJ103DNB ({start_date}..{end_date})",
+        ]
+        if str(overlay_vector).strip():
+            resolved_overlay = _resolve_read_path(overlay_vector, thread_id=thread_id)
+            if not resolved_overlay.exists():
+                raise FileNotFoundError(f"overlay_vector not found: {resolved_overlay}")
+            gif_cmd += ["--vector", str(resolved_overlay)]
+            if str(overlay_label_field).strip():
+                gif_cmd += ["--label-field", str(overlay_label_field).strip()]
+        if str(overlay_point_class_field).strip():
+            gif_cmd += ["--point-class-field", str(overlay_point_class_field).strip()]
+        if str(point_legend_label).strip():
+            gif_cmd += ["--point-legend-label", str(point_legend_label).strip()]
+        if str(point_legend_title).strip():
+            gif_cmd += ["--point-legend-title", str(point_legend_title).strip()]
+        if bool(show_point_legend):
+            gif_cmd += ["--show-point-legend"]
+        if str(boundary_vector).strip():
+            resolved_boundary = _resolve_read_path(boundary_vector, thread_id=thread_id)
+            if not resolved_boundary.exists():
+                raise FileNotFoundError(f"boundary_vector not found: {resolved_boundary}")
+            gif_cmd += [
+                "--boundary-vector",
+                str(resolved_boundary),
+                "--boundary-edge-color",
+                str(boundary_edge_color),
+                "--boundary-linewidth",
+                str(float(boundary_linewidth)),
+                "--boundary-alpha",
+                str(float(boundary_alpha)),
+            ]
+        gif_result = _run_cmd(gif_cmd, REPO_ROOT)
+        if gif_result["returncode"] != 0:
+            raise RuntimeError(
+                "GIF step failed.\n"
+                f"cmd={' '.join(gif_cmd)}\n"
+                f"stderr={gif_result['stderr'][-1600:]}\n"
+                f"stdout={gif_result['stdout'][-1600:]}"
+            )
+        gif_summary = gif_dir / "gif_summary.json"
+        if gif_summary.exists():
+            try:
+                gif_path = json.loads(gif_summary.read_text(encoding="utf-8")).get("gif_path")
+            except Exception:
+                gif_path = None
+        if not gif_path:
+            gif_path = str(gif_dir / "ntl_daily_animation.gif")
 
     manifest = {
         "status": "success",
@@ -270,6 +482,24 @@ def run_official_vj_dnb_fullchain(
             "token_env": token_env,
             "token_present": token_present,
             "skip_preprocess": bool(skip_preprocess),
+            "generate_gif": bool(generate_gif),
+            "gif_style_palette": gif_style_palette,
+            "overlay_vector": overlay_vector,
+            "overlay_label_field": overlay_label_field,
+            "overlay_point_class_field": overlay_point_class_field,
+            "point_legend_label": point_legend_label,
+            "point_legend_title": point_legend_title,
+            "show_point_legend": bool(show_point_legend),
+            "boundary_vector": boundary_vector,
+            "boundary_edge_color": boundary_edge_color,
+            "boundary_linewidth": float(boundary_linewidth),
+            "boundary_alpha": float(boundary_alpha),
+            "gif_duration_ms": int(gif_duration_ms),
+            "gif_fps": float(gif_fps),
+            "gif_percentile_min": float(gif_percentile_min),
+            "gif_percentile_max": float(gif_percentile_max),
+            "gif_cmap": gif_cmap,
+            "ask_user_for_params": bool(ask_user_for_params),
             "path_mode": path_mode,
         },
         "paths": {
@@ -280,12 +510,16 @@ def run_official_vj_dnb_fullchain(
             "processed_dir": str(processed_dir),
             "download_manifest": str(raw_dir / "download_manifest.json"),
             "preprocess_summary": str(processed_dir / "precise_preprocess_summary.json"),
+            "gif_path": gif_path,
+            "gif_summary": str(run_dir / "visualization" / "gif_summary.json"),
         },
         "output_files": daily_outputs,
         "steps": {
             "query": query_result,
             "download": download_result,
             "preprocess": preprocess_result,
+            "preprocess_fallback": preprocess_fallback,
+            "gif": gif_result,
         },
     }
     out_manifest = run_dir / "pipeline_manifest.json"

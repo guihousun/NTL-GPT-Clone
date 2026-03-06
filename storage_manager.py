@@ -91,6 +91,14 @@ class StorageManager:
             raise ValueError(f"Unsafe or empty virtual path tail: {full_path}")
         return rel
 
+    @staticmethod
+    def _safe_workspace_relative_path(path_value: str) -> PurePosixPath:
+        raw = str(path_value or "").strip().replace("\\", "/")
+        rel = PurePosixPath(raw)
+        if not raw or rel.is_absolute() or ".." in rel.parts:
+            raise ValueError(f"Unsafe workspace-relative path: {path_value}")
+        return rel
+
     def resolve_deepagents_path(self, deep_path: str, thread_id: Optional[str] = None) -> Path:
         workspace = self.get_workspace(thread_id)
         should_create_parent = True
@@ -112,6 +120,47 @@ class StorageManager:
         if should_create_parent:
             target.parent.mkdir(parents=True, exist_ok=True)
         return target.resolve()
+
+    def resolve_workspace_relative_path(
+        self,
+        path_value: str,
+        thread_id: Optional[str] = None,
+        *,
+        default_root: str = "outputs",
+        create_parent: bool = False,
+        allow_memory: bool = True,
+    ) -> Path:
+        if self._is_deepagents_virtual_path(path_value):
+            if self._is_shared_virtual_path(path_value) and create_parent:
+                raise PermissionError("Shared dataset path is read-only.")
+            return self.resolve_deepagents_path(path_value, thread_id)
+
+        workspace = self.get_workspace(thread_id)
+        rel = self._safe_workspace_relative_path(path_value)
+        roots = {
+            "inputs": (workspace / "inputs").resolve(),
+            "outputs": (workspace / "outputs").resolve(),
+            "memory": (workspace / "memory").resolve(),
+        }
+        if default_root not in roots:
+            raise ValueError(f"Unsupported default_root: {default_root}")
+
+        parts = rel.parts
+        if parts and parts[0] in roots:
+            if parts[0] == "memory" and not allow_memory:
+                raise PermissionError("Memory path is not allowed in this context.")
+            target = roots[parts[0]].joinpath(*parts[1:])
+            allowed_root = roots[parts[0]]
+        else:
+            target = roots[default_root].joinpath(*parts)
+            allowed_root = roots[default_root]
+
+        resolved = target.resolve()
+        if resolved != allowed_root and not str(resolved).startswith(str(allowed_root) + os.sep):
+            raise PermissionError("Resolved path escaped the allowed workspace root.")
+        if create_parent:
+            resolved.parent.mkdir(parents=True, exist_ok=True)
+        return resolved
 
     @staticmethod
     def _is_shared_virtual_path(path_value: str) -> bool:

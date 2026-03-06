@@ -795,27 +795,23 @@ class NOAA20SDRPreprocessInput(BaseModel):
 
 def preprocess_noaa20_viirs(input_subfolder: str, output_subfolder: str = "processed_noaa20") -> str:
     """
-    Wrapper for the NOAA-20 VIIRS DNB SDR preprocessing workflow.
+    Deprecated legacy wrapper.
     """
-    try:
-        batch_pro_noaa20(input_subfolder, output_subfolder)
-        return (
-            f"鉁?NOAA-20 VIIRS SDR Preprocessing Completed.\n"
-            f"- **Input Source**: `inputs/{input_subfolder}`\n"
-            f"- **Process**: Quality control applied (Solar/Lunar zenith correction, noise removal).\n"
-            f"- **Output Location**: `outputs/{output_subfolder}/` (GeoTIFF format)."
-        )
-    except Exception as e:
-        return f"鉂?Error during preprocessing: {str(e)}"
+    _ = (input_subfolder, output_subfolder)
+    return (
+        "Noaa20_VIIRS_Preprocess has been disabled. "
+        "Use official_vj_dnb_preprocess_tool "
+        "(alias: convert_vj102_vj103_precise_to_tif_tool) instead. "
+        "Expected input is matched VJ102DNB/VJ103DNB NC files."
+    )
 
 # Tool Registration
 noaa20_sdr_preprocess_tool = StructuredTool.from_function(
     func=preprocess_noaa20_viirs,
     name="Noaa20_VIIRS_Preprocess",
     description=(
-        "Performs quality control and systematic preprocessing on NOAA-20 VIIRS DNB SDR (Sensor Data Record) imagery. "
-        "It converts raw HDF5 (.h5) files into georeferenced GeoTIFFs while filtering out noise from sunlight, "
-        "moonlight, and scan-edge artifacts. This is a crucial step for preparing VIIRS data for scientific analysis."
+        "DEPRECATED/DISABLED: legacy NOAA-20 SDR preprocessing entry. "
+        "Use official_vj_dnb_preprocess_tool or convert_vj102_vj103_precise_to_tif_tool for the current official workflow."
     ),
     input_type=NOAA20SDRPreprocessInput
 )

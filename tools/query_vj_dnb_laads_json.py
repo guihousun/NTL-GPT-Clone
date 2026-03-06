@@ -15,6 +15,19 @@ if str(ROOT) not in sys.path:
 from experiments.official_daily_ntl_fastpath.cmr_client import extract_download_link, search_granules
 
 
+SUPPORTED_SOURCES = {
+    # Swath (L1/L2-like) products.
+    "VJ102DNB",
+    "VJ103DNB",
+    # Gridded (L3-like) daily products.
+    "VJ146A1",
+    "VJ146A2",
+    # Optional NRT variants (if available in CMR by short_name).
+    "VJ102DNB_NRT",
+    "VJ146A1_NRT",
+}
+
+
 def _parse_bbox(raw: str) -> tuple[float, float, float, float]:
     parts = [p.strip() for p in (raw or "").split(",")]
     if len(parts) != 4:
@@ -31,8 +44,9 @@ def _parse_sources(raw: str) -> list[str]:
         s = p.strip().upper()
         if not s:
             continue
-        if s not in {"VJ102DNB", "VJ103DNB"}:
-            raise ValueError(f"Unsupported source '{s}'. Only VJ102DNB,VJ103DNB are supported.")
+        if s not in SUPPORTED_SOURCES:
+            supported = ",".join(sorted(SUPPORTED_SOURCES))
+            raise ValueError(f"Unsupported source '{s}'. Supported sources: {supported}")
         if s not in out:
             out.append(s)
     if not out:
@@ -80,7 +94,7 @@ def build_query_string(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Query VJ102DNB/VJ103DNB by bbox+date and export LAADS-like JSON download list."
+        description="Query VIIRS products by bbox+date and export LAADS-like JSON download list."
     )
     parser.add_argument("--start-date", required=True, help="YYYY-MM-DD")
     parser.add_argument("--end-date", required=True, help="YYYY-MM-DD")
@@ -88,7 +102,10 @@ def main() -> None:
     parser.add_argument(
         "--sources",
         default="VJ102DNB,VJ103DNB",
-        help="Comma list: VJ102DNB,VJ103DNB (default both)",
+        help=(
+            "Comma list of short_names. "
+            "Examples: VJ102DNB,VJ103DNB or VJ146A1 or VJ146A1,VJ146A2"
+        ),
     )
     parser.add_argument(
         "--output",
@@ -124,8 +141,16 @@ def main() -> None:
             url = extract_download_link(g.links)
             if not url:
                 continue
-            # Keep only file download links.
-            if not (url.endswith(".nc") or ".nc?" in url or url.endswith(".h5") or ".h5?" in url):
+            # Keep only likely data file links.
+            lower_url = url.lower()
+            if not (
+                lower_url.endswith(".nc")
+                or ".nc?" in lower_url
+                or lower_url.endswith(".h5")
+                or ".h5?" in lower_url
+                or lower_url.endswith(".hdf")
+                or ".hdf?" in lower_url
+            ):
                 continue
             all_items.append(
                 {
