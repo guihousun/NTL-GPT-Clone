@@ -89,6 +89,12 @@ PALETTES: dict[str, dict[str, str]] = {
         "point_edge": "#ffffff",
         "boundary_edge_color": "#22d3ee",
     },
+    "white_viridis": {
+        "cmap": "viridis",
+        "point_color": "#0f172a",
+        "point_edge": "#ffffff",
+        "boundary_edge_color": "#4b5563",
+    },
 }
 
 

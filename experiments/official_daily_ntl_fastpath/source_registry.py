@@ -8,6 +8,8 @@ class SourceSpec:
     short_name: str
     processing_mode: str
     variable_candidates: tuple[str, ...]
+    qa_variable_candidates: dict[str, tuple[str, ...]] | None = None
+    default_qa_mode: str = "balanced"
     night_only: bool = False
 
 
@@ -20,6 +22,18 @@ _SOURCE_REGISTRY: dict[str, SourceSpec] = {
             "DNB_At_Sensor_Radiance_500m",
             "DNB_At_Sensor_Radiance",
         ),
+        qa_variable_candidates={
+            "QF_Cloud_Mask": (
+                "HDFEOS/GRIDS/VIIRS_Grid_DNB_2d/Data Fields/QF_Cloud_Mask",
+                "HDFEOS/GRIDS/VNP_Grid_DNB/Data Fields/QF_Cloud_Mask",
+                "QF_Cloud_Mask",
+            ),
+            "QF_DNB": (
+                "HDFEOS/GRIDS/VIIRS_Grid_DNB_2d/Data Fields/QF_DNB",
+                "HDFEOS/GRIDS/VNP_Grid_DNB/Data Fields/QF_DNB",
+                "QF_DNB",
+            ),
+        },
         night_only=False,
     ),
     "VJ146A1G_NRT": SourceSpec(
@@ -37,6 +51,20 @@ _SOURCE_REGISTRY: dict[str, SourceSpec] = {
             "Gap_Filled_DNB_BRDF_Corrected_NTL",
             "DNB_BRDF-Corrected_NTL",
         ),
+        qa_variable_candidates={
+            "Mandatory_Quality_Flag": (
+                "HDFEOS/GRIDS/VNP_Grid_DNB/Data Fields/Mandatory_Quality_Flag",
+                "Mandatory_Quality_Flag",
+            ),
+            "QF_Cloud_Mask": (
+                "HDFEOS/GRIDS/VNP_Grid_DNB/Data Fields/QF_Cloud_Mask",
+                "QF_Cloud_Mask",
+            ),
+            "Snow_Flag": (
+                "HDFEOS/GRIDS/VNP_Grid_DNB/Data Fields/Snow_Flag",
+                "Snow_Flag",
+            ),
+        },
         night_only=False,
     ),
     "VJ146A1": SourceSpec(
@@ -47,6 +75,18 @@ _SOURCE_REGISTRY: dict[str, SourceSpec] = {
             "DNB_At_Sensor_Radiance_500m",
             "DNB_At_Sensor_Radiance",
         ),
+        qa_variable_candidates={
+            "QF_Cloud_Mask": (
+                "HDFEOS/GRIDS/VIIRS_Grid_DNB_2d/Data Fields/QF_Cloud_Mask",
+                "HDFEOS/GRIDS/VNP_Grid_DNB/Data Fields/QF_Cloud_Mask",
+                "QF_Cloud_Mask",
+            ),
+            "QF_DNB": (
+                "HDFEOS/GRIDS/VIIRS_Grid_DNB_2d/Data Fields/QF_DNB",
+                "HDFEOS/GRIDS/VNP_Grid_DNB/Data Fields/QF_DNB",
+                "QF_DNB",
+            ),
+        },
         night_only=False,
     ),
     "VJ102DNB": SourceSpec(

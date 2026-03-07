@@ -14,6 +14,7 @@ from langchain_core.runnables.config import var_child_runnable_config
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
+from experiments.official_daily_ntl_fastpath.source_registry import get_source_spec, parse_sources_arg
 from storage_manager import current_thread_id, storage_manager
 
 
@@ -22,6 +23,7 @@ QUERY_SCRIPT = REPO_ROOT / "tools" / "query_vj_dnb_laads_json.py"
 DOWNLOAD_SCRIPT = REPO_ROOT / "tools" / "download_vj_dnb.py"
 PREPROCESS_SCRIPT = REPO_ROOT / "experiments" / "official_daily_ntl_fastpath" / "convert_vj102_vj103_precise_to_tif.py"
 GIF_SCRIPT = REPO_ROOT / "experiments" / "official_daily_ntl_fastpath" / "make_ntl_daily_gif.py"
+GRIDDED_DOWNLOAD_SCRIPT = REPO_ROOT / "experiments" / "official_daily_ntl_fastpath" / "download_official_ntl_by_bbox.py"
 
 
 class OfficialVJDNBPipelineInput(BaseModel):
@@ -50,10 +52,14 @@ class OfficialVJDNBPipelineInput(BaseModel):
     token_env: str = Field(default="EARTHDATA_TOKEN", description="Earthdata token env var name")
     page_size: int = Field(default=200, description="CMR query page size")
     skip_preprocess: bool = Field(default=False, description="If true, only query+download without preprocessing")
+    qa_mode: str = Field(
+        default="",
+        description="Optional QA mode for gridded sources: balanced | strict | clear_only. Empty uses source default.",
+    )
     generate_gif: bool = Field(default=True, description="If true, render daily tif series to GIF (step 4).")
     gif_style_palette: str = Field(
         default="report_dark",
-        description="GIF style preset: report_dark | night_blue | mono_gray | impact_hot",
+        description="GIF style preset: report_dark | night_blue | mono_gray | impact_hot | white_viridis",
     )
     overlay_vector: str = Field(default="", description="Optional event vector file (GeoJSON/SHP/GPKG) for GIF overlay.")
     overlay_label_field: str = Field(default="", description="Optional overlay field used for labels in GIF frames.")
@@ -205,6 +211,34 @@ def _build_run_label(start_date: str, end_date: str, run_label: str) -> str:
     return f"vj_dnb_{start_date.replace('-', '')}_{end_date.replace('-', '')}"
 
 
+def _resolve_pipeline_mode(sources_raw: str) -> tuple[str, list[str]]:
+    swath_sources = {"VJ102DNB", "VJ103DNB", "VJ102DNB_NRT", "VJ103DNB_NRT"}
+    raw_parts = [part.strip().upper() for part in str(sources_raw or "").split(",") if part.strip()]
+    if not raw_parts:
+        raw_parts = ["VJ102DNB", "VJ103DNB"]
+
+    deduped: list[str] = []
+    for key in raw_parts:
+        if key in swath_sources:
+            if key not in deduped:
+                deduped.append(key)
+            continue
+        spec = get_source_spec(key)
+        if spec.processing_mode != "gridded_tile_clip":
+            raise ValueError(f"Unsupported source for official_vj_dnb_fullchain_tool: {key}")
+        if key not in deduped:
+            deduped.append(key)
+
+    has_swath = any(key in swath_sources for key in deduped)
+    has_gridded = any(key not in swath_sources for key in deduped)
+    if has_swath and has_gridded:
+        raise ValueError("Mixed swath and gridded sources are not supported in one official_vj_dnb_fullchain_tool run.")
+    if has_gridded:
+        resolved = parse_sources_arg(",".join(key for key in deduped if key not in swath_sources))
+        return "gridded_tile_clip", resolved
+    return "swath_precise", deduped
+
+
 def run_official_vj_dnb_fullchain(
     start_date: str,
     end_date: str,
@@ -219,6 +253,7 @@ def run_official_vj_dnb_fullchain(
     token_env: str = "EARTHDATA_TOKEN",
     page_size: int = 200,
     skip_preprocess: bool = False,
+    qa_mode: str = "",
     generate_gif: bool = True,
     gif_style_palette: str = "report_dark",
     overlay_vector: str = "",
@@ -254,7 +289,7 @@ def run_official_vj_dnb_fullchain(
                 "请确认时空范围：start_date/end_date 与 bbox(minx,miny,maxx,maxy)。",
                 "请确认数据源：默认 VJ102DNB,VJ103DNB 是否保持不变？",
                 "预处理参数是否使用默认：composite=mean, resolution_m=500, radius_m=2000？",
-                "是否生成 GIF？如是，请选择 gif_style_palette（report_dark/night_blue/mono_gray/impact_hot）。",
+                "是否生成 GIF？如是，请选择 gif_style_palette（report_dark/night_blue/mono_gray/impact_hot/white_viridis）。",
                 "是否叠加事件点与行政区边界？如是请提供 overlay_vector 与 boundary_vector 路径。",
             ],
             "recommended_defaults": {
@@ -273,6 +308,11 @@ def run_official_vj_dnb_fullchain(
         raise ValueError("end_date must be >= start_date")
     if composite not in {"mean", "max"}:
         raise ValueError("composite must be mean or max")
+    qa_mode = str(qa_mode or "").strip().lower()
+    if qa_mode not in {"", "balanced", "strict", "clear_only"}:
+        raise ValueError("qa_mode must be empty, balanced, strict, or clear_only")
+
+    pipeline_mode, resolved_sources = _resolve_pipeline_mode(sources)
 
     thread_id = _resolve_thread_id_from_config(config)
     label = _build_run_label(start_date, end_date, run_label)
@@ -281,126 +321,186 @@ def run_official_vj_dnb_fullchain(
     query_dir = run_dir / "query"
     raw_dir = run_dir / "raw_nc"
     processed_dir = run_dir / "processed_tif"
+    gridded_workspace = run_dir / "gridded_workspace"
     run_dir.mkdir(parents=True, exist_ok=True)
     # Deterministic rerun behavior for fixed run_label: avoid stale files from older runs.
     _reset_dir(query_dir)
     _reset_dir(raw_dir)
     _reset_dir(processed_dir)
+    _reset_dir(gridded_workspace)
 
     query_json = query_dir / f"LAADS_query_{start_date}_{end_date}.json"
 
     _ = kwargs  # reserved for forward-compatible optional fields
     env = os.environ.copy()
     token_present = bool(env.get(token_env, "").strip())
-
-    query_cmd = [
-        sys.executable,
-        str(QUERY_SCRIPT),
-        "--start-date",
-        start_date,
-        "--end-date",
-        end_date,
-        "--bbox",
-        bbox,
-        "--sources",
-        sources,
-        "--output",
-        str(query_json),
-        "--page-size",
-        str(int(page_size)),
-    ]
-    query_result = _run_cmd(query_cmd, REPO_ROOT)
-    if query_result["returncode"] != 0:
-        raise RuntimeError(
-            "Query step failed.\n"
-            f"cmd={' '.join(query_cmd)}\n"
-            f"stderr={query_result['stderr'][-1200:]}\n"
-            f"stdout={query_result['stdout'][-1200:]}"
-        )
-
-    download_cmd = [
-        sys.executable,
-        str(DOWNLOAD_SCRIPT),
-        "--input",
-        str(query_json),
-        "--output",
-        str(raw_dir),
-        "--token-env",
-        token_env,
-    ]
-    download_result = _run_cmd(download_cmd, REPO_ROOT)
-    if download_result["returncode"] != 0:
-        raise RuntimeError(
-            "Download step failed.\n"
-            f"cmd={' '.join(download_cmd)}\n"
-            f"stderr={download_result['stderr'][-1600:]}\n"
-            f"stdout={download_result['stdout'][-1600:]}"
-        )
-    if not token_present:
-        token_present = "token : configured" in (download_result.get("stdout", "").lower())
-
+    query_result: Optional[dict[str, Any]] = None
+    download_result: Optional[dict[str, Any]] = None
     preprocess_result: Optional[dict[str, Any]] = None
     preprocess_fallback: Optional[dict[str, Any]] = None
-    if not skip_preprocess:
-        preprocess_cmd = [
+    daily_outputs: list[str] = []
+    gif_input_dir: Optional[Path] = None
+
+    if pipeline_mode == "swath_precise":
+        query_cmd = [
             sys.executable,
-            str(PREPROCESS_SCRIPT),
-            "--input-dir",
-            str(raw_dir),
-            "--output-dir",
-            str(processed_dir),
+            str(QUERY_SCRIPT),
             "--start-date",
             start_date,
             "--end-date",
             end_date,
             "--bbox",
             bbox,
-            "--composite",
-            composite,
-            "--resolution-m",
-            str(float(resolution_m)),
-            "--radius-m",
-            str(float(radius_m)),
-            "--radiance-scale",
-            str(float(radiance_scale)),
+            "--sources",
+            ",".join(resolved_sources),
+            "--output",
+            str(query_json),
+            "--page-size",
+            str(int(page_size)),
         ]
-        preprocess_result = _run_cmd(preprocess_cmd, REPO_ROOT)
-        if preprocess_result["returncode"] != 0:
+        query_result = _run_cmd(query_cmd, REPO_ROOT)
+        if query_result["returncode"] != 0:
             raise RuntimeError(
-                "Preprocess step failed.\n"
-                f"cmd={' '.join(preprocess_cmd)}\n"
-                f"stderr={preprocess_result['stderr'][-1600:]}\n"
-                f"stdout={preprocess_result['stdout'][-1600:]}"
+                "Query step failed.\n"
+                f"cmd={' '.join(query_cmd)}\n"
+                f"stderr={query_result['stderr'][-1200:]}\n"
+                f"stdout={query_result['stdout'][-1200:]}"
             )
-        summary_path = processed_dir / "precise_preprocess_summary.json"
-        daily_valid_ratios = _load_daily_valid_ratios(summary_path)
-        all_empty = bool(daily_valid_ratios) and all(v <= 0.0 for v in daily_valid_ratios)
-        # Practical fallback: strict lunar mask can wipe all nighttime pixels in bright-moon windows.
-        if all_empty:
-            preprocess_cmd_fallback = preprocess_cmd + ["--disable-lunar-mask"]
-            preprocess_fallback = _run_cmd(preprocess_cmd_fallback, REPO_ROOT)
-            if preprocess_fallback["returncode"] != 0:
-                raise RuntimeError(
-                    "Preprocess fallback step failed.\n"
-                    f"cmd={' '.join(preprocess_cmd_fallback)}\n"
-                    f"stderr={preprocess_fallback['stderr'][-1600:]}\n"
-                    f"stdout={preprocess_fallback['stdout'][-1600:]}"
-                )
 
-    daily_outputs: list[str] = []
-    if processed_dir.exists():
-        daily_outputs = sorted(str(p) for p in (processed_dir / "daily_4326").glob("*.tif"))
+        download_cmd = [
+            sys.executable,
+            str(DOWNLOAD_SCRIPT),
+            "--input",
+            str(query_json),
+            "--output",
+            str(raw_dir),
+            "--token-env",
+            token_env,
+        ]
+        download_result = _run_cmd(download_cmd, REPO_ROOT)
+        if download_result["returncode"] != 0:
+            raise RuntimeError(
+                "Download step failed.\n"
+                f"cmd={' '.join(download_cmd)}\n"
+                f"stderr={download_result['stderr'][-1600:]}\n"
+                f"stdout={download_result['stdout'][-1600:]}"
+            )
+        if not token_present:
+            token_present = "token : configured" in (download_result.get("stdout", "").lower())
+
+        if not skip_preprocess:
+            preprocess_cmd = [
+                sys.executable,
+                str(PREPROCESS_SCRIPT),
+                "--input-dir",
+                str(raw_dir),
+                "--output-dir",
+                str(processed_dir),
+                "--start-date",
+                start_date,
+                "--end-date",
+                end_date,
+                "--bbox",
+                bbox,
+                "--composite",
+                composite,
+                "--resolution-m",
+                str(float(resolution_m)),
+                "--radius-m",
+                str(float(radius_m)),
+                "--radiance-scale",
+                str(float(radiance_scale)),
+            ]
+            preprocess_result = _run_cmd(preprocess_cmd, REPO_ROOT)
+            if preprocess_result["returncode"] != 0:
+                raise RuntimeError(
+                    "Preprocess step failed.\n"
+                    f"cmd={' '.join(preprocess_cmd)}\n"
+                    f"stderr={preprocess_result['stderr'][-1600:]}\n"
+                    f"stdout={preprocess_result['stdout'][-1600:]}"
+                )
+            summary_path = processed_dir / "precise_preprocess_summary.json"
+            daily_valid_ratios = _load_daily_valid_ratios(summary_path)
+            all_empty = bool(daily_valid_ratios) and all(v <= 0.0 for v in daily_valid_ratios)
+            if all_empty:
+                preprocess_cmd_fallback = preprocess_cmd + ["--disable-lunar-mask"]
+                preprocess_fallback = _run_cmd(preprocess_cmd_fallback, REPO_ROOT)
+                if preprocess_fallback["returncode"] != 0:
+                    raise RuntimeError(
+                        "Preprocess fallback step failed.\n"
+                        f"cmd={' '.join(preprocess_cmd_fallback)}\n"
+                        f"stderr={preprocess_fallback['stderr'][-1600:]}\n"
+                        f"stdout={preprocess_fallback['stdout'][-1600:]}"
+                    )
+
+        if processed_dir.exists():
+            gif_input_dir = processed_dir / "daily_4326"
+            daily_outputs = sorted(str(p) for p in gif_input_dir.glob("*.tif"))
+    else:
+        skip_preprocess = False
+        query_result = {
+            "cmd": [],
+            "returncode": 0,
+            "stdout": "",
+            "stderr": "",
+            "notes": "gridded pipeline downloads and clips directly; no LAADS JSON query step",
+        }
+        download_cmd = [
+            sys.executable,
+            str(GRIDDED_DOWNLOAD_SCRIPT),
+            "--sources",
+            ",".join(resolved_sources),
+            "--start-date",
+            start_date,
+            "--end-date",
+            end_date,
+            "--bbox",
+            bbox,
+            "--format",
+            "clipped_tif",
+            "--workspace",
+            str(gridded_workspace),
+            "--earthdata-token-env",
+            token_env,
+        ]
+        if qa_mode:
+            download_cmd += ["--qa-mode", qa_mode]
+        download_result = _run_cmd(download_cmd, REPO_ROOT)
+        if download_result["returncode"] != 0:
+            raise RuntimeError(
+                "Gridded download step failed.\n"
+                f"cmd={' '.join(download_cmd)}\n"
+                f"stderr={download_result['stderr'][-1600:]}\n"
+                f"stdout={download_result['stdout'][-1600:]}"
+            )
+        manifest_path = gridded_workspace / "outputs" / "official_download_manifest.json"
+        preprocess_result = {
+            "cmd": download_cmd,
+            "returncode": int(download_result["returncode"]),
+            "stdout": download_result["stdout"],
+            "stderr": download_result["stderr"],
+            "notes": "gridded clipped_tif workflow handled by download_official_ntl_by_bbox.py",
+            "manifest": str(manifest_path),
+        }
+        if len(resolved_sources) == 1:
+            gif_input_dir = gridded_workspace / "outputs" / resolved_sources[0]
+            daily_outputs = sorted(str(p) for p in gif_input_dir.glob("*/*.tif"))
+        else:
+            for source_name in resolved_sources:
+                source_files = sorted(str(p) for p in (gridded_workspace / "outputs" / source_name).glob("*/*.tif"))
+                daily_outputs.extend(source_files)
+        token_present = token_present or bool(env.get(token_env, "").strip())
 
     gif_result: Optional[dict[str, Any]] = None
     gif_path: Optional[str] = None
-    if generate_gif and (not skip_preprocess) and daily_outputs:
+    if generate_gif and daily_outputs and gif_input_dir is not None:
         gif_dir = run_dir / "visualization"
         gif_dir.mkdir(parents=True, exist_ok=True)
         gif_cmd = [
             sys.executable,
             str(GIF_SCRIPT),
             "--input-dir",
-            str(processed_dir / "daily_4326"),
+            str(gif_input_dir),
             "--output-dir",
             str(gif_dir),
             "--pattern",
@@ -418,7 +518,7 @@ def run_official_vj_dnb_fullchain(
             "--cmap",
             str(gif_cmap),
             "--title-prefix",
-            f"VJ102DNB+VJ103DNB ({start_date}..{end_date})",
+            f"{'+'.join(resolved_sources)} ({start_date}..{end_date})",
         ]
         if str(overlay_vector).strip():
             resolved_overlay = _resolve_read_path(overlay_vector, thread_id=thread_id)
@@ -466,6 +566,12 @@ def run_official_vj_dnb_fullchain(
         if not gif_path:
             gif_path = str(gif_dir / "ntl_daily_animation.gif")
 
+    download_manifest_path = raw_dir / "download_manifest.json"
+    preprocess_summary_path = processed_dir / "precise_preprocess_summary.json"
+    if pipeline_mode == "gridded_tile_clip":
+        download_manifest_path = gridded_workspace / "outputs" / "official_download_manifest.json"
+        preprocess_summary_path = gridded_workspace / "outputs" / "official_download_manifest.json"
+
     manifest = {
         "status": "success",
         "tool": "official_vj_dnb_fullchain_tool",
@@ -475,6 +581,8 @@ def run_official_vj_dnb_fullchain(
             "end_date": end_date,
             "bbox": bbox,
             "sources": sources,
+            "resolved_sources": resolved_sources,
+            "pipeline_mode": pipeline_mode,
             "composite": composite,
             "resolution_m": float(resolution_m),
             "radius_m": float(radius_m),
@@ -482,6 +590,7 @@ def run_official_vj_dnb_fullchain(
             "token_env": token_env,
             "token_present": token_present,
             "skip_preprocess": bool(skip_preprocess),
+            "qa_mode": qa_mode,
             "generate_gif": bool(generate_gif),
             "gif_style_palette": gif_style_palette,
             "overlay_vector": overlay_vector,
@@ -508,8 +617,9 @@ def run_official_vj_dnb_fullchain(
             "query_json": str(query_json),
             "raw_dir": str(raw_dir),
             "processed_dir": str(processed_dir),
-            "download_manifest": str(raw_dir / "download_manifest.json"),
-            "preprocess_summary": str(processed_dir / "precise_preprocess_summary.json"),
+            "gridded_workspace": str(gridded_workspace),
+            "download_manifest": str(download_manifest_path),
+            "preprocess_summary": str(preprocess_summary_path),
             "gif_path": gif_path,
             "gif_summary": str(run_dir / "visualization" / "gif_summary.json"),
         },
@@ -532,8 +642,8 @@ official_vj_dnb_fullchain_tool = StructuredTool.from_function(
     func=run_official_vj_dnb_fullchain,
     name="official_vj_dnb_fullchain_tool",
     description=(
-        "Official VJ102DNB/VJ103DNB full chain pipeline: query LAADS JSON by bbox/date, "
-        "download raw NC files, and preprocess into daily GeoTIFF outputs."
+        "Official nighttime lights full chain pipeline. Supports VJ102DNB/VJ103DNB swath query+download+precise "
+        "preprocess, and VJ146A1/VJ146A2 gridded clipped outputs with optional qa_mode and GIF rendering."
     ),
     args_schema=OfficialVJDNBPipelineInput,
 )

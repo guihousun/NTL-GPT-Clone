@@ -136,6 +136,7 @@ def _download_clipped_for_source(
     bbox: tuple[float, float, float, float],
     workspace: Path,
     token: str,
+    qa_mode: str = "",
 ) -> dict[str, Any]:
     spec = get_source_spec(source)
     if spec.processing_mode != "gridded_tile_clip":
@@ -168,9 +169,11 @@ def _download_clipped_for_source(
             day=day,
             entries=entries,
             variable_candidates=spec.variable_candidates,
+            qa_variable_candidates=spec.qa_variable_candidates,
             roi_gdf=roi_gdf,
             workspace=workspace,
             earthdata_token=token,
+            qa_mode=(str(qa_mode).strip() or spec.default_qa_mode),
         )
         if result.get("status") == "ok" and result.get("output_path"):
             tif_paths.append(Path(str(result["output_path"])))
@@ -232,6 +235,12 @@ def main() -> None:
         help="workspace directory",
     )
     parser.add_argument(
+        "--qa-mode",
+        default="",
+        choices=["", "balanced", "strict", "clear_only"],
+        help="Optional QA mode override for gridded clipped outputs. Default: source-specific default.",
+    )
+    parser.add_argument(
         "--earthdata-token-env",
         default="EARTHDATA_TOKEN",
         help="env key for Earthdata bearer token",
@@ -259,7 +268,15 @@ def main() -> None:
         if args.format == "raw_h5":
             row = _download_raw_for_source(source, args.start_date, args.end_date, bbox, workspace, token)
         else:
-            row = _download_clipped_for_source(source, args.start_date, args.end_date, bbox, workspace, token)
+            row = _download_clipped_for_source(
+                source,
+                args.start_date,
+                args.end_date,
+                bbox,
+                workspace,
+                token,
+                qa_mode=str(args.qa_mode or ""),
+            )
         rows.append(row)
         print(f"{source}: {row.get('status')} | files={len(row.get('files', []))}")
 
@@ -270,6 +287,7 @@ def main() -> None:
         "end_date": args.end_date,
         "bbox": bbox,
         "format": args.format,
+        "qa_mode": str(args.qa_mode or ""),
         "rows": rows,
     }
     out_json = workspace / "outputs" / "official_download_manifest.json"

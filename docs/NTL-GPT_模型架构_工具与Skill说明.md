@@ -336,6 +336,32 @@
 - `gee-routing-blueprint-strategy` 更偏数据检索路径与 GEE 决策策略。
 - `code-generation-execution-loop` 更偏 Code Assistant 的执行闭环约束。
 
+### 7.4 案例工作流与通用 Tool 的边界
+
+后续扩展时，建议明确区分“通用能力”与“案例编排”：
+
+- `tools/` 只承载可复用的正式能力，例如：
+  - 新数据源支持
+  - `qa_mode`
+  - 通用制图参数
+  - 通用叠加与 GIF 输出能力
+- 区域专题案例应优先沉淀到 Skill workflow，而不是继续往通用 Tool 里塞固定区域语义，例如：
+  - 德黑兰窗口
+  - 霍尔木兹海峡窗口
+  - 卡拉季专题窗口
+  - 某一套固定白底专题样式组合
+
+推荐落点是：
+
+- `.ntl-gpt/skills/NTL-workflow-guidance/references/workflows/*.json`
+- `.ntl-gpt/skills/NTL-workflow-guidance/references/code/*`
+
+当前已经按这个原则补入一个正式案例：
+
+- `Q22`
+  位于 `.ntl-gpt/skills/NTL-workflow-guidance/references/workflows/event_impact_assessment.json`
+  用于 `VJ146A1 + qa_mode + 德黑兰/霍尔木兹专题图/GIF`
+
 ## 8. 当前架构的几个关键特征
 
 ### 8.1 懒加载工具

@@ -11,7 +11,7 @@ from rasterio.mask import mask
 from rasterio.merge import merge
 from rasterio.transform import from_bounds
 
-from .cmr_client import GranuleRecord, download_file_with_curl, extract_download_link
+from .cmr_client import GranuleRecord, download_file_with_curl, extract_download_link, validate_download_payload
 
 
 def list_hdf5_dataset_paths(h5_path: Path) -> list[str]:
@@ -109,6 +109,287 @@ def _read_hdf_variable(h5_path: Path, variable_path: str) -> tuple[np.ndarray, f
     nodata = -9999.0
     data = np.where(np.isnan(data), nodata, data).astype(np.float32)
     return data, nodata
+
+
+def _read_hdf_raw_dataset(h5_path: Path, variable_path: str) -> np.ndarray:
+    with h5py.File(h5_path, "r") as handle:
+        return np.array(handle[variable_path])
+
+
+def _valid_data_mask(data: np.ndarray, nodata: float) -> np.ndarray:
+    valid = np.isfinite(data)
+    if np.isfinite(nodata):
+        valid &= data != nodata
+    return valid
+
+
+def _coerce_qa_array(
+    qa_layers: dict[str, np.ndarray],
+    key: str,
+    shape: tuple[int, ...],
+) -> np.ndarray | None:
+    arr = qa_layers.get(key)
+    if arr is None:
+        return None
+    if arr.shape != shape:
+        return None
+    return arr
+
+
+def _apply_vj146a1_balanced_mask(qa_layers: dict[str, np.ndarray], shape: tuple[int, ...]) -> np.ndarray:
+    mask = np.ones(shape, dtype=bool)
+
+    qf_cloud_mask = _coerce_qa_array(qa_layers, "QF_Cloud_Mask", shape)
+    if qf_cloud_mask is not None:
+        cloud = qf_cloud_mask.astype(np.uint16, copy=False)
+        is_night = ((cloud >> 0) & 0b1) == 0
+        cloud_mask_quality = (cloud >> 4) & 0b11
+        cloud_confidence = (cloud >> 6) & 0b11
+        no_shadow = ((cloud >> 8) & 0b1) == 0
+        no_cirrus = ((cloud >> 9) & 0b1) == 0
+        no_snow = ((cloud >> 10) & 0b1) == 0
+        mask &= is_night
+        mask &= cloud_mask_quality >= 1
+        mask &= cloud_confidence <= 1
+        mask &= no_shadow
+        mask &= no_cirrus
+        mask &= no_snow
+
+    qf_dnb = _coerce_qa_array(qa_layers, "QF_DNB", shape)
+    if qf_dnb is not None:
+        dnb = qf_dnb.astype(np.uint16, copy=False)
+        severe_flags = 2 | 4 | 16 | 256 | 512 | 1024 | 2048
+        mask &= (dnb & severe_flags) == 0
+
+    return mask
+
+
+def _apply_vj146a1_strict_mask(qa_layers: dict[str, np.ndarray], shape: tuple[int, ...]) -> np.ndarray:
+    mask = np.ones(shape, dtype=bool)
+
+    qf_cloud_mask = _coerce_qa_array(qa_layers, "QF_Cloud_Mask", shape)
+    if qf_cloud_mask is not None:
+        cloud = qf_cloud_mask.astype(np.uint16, copy=False)
+        is_night = ((cloud >> 0) & 0b1) == 0
+        cloud_mask_quality = (cloud >> 4) & 0b11
+        cloud_confidence = (cloud >> 6) & 0b11
+        no_shadow = ((cloud >> 8) & 0b1) == 0
+        no_cirrus = ((cloud >> 9) & 0b1) == 0
+        no_snow = ((cloud >> 10) & 0b1) == 0
+        mask &= is_night
+        mask &= cloud_mask_quality >= 2
+        mask &= cloud_confidence == 0
+        mask &= no_shadow
+        mask &= no_cirrus
+        mask &= no_snow
+
+    qf_dnb = _coerce_qa_array(qa_layers, "QF_DNB", shape)
+    if qf_dnb is not None:
+        dnb = qf_dnb.astype(np.uint16, copy=False)
+        mask &= dnb == 0
+
+    return mask
+
+
+def _apply_vj146a2_balanced_mask(qa_layers: dict[str, np.ndarray], shape: tuple[int, ...]) -> np.ndarray:
+    mask = np.ones(shape, dtype=bool)
+
+    mandatory_quality_flag = _coerce_qa_array(qa_layers, "Mandatory_Quality_Flag", shape)
+    if mandatory_quality_flag is not None:
+        mqf = mandatory_quality_flag.astype(np.uint16, copy=False)
+        mask &= mqf == 0
+
+    qf_cloud_mask = _coerce_qa_array(qa_layers, "QF_Cloud_Mask", shape)
+    if qf_cloud_mask is not None:
+        cloud = qf_cloud_mask.astype(np.uint16, copy=False)
+        is_night = ((cloud >> 0) & 0b1) == 0
+        cloud_mask_quality = (cloud >> 4) & 0b11
+        cloud_confidence = (cloud >> 6) & 0b11
+        no_shadow = ((cloud >> 8) & 0b1) == 0
+        no_cirrus = ((cloud >> 9) & 0b1) == 0
+        no_snow = ((cloud >> 10) & 0b1) == 0
+        mask &= is_night
+        mask &= cloud_mask_quality >= 1
+        mask &= cloud_confidence <= 1
+        mask &= no_shadow
+        mask &= no_cirrus
+        mask &= no_snow
+
+    snow_flag = _coerce_qa_array(qa_layers, "Snow_Flag", shape)
+    if snow_flag is not None:
+        mask &= snow_flag.astype(np.uint16, copy=False) == 0
+
+    return mask
+
+
+def _apply_vj146a2_strict_mask(qa_layers: dict[str, np.ndarray], shape: tuple[int, ...]) -> np.ndarray:
+    mask = _apply_vj146a2_balanced_mask(qa_layers, shape)
+    qf_cloud_mask = _coerce_qa_array(qa_layers, "QF_Cloud_Mask", shape)
+    if qf_cloud_mask is not None:
+        cloud = qf_cloud_mask.astype(np.uint16, copy=False)
+        cloud_mask_quality = (cloud >> 4) & 0b11
+        cloud_confidence = (cloud >> 6) & 0b11
+        mask &= cloud_mask_quality >= 2
+        mask &= cloud_confidence == 0
+    return mask
+
+
+def _apply_vj146a1_clear_only_mask(qa_layers: dict[str, np.ndarray], shape: tuple[int, ...]) -> np.ndarray:
+    mask = np.ones(shape, dtype=bool)
+
+    qf_cloud_mask = _coerce_qa_array(qa_layers, "QF_Cloud_Mask", shape)
+    if qf_cloud_mask is not None:
+        cloud = qf_cloud_mask.astype(np.uint16, copy=False)
+        is_night = ((cloud >> 0) & 0b1) == 0
+        cloud_mask_quality = (cloud >> 4) & 0b11
+        cloud_confidence = (cloud >> 6) & 0b11
+        no_shadow = ((cloud >> 8) & 0b1) == 0
+        no_cirrus = ((cloud >> 9) & 0b1) == 0
+        no_snow = ((cloud >> 10) & 0b1) == 0
+        mask &= is_night
+        mask &= cloud_mask_quality == 3
+        mask &= cloud_confidence == 0
+        mask &= no_shadow
+        mask &= no_cirrus
+        mask &= no_snow
+
+    qf_dnb = _coerce_qa_array(qa_layers, "QF_DNB", shape)
+    if qf_dnb is not None:
+        dnb = qf_dnb.astype(np.uint16, copy=False)
+        mask &= dnb == 0
+
+    return mask
+
+
+def _apply_vj146a2_clear_only_mask(qa_layers: dict[str, np.ndarray], shape: tuple[int, ...]) -> np.ndarray:
+    mask = np.ones(shape, dtype=bool)
+
+    mandatory_quality_flag = _coerce_qa_array(qa_layers, "Mandatory_Quality_Flag", shape)
+    if mandatory_quality_flag is not None:
+        mqf = mandatory_quality_flag.astype(np.uint16, copy=False)
+        mask &= mqf == 0
+
+    qf_cloud_mask = _coerce_qa_array(qa_layers, "QF_Cloud_Mask", shape)
+    if qf_cloud_mask is not None:
+        cloud = qf_cloud_mask.astype(np.uint16, copy=False)
+        is_night = ((cloud >> 0) & 0b1) == 0
+        cloud_mask_quality = (cloud >> 4) & 0b11
+        cloud_confidence = (cloud >> 6) & 0b11
+        no_shadow = ((cloud >> 8) & 0b1) == 0
+        no_cirrus = ((cloud >> 9) & 0b1) == 0
+        no_snow = ((cloud >> 10) & 0b1) == 0
+        mask &= is_night
+        mask &= cloud_mask_quality == 3
+        mask &= cloud_confidence == 0
+        mask &= no_shadow
+        mask &= no_cirrus
+        mask &= no_snow
+
+    snow_flag = _coerce_qa_array(qa_layers, "Snow_Flag", shape)
+    if snow_flag is not None:
+        mask &= snow_flag.astype(np.uint16, copy=False) == 0
+
+    return mask
+
+
+def apply_quality_mask(
+    *,
+    source: str,
+    data: np.ndarray,
+    nodata: float,
+    qa_mode: str,
+    qa_layers: dict[str, np.ndarray],
+) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
+    qa_mode_normalized = (qa_mode or "balanced").strip().lower()
+    if qa_mode_normalized not in {"balanced", "strict", "clear_only", "none"}:
+        raise ValueError(f"Unsupported qa_mode: {qa_mode}")
+
+    source_key = (source or "").strip().upper()
+    base_valid_mask = _valid_data_mask(data, nodata)
+
+    if qa_mode_normalized == "none":
+        masked = np.where(base_valid_mask, data, nodata).astype(np.float32, copy=False)
+        summary = {
+            "source": source_key,
+            "qa_mode": qa_mode_normalized,
+            "valid_pixel_count": int(base_valid_mask.sum()),
+            "masked_pixel_count": int(base_valid_mask.size - base_valid_mask.sum()),
+            "valid_ratio": float(base_valid_mask.mean()) if base_valid_mask.size else 0.0,
+            "applied_qa_layers": [],
+        }
+        return masked, base_valid_mask, summary
+
+    if source_key == "VJ146A1":
+        if qa_mode_normalized == "balanced":
+            qa_mask = _apply_vj146a1_balanced_mask(qa_layers, data.shape)
+        elif qa_mode_normalized == "strict":
+            qa_mask = _apply_vj146a1_strict_mask(qa_layers, data.shape)
+        else:
+            qa_mask = _apply_vj146a1_clear_only_mask(qa_layers, data.shape)
+    elif source_key == "VJ146A2":
+        if qa_mode_normalized == "balanced":
+            qa_mask = _apply_vj146a2_balanced_mask(qa_layers, data.shape)
+        elif qa_mode_normalized == "strict":
+            qa_mask = _apply_vj146a2_strict_mask(qa_layers, data.shape)
+        else:
+            qa_mask = _apply_vj146a2_clear_only_mask(qa_layers, data.shape)
+    else:
+        qa_mask = np.ones(data.shape, dtype=bool)
+
+    valid_mask = base_valid_mask & qa_mask
+    masked = np.where(valid_mask, data, nodata).astype(np.float32, copy=False)
+    applied_qa_layers = sorted([key for key, arr in qa_layers.items() if arr is not None and arr.shape == data.shape])
+    summary = {
+        "source": source_key,
+        "qa_mode": qa_mode_normalized,
+        "valid_pixel_count": int(valid_mask.sum()),
+        "masked_pixel_count": int(valid_mask.size - valid_mask.sum()),
+        "valid_ratio": float(valid_mask.mean()) if valid_mask.size else 0.0,
+        "applied_qa_layers": applied_qa_layers,
+    }
+    return masked, valid_mask, summary
+
+
+def _read_qa_layers(
+    h5_path: Path,
+    dataset_paths: list[str],
+    qa_variable_candidates: dict[str, tuple[str, ...]] | None,
+) -> tuple[dict[str, np.ndarray], list[str]]:
+    if not qa_variable_candidates:
+        return {}, []
+
+    out: dict[str, np.ndarray] = {}
+    missing: list[str] = []
+    for qa_key, candidates in qa_variable_candidates.items():
+        variable_path = select_variable_path(dataset_paths, candidates)
+        if not variable_path:
+            missing.append(qa_key)
+            continue
+        try:
+            out[qa_key] = _read_hdf_raw_dataset(h5_path, variable_path)
+        except Exception:  # noqa: BLE001
+            missing.append(qa_key)
+    return out, missing
+
+
+def ensure_required_qa_layers_present(
+    *,
+    source: str,
+    qa_mode: str,
+    qa_layers: dict[str, np.ndarray],
+    qa_variable_candidates: dict[str, tuple[str, ...]] | None,
+) -> None:
+    qa_mode_normalized = (qa_mode or "balanced").strip().lower()
+    if qa_mode_normalized == "none":
+        return
+    if not qa_variable_candidates:
+        raise ValueError(f"{source} qa_mode={qa_mode_normalized} requires QA layers but none are configured")
+
+    missing = sorted([key for key in qa_variable_candidates if key not in qa_layers])
+    if missing:
+        raise ValueError(
+            f"{source} qa_mode={qa_mode_normalized} missing required QA layers: {', '.join(missing)}"
+        )
 
 
 def _parse_polygon_to_bbox(polygons: list[str], fallback: tuple[float, float, float, float] | None = None) -> tuple[float, float, float, float]:
@@ -214,9 +495,11 @@ def process_gridded_day(
     day: str,
     entries: list[GranuleRecord],
     variable_candidates: tuple[str, ...],
+    qa_variable_candidates: dict[str, tuple[str, ...]] | None,
     roi_gdf,
     workspace: Path,
     earthdata_token: str | None,
+    qa_mode: str = "balanced",
 ) -> dict[str, Any]:
     raw_dir = workspace / "raw" / source / day
     tile_dir = workspace / "tmp_tiles" / source / day
@@ -234,6 +517,7 @@ def process_gridded_day(
     variable_used: str | None = None
     notes: list[str] = []
     failure_status: str | None = None
+    qa_summaries: list[dict[str, Any]] = []
     roi_bbox = tuple(float(v) for v in roi_gdf.total_bounds)
     for idx, entry in enumerate(entries, start=1):
         link = extract_download_link(entry.links)
@@ -243,11 +527,18 @@ def process_gridded_day(
             continue
         filename = Path(link.split("?")[0]).name or f"{source}_{day}_{idx}.h5"
         granule_path = raw_dir / filename
-        ok, err = download_file_with_curl(link, granule_path, earthdata_token=earthdata_token)
+        if granule_path.exists():
+            ok, err = validate_download_payload(granule_path)
+            if not ok:
+                granule_path.unlink(missing_ok=True)
+        else:
+            ok, err = False, "missing_local_granule"
         if not ok:
-            notes.append(f"[{idx}] download_failed: {err}")
-            failure_status = failure_status or "download_failed"
-            continue
+            ok, err = download_file_with_curl(link, granule_path, earthdata_token=earthdata_token)
+            if not ok:
+                notes.append(f"[{idx}] download_failed: {err}")
+                failure_status = failure_status or "download_failed"
+                continue
         try:
             dataset_paths = list_hdf5_dataset_paths(granule_path)
         except OSError as exc:
@@ -266,6 +557,33 @@ def process_gridded_day(
             notes.append(f"[{idx}] variable_read_failed: {exc}")
             failure_status = failure_status or "variable_read_failed"
             continue
+        qa_layers, missing_qa_layers = _read_qa_layers(
+            granule_path,
+            dataset_paths=dataset_paths,
+            qa_variable_candidates=qa_variable_candidates,
+        )
+        try:
+            ensure_required_qa_layers_present(
+                source=source,
+                qa_mode=qa_mode,
+                qa_layers=qa_layers,
+                qa_variable_candidates=qa_variable_candidates,
+            )
+        except ValueError as exc:
+            notes.append(f"[{idx}] qa_required_missing: {exc}")
+            failure_status = failure_status or "qa_required_missing"
+            continue
+        data, _valid_mask, qa_summary = apply_quality_mask(
+            source=source,
+            data=data,
+            nodata=float(nodata),
+            qa_mode=qa_mode,
+            qa_layers=qa_layers,
+        )
+        if missing_qa_layers:
+            qa_summary["missing_qa_layers"] = missing_qa_layers
+            notes.append(f"[{idx}] qa_missing:{','.join(missing_qa_layers)}")
+        qa_summaries.append(qa_summary)
         try:
             bbox = _parse_polygon_to_bbox(entry.polygons, fallback=roi_bbox)
         except ValueError as exc:
@@ -302,4 +620,6 @@ def process_gridded_day(
         "output_path": str(output_path),
         "notes": " | ".join(notes),
         "variable_used": variable_used,
+        "qa_mode": qa_mode,
+        "qa_summaries": qa_summaries,
     }

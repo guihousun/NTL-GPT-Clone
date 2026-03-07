@@ -510,9 +510,11 @@ def build_download_data(
             day=day,
             entries=entries,
             variable_candidates=spec.variable_candidates,
+            qa_variable_candidates=spec.qa_variable_candidates,
             roi_gdf=boundary.gdf,
             workspace=DEFAULT_WORKSPACE,
             earthdata_token=token,
+            qa_mode=spec.default_qa_mode,
         )
         if result.get("status") == "ok" and result.get("output_path"):
             tif_paths.append(Path(str(result["output_path"])))

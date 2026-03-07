@@ -26,7 +26,7 @@ class OfficialVJDNBGifInput(BaseModel):
     tif_pattern: str = Field(default="*.tif", description="GeoTIFF filename glob pattern.")
     style_palette: str = Field(
         default="report_dark",
-        description="Color style preset: report_dark | night_blue | mono_gray | impact_hot",
+        description="Color style preset: report_dark | night_blue | mono_gray | impact_hot | white_viridis",
     )
     overlay_vector: str = Field(default="", description="Optional vector data path (GeoJSON/SHP/GPKG) for event points.")
     overlay_label_field: str = Field(default="", description="Optional field name used for overlay text labels.")
@@ -191,6 +191,7 @@ def run_official_vj_dnb_gif(
             "tool": "official_vj_dnb_gif_tool",
             "questions": [
                 "请确认 style_palette：report_dark / night_blue / mono_gray / impact_hot。",
+                "如需白底 viridis 专题图，可选择 style_palette=white_viridis。",
                 "是否叠加事件点？如是，请提供 overlay_vector 路径与 overlay_label_field。",
                 "点图例是否按字段分类？如是，请提供 overlay_point_class_field。",
                 "如需差异化符号，请提供 point_style_map（JSON 文本或 JSON 文件路径）。",

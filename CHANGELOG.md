@@ -10,6 +10,14 @@ This changelog is intentionally lightweight:
 ## [Unreleased]
 
 ### Added
+- Added reusable spatial-join utility module `tools/spatial_join_utils.py` for:
+  - overlap-safe unique point-to-polygon assignment,
+  - country-level (ADM0) point assignment,
+  - per-country geoBoundaries ADM1/ADM2/ADM3 enrichment,
+  - reusable impact summaries with strike-type and source-service breakdowns.
+- Added generalized tests `tests/test_spatial_join_utils.py` to validate:
+  - deterministic overlap disambiguation,
+  - multi-country summary behavior with a non-default strike-type column.
 - Added `experiments/official_daily_ntl_fastpath/convert_vnp46a1_to_tif.py` for local VNP46A1 batch conversion (`.h5 -> GeoTIFF`), including auto variable-path compatibility, tile mosaic, EPSG:4326 output, and optional bbox clipping.
 - Added `experiments/official_daily_ntl_fastpath/convert_vj102dnb_to_tif.py` for VJ102DNB batch conversion (`.nc -> GeoTIFF`), with date filtering, optional DNB quality-flag masking, mosaic, and optional bbox clipping.
 - Added `experiments/official_daily_ntl_fastpath/convert_vj102_vj103_precise_to_tif.py` for paired precise preprocessing (`VJ102DNB + VJ103DNB`) using per-pixel geolocation and daily composites.
@@ -17,10 +25,21 @@ This changelog is intentionally lightweight:
 - Added `tools/query_vj_dnb_laads_json.py` to generate LAADS-style download JSON lists for `VJ102DNB`/`VJ103DNB` by bbox and date range.
 - Added a clean UTF-8 `tools/download_vj_dnb_README.md` with validated Windows/Conda usage examples for tokenized LAADS downloads.
 - Added `tools/official_vj_dnb_pipeline_tool.py` with LangChain `StructuredTool` registration (`official_vj_dnb_fullchain_tool`) to orchestrate official-source VJ102/VJ103 query + download + preprocessing in one callable tool.
+- Added explicit preprocessing alias tool `convert_vj102_vj103_precise_to_tif_tool` (registered from `tools/official_vj_dnb_preprocess_tool.py`) so the precise converter workflow can be invoked directly by tool name.
 - Added workflow/code references under `.ntl-gpt/skills/NTL-workflow-guidance` for the new official VJ full-chain path:
   - workflow task `Q25` in `references/workflows/data_retrieval_preprocessing.json`
   - code index entry in `references/code/code_index.json`
   - executable reference script `references/code/data_retrieval_preprocessing/Q25_official_vj_dnb_fullchain_iran.py`
+- Added workflow/code references for preprocess-only and conflict assessment scenarios:
+  - workflow task `Q26` in `references/workflows/data_retrieval_preprocessing.json` (preprocess-only, storage-manager paths)
+  - workflow task `Q21` in `references/workflows/event_impact_assessment.json` (official VJ conflict assessment chain)
+  - code examples:
+    - `references/code/data_retrieval_preprocessing/Q26_vj102_vj103_preprocess_storage_paths.py`
+    - `references/code/event_impact_assessment/Q21_iran_conflict_official_vj_workflow.py`
+- Added workflow/code references for QA-controlled local-topic conflict mapping:
+  - workflow task `Q22` in `references/workflows/event_impact_assessment.json`
+  - code example `references/code/event_impact_assessment/Q22_iran_vj146a1_tehran_hormuz_workflow.py`
+  - documents the boundary between generic tools and case-specific regional workflows.
 - Added `agents/NTL_Knowledge_Subagent.py` as a dedicated Deep Agents subagent prompt for KB routing, with strict JSON response contract (`ntl.kb.subagent.response.v1`).
 - Added `docs/NTL-GPT版本介绍.md` as the consolidated product/version overview document.
 - Added explicit policy in `AGENTS.md`: complex tasks should prioritize `using-superpowers`.
@@ -46,6 +65,29 @@ This changelog is intentionally lightweight:
 - Registered the new benchmark tools in `Engineer_tools` via `tools/__init__.py` without changing prompt/graph architecture.
 
 ### Changed
+- Extended `tools/GEE_download.py` `NTL_download_tool` to support direct AOI download by `bbox/box` (`minx,miny,maxx,maxy`) in addition to administrative region matching, with centralized bbox parsing/validation and backward-compatible aliases.
+- Refactored `tools/fetch_inss_arcgis_strikes.py` into a thin fetch-orchestrator and moved spatial hierarchy logic to reusable helpers.
+- Extended strike fetch pipeline outputs with impacted-area products:
+  - `inss_arcgis_strikes_spatial_enriched.{geojson,csv}`
+  - `inss_arcgis_strikes_country_summary.csv`
+  - `inss_arcgis_strikes_country_type_summary.csv`
+  - `inss_arcgis_strikes_admin_summary.csv`
+  - `inss_arcgis_strikes_admin_type_summary.csv`
+  - `inss_arcgis_strikes_spatial_catalog.json`
+- Added CLI controls for reusable spatial packaging:
+  - `--skip-spatial-summary`
+  - `--spatial-levels`
+  - `--spatial-cache-dir`
+  - `--country-boundary-url`
+- Refactored event-report rebuild flow under `base_data/Iran_War/analysis/scripts/` into modular layers:
+  - added `iran_event_report_config.py` for event/city/time/scale runtime configuration,
+  - added `iran_event_report_pipeline.py` for step-based data prep/render/report orchestration,
+  - converted `rebuild_iran_event_report.py` to a thin CLI entrypoint (supports cross-event/cross-country overrides, e.g. Israel),
+  - updated shared helpers to support injected city alias mappings and configurable local-map sizing.
+- Generalized admin/strike schema handling in pipeline:
+  - admin name-field auto-detection for ADM1/ADM2/ADM3,
+  - strike date-field auto-detection (`Date/date/event_date/strike_date`),
+  - preserved unique point-to-unit assignment for province/city/county accuracy.
 - Reworked `tools/download_vj_dnb.py` for robust production download behavior:
   - auto-loads `.env` (including repo-root `.env`) for `EARTHDATA_TOKEN`,
   - applies Windows Schannel workaround (`curl --ssl-no-revoke`) for revocation/TLS failures,
@@ -57,6 +99,19 @@ This changelog is intentionally lightweight:
   - default output grid now targets `500m` via new `--resolution-m` (with optional `--resolution-deg` override),
   - summary metadata now records raw units, scale attributes, applied radiance scale, and resolved output resolution.
 - Registered `official_vj_dnb_fullchain_tool` in `tools/__init__.py` and exposed it to both `data_searcher_tools` and `Engineer_tools`.
+- Registered `convert_vj102_vj103_precise_to_tif_tool` in `tools/__init__.py` and exposed it to both `data_searcher_tools` and `Engineer_tools`.
+- Extended `tools/official_vj_dnb_pipeline_tool.py` to support:
+  - gridded `VJ146A1/VJ146A2` runs in addition to swath `VJ102DNB/VJ103DNB`,
+  - explicit `qa_mode` passthrough for gridded runs,
+  - formal pipeline-mode routing with mixed-source rejection,
+  - gridded manifest/path reporting aligned with the formal tool contract.
+- Improved storage-manager path compatibility for official VJ tools:
+  - `official_vj_dnb_preprocess_tool` now supports virtual paths (`/data/raw`, `/data/processed`, `/memories`, `/shared`) and workspace-relative reads/writes with output-root safety checks.
+  - `official_vj_dnb_fullchain_tool` output root resolution now handles `outputs/...` prefixes without duplication and enforces `outputs`-only write boundaries.
+- Disabled legacy `Noaa20_VIIRS_Preprocess` routing for agent tool selection and migrated default preprocessing path to official VJ workflow:
+  - removed `noaa20_sdr_preprocess_tool` from active `Engineer_tools` registry in `tools/__init__.py`,
+  - retained a deprecated compatibility stub in `tools/NTL_preprocess.py` that returns a migration message,
+  - remapped KB aliases and workflow/tool metadata to `convert_vj102_vj103_precise_to_tif_tool`.
 - Enhanced NTL workflow router keywords in `.ntl-gpt/skills/NTL-workflow-guidance/references/router_index.json` to include official-source terms (`laads`, `VJ102DNB`, `VJ103DNB`).
 - Updated `experiments/official_daily_ntl_fastpath/convert_vnp46a1_to_tif.py` to support date filtering via `--date` and `--start-date/--end-date`, with file-date parsing from `Ayyyyddd` granule names and filter metadata in summary output.
 - Documented VJ102DNB geolocation handling in conversion summaries as `approx_granule_bbox_from_global_attrs` and explicit recommendation to pair with VJ103DNB for precise per-pixel geolocation.

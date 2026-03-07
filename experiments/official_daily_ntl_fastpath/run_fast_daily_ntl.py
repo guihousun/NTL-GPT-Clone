@@ -190,9 +190,11 @@ def run() -> dict[str, Any]:
                     day=day,
                     entries=selected[day],
                     variable_candidates=spec.variable_candidates,
+                    qa_variable_candidates=spec.qa_variable_candidates,
                     roi_gdf=boundary.gdf,
                     workspace=workspace,
                     earthdata_token=token,
+                    qa_mode=spec.default_qa_mode,
                 )
                 day_statuses.append(str(result.get("status")))
                 if result.get("output_path"):
