@@ -77,4 +77,3 @@ A temporary public demo is available at:
 ## Notes
 
 - `environment.yml` is the supported installation entry for this repository.
-- `.env.example` is a template; copy it to `.env` before running the app.
