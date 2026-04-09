@@ -58,9 +58,6 @@ _external_refs/
 base_data/
 RAG/RAG.rar
 RAG/literature base/
-RAG/Code_RAG/
-RAG/Literature_RAG/
-RAG/Solution_RAG/
 RAG/RAG_Faiss/
 RAG/Solution_RAG.zip
 RAG/*.zip

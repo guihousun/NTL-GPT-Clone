@@ -1,0 +1,32 @@
+{
+  "collection_name": "Code_RAG",
+  "persistent_directory": "RAG/Code_RAG",
+  "embedding_model": "text-embedding-3-small",
+  "profile": "code",
+  "reset": true,
+  "deleted_before_rebuild": 0,
+  "records_seen": 1194,
+  "records_ingested": 1119,
+  "records_skipped": 75,
+  "dedupe_removed_count": 75,
+  "errors": [],
+  "non_json_docs_loaded": 0,
+  "chunks_written": 1119,
+  "final_collection_count": 1119,
+  "doc_type_counts": {
+    "dataset_card": 633,
+    "code_symbol": 389,
+    "code_module": 16,
+    "gis_guide": 75,
+    "tool_template": 6
+  },
+  "source_bucket_counts": {
+    "code_guide": 1113,
+    "tools_latest": 6
+  },
+  "language_counts": {
+    "json": 633,
+    "python": 411,
+    "text": 75
+  }
+}
