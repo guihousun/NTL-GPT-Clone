@@ -4,6 +4,8 @@ NTL-GPT is an open-source Streamlit application for nighttime light analysis. It
 
 ## Quick Start
 
+macOS / Linux (`bash`):
+
 ```bash
 cd /path/to/NTL-GPT-stable
 conda env create -f environment.yml
@@ -13,7 +15,7 @@ python check_env.py
 streamlit run Streamlit.py
 ```
 
-PowerShell:
+Windows (`PowerShell`):
 
 ```powershell
 Set-Location E:\NTL-GPT-stable
