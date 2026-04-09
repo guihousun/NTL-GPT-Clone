@@ -1,6 +1,6 @@
 # NTL-GPT-Clone
 
-NTL-GPT is a Streamlit-based multi-agent workspace for nighttime light analysis. The stable public build focuses on local use: chat-driven data search, geospatial processing, official VIIRS workflows, and code-assisted NTL analysis.
+NTL-GPT is an open-source Streamlit application for nighttime light analysis. It combines multi-agent orchestration, geospatial tooling, Google Earth Engine workflows, and official VIIRS data processing in a single local workspace.
 
 ## Quick Start
 
@@ -22,36 +22,37 @@ python check_env.py
 streamlit run Streamlit.py
 ```
 
-## Environment
+## Configure `.env`
 
-Fill these required values in `.env`:
+Required:
 
 - `DASHSCOPE_Qwen_plus_KEY`
 - `DASHSCOPE_Qwen_plus_URL`
 - `DASHSCOPE_Coding_URL`
 
-Common optional values:
+Optional:
 
 - `GEE_DEFAULT_PROJECT_ID`
 - `EARTHDATA_TOKEN`
 - `NTL_TOOL_PROFILE`
 - `NTL_CONTEXTILY_TMP`
 
-## Capability Tiers
+## Main Capabilities
 
-Works after basic setup:
+Available after basic setup:
 
-- chat interface
+- chat-based task handling
 - local tool orchestration
 - knowledge-guided geospatial code generation
 
-Needs `GEE_DEFAULT_PROJECT_ID` and local Earth Engine auth:
+Additional setup for Google Earth Engine:
 
-- Google Earth Engine download and analysis tools
+- set `GEE_DEFAULT_PROJECT_ID`
+- authenticate locally with Earth Engine if needed
 
-Needs `EARTHDATA_TOKEN`:
+Additional setup for official VIIRS downloads:
 
-- official VIIRS / Earthdata download workflows
+- set `EARTHDATA_TOKEN`
 
 ## Startup Check
 
@@ -61,14 +62,19 @@ Run this before first launch:
 python check_env.py
 ```
 
-It verifies:
+The checker verifies:
 
 - required environment variables
 - key project files
 - core Python imports
 
+## Cloud Demo
+
+A temporary public demo is available at:
+
+[https://ntl-gpt.gischaser.cn/](https://ntl-gpt.gischaser.cn/)
+
 ## Notes
 
-- `environment.yml` is the only supported install path for the public stable build.
-- `.env.example` is a template only. Do not commit a real `.env`.
-- A temporary cloud demo is available at [https://ntl-gpt.gischaser.cn/](https://ntl-gpt.gischaser.cn/).
+- `environment.yml` is the supported installation entry for this repository.
+- `.env.example` is a template; copy it to `.env` before running the app.
