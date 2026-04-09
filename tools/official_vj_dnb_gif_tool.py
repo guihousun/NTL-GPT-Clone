@@ -59,9 +59,9 @@ class OfficialVJDNBGifInput(BaseModel):
     )
     basemap_alpha: float = Field(default=0.92, description="Basemap alpha.")
     ntl_alpha: float = Field(default=0.65, description="Nighttime light raster alpha.")
-    transparent_below: float = Field(
-        default=float("-inf"),
-        description="Mask nighttime light pixels below this value so they render transparent.",
+    transparent_below: Optional[float] = Field(
+        default=None,
+        description="Optional threshold below which nighttime light pixels render transparent.",
     )
     classification_mode: str = Field(
         default="continuous",
@@ -176,7 +176,7 @@ def run_official_vj_dnb_gif(
     basemap_provider: str = "",
     basemap_alpha: float = 0.92,
     ntl_alpha: float = 0.65,
-    transparent_below: float = float("-inf"),
+    transparent_below: Optional[float] = None,
     classification_mode: str = "continuous",
     class_bins: int = 8,
     stddev_range: float = 2.0,
@@ -258,8 +258,6 @@ def run_official_vj_dnb_gif(
         str(float(basemap_alpha)),
         "--ntl-alpha",
         str(float(ntl_alpha)),
-        "--transparent-below",
-        str(float(transparent_below)),
         "--classification-mode",
         str(classification_mode),
         "--class-bins",
@@ -269,6 +267,8 @@ def run_official_vj_dnb_gif(
     ]
     if not bool(show_colorbar):
         cmd += ["--no-colorbar"]
+    if transparent_below is not None:
+        cmd += ["--transparent-below", str(float(transparent_below))]
     if str(overlay_vector).strip():
         resolved_vector = _resolve_workspace_path(overlay_vector, thread_id, writable=False)
         if not resolved_vector.exists():

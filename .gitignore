@@ -1,6 +1,7 @@
 # Secrets
 .env
 .env.*
+!.env.example
 *.pem
 *.p12
 *.key
@@ -43,6 +44,7 @@ skill_runtime/
 tmp_code_extract/
 utils/sessions/
 .tmp_langsmith_dump*/
+.conda-env/
 
 # Local backups and experiments byproducts
 backups/

@@ -17,17 +17,44 @@ from pydantic import BaseModel, Field
 
 from storage_manager import current_thread_id, storage_manager
 
-_PROJECT_ID = "empyrean-caster-430308-m2"
+_PROJECT_ID = (
+    os.getenv("GEE_DEFAULT_PROJECT_ID", "").strip()
+    or os.getenv("EE_PROJECT_ID", "").strip()
+    or "empyrean-caster-430308-m2"
+)
 BBoxLike = str | list[float] | tuple[float, float, float, float] | dict[str, float]
 
 
-def _ensure_ee_initialized() -> None:
+def _get_streamlit_secret(name: str):
     try:
-        ee.Initialize(project=_PROJECT_ID)
+        st_obj = getattr(__import__("builtins"), "st", None)
+        if st_obj is not None and hasattr(st_obj, "secrets"):
+            return st_obj.secrets.get(name)
     except Exception:
-        # If credentials are not available, caller will receive this as tool error.
+        return None
+    return None
+
+
+def _ensure_ee_initialized() -> None:
+    sa_email = os.getenv("EE_SERVICE_ACCOUNT") or _get_streamlit_secret("EE_SERVICE_ACCOUNT")
+    sa_key_json = os.getenv("EE_PRIVATE_KEY_JSON") or _get_streamlit_secret("EE_PRIVATE_KEY_JSON")
+    if sa_email and sa_key_json:
+        creds = ee.ServiceAccountCredentials(sa_email, key_data=str(sa_key_json))
+        ee.Initialize(credentials=creds, project=_PROJECT_ID)
+        return
+
+    try:
+        if _PROJECT_ID:
+            ee.Initialize(project=_PROJECT_ID)
+        else:
+            ee.Initialize()
+    except Exception:
+        # For personal local use, fall back to interactive auth if no env-backed creds are available.
         ee.Authenticate()
-        ee.Initialize(project=_PROJECT_ID)
+        if _PROJECT_ID:
+            ee.Initialize(project=_PROJECT_ID)
+        else:
+            ee.Initialize()
 
 
 def _resolve_thread_id_from_config(config: Optional[RunnableConfig] = None) -> str:
