@@ -1,9 +1,0 @@
-{
-  "timestamp_utc": "20260223T163311Z",
-  "source_tool": "final_geospatial_code_execution_tool",
-  "thread_id": "thread_ctx_final",
-  "original_script_name": "final_geocode_20260223T163309Z_70647069.py",
-  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\thread_ctx_final\\outputs\\final_geocode_20260223T163309Z_70647069.py",
-  "content_hash": "7e5bad8d31b25e8bbbef037010c4c16a7f71f1fd57535f92c180150567cc29a2",
-  "stdout_excerpt": "E:\\NTL-GPT-Clone\\user_data\\thread_ctx_final\\outputs\\ctx_check_final.txt\n"
-}

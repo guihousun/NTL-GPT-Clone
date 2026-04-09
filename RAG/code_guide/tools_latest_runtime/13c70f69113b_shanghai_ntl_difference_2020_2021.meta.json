@@ -1,9 +1,0 @@
-{
-  "timestamp_utc": "20260222T155010Z",
-  "source_tool": "execute_geospatial_script_tool",
-  "thread_id": "ddd20b0a",
-  "original_script_name": "shanghai_ntl_difference_2020_2021.py",
-  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\ddd20b0a\\outputs\\shanghai_ntl_difference_2020_2021.py",
-  "content_hash": "13c70f69113b4af72476499852819e1088dbd31da0dd40403a7e8fe9f5b36e81",
-  "stdout_excerpt": "[StorageManager] Resolving 'shanghai_ntl_2020_2021_2020.tif' for thread_id='ddd20b0a'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\ddd20b0a\\inputs\\shanghai_ntl_2020_2021_2020.tif\n[StorageManager] Resolving 'shanghai_ntl_2020_2021_2021.tif' for thread_id='ddd20b0a'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\ddd20b0a\\inputs\\shanghai_ntl_2020_2021_2021.tif\nLoading shanghai_ntl_2020_2021_2020.tif...\nLoading shanghai_ntl_2020_2021_2021.tif...\nDifference raster saved to: NTL_Difference_2021_2020.tif\n\n=== NTL Difference Analysis Summary ===\nMean change: 0.2084\nStd change: 2.0400\nMin change: -85.0150\nMax change: 32.7950\nPixels with increase (>0): 19213\nPixels with decrease (<0): 9267\nPixels unchanged (~0): 46888\nTotal valid pixels: 73622\n\nVisualization saved to: NTL_Difference_Visualization.png\nStatistics saved to: NTL_Difference_Statistics.csv\n\n=== Analysis Complete ===\n"
-}

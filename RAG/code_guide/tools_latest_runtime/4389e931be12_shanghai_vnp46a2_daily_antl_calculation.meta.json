@@ -1,9 +1,0 @@
-{
-  "timestamp_utc": "20260218T071303Z",
-  "source_tool": "execute_geospatial_script_tool",
-  "thread_id": "case_1771395733_13",
-  "original_script_name": "shanghai_vnp46a2_daily_antl_calculation.py",
-  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\case_1771395733_13\\outputs\\shanghai_vnp46a2_daily_antl_calculation.py",
-  "content_hash": "4389e931be12a516c48afb029dbf241b4563f1c9fc45d66eceeb754938a6d083",
-  "stdout_excerpt": "[StorageManager] Resolving 'shanghai_boundary.shp' for thread_id='case_1771395733_13'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\case_1771395733_13\\inputs\\shanghai_boundary.shp\nCSV saved to: E:\\NTL-GPT-Clone\\user_data\\case_1771395733_13\\outputs\\shanghai_vnp46a2_daily_antl_2022_01.csv\nTotal daily records: 30\n         ANTL        date\n0   18.665744  2022-01-01\n1   19.429925  2022-01-02\n2   23.197075  2022-01-03\n3   19.210820  2022-01-04\n4   20.217803  2022-01-05\n5   20.182493  2022-01-06\n6   19.861458  2022-01-07\n7   20.714223  2022-01-08\n8   16.069872  2022-01-09\n9   19.611384  2022-01-10\n10  19.197438  2022-01-11\n11  19.338315  2022-01-12\n12  21.815327  2022-01-13\n13  20.009285  2022-01-14\n14  20.627075  2022-01-15\n15  20.627075  2022-01-16\n16  20.627080  2022-01-17\n17  19.450903  2022-01-18\n18  21.354001  2022-01-19\n19  21.064190  2022-01-20\n20  20.627075  2022-01-21\n21  20.625432  2022-01-22\n22  20.627075  2022-01-23\n23  20.545483  2022-01-24\n24  20.481367  2022-01-25\n25  20.614805  2022-01-26\n26  20.525320  2022-01-27\n27  20.627259  2022-01-28\n28  20.624204  2022-01-29\n29  18.201590  2022-01-30\n"
-}

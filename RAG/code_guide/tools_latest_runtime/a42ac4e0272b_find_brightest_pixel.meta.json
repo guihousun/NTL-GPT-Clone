@@ -1,9 +1,0 @@
-{
-  "timestamp_utc": "20260218T062800Z",
-  "source_tool": "execute_geospatial_script_tool",
-  "thread_id": "case_1771395733_2",
-  "original_script_name": "find_brightest_pixel.py",
-  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\case_1771395733_2\\outputs\\find_brightest_pixel.py",
-  "content_hash": "a42ac4e0272b508b5c6786455ca620d58eeee1416571f6306bd21af949090e22",
-  "stdout_excerpt": "[StorageManager] Resolving 'shanghai_NTL_2022.tif' for thread_id='case_1771395733_2'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\case_1771395733_2\\inputs\\shanghai_NTL_2022.tif\nMaximum NTL value: 316.9000244140625\nPixel location (row, col): (162, 212)\nWGS84 Coordinates: Latitude=31.137854, Longitude=121.809307\nResults saved to E:\\NTL-GPT-Clone\\user_data\\case_1771395733_2\\outputs\\brightest_pixel_coordinates.csv\n"
-}

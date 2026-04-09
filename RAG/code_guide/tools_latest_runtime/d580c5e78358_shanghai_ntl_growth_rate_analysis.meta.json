@@ -1,9 +1,0 @@
-{
-  "timestamp_utc": "20260218T065856Z",
-  "source_tool": "execute_geospatial_script_tool",
-  "thread_id": "case_1771395733_10",
-  "original_script_name": "shanghai_ntl_growth_rate_analysis.py",
-  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\case_1771395733_10\\outputs\\shanghai_ntl_growth_rate_analysis.py",
-  "content_hash": "d580c5e78358edcf5feeb2fd94d6c2c75f6c6728434bd0c5cc640723d627395a",
-  "stdout_excerpt": "Growth rate CSV saved: E:\\NTL-GPT-Clone\\user_data\\case_1771395733_10\\outputs\\shanghai_ntl_growth_rate.csv\nGrowth rate visualization saved: E:\\NTL-GPT-Clone\\user_data\\case_1771395733_10\\outputs\\shanghai_ntl_growth_rate.png\n\n=== Shanghai NTL Annual Growth Rate Summary (2015-2020) ===\n Year  Total_TNTL  Growth_Rate\n 2015 867135.4733          NaN\n 2016 861477.9283    -0.652441\n 2017 947629.3122    10.000417\n 2018 954755.0213     0.751951\n 2019 959794.6915     0.527850\n 2020 980150.5803     2.120859\n"
-}

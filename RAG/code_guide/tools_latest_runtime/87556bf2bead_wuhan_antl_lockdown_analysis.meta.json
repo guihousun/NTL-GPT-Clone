@@ -1,9 +1,0 @@
-{
-  "timestamp_utc": "20260221T162513Z",
-  "source_tool": "execute_geospatial_script_tool",
-  "thread_id": "a1f6def8",
-  "original_script_name": "wuhan_antl_lockdown_analysis.py",
-  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\a1f6def8\\outputs\\wuhan_antl_lockdown_analysis.py",
-  "content_hash": "87556bf2beaddcde30497e387251c68117663b116762ccae4639d93842b34903",
-  "stdout_excerpt": "Calculating ANTL for baseline period 2019 (Jan 23 - Apr 8)...\nCalculating ANTL for lockdown period 2020 (Jan 23 - Apr 8)...\nExecuting GEE computation...\nResults saved to: E:\\NTL-GPT-Clone\\user_data\\debug\\outputs\\wuhan_antl_lockdown_comparison.csv\n\n=== ANTL Comparison Results ===\n2019 Baseline (Jan 23 - Apr 8): 4.71459632242541\n2020 Lockdown (Jan 23 - Apr 8): 6.146513107256638\nAbsolute Change: 1.4319167848312278\nPercent Change: 30.37%\n"
-}

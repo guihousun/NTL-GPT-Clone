@@ -1,9 +1,0 @@
-{
-  "timestamp_utc": "20260222T051417Z",
-  "source_tool": "execute_geospatial_script_tool",
-  "thread_id": "26cf1633",
-  "original_script_name": "shanghai_tntl_growth_final.py",
-  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\26cf1633\\outputs\\shanghai_tntl_growth_final.py",
-  "content_hash": "b995a44dd1a9fc93d626807ae4883c03535ad34326b44028ba520e03e71e1a3a",
-  "stdout_excerpt": "TNTL values for Shanghai 2015-2020:\n   year                  raster         TNTL\n0  2015  shanghai_ntl__2015.tif  433567.7500\n1  2016   shanghai_ntl_2016.tif  430738.9688\n2  2017  shanghai_ntl__2017.tif  473814.6562\n3  2018  shanghai_ntl__2018.tif  477377.5000\n4  2019  shanghai_ntl__2019.tif  479897.3438\n5  2020   shanghai_ntl_2020.tif  490075.2812\n\nCAGR (2015-2020): 2.4805%\n\nResults saved to: E:\\NTL-GPT-Clone\\user_data\\debug\\outputs\\shanghai_tntl_growth_rates_final.csv\n\n================================================================================\nANNUAL TNTL GROWTH RATES FOR SHANGHAI (2015-2020)\n================================================================================\n2015: TNTL = 433,567.75, Growth Rate = N/A (baseline year)\n2016: TNTL = 430,738.97, Change = -2,828.78, Growth Rate = -0.6524%\n2017: TNTL = 473,814.66, Change = +43,075.69, Growth Rate = +10.0004%\n2018: TNTL = 477,377.50, Change = +3,562.84, Growth Rate = +0.7519%\n2019: TNTL = 479,897.34, Change = +2,519.84, Growth Rate = +0.5279%\n2020: TNTL = 490,075.28, Change = +10,177.94, Growth Rate = +2.1209%\n================================================================================\n"
-}

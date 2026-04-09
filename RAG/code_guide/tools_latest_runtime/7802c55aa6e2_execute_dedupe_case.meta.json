@@ -1,9 +1,0 @@
-{
-  "timestamp_utc": "20260225T060620Z",
-  "source_tool": "execute_geospatial_script_tool",
-  "thread_id": "thread_exec_dedupe_7cb6c506",
-  "original_script_name": "execute_dedupe_case.py",
-  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\thread_exec_dedupe_7cb6c506\\outputs\\execute_dedupe_case.py",
-  "content_hash": "7802c55aa6e28ce1866e9bafd49f9cd50c595cd73aa83a44829d9233516d85c7",
-  "stdout_excerpt": "run_once_is_enough\n"
-}

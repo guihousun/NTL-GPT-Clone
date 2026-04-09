@@ -1,9 +1,0 @@
-{
-  "timestamp_utc": "20260217T154402Z",
-  "source_tool": "execute_geospatial_script_tool",
-  "thread_id": "5b12f66f",
-  "original_script_name": "myanmar_earthquake_zone_antl_analysis.py",
-  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\5b12f66f\\outputs\\myanmar_earthquake_zone_antl_analysis.py",
-  "content_hash": "b9418ef8ca7ba8f265e5fad13cc9d7c40be25b93729e8b6018c4066674c5ed1f",
-  "stdout_excerpt": "Daily ANTL saved to: E:\\NTL-GPT-Clone\\user_data\\5b12f66f\\outputs\\myanmar_eq_zone_daily_antl.csv\nSummary statistics saved to: E:\\NTL-GPT-Clone\\user_data\\5b12f66f\\outputs\\myanmar_eq_zone_summary.csv\nDamage assessment saved to: E:\\NTL-GPT-Clone\\user_data\\5b12f66f\\outputs\\myanmar_eq_zone_damage_assessment.csv\n\n======================================================================\n2025年缅甸地震 - 分区ANTL灾害评估\n震中: 22.013°N, 95.922°E (M7.7, 2025-03-28)\n======================================================================\n\n区域                         震前均值       地震当日        变化%       震后均值        变化%\n----------------------------------------------------------------------\n0-100km severe           0.6760     0.8516    +25.97%     0.6947     +2.76%\n100-200km moderate       0.5652     0.8496    +50.33%     0.7143    +26.38%\n200-300km light          0.5879     0.8126    +38.21%     0.8121    +38.14%\n300-500km control        0.6474     0.8629    +33.29%     0.7342    +13.40%\n======================================================================\n"
-}

@@ -1,9 +1,0 @@
-{
-  "timestamp_utc": "20260217T163029Z",
-  "source_tool": "execute_geospatial_script_tool",
-  "thread_id": "09b989ca",
-  "original_script_name": "myanmar_earthquake_2025_antlr_analysis.py",
-  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\09b989ca\\outputs\\myanmar_earthquake_2025_antlr_analysis.py",
-  "content_hash": "226b8e6590911341c0e2b7c92385d0ab87e29cf9917e39d288ea93cfad17c32f",
-  "stdout_excerpt": "GEE initialized successfully\n[StorageManager] Resolving 'myanmar_boundary.shp' for thread_id='09b989ca'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\09b989ca\\inputs\\myanmar_boundary.shp\nBoundary loaded: CRS=EPSG:4326, bounds=[ 92.1729181   9.526084  101.1700796  28.547835 ]\nGEE region created: MultiPolygon\nCollection filtered, computing daily ANTL...\nComputed ANTL for 60 days\n\n=== Period Statistics ===\n     period  mean_antlr  std_antlr  min_antlr  max_antlr  days\nevent_night    0.743669        NaN   0.743669   0.743669     1\n post_event    0.404225   0.177602   0.198769   0.867893    32\n  pre_event    0.366596   0.181104   0.165525   0.676279    27\n\n=== Damage Assessment Metrics ===\nPre-event mean ANTL (Mar 1-27): 0.366596\nEvent night ANTL (Mar 28): 0.743669\nPost-event mean ANTL (Mar 29-Apr 30): 0.404225\nImmediate light drop on event night: -102.86%\nSustained ANTL change (post vs pre): 10.26%\n\nDaily ANTL time series saved: E:\\NTL-GPT-Clone\\user_data\\09b989ca\\outputs\\myanmar_earthquake_2025_antlr_daily.csv\nPeriod summary saved: E:\\NTL-GPT-Clone\\user_data\\09b989ca\\outputs\\myanmar_earthquake_2025_antlr_summary.csv\nDamage metrics saved: E:\\NTL-GPT-Clone\\user_data\\09b989ca\\outputs\\myanmar_earthquake_2025_damage_metrics.csv\n\n=== Analysis Complete ===\n"
-}

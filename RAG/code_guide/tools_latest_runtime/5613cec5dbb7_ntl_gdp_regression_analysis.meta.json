@@ -1,9 +1,0 @@
-{
-  "timestamp_utc": "20260217T121423Z",
-  "source_tool": "execute_geospatial_script_tool",
-  "thread_id": "6b50d025",
-  "original_script_name": "ntl_gdp_regression_analysis.py",
-  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\6b50d025\\outputs\\ntl_gdp_regression_analysis.py",
-  "content_hash": "5613cec5dbb7f17ed8b3cbd2dba236ab39833d0d2726b37f32404e413a122318",
-  "stdout_excerpt": "OLS: R² = 0.919031, RMSE = 223.0920\nRidge: R² = 0.909621, RMSE = 235.6987\nLasso: R² = 0.919031, RMSE = 223.0921\nRandom Forest: R² = 0.983786, RMSE = 99.8305\n\nBest model by R²: Random Forest (R² = 0.983786)\nBest model by RMSE: Random Forest (RMSE = 99.8305)\n\nSelected best-fitting model: Random Forest\n\nRegression results saved to: E:\\NTL-GPT-Clone\\user_data\\debug\\outputs\\ntl_gdp_regression_results.csv\nDetailed predictions saved to: E:\\NTL-GPT-Clone\\user_data\\debug\\outputs\\ntl_gdp_detailed_predictions.csv\nVisualization saved to: E:\\NTL-GPT-Clone\\user_data\\debug\\outputs\\ntl_gdp_regression_analysis.png\n\n============================================================\nREGRESSION ANALYSIS SUMMARY\n============================================================\n\nStudy Area: Shanghai, China\nTime Period: 2013-2022 (10 years)\n\nANTL Range: 12.3080 - 14.9202\nGDP Range: 2160.21 - 4465.28 billion yuan\n\nModel Performance:\n        Model       R2       RMSE  Coefficient    Intercept\n          OLS 0.919031 223.092035   797.469163 -7618.719946\n        Ridge 0.909621 235.698740   716.776823 -6518.157925\n        Lasso 0.919031 223.092060   797.356587 -7617.184514\nRandom Forest 0.983786  99.830545          NaN          NaN\n\n*** BEST-FITTING MODEL: Random Forest ***\n    R² = 0.983786\n    RMSE = 99.8305 billion yuan\n============================================================\n"
-}

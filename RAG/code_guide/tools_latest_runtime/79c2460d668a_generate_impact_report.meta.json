@@ -1,9 +1,0 @@
-{
-  "timestamp_utc": "20260218T161319Z",
-  "source_tool": "execute_geospatial_script_tool",
-  "thread_id": "f82a6486",
-  "original_script_name": "generate_impact_report.py",
-  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\f82a6486\\outputs\\generate_impact_report.py",
-  "content_hash": "79c2460d668a611253a6ad886b716e45ef823ebceb0d8a04001baf7e38506ed4",
-  "stdout_excerpt": "======================================================================\nIMPACT ASSESSMENT REPORT GENERATED\n======================================================================\nReport saved to: E:\\NTL-GPT-Clone\\user_data\\f82a6486\\outputs\\Myanmar_Earthquake_2025_Impact_Assessment_Report.json\n\nExecutive Summary:\n  - Event: M7.7 Myanmar Earthquake, March 28, 2025\n  - Epicenter: 22.01°N, 95.92°E (16 km NNW of Sagaing)\n  - Casualties: ~3,800 deaths, 5,100+ injuries (UN OCHA)\n  - NTL Findings:\n      * 25km zone: 41.06% blackout (Moderate damage)\n      * 50km zone: 3.34% blackout (Minor damage)\n      * 100km zone: -33.39% (brightness increase)\n  - Recovery: 44.56% in 25km zone by April 4-11\n======================================================================\n"
-}

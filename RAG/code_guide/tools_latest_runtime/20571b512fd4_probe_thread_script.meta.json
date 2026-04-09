@@ -1,9 +1,0 @@
-{
-  "timestamp_utc": "20260223T155021Z",
-  "source_tool": "execute_geospatial_script_tool",
-  "thread_id": "e1060731",
-  "original_script_name": "probe_thread_script.py",
-  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\e1060731\\outputs\\probe_thread_script.py",
-  "content_hash": "20571b512fd4e416af80be815bd1c14bd56a8fb2b00139889b3b4ffb3de5acdb",
-  "stdout_excerpt": "OUTPATH: E:\\NTL-GPT-Clone\\user_data\\e1060731\\outputs\\probe_thread_output.txt\n"
-}

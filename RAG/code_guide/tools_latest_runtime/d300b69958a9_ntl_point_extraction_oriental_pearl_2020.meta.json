@@ -1,9 +1,0 @@
-{
-  "timestamp_utc": "20260218T063428Z",
-  "source_tool": "execute_geospatial_script_tool",
-  "thread_id": "case_1771395733_4",
-  "original_script_name": "ntl_point_extraction_oriental_pearl_2020.py",
-  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\case_1771395733_4\\outputs\\ntl_point_extraction_oriental_pearl_2020.py",
-  "content_hash": "d300b69958a914f9d517facab40db7f23a0af193e8825b7f8179690c304809ff",
-  "stdout_excerpt": "[StorageManager] Resolving 'ntl_shanghai_2020.tif' for thread_id='case_1771395733_4'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\case_1771395733_4\\inputs\\ntl_shanghai_2020.tif\n[StorageManager] Resolving 'oriental_pearl_tower_location.csv' for thread_id='case_1771395733_4'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\case_1771395733_4\\inputs\\oriental_pearl_tower_location.csv\n============================================================\nNTL Intensity Extraction at Oriental Pearl Tower\n============================================================\nLocation: Oriental Pearl Tower, Shanghai, China\nCoordinates: 31.241451°N, 121.495539°E (WGS-84)\nYear: 2020\nDataset: NPP-VIIRS-Like\nUnits: nW·cm⁻²·sr⁻¹ (nano-Watts per square centimeter per steradian)\n============================================================\n\nExtraction Results:\n  Single pixel (nearest-neighbor): 60.3100 nW·cm⁻²·sr⁻¹\n  3x3 focal mean (recommended):    42.1672 nW·cm⁻²·sr⁻¹\n  Bilinear interpolation:          60.3100 nW·cm⁻²·sr⁻¹\n\n  *** RECOMMENDED VALUE: 42.1672 nW·cm⁻²·sr⁻¹ ***\n  (3x3 focal mean recommended for noise reduction)\n\nResults saved to: E:\\NTL-GPT-Clone\\user_data\\case_1771395733_4\\outputs\\ntl_oriental_pearl_tower_2020.csv\n============================================================\n"
-}

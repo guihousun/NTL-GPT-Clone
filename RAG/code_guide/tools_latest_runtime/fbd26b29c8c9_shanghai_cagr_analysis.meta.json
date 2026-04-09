@@ -1,9 +1,0 @@
-{
-  "timestamp_utc": "20260218T065424Z",
-  "source_tool": "execute_geospatial_script_tool",
-  "thread_id": "case_1771395733_9",
-  "original_script_name": "shanghai_cagr_analysis.py",
-  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\case_1771395733_9\\outputs\\shanghai_cagr_analysis.py",
-  "content_hash": "fbd26b29c8c96e6a82283384043e82e0d83cd3691f38c33b2a197df76d591d1e",
-  "stdout_excerpt": "CAGR results saved to: E:\\NTL-GPT-Clone\\user_data\\case_1771395733_9\\outputs\\shanghai_cagr_2015_2020.csv\nVisualization saved to: E:\\NTL-GPT-Clone\\user_data\\case_1771395733_9\\outputs\\shanghai_tntl_cagr_2015_2020.png\n\n=== CAGR Analysis Summary ===\nStudy Area: Shanghai\nPeriod: 2015-2020\nBeginning TNTL (2015): 433567.75\nEnding TNTL (2020): 490075.28\nNumber of Years: 5\nCAGR: 0.024805\nCAGR (%): 2.4805%\n"
-}

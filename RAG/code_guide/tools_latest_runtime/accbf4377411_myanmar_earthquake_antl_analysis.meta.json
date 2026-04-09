@@ -1,9 +1,0 @@
-{
-  "timestamp_utc": "20260221T065357Z",
-  "source_tool": "execute_geospatial_script_tool",
-  "thread_id": "8cf9772a",
-  "original_script_name": "myanmar_earthquake_antl_analysis.py",
-  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\8cf9772a\\outputs\\myanmar_earthquake_antl_analysis.py",
-  "content_hash": "accbf4377411b941aeca5407e0b78afd0fa3507ab400245d91dc7a50b1ede500",
-  "stdout_excerpt": "Computing ANTL for pre-event baseline period (2025-03-14 to 2025-03-21)...\n  25km baseline ANTL: 1.558259350676268\n  25km first night ANTL: 0.8936574001376311\n  25km recovery ANTL: 1.2243702763363518\n  50km baseline ANTL: 0.718384935045797\n  50km first night ANTL: 0.6852822217630338\n  50km recovery ANTL: 0.5870618053966715\n  100km baseline ANTL: 0.49635892114873065\n  100km first night ANTL: 0.6533834015736462\n  100km recovery ANTL: 0.3864222155696575\n\nCalculating impact metrics...\n  25km: Drop=-42.65% (if calculated), Recovery=49.76% (if calculated)\n  50km: Drop=-4.61% (if calculated), Recovery=-296.71% (if calculated)\n  100km: Drop=31.64% (if calculated), Recovery=170.01% (if calculated)\n\nANTL results saved to: E:\\NTL-GPT-Clone\\user_data\\8cf9772a\\outputs\\myanmar_earthquake_antl_analysis.csv\nImpact metrics saved to: E:\\NTL-GPT-Clone\\user_data\\8cf9772a\\outputs\\myanmar_earthquake_impact_metrics.csv\nComprehensive report saved to: E:\\NTL-GPT-Clone\\user_data\\8cf9772a\\outputs\\myanmar_earthquake_impact_assessment_report.json\n\n=== Earthquake Impact Assessment Complete ===\nEvent: M 7.7 Myanmar Earthquake, 2025-03-28\nAnalysis periods: Baseline (2025-03-14 to 2025-03-21), First Night (2025-03-29), Recovery (2025-04-04 to 2025-04-11)\nOutput files generated in workspace outputs/\n"
-}

@@ -1,6 +1,0 @@
-{
-  "stage1_jobs": 200,
-  "stage2_jobs": 200,
-  "stage3_jobs": 200,
-  "jobs_dir": "E:\\NTL-GPT-Clone\\benchmarks\\ntl_vlm_mvp\\jobs"
-}

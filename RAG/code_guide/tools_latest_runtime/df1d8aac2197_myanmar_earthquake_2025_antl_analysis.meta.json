@@ -1,9 +1,0 @@
-{
-  "timestamp_utc": "20260217T174504Z",
-  "source_tool": "execute_geospatial_script_tool",
-  "thread_id": "c00575f3",
-  "original_script_name": "myanmar_earthquake_2025_antl_analysis.py",
-  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\c00575f3\\outputs\\myanmar_earthquake_2025_antl_analysis.py",
-  "content_hash": "df1d8aac219773bb978626c1aec6b792292c393ecf5e622c0f9874d9d5468e13",
-  "stdout_excerpt": "[StorageManager] Resolving 'myanmar_boundary.shp' for thread_id='c00575f3'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\c00575f3\\inputs\\myanmar_boundary.shp\nBoundary loaded: 1 feature(s), CRS: EPSG:4326\nGeometry bounds: {'geodesic': False, 'type': 'Polygon', 'coordinates': [[[92.1729181, 9.526083999999976], [101.1700796, 9.526083999999976], [101.1700796, 28.547835000000028], [92.1729181, 28.547835000000028], [92.1729181, 9.526083999999976]]]}\nVNP46A2 images found: 61\nDaily ANTL metrics saved to: E:\\NTL-GPT-Clone\\user_data\\c00575f3\\outputs\\myanmar_earthquake_2025_antl_metrics.csv\nImpact summary saved to: E:\\NTL-GPT-Clone\\user_data\\c00575f3\\outputs\\myanmar_earthquake_2025_impact_summary.json\n\n=== Myanmar Earthquake 2025 NTL Impact Assessment ===\nPre-event mean ANTL (27 days): 0.3666\nEvent day ANTL (2025-03-28): 0.7437\nPost-event mean ANTL (33 days): 0.4012\nANTL drop on event night: 0.3771 (102.86%)\nRecovery (post vs pre): 0.0346 (9.44%)\n====================================================\n"
-}

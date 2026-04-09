@@ -1,9 +1,0 @@
-{
-  "timestamp_utc": "20260223T164125Z",
-  "source_tool": "execute_geospatial_script_tool",
-  "thread_id": "thread_migrate_real_001",
-  "original_script_name": "real_migrate_case.py",
-  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\thread_migrate_real_001\\outputs\\real_migrate_case.py",
-  "content_hash": "31787877e3802dd225e2d1a5da922d595291fc9c5131fc76e354e4b36b6b2619",
-  "stdout_excerpt": "WROTE E:\\NTL-GPT-Clone\\user_data\\debug\\outputs\\real_migrate.csv\n"
-}

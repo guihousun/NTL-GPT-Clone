@@ -1,9 +1,0 @@
-{
-  "timestamp_utc": "20260217T163105Z",
-  "source_tool": "execute_geospatial_script_tool",
-  "thread_id": "09b989ca",
-  "original_script_name": "myanmar_earthquake_2025_visualization.py",
-  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\09b989ca\\outputs\\myanmar_earthquake_2025_visualization.py",
-  "content_hash": "4490e56d27c94990e03eb1494f636f443d61ac26b55e0caba53fe89279331ee9",
-  "stdout_excerpt": "Time series plot saved: E:\\NTL-GPT-Clone\\user_data\\09b989ca\\outputs\\myanmar_earthquake_2025_antlr_timeseries.png\nZoomed plot saved: E:\\NTL-GPT-Clone\\user_data\\09b989ca\\outputs\\myanmar_earthquake_2025_antlr_zoomed.png\n\n=== Visualization Complete ===\n"
-}

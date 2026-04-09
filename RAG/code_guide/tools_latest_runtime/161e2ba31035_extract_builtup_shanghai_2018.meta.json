@@ -1,9 +1,0 @@
-{
-  "timestamp_utc": "20260218T072442Z",
-  "source_tool": "execute_geospatial_script_tool",
-  "thread_id": "case_1771395733_16",
-  "original_script_name": "extract_builtup_shanghai_2018.py",
-  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\case_1771395733_16\\outputs\\extract_builtup_shanghai_2018.py",
-  "content_hash": "161e2ba31035a0c66484a0f85498175f7b21bd4e693ad712d4c4840653fd8451",
-  "stdout_excerpt": "[StorageManager] Resolving 'ntl_shanghai_2018.tif' for thread_id='case_1771395733_16'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\case_1771395733_16\\inputs\\ntl_shanghai_2018.tif\n[StorageManager] Resolving 'shanghai_boundary.shp' for thread_id='case_1771395733_16'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\case_1771395733_16\\inputs\\shanghai_boundary.shp\nBuilt-up area mask saved to: E:\\NTL-GPT-Clone\\user_data\\case_1771395733_16\\outputs\\shanghai_builtup_2018_threshold10.tif\nTotal pixels within boundary: 37410\nBuilt-up pixels (NTL >= 10): 15183\nBuilt-up area (approx km2): 3795.78\nBuilt-up percentage: 40.59%\n"
-}

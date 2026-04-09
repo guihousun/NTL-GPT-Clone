@@ -1,9 +1,0 @@
-{
-  "timestamp_utc": "20260222T050631Z",
-  "source_tool": "execute_geospatial_script_tool",
-  "thread_id": "26cf1633",
-  "original_script_name": "shanghai_ntl_threshold_analysis.py",
-  "original_script_path": "E:\\NTL-GPT-Clone\\user_data\\26cf1633\\outputs\\shanghai_ntl_threshold_analysis.py",
-  "content_hash": "2a4742a179970af19bc84f66378c8e3149c08711bb2ce25830e56a96c6f00ae3",
-  "stdout_excerpt": "[StorageManager] Resolving 'shanghai_ntl_2020.tif' for thread_id='26cf1633'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\26cf1633\\inputs\\shanghai_ntl_2020.tif\n[StorageManager] Resolving 'shanghai_boundary.shp' for thread_id='26cf1633'\n[StorageManager] Found in user workspace: E:\\NTL-GPT-Clone\\user_data\\26cf1633\\inputs\\shanghai_boundary.shp\nTotal valid pixels within Shanghai boundary: 73622\nPixels with NTL value > 50: 906\nProportion of pixels > 50: 1.2306%\n\nResults saved to: E:\\NTL-GPT-Clone\\user_data\\26cf1633\\outputs\\shanghai_ntl_threshold_proportion_2020.csv\n"
-}
