@@ -1,7 +1,0 @@
-﻿ranking_date,rank_overall,model_id,model_name,provider,region,tokens_weekly,prompt_usd_per_1m,completion_usd_per_1m,avg_usd_per_1m,is_free_price,price_available,region_rank
-"2026-02-02, 2026-02-02T00:00:00+00:00, 2026-02-06",1,moonshotai/kimi-k2.5-0127,moonshotai/kimi-k2.5-0127,moonshotai,国内,1204542701812.6665,,,,False,False,1.0
-"2026-02-02, 2026-02-02T00:00:00+00:00, 2026-02-06",2,minimax/minimax-m2.1,MiniMax: MiniMax M2.1,minimax,国内,403725897393.3333,0.27,0.95,0.61,False,True,2.0
-"2026-02-02, 2026-02-02T00:00:00+00:00, 2026-02-06",8,deepseek/deepseek-v3.2-20251201,deepseek/deepseek-v3.2-20251201,deepseek,国内,157485573333.3333,,,,False,False,3.0
-"2026-02-02, 2026-02-02T00:00:00+00:00, 2026-02-06",10,z-ai/glm-4.7-20251222,z-ai/glm-4.7-20251222,z-ai,国内,77866204695.0,,,,False,False,4.0
-"2026-02-02, 2026-02-02T00:00:00+00:00, 2026-02-06",18,qwen/qwen3-vl-235b-a22b-instruct,Qwen: Qwen3 VL 235B A22B Instruct,qwen,国内,4610789.0,0.19999999999999998,0.88,0.54,False,True,5.0
-"2026-02-02, 2026-02-02T00:00:00+00:00, 2026-02-06",19,qwen/qwen3-vl-8b-instruct,Qwen: Qwen3 VL 8B Instruct,qwen,国内,4594154.0,0.08,0.5,0.29,False,True,6.0

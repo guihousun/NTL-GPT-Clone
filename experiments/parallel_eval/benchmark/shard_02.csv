@@ -1,9 +1,0 @@
-﻿id,category,label,case,difficulty_score,priority_level,shard_id
-8,data retrieval and preprocessing,"Annual,monthly,daily mix","Retrieve NPP VIIRS annual NTL data for Shanghai in 2020, NPP VIIRS monthly NTL data for January 2020, and NPP VIIRS daily NTL data in January 1 2020.",0,normal,2
-18,data retrieval and preprocessing,Coordinates,Retrieve coordinates for the Oriental Pearl Tower in Shanghai.,0,normal,2
-28,data retrieval and preprocessing,SDGSAT-1 NDIBG,Calculate NDIBG using the SDGSAT-1 GLI image at inputs/.,0,normal,2
-37,NTL spatial statistic and querying,Standard deviation of NTL [SDNTL],"Calculate standard deviation of  NPP-VIIRS-like annual NTL image for each district in Shanghai, 2020.",0,normal,2
-45,NTL spatial statistic and querying,Deviation of NTL intensity [DNTL],"Calculate deviation of NTL intensity of  NPP-VIIRS-like annual NTL image for each district in Shanghai, 2020.",0,normal,2
-48,NTL spatial statistic and querying,Threshold processing,"Within Shanghai’s 2020 administrative boundary, calculate the proportion of NPP-VIIRS NTL pixels with values lower than 3.",2,normal,2
-66,NTL application and modeling,Built-Up Areas Extraction,"Download the 2020 NTL imagery for Shanghai. Then, extract the built-up area using the SVM method. Finally, calculate the proportion of built-up area within each district of Shanghai.",2,normal,2
-68,NTL application and modeling,SDG 7.1.1,Please use the 2020 NPP-VIIRS NTL imagery and LandScan population data to measure the population with access to electricity.,14,critical,2

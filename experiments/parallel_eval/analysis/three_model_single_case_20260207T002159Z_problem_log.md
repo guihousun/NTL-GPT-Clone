@@ -1,9 +1,0 @@
-# Problem Log (Manual Review)
-
-exp_id: `three_model_single_case_20260207T002159Z`
-
-| model | case_id | problem_type | reason | runtime_s | output_files_count |
-|---|---:|---|---|---:|---:|
-| qwen3-max-2026-01-23 | 1 | artifact_tracking_gap | Model claims files in inputs/, but current evaluator only tracks outputs/ deltas, so evidence is not fully captured. | 116.45 | 0 |
-| gpt-5-mini | 35 | none | At least one concrete output artifact was generated and no fail-status tool response was captured. | 104.11 | 1 |
-| gpt-5.1 | 70 | hallucination_or_non_executed_answer | Returned a long script/plan but produced no output artifacts; answer likely not actually executed end-to-end. | 65.18 | 0 |

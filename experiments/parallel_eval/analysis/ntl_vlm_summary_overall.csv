@@ -1,4 +1,0 @@
-﻿track,model,split,objective_score,text_score,overall_score
-fine_tune,lora7b_mock,overall,0.9171860818994064,0.9099384437658388,0.915011790459336
-zero_shot,api_mock_strong,overall,0.8839993824106602,0.8659479958103402,0.8785839664305641
-zero_shot,api_mock_random,overall,0.4505150949888117,0.2494779780226547,0.3902039598989645
