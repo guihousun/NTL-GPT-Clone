@@ -30,6 +30,7 @@ streamlit run Streamlit.py
 
 Required:
 
+- `DASHSCOPE_API_KEY`
 - `DASHSCOPE_Qwen_plus_KEY`
 - `DASHSCOPE_Qwen_plus_URL`
 - `DASHSCOPE_Coding_URL`
@@ -57,6 +58,11 @@ Additional setup for Google Earth Engine:
 Additional setup for official VIIRS downloads:
 
 - set `EARTHDATA_TOKEN`
+
+DashScope channel mapping:
+
+- `DASHSCOPE_API_KEY` is used with `DASHSCOPE_Coding_URL`
+- `DASHSCOPE_Qwen_plus_KEY` is used with `DASHSCOPE_Qwen_plus_URL`
 
 ## Startup Check
 

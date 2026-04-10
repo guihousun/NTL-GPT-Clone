@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parent
 DOTENV_PATH = ROOT / ".env"
 
 REQUIRED_ENV = [
+    "DASHSCOPE_API_KEY",
     "DASHSCOPE_Qwen_plus_KEY",
     "DASHSCOPE_Qwen_plus_URL",
     "DASHSCOPE_Coding_URL",
