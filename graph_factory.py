@@ -82,7 +82,13 @@ def _validate_skill_runtime_discovery() -> None:
 
 
 
-def build_ntl_graph(
+def use_env_key_for_qwen = "qwen" in selected_model.lower()
+env_qwen_key = (os.getenv("DASHSCOPE_API_KEY") or "").strip()  # 从 .env 读取
+
+if use_env_key_for_qwen:
+    effective_api_key = env_qwen_key  # 使用 .env 中的 key
+else:
+    effective_api_key = (user_api_key or "").strip()  # 使用用户输入的 key(
     model_name: str,
     api_key: str,
     request_timeout_s: int = 120,

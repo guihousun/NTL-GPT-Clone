@@ -4,10 +4,7 @@ NTL-GPT is an open-source Streamlit application for nighttime light analysis. It
 
 ## Quick Start
 
-macOS / Linux (`bash`):
-
 ```bash
-cd /path/to/NTL-GPT-stable
 conda env create -f environment.yml
 conda activate NTL-GPT-stable
 cp .env.example .env
@@ -15,10 +12,9 @@ python check_env.py
 streamlit run Streamlit.py
 ```
 
-Windows (`PowerShell`):
+PowerShell:
 
 ```powershell
-Set-Location E:\NTL-GPT-stable
 conda env create -f environment.yml
 conda activate NTL-GPT-stable
 Copy-Item .env.example .env
@@ -30,7 +26,6 @@ streamlit run Streamlit.py
 
 Required:
 
-- `DASHSCOPE_API_KEY`
 - `DASHSCOPE_Qwen_plus_KEY`
 - `DASHSCOPE_Qwen_plus_URL`
 - `DASHSCOPE_Coding_URL`
@@ -58,11 +53,6 @@ Additional setup for Google Earth Engine:
 Additional setup for official VIIRS downloads:
 
 - set `EARTHDATA_TOKEN`
-
-DashScope channel mapping:
-
-- `DASHSCOPE_API_KEY` is used with `DASHSCOPE_Coding_URL`
-- `DASHSCOPE_Qwen_plus_KEY` is used with `DASHSCOPE_Qwen_plus_URL`
 
 ## Startup Check
 
