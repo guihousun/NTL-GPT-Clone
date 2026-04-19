@@ -14,6 +14,31 @@ class SourceSpec:
 
 
 _SOURCE_REGISTRY: dict[str, SourceSpec] = {
+    "VNP46A1": SourceSpec(
+        short_name="VNP46A1",
+        processing_mode="gridded_tile_stats",
+        variable_candidates=(
+            "HDFEOS/GRIDS/VIIRS_Grid_DNB_2d/Data Fields/DNB_At_Sensor_Radiance",
+            "DNB_At_Sensor_Radiance",
+            "DNB_At_Sensor_Radiance_500m",
+        ),
+        qa_variable_candidates={
+            "QF_Cloud_Mask": (
+                "HDFEOS/GRIDS/VIIRS_Grid_DNB_2d/Data Fields/QF_Cloud_Mask",
+                "QF_Cloud_Mask",
+            ),
+            "QF_DNB": (
+                "HDFEOS/GRIDS/VIIRS_Grid_DNB_2d/Data Fields/QF_DNB",
+                "QF_DNB",
+            ),
+            "UTC_Time": (
+                "HDFEOS/GRIDS/VIIRS_Grid_DNB_2d/Data Fields/UTC_Time",
+                "UTC_Time",
+            ),
+        },
+        default_qa_mode="balanced",
+        night_only=False,
+    ),
     "VJ146A1_NRT": SourceSpec(
         short_name="VJ146A1_NRT",
         processing_mode="gridded_tile_clip",
@@ -111,7 +136,7 @@ _SOURCE_REGISTRY: dict[str, SourceSpec] = {
 
 
 def get_default_sources() -> list[str]:
-    return ["VJ146A2", "VJ146A1", "VJ102DNB"]
+    return ["VNP46A1", "VJ146A2", "VJ146A1", "VJ102DNB"]
 
 
 def get_nrt_priority_sources() -> list[str]:

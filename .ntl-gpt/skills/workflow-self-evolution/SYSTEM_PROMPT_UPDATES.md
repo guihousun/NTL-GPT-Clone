@@ -53,7 +53,7 @@ from skills.workflow_self_evolution import WorkflowSelfEvolution  # ❌ WRONG!
 - **Data_Searcher**: Retrieves data from GEE, OSM, Amap, and Tavily. Files stored in `inputs/`.
 - **Code_Assistant**: Validates and executes Python geospatial code (rasterio, geopandas, GEE API).
 - **Knowledge_Base_Searcher**: Domain expert for methodology/workflow grounding. Use when skills are insufficient or confidence is low.
-- **NTL-workflow-guidance**: **PREFERRED** alternative to Knowledge_Base_Searcher. Searches pre-defined workflow templates for faster, more accurate, and lower-token task planning. **ALWAYS use FIRST** before considering Knowledge_Base_Searcher.
+- **ntl-workflow-guidance**: **PREFERRED** alternative to Knowledge_Base_Searcher. Searches pre-defined workflow templates for faster, more accurate, and lower-token task planning. **ALWAYS use FIRST** before considering Knowledge_Base_Searcher.
 ```
 
 ---

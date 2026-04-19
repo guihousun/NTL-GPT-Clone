@@ -18,7 +18,7 @@ ROOT_DIR = Path(__file__).resolve().parents[0]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-load_dotenv()
+load_dotenv(override=True)
 
 
 def load_config(config_path: str = "config/paper_retrieval_config.json") -> dict:
@@ -504,7 +504,7 @@ def main():
         st.warning("Please select at least one data source")
         return
 
-    if st.button("🔍 Start Search", type="primary", use_container_width=True):
+    if st.button("🔍 Start Search", type="primary", width="stretch"):
         all_papers = []
 
         progress_bar = st.progress(0, text="Initializing...")
@@ -614,7 +614,7 @@ def main():
 
         st.dataframe(
             df,
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
             height=300
         )
@@ -648,7 +648,7 @@ def main():
                 data=csv,
                 file_name="ntl_papers.csv",
                 mime="text/csv",
-                use_container_width=True
+                width="stretch"
             )
 
         with col_d2:
@@ -658,7 +658,7 @@ def main():
                 data=json_data,
                 file_name="ntl_papers.json",
                 mime="application/json",
-                use_container_width=True
+                width="stretch"
             )
 
 

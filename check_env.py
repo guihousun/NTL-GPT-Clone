@@ -10,12 +10,15 @@ ROOT = Path(__file__).resolve().parent
 DOTENV_PATH = ROOT / ".env"
 
 REQUIRED_ENV = [
+    "DASHSCOPE_API_KEY",
     "DASHSCOPE_Qwen_plus_KEY",
     "DASHSCOPE_Qwen_plus_URL",
     "DASHSCOPE_Coding_URL",
 ]
 
 OPTIONAL_ENV = [
+    "MINIMAX_API_KEY",
+    "MINIMAX_Coding_URL",
     "GEE_DEFAULT_PROJECT_ID",
     "EARTHDATA_TOKEN",
     "NTL_TOOL_PROFILE",
@@ -56,10 +59,10 @@ def _check_env() -> tuple[list[str], list[str]]:
     env_snapshot = _load_dotenv_snapshot()
 
     def _value(name: str) -> str:
-        runtime = str(os.getenv(name, "") or "").strip()
-        if runtime:
-            return runtime
-        return str(env_snapshot.get(name, "") or "").strip()
+        project_value = str(env_snapshot.get(name, "") or "").strip()
+        if project_value:
+            return project_value
+        return str(os.getenv(name, "") or "").strip()
 
     missing = [name for name in REQUIRED_ENV if not _value(name)]
     optional = [name for name in OPTIONAL_ENV if _value(name)]
@@ -87,7 +90,7 @@ def _check_imports() -> tuple[list[str], list[str]]:
 
 
 def main() -> int:
-    print("NTL-GPT stable environment check")
+    print("NTL-Claw stable environment check")
     print(f"Repository: {ROOT}")
     print(f"Python: {sys.executable}")
 

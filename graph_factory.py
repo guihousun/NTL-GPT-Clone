@@ -15,6 +15,7 @@ from agents.NTL_Code_Assistant import Code_Assistant_system_prompt_text
 from agents.NTL_Data_Searcher import system_prompt_data_searcher
 from agents.NTL_Engineer import system_prompt_text
 from agents.NTL_Knowledge_Subagent import system_prompt_kb_searcher
+from model_config import get_api_model_name, get_base_url, get_model_config
 from storage_manager import current_thread_id, storage_manager
 from tools import Code_tools, Engineer_tools, data_searcher_tools
 from tools.NTL_Knowledge_Base_Searcher import NTL_Knowledge_Base
@@ -29,15 +30,17 @@ SKILLS_SOURCE = "/skills/"
 
 
 def _build_llm(model_name: str, api_key: str, request_timeout_s: int):
-    if "qwen" in model_name.lower():
+    model_config = get_model_config(model_name)
+    api_model = get_api_model_name(model_name)
+    if model_config.provider in {"dashscope", "minimax"}:
         return ChatOpenAI(
             api_key=SecretStr(api_key),
-            base_url=os.getenv("DASHSCOPE_Coding_URL"),
-            model=model_name,
+            base_url=get_base_url(model_name),
+            model=api_model,
             timeout=request_timeout_s,
         )
     return init_chat_model(
-        model_name,
+        api_model,
         model_provider="openai",
         api_key=api_key,
         temperature=0,
@@ -82,13 +85,7 @@ def _validate_skill_runtime_discovery() -> None:
 
 
 
-def use_env_key_for_qwen = "qwen" in selected_model.lower()
-env_qwen_key = (os.getenv("DASHSCOPE_API_KEY") or "").strip()  # 从 .env 读取
-
-if use_env_key_for_qwen:
-    effective_api_key = env_qwen_key  # 使用 .env 中的 key
-else:
-    effective_api_key = (user_api_key or "").strip()  # 使用用户输入的 key(
+def build_ntl_graph(
     model_name: str,
     api_key: str,
     request_timeout_s: int = 120,

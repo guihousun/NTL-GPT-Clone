@@ -7,7 +7,7 @@
     {
       "intent_id": "data_retrieval_preprocessing",
       "intent_name": "data retrieval preprocessing",
-      "workflow_file": "/skills/NTL-workflow-guidance/references/workflows/data_retrieval_preprocessing.json",
+      "workflow_file": "/skills/ntl-workflow-guidance/references/workflows/data_retrieval_preprocessing.json",
       "priority": 1,
       "source_categories": [
         "Data Retrieval and Preprocessing"
@@ -45,7 +45,7 @@
     {
       "intent_id": "statistical_analysis",
       "intent_name": "statistical analysis",
-      "workflow_file": "/skills/NTL-workflow-guidance/references/workflows/statistical_analysis.json",
+      "workflow_file": "/skills/ntl-workflow-guidance/references/workflows/statistical_analysis.json",
       "priority": 2,
       "source_categories": [
         "NTL statistics"
@@ -79,7 +79,7 @@
     {
       "intent_id": "trend_change_detection",
       "intent_name": "trend change detection",
-      "workflow_file": "/skills/NTL-workflow-guidance/references/workflows/trend_change_detection.json",
+      "workflow_file": "/skills/ntl-workflow-guidance/references/workflows/trend_change_detection.json",
       "priority": 3,
       "source_categories": [
         "NTL statistics"
@@ -113,7 +113,7 @@
     {
       "intent_id": "regression_indicator_estimation",
       "intent_name": "regression indicator estimation",
-      "workflow_file": "/skills/NTL-workflow-guidance/references/workflows/regression_indicator_estimation.json",
+      "workflow_file": "/skills/ntl-workflow-guidance/references/workflows/regression_indicator_estimation.json",
       "priority": 4,
       "source_categories": [
         "Application and Modeling > Socio-economic indicator modeling",
@@ -149,7 +149,7 @@
     {
       "intent_id": "event_impact_assessment",
       "intent_name": "event impact assessment",
-      "workflow_file": "/skills/NTL-workflow-guidance/references/workflows/event_impact_assessment.json",
+      "workflow_file": "/skills/ntl-workflow-guidance/references/workflows/event_impact_assessment.json",
       "priority": 5,
       "source_categories": [
         "Application and Modeling > Disaster monitoring"
@@ -184,7 +184,7 @@
     {
       "intent_id": "urban_extraction_structure",
       "intent_name": "urban extraction structure",
-      "workflow_file": "/skills/NTL-workflow-guidance/references/workflows/urban_extraction_structure.json",
+      "workflow_file": "/skills/ntl-workflow-guidance/references/workflows/urban_extraction_structure.json",
       "priority": 6,
       "source_categories": [
         "Application and Modeling > Urban spatial structure analyses",
@@ -220,7 +220,7 @@
     {
       "intent_id": "quality_validation_misc",
       "intent_name": "quality validation misc",
-      "workflow_file": "/skills/NTL-workflow-guidance/references/workflows/quality_validation_misc.json",
+      "workflow_file": "/skills/ntl-workflow-guidance/references/workflows/quality_validation_misc.json",
       "priority": 7,
       "source_categories": [
         "Data Preprocessing > Cross-sensor harmonization"

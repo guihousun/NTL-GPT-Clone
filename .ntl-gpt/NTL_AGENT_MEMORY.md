@@ -29,25 +29,25 @@ This file is dedicated to NTL-GPT runtime memory and must not be mixed with Code
 
 ## CRITICAL: Workflow Router Protocol (MANDATORY)
 
-**Lesson from 2026-02-28**: Myanmar earthquake analysis failed because NTL_Engineer skipped NTL-workflow-guidance. Always query router FIRST.
+**Lesson from 2026-02-28**: Myanmar earthquake analysis failed because NTL_Engineer skipped ntl-workflow-guidance. Always query router FIRST.
 
 ### Router Priority
 ```
-FIRST:  NTL-workflow-guidance (ALWAYS query first)
+FIRST:  ntl-workflow-guidance (ALWAYS query first)
 SECOND: gee-routing-blueprint-strategy (for GEE routing)
 LAST:   Knowledge_Base_Searcher (only if no workflow match)
 ```
 
 ### Pre-Execution Checklist
 ```
-□ [ ] 1. Query NTL-workflow-guidance → identify matching workflow JSON
+□ [ ] 1. Query ntl-workflow-guidance → identify matching workflow JSON
 □ [ ] 2. Read workflow JSON → confirm steps, outputs, task_level
 □ [ ] 3. After execution, ask user whether to run self-evolution for this run
 ```
 
-**REMEMBER**: Skipping NTL-workflow-guidance = Protocol Violation = Systemic Failure
+**REMEMBER**: Skipping ntl-workflow-guidance = Protocol Violation = Systemic Failure
 
-For detailed workflow specs, see `/skills/NTL-workflow-guidance/references/workflows/`.
+For detailed workflow specs, see `/skills/ntl-workflow-guidance/references/workflows/`.
 For event impact (Q20), see `event_impact_assessment.json` for multi-scale buffer requirements.
 
 ---

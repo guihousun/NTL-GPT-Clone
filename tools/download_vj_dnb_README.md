@@ -16,15 +16,15 @@ EARTHDATA_TOKEN=你的token
 ```
 
 脚本会自动加载：
-- `E:\NTL-GPT-Clone\.env`
+- `E:\NTL-Claw-Clone\.env`
 - 当前工作目录 `.env`
 
 ## 2. 命令
 
 ```powershell
-conda run -n NTL-GPT python tools/download_vj_dnb.py `
+conda run -n NTL-Claw python tools/download_vj_dnb.py `
   --input "E:\Download\LAADS_query.test_vj102_vj103.json" `
-  --output "E:\NTL-GPT-Clone\base_data\VJ102DNB_Iran"
+  --output "E:\NTL-Claw-Clone\base_data\VJ102DNB_Iran"
 ```
 
 可选参数：

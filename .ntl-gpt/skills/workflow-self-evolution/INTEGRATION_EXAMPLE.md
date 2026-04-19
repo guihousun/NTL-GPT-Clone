@@ -268,7 +268,7 @@ def backup_workflow_before_update(workflow_id, workflow_path):
     """
     
     # Create version directory
-    version_dir = f"/skills/NTL-workflow-guidance/references/workflows/versions/{workflow_id}"
+    version_dir = f"/skills/ntl-workflow-guidance/references/workflows/versions/{workflow_id}"
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     backup_path = f"{version_dir}/{workflow_id}_{timestamp}.json"
     
@@ -300,7 +300,7 @@ def rollback_workflow(workflow_id, backup_path):
     Returns rollback result.
     """
     
-    workflow_path = f"/skills/NTL-workflow-guidance/references/workflows/{workflow_id}.json"
+    workflow_path = f"/skills/ntl-workflow-guidance/references/workflows/{workflow_id}.json"
     
     # Restore from backup
     shutil.copy2(backup_path, workflow_path)
@@ -447,7 +447,7 @@ def execute_task_with_full_evolution(task):
                 # Backup first
                 backup_path = backup_workflow_before_update(
                     result.workflow_id,
-                    f"/skills/NTL-workflow-guidance/references/workflows/{result.workflow_id}.json"
+                    f"/skills/ntl-workflow-guidance/references/workflows/{result.workflow_id}.json"
                 )
                 
                 # Modify workflow
@@ -707,10 +707,10 @@ def provide_helpful_feedback(result):
 
 ---
 
-## Example 6: Complete Integration in NTL-workflow-guidance
+## Example 6: Complete Integration in ntl-workflow-guidance
 
 ```python
-# This is how NTL-workflow-guidance should integrate workflow-self-evolution
+# This is how ntl-workflow-guidance should integrate workflow-self-evolution
 
 from skills.workflow_self_evolution import WorkflowSelfEvolution
 

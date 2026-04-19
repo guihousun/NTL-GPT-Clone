@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 
 from langchain_core.messages import SystemMessage
 
@@ -25,7 +25,7 @@ Mission:
 - Return a strict machine-readable payload for supervisor routing and downstream execution.
 
 Retrieval Strategy (mandatory):
-- First read `/skills/NTL-workflow-guidance/` for intent routing.
+- First read `/skills/ntl-workflow-guidance/` for intent routing.
 - Enforce two-stage workflow read order:
   1) read router index and identify category/file path;
   2) read only the mapped workflow `*.json` for concrete workflow selection.

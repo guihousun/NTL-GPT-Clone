@@ -144,7 +144,7 @@
 **实施步骤**:
 ```python
 # 步骤 1: 创建失败日志文件 (1h)
-# /skills/NTL-workflow-guidance/references/failure_log.jsonl
+# /skills/ntl-workflow-guidance/references/failure_log.jsonl
 
 # 步骤 2: 实现失败模式分析 (2h)
 def analyze_failure(task_result):
@@ -306,7 +306,7 @@ def check_force_learn_triggers(task_result):
 **实施步骤**:
 ```python
 # 步骤 1: 创建版本历史目录结构 (1h)
-# /skills/NTL-workflow-guidance/references/versions/
+# /skills/ntl-workflow-guidance/references/versions/
 #   ├── Q11/
 #   │   ├── v1_2026-02-28.json
 #   │   ├── v2_2026-03-01.json

@@ -6,7 +6,7 @@ from rasterio.features import geometry_mask
 import os
 
 # Files are in the debug workspace
-debug_base = r'E:\NTL-GPT-Clone\user_data\debug\inputs'
+debug_base = r'E:\NTL-Claw-Clone\user_data\debug\inputs'
 raster_path = os.path.join(debug_base, 'shanghai_ntl_2022.tif')
 vector_path = os.path.join(debug_base, 'shanghai_districts_boundary.shp')
 

@@ -21,7 +21,7 @@ def _resolve_rag_persist_dir(store_name: str) -> str:
     Resolve RAG store path in a cwd-independent way.
 
     Priority:
-    1) NTL_RAG_ROOT env (absolute recommended), e.g. D:\\NTL-GPT\\NTL-GPT-Clone\\RAG
+    1) NTL_RAG_ROOT env (absolute recommended), e.g. D:\\NTL-Claw\\NTL-Claw-Clone\\RAG
     2) repository-root/RAG (derived from this file location)
     """
     env_root = str(os.getenv("NTL_RAG_ROOT", "") or "").strip()

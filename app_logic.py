@@ -29,6 +29,7 @@ def _ensure_runtime_state_defaults() -> None:
     st.session_state.setdefault("pending_activate_request", None)
     st.session_state.setdefault("run_last_terminal_kind", "")
     st.session_state.setdefault("ui_force_refresh_once", False)
+    st.session_state.setdefault("pending_map_focus_layer", None)
 
 
 def should_recover_stale_run(
@@ -159,13 +160,31 @@ def ensure_conversation_initialized():
     )
 
 
-def _collect_recent_outputs(seconds: int = 120, thread_id: Optional[str] = None):
+def _collect_recent_outputs(
+    seconds: int = 120,
+    thread_id: Optional[str] = None,
+    since_ts: Optional[float] = None,
+):
     tid = str(thread_id or st.session_state.get("thread_id") or current_thread_id.get() or "debug")
     out_dir = storage_manager.get_workspace(tid) / "outputs"
+    if not out_dir.exists():
+        return
     now = time.time()
 
+    def _is_run_output(path) -> bool:
+        try:
+            mtime = os.path.getmtime(path)
+        except OSError:
+            return False
+        if since_ts is not None:
+            try:
+                return mtime >= float(since_ts) - 5.0
+            except Exception:
+                pass
+        return (now - mtime) < seconds
+
     for f in out_dir.glob("*.png"):
-        if now - os.path.getmtime(f) < seconds:
+        if _is_run_output(f):
             st.session_state.chat_history.append(("assistant_img", str(f)))
             try:
                 history_store.append_chat_record(tid, role="assistant_img", content=str(f), kind="image")
@@ -173,22 +192,31 @@ def _collect_recent_outputs(seconds: int = 120, thread_id: Optional[str] = None)
                 pass
 
     for f in out_dir.glob("*.csv"):
-        if now - os.path.getmtime(f) < seconds:
+        if _is_run_output(f):
             st.session_state.chat_history.append(("assistant_table", str(f)))
             try:
                 history_store.append_chat_record(tid, role="assistant_table", content=str(f), kind="table")
             except Exception:
                 pass
 
-    latest_tif = None
-    latest_mtime = -1
-    for f in out_dir.glob("*.tif"):
-        mtime = os.path.getmtime(f)
-        if now - mtime < seconds and mtime > latest_mtime:
-            latest_tif = f
-            latest_mtime = mtime
-    if latest_tif:
-        st.session_state.current_map_tif = str(latest_tif)
+    latest_geo = None
+    latest_mtime = -1.0
+    for pattern in ("*.tif", "*.tiff", "*.shp", "*.geojson"):
+        for f in out_dir.glob(pattern):
+            if not _is_run_output(f):
+                continue
+            try:
+                mtime = os.path.getmtime(f)
+            except OSError:
+                continue
+            if mtime > latest_mtime:
+                latest_geo = f
+                latest_mtime = mtime
+    if latest_geo:
+        st.session_state["pending_map_focus_layer"] = str(latest_geo)
+        st.session_state["current_map_layer"] = str(latest_geo)
+        if latest_geo.suffix.lower() in {".tif", ".tiff"}:
+            st.session_state.current_map_tif = str(latest_geo)
 
 
 def _build_injected_context_system_message(question: str, thread_id: str) -> Optional[str]:
@@ -766,6 +794,7 @@ def _worker_run_main(run_id: str) -> None:
             "status": status,
             "thread_id": run_thread_id,
             "elapsed_s": elapsed_s,
+            "start_ts": start_ts,
         },
     )
     with _RUN_REGISTRY_LOCK:
@@ -803,7 +832,11 @@ def consume_active_run_events() -> bool:
         if kind == "done":
             run_thread = str(payload.get("thread_id") or st.session_state.get("active_run_thread_id") or "")
             if run_thread and run_thread == str(st.session_state.get("thread_id") or ""):
-                _collect_recent_outputs(seconds=120, thread_id=run_thread)
+                _collect_recent_outputs(
+                    seconds=120,
+                    thread_id=run_thread,
+                    since_ts=payload.get("start_ts") or st.session_state.get("run_started_ts"),
+                )
                 # Trigger one full-page rerun so map/output preview can pick up new artifacts.
                 st.session_state["ui_force_refresh_once"] = True
             st.session_state["run_ended_ts"] = time.time()
@@ -814,6 +847,13 @@ def consume_active_run_events() -> bool:
             st.session_state["active_run_thread_id"] = None
 
     if not events and state in {"success", "error", "interrupted", "partial", "missing"}:
+        run_thread = str(st.session_state.get("active_run_thread_id") or st.session_state.get("thread_id") or "")
+        if run_thread and run_thread == str(st.session_state.get("thread_id") or ""):
+            _collect_recent_outputs(
+                seconds=120,
+                thread_id=run_thread,
+                since_ts=st.session_state.get("run_started_ts"),
+            )
         st.session_state["is_running"] = False
         st.session_state["stopping"] = False
         st.session_state["cancel_requested"] = False
@@ -835,4 +875,3 @@ def handle_userinput(
     result = start_user_run(user_question)
     consume_active_run_events()
     return result
-

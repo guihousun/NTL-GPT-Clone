@@ -6,7 +6,7 @@ version: "1.0.0"
 type: "meta-capability"
 dependencies: []
 skills_served:
-  - NTL-workflow-guidance
+  - ntl-workflow-guidance
   - gee-routing-blueprint-strategy
   - code-generation-execution-loop
   - ntl-gdp-regression-analysis
@@ -38,7 +38,7 @@ Layer 1: Meta-Capability Skills
 └── code-generation-execution-loop
 
 Layer 2: Business Skills (call Layer 1)
-├── NTL-workflow-guidance
+├── ntl-workflow-guidance
 ├── gee-routing-blueprint-strategy
 ├── gee-ntl-date-boundary-handling
 └── ntl-gdp-regression-analysis

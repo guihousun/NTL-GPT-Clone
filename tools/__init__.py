@@ -88,7 +88,6 @@ _GROUPS: dict[str, list[str]] = {
         "GEE_dataset_metadata_tool",
     ],
     "Code_tools": [
-        "geodata_inspector_tool",
         "GeoCode_Knowledge_Recipes_tool",
         "execute_geospatial_script_tool",
         "GeoCode_COT_Validation_tool",

@@ -1,14 +1,13 @@
 ---
-name: NTL-workflow-guidance
+name: ntl-workflow-guidance
 description: "PREFERRED alternative to Knowledge_Base_Searcher. Searches pre-defined workflow templates from local JSON files for faster, more accurate, and lower-token task planning. ALWAYS use this FIRST before considering Knowledge_Base_Searcher."
-allowed-tools:
-  - NTL_Solution_Knowledge
+allowed-tools: "NTL_Solution_Knowledge"
 license: "Proprietary"
 metadata:
   schema: "ntl.workflow.intent.router.v1"
-  router_index: "/skills/NTL-workflow-guidance/references/router_index.json"
-  workflows_root: "/skills/NTL-workflow-guidance/references/workflows"
-  code_root: "/skills/NTL-workflow-guidance/references/code"
+  router_index: "/skills/ntl-workflow-guidance/references/router_index.json"
+  workflows_root: "/skills/ntl-workflow-guidance/references/workflows"
+  code_root: "/skills/ntl-workflow-guidance/references/code"
   learning_mode: "posterior_only"
   priority: "HIGH - Use before Knowledge_Base_Searcher"
 ---
@@ -23,7 +22,7 @@ This skill is your **FIRST CHOICE** for task planning and workflow selection.
 
 ### Why This Skill is Better Than Knowledge_Base_Searcher
 
-| Aspect | NTL-workflow-guidance | Knowledge_Base_Searcher |
+| Aspect | ntl-workflow-guidance | Knowledge_Base_Searcher |
 |--------|------------------------|------------------------|
 | **Speed** | ✅ Instant (local JSON files) | ❌ Slower (external API calls) |
 | **Accuracy** | ✅ Pre-validated workflow templates | ⚠️ Variable (depends on search) |
@@ -61,7 +60,7 @@ This skill covers 7 major intent categories with pre-defined templates:
 **PRIORITY ORDER - FOLLOW STRICTLY:**
 
 ```
-1. FIRST:  Try `NTL-workflow-guidance` (THIS SKILL)
+1. FIRST:  Try `ntl-workflow-guidance` (THIS SKILL)
            ↓ (if no match with confidence >= 0.40)
 2. SECOND: Try `gee-routing-blueprint-strategy` (for GEE-specific routing only)
            ↓ (if still no match)
@@ -88,14 +87,14 @@ This skill covers 7 major intent categories with pre-defined templates:
 ## Mandatory Execution Order
 
 ### Stage 1: Intent Classification
-1. Read `/skills/NTL-workflow-guidance/references/router_index.json`.
+1. Read `/skills/ntl-workflow-guidance/references/router_index.json`.
 2. Classify the user request into one `intent_id` using:
    - **Primary**: Lexical similarity on `intent_name + source_categories`
    - **Secondary**: Keyword matching on user task description
    - **Tertiary**: Category hierarchy matching
 
 ### Stage 2: Workflow Selection
-3. Read only the mapped file under `/skills/NTL-workflow-guidance/references/workflows/<intent_id>.json`.
+3. Read only the mapped file under `/skills/ntl-workflow-guidance/references/workflows/<intent_id>.json`.
 4. Select one executable workflow task using multi-stage matching:
    - **Stage 2a**: Exact match on `task_id` (if user provides specific ID)
    - **Stage 2b**: Fuzzy match on `task_name` (threshold: 0.60)
@@ -231,9 +230,9 @@ This skill covers 7 major intent categories with pre-defined templates:
    - on failure append `/skills/workflow-self-evolution/references/failure_log.jsonl`
    - if learning is needed, backup/patch target workflow JSON and append:
      - `/skills/workflow-self-evolution/references/learning_log.jsonl`
-     - `/skills/NTL-workflow-guidance/references/evolution_log.jsonl`
+     - `/skills/ntl-workflow-guidance/references/evolution_log.jsonl`
 4) Formal workflow improvement must directly modify:
-   - `/skills/NTL-workflow-guidance/references/workflows/<intent_id>.json`
+   - `/skills/ntl-workflow-guidance/references/workflows/<intent_id>.json`
    and include `_evolution` annotations in changed/new items.
 5) Never use fake imports like `from skills.workflow_self_evolution import ...`.
 ```
@@ -249,13 +248,13 @@ This skill covers 7 major intent categories with pre-defined templates:
     - `Code_Assistant`: proposal-only (`ntl.workflow.evolution.proposal.v1`), no direct file edits.
     - `NTL_Engineer`: only role allowed to decide and write formal workflow mutations.
   - Engineer directly edits:
-    - `/skills/NTL-workflow-guidance/references/workflows/<intent_id>.json`
-    - `/skills/NTL-workflow-guidance/references/evolution_log.jsonl`
+    - `/skills/ntl-workflow-guidance/references/workflows/<intent_id>.json`
+    - `/skills/ntl-workflow-guidance/references/evolution_log.jsonl`
   - Engineer must write `_evolution` note into the changed/added workflow item.
   - Writing only `workflow-self-evolution` logs is insufficient; target workflow JSON must be updated for persistent guidance fixes.
 - Failure or interruption:
   - Engineer may write candidate evidence to
-    `/skills/NTL-workflow-guidance/references/evolution_candidates.jsonl`
+    `/skills/ntl-workflow-guidance/references/evolution_candidates.jsonl`
   - do not mutate formal workflow files.
 - Candidate-to-formal promotion:
   - when a later run reaches `success + artifact_audit.pass=true`,
@@ -274,14 +273,14 @@ Forbidden:
 - Deleting key output definitions.
 
 ## Formal Logs
-- Formal mutations: `/skills/NTL-workflow-guidance/references/evolution_log.jsonl`
-- Candidate-only records: `/skills/NTL-workflow-guidance/references/evolution_candidates.jsonl`
+- Formal mutations: `/skills/ntl-workflow-guidance/references/evolution_log.jsonl`
+- Candidate-only records: `/skills/ntl-workflow-guidance/references/evolution_candidates.jsonl`
 
 ## Successful Code Case Library
 - Store successful runnable scripts under:
-  - `/skills/NTL-workflow-guidance/references/code/<intent_id>/`
+  - `/skills/ntl-workflow-guidance/references/code/<intent_id>/`
 - Maintain index:
-  - `/skills/NTL-workflow-guidance/references/code/code_index.json`
+  - `/skills/ntl-workflow-guidance/references/code/code_index.json`
 - For each curated case, link it from the corresponding workflow task with fields like:
   - `code_examples[]` (path, status, quality notes)
 - Use curated code as implementation guidance, not blind copy:

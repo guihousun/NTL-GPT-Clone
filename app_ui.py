@@ -1,4 +1,4 @@
-﻿import os
+import os
 import re
 import json
 import hashlib
@@ -48,6 +48,7 @@ from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 import app_state 
 import app_logic
 import history_store
+import model_config
 from storage_manager import storage_manager
 from map_view_policy import build_layer_signature, advance_map_view_state
 
@@ -115,6 +116,138 @@ _NTL_SCAN_REFRESH_SECONDS = 3600
 _NTL_SCAN_LOCK_FILE = _NTL_SCAN_OUTPUT_DIR / ".ntl_availability_refresh.lock"
 _NTL_SCAN_LOCK_STALE_SECONDS = max(_NTL_SCAN_TIMEOUT_SECONDS * 2, 600)
 _TEST_CASE_FILES = [_project_path("example", "test_cases_mini.xlsx")]
+_TEST_CASE_CATEGORY_EN = {
+    "data retrieval and preprocessing": "Data Retrieval and Preprocessing",
+    "ntl spatial statistic and querying": "NTL Spatial Statistic and Querying",
+    "ntl application and modeling": "NTL Application and Modeling",
+}
+_TEST_CASE_CATEGORY_ZH = {
+    "data retrieval and preprocessing": "数据检索与预处理",
+    "ntl spatial statistic and querying": "夜间灯光空间统计与查询",
+    "ntl application and modeling": "夜间灯光应用与建模",
+}
+_TEST_CASE_LABEL_ZH_BY_ID = {
+    "1": "NPP VIIRS 年度数据",
+    "2": "DMSP-OLS 年度数据",
+    "3": "类 NPP-VIIRS 年度数据",
+    "4": "NPP VIIRS 月度数据",
+    "5": "VNP46A1 日度数据",
+    "6": "VNP46A2 日度数据",
+    "7": "月度合成",
+    "8": "事件新闻",
+    "9": "行政边界",
+    "10": "兴趣点",
+    "11": "坐标查询",
+    "12": "SDGSAT-1 条带噪声去除",
+    "13": "SDGSAT-1 辐射定标",
+    "14": "NOAA-20 预处理",
+    "15": "SDGSAT-1 RRLI 指数",
+    "16": "分区统计",
+    "17": "最亮像元坐标",
+    "18": "最暗像元坐标",
+    "19": "点位灯光强度",
+    "20": "最大夜间灯光强度 [MaxNTL(P)]",
+    "21": "总夜间灯光强度 [TNTL]",
+    "22": "平均夜间灯光强度 [ANTL]",
+    "23": "阈值处理",
+    "24": "复合年增长率统计",
+    "25": "逐年增长率统计",
+    "26": "最高增长率区县识别",
+    "27": "异常检测",
+    "28": "GEE 日度统计",
+    "29": "GEE 年度统计",
+    "31": "阈值建成区提取",
+    "32": "灯光强度差异",
+    "33": "可视化",
+    "34": "城市对比",
+    "35": "趋势分析",
+    "36": "地震影响评估",
+    "37": "GDP 建模",
+    "38": "COVID-19 封控影响",
+    "39": "建成区提取",
+    "40": "城市主干道路提取",
+    "41": "路灯类型分类",
+}
+_TEST_CASE_QUERY_ZH_BY_ID = {
+    "1": "检索 2019 至 2020 年上海市 NPP VIIRS 年度夜间灯光数据。",
+    "2": "检索 2009 至 2010 年上海市 DMSP-OLS 年度夜间灯光数据。",
+    "3": "检索 2010 至 2020 年上海市类 NPP-VIIRS 年度夜间灯光数据。",
+    "4": "检索 2020 年 1 月至 12 月上海市 NPP VIIRS 月度夜间灯光数据。",
+    "5": "检索 2020 年 12 月 1 日至 12 月 7 日上海市 NPP VIIRS VNP46A1 日度夜间灯光数据。",
+    "6": "检索 2020 年 1 月 1 日至 1 月 7 日上海市 NPP VIIRS VNP46A2 日度夜间灯光数据。",
+    "7": "检索 2020 年 1 月 1 日至 1 月 31 日上海市 NPP VIIRS VNP46A2 日度夜间灯光数据，并将其合成为月度夜间灯光影像。",
+    "8": "从 USGS 和 ReliefWeb 检索 2025 年缅甸地震的事件信息。",
+    "9": "从高德地图检索上海市行政边界。",
+    "10": "从高德地图检索东方明珠塔周边 200 米范围内的兴趣点数据。",
+    "11": "检索上海东方明珠塔的坐标。",
+    "12": "对 inputs/ 目录中的 SDGSAT-1 GLI 影像执行条带噪声去除。",
+    "13": "对 inputs/ 目录中的 SDGSAT-1 GLI 影像执行辐射定标。",
+    "14": "对保存在 inputs/ 目录中的 NOAA-20 VIIRS 数据进行预处理。",
+    "15": "基于 inputs/ 目录中的 SDGSAT-1 GLI 影像计算 RRLI 指数。",
+    "16": "在 2022 年类 NPP-VIIRS 影像中，识别上海市 ANTL 最高的区。",
+    "17": "识别 2022 年上海市 NPP-VIIRS 夜间灯光影像中最亮像元的 WGS84 坐标。",
+    "18": "识别 2022 年 6 月上海市 NPP-VIIRS 夜间灯光影像中最暗像元的 WGS84 坐标。",
+    "19": "报告 2020 年 NPP-VIIRS 影像中东方明珠塔位置的夜间灯光强度。",
+    "20": "计算 2020 年上海市各区类 NPP-VIIRS 年度夜间灯光影像的最大夜间灯光强度。",
+    "21": "计算 2020 年上海市各区类 NPP-VIIRS 年度夜间灯光影像的总夜间灯光强度。",
+    "22": "计算 2020 年上海市各区类 NPP-VIIRS 年度夜间灯光影像的平均夜间灯光强度。",
+    "23": "在上海市 2020 年行政边界内，计算 NPP-VIIRS 夜间灯光像元值大于 50 的比例。",
+    "24": "计算 2015 至 2020 年上海市总夜间灯光强度的复合年增长率。",
+    "25": "计算 2015 至 2020 年上海市总夜间灯光强度的逐年增长率。",
+    "26": "识别 2019 至 2020 年上海市夜间灯光增长率最高的区。",
+    "27": "检测 2015 至 2020 年上海市的异常像元。",
+    "28": "使用 GEE Python 代码计算 2022 年 1 月 1 日至 1 月 31 日上海市每日 VNP46A2 平均夜间灯光强度（ANTL），并保存为 CSV。",
+    "29": "使用 GEE Python 代码计算 2015 至 2022 年上海市每年 NPP-VIIRS 平均夜间灯光强度（ANTL），并保存为 CSV。",
+    "31": "使用阈值 10 提取 2018 年上海市建成区。",
+    "32": "计算并可视化 2020 年与 2021 年上海市夜间灯光强度差异。",
+    "33": "下载 2020 年上海市类 NPP-VIIRS 影像，将小于 1 的噪声值设为 NaN，并使用 viridis 色带进行可视化。",
+    "34": "比较 2022 年上海市和北京市的 ANTL，并说明哪个城市更亮。",
+    "35": "对 2000 至 2020 年上海市类 NPP-VIIRS 年度夜间灯光数据进行斜率趋势分析。",
+    "36": "使用日度 NPP-VIIRS VNP46A2 影像评估 2025 年缅甸地震影响。从官方来源（USGS、ReliefWeb）检索地震详情以确定震中，使用 GEE Python API 计算事件前、事件后以及震后首夜的 ANTL，并汇总结果用于损害评估。",
+    "37": "检索上海市 GDP 数据以及 2013 至 2022 年 NPP-VIIRS 夜间灯光影像，使用多种回归模型分析 ANTL 与 GDP 的关系，并选择拟合效果最佳的模型。",
+    "38": "计算武汉市官方封控期（2020 年 1 月 23 日至 4 月 8 日）的 ANTL，并与 2019 年同期进行比较。",
+    "39": "下载 2020 年上海市夜间灯光影像，使用 SVM 方法提取建成区，并计算上海市各区建成区占比。",
+    "40": "基于 inputs\\SDG_rgb.tif 中的 SDGSAT-1 GLI 夜间灯光影像提取城市主干道路，并将结果转换为 shapefile（.shp）。",
+    "41": "基于 inputs\\SDG_rgb.tif 中的 RGB 夜间灯光影像计算红光比值指数（RRLI）和蓝光比值指数（RBLI），并按照 Jia 等（2024）的方法对像元进行类型分类。",
+}
+
+
+def _normalize_test_case_id(value) -> str:
+    if pd.isna(value):
+        return ""
+    text = str(value).strip()
+    try:
+        number = float(text)
+    except ValueError:
+        return text
+    if number.is_integer():
+        return str(int(number))
+    return text
+
+
+def _test_case_id_from_row(row: pd.Series) -> str:
+    for key in ("Unnamed: 0", "No", "ID", "Id", "id"):
+        if key in row.index:
+            case_id = _normalize_test_case_id(row.get(key))
+            if case_id:
+                return case_id
+    if len(row.index) > 0:
+        return _normalize_test_case_id(row.iloc[0])
+    return ""
+
+
+def _localized_test_case(category: str, label: str, query: str, case_id: str) -> dict:
+    category_key = str(category or "").strip().lower()
+    if _is_en():
+        display_category = _TEST_CASE_CATEGORY_EN.get(category_key, str(category or "General").strip().title())
+        return {"id": case_id, "category": display_category, "label": label, "query": query}
+    display_category = _TEST_CASE_CATEGORY_ZH.get(category_key, str(category or "通用").strip())
+    return {
+        "id": case_id,
+        "category": display_category,
+        "label": _TEST_CASE_LABEL_ZH_BY_ID.get(case_id, label),
+        "query": _TEST_CASE_QUERY_ZH_BY_ID.get(case_id, query),
+    }
 
 
 def _normalize_availability_rows(payload: dict) -> list[dict]:
@@ -315,7 +448,7 @@ def _load_ntl_availability_snapshot_once() -> dict:
 
     if not snapshot.get("ok"):
         try:
-            req = Request(MONITOR_API_URL, headers={"User-Agent": "NTL-GPT-UI/1.0"})
+            req = Request(MONITOR_API_URL, headers={"User-Agent": "NTL-Claw-UI/1.0"})
             with urlopen(req, timeout=6) as resp:  # noqa: S310
                 payload = json.loads(resp.read().decode("utf-8", errors="replace"))
             snapshot = _build_snapshot_from_payload(payload, source="monitor_api")
@@ -341,7 +474,7 @@ def _load_ntl_availability_snapshot_once() -> dict:
 
 def _render_monitor_jump_button(label: str) -> None:
     if hasattr(st, "link_button"):
-        st.link_button(label, MONITOR_UI_URL, use_container_width=True)
+        st.link_button(label, MONITOR_UI_URL, width="stretch")
         return
 
     safe_label = html.escape(label)
@@ -395,7 +528,7 @@ def _render_data_availability_block() -> None:
                 st.caption(f"查询窗口: {snapshot.get('start_date') or '-'} -> {snapshot.get('end_date') or '-'}")
             jump_label = "打开夜光遥感数据监控界面"
 
-        st.dataframe(df, use_container_width=True, hide_index=False, height=260)
+        st.dataframe(df, width="stretch", hide_index=False, height=260)
         # if snapshot.get("error"):
         #     st.caption(_tr(f"本地扫描告警：{snapshot.get('error')}", f"Local scan warning: {snapshot.get('error')}"))
         # _render_monitor_jump_button(jump_label)
@@ -408,7 +541,7 @@ def _render_data_availability_block() -> None:
     else:
         st.warning(_tr(f"未能读取 Monitor 快照：{msg}", f"Failed to load monitor snapshot: {msg}"))
     _render_monitor_jump_button(_tr("打开夜光遥感数据监控界面", "Open NTL Data Monitor"))
-    if st.button(_tr("重试加载", "Retry Loading"), key="retry_ntl_availability_snapshot", use_container_width=True):
+    if st.button(_tr("重试加载", "Retry Loading"), key="retry_ntl_availability_snapshot", width="stretch"):
         if _NTL_AVAIL_SNAPSHOT_KEY in st.session_state:
             del st.session_state[_NTL_AVAIL_SNAPSHOT_KEY]
         st.rerun()
@@ -797,7 +930,7 @@ def inject_css():
         -webkit-text-fill-color: #334155 !important;
         opacity: 1 !important;
     }
-    /* Premium sidebar style overrides (NTL-GPT night console) */
+    /* Premium sidebar style overrides (NTL-Claw night console) */
     [data-testid="stSidebar"] [data-baseweb="select"] > div {
         background: rgba(10, 18, 40, 0.86) !important;
         border: 1px solid rgba(110, 151, 255, 0.42) !important;
@@ -2029,7 +2162,7 @@ def render_uploaded_understanding_output(raw_content, tool_name: str = ""):
 def render_sidebar():
     """Render all sidebar controls."""
     with st.sidebar:
-        st.subheader(_tr("NTL-GPT 控制台", "NTL-GPT Console"))
+        st.subheader(_tr("NTL-Claw 控制台", "NTL-Claw Console"))
 
         workspace = storage_manager.get_workspace(st.session_state.get("thread_id", "debug"))
         # User/session scope: each user owns independent thread history in workspace.
@@ -2129,7 +2262,7 @@ def render_sidebar():
                     "🗑",
                     key="delete_selected_thread_inline_trigger",
                     help=_tr("删除当前选中线程", "Delete selected thread"),
-                    use_container_width=True,
+                    width="stretch",
                 ):
                     st.session_state["confirm_delete_selected_thread_inline"] = True
 
@@ -2152,7 +2285,7 @@ def render_sidebar():
                     if st.button(
                         _tr("确认删除", "Confirm Delete"),
                         key="delete_selected_thread_inline_confirm_btn",
-                        use_container_width=True,
+                        width="stretch",
                     ):
                         if st.session_state.get("is_running", False):
                             app_logic.request_stop_active_run(thread_id=selected_tid, detach_session=True)
@@ -2182,7 +2315,7 @@ def render_sidebar():
                     if st.button(
                         _tr("取消", "Cancel"),
                         key="delete_selected_thread_inline_cancel_btn",
-                        use_container_width=True,
+                        width="stretch",
                     ):
                         st.session_state["confirm_delete_selected_thread_inline"] = False
                         st.rerun()
@@ -2193,6 +2326,9 @@ def render_sidebar():
         current_model = st.session_state.get("cfg_model", app_state.MODEL_OPTIONS[0])
         if current_model not in app_state.MODEL_OPTIONS:
             current_model = app_state.MODEL_OPTIONS[0]
+            st.session_state["cfg_model"] = current_model
+        if st.session_state.get("model_selector") not in app_state.MODEL_OPTIONS:
+            st.session_state["model_selector"] = current_model
         selected_model = st.selectbox(
             _tr("模型", "Model"),
             app_state.MODEL_OPTIONS,
@@ -2220,28 +2356,19 @@ def render_sidebar():
             st.caption(_tr(f"待生效模型: {pending_model}", f"Pending model: {pending_model}"))
         selected_model = current_model
 
-        key_label = "OpenAI API Key"
-        if "qwen" in selected_model.lower():
-            key_label = "DashScope API Key"
-        elif "claude" in selected_model.lower():
-            key_label = "Anthropic API Key"
-
-        use_env_key_for_qwen = "qwen" in selected_model.lower()
-        env_qwen_key = (os.getenv("DASHSCOPE_API_KEY") or "").strip()
+        selected_model_config = model_config.get_model_config(selected_model)
+        key_label = selected_model_config.key_label
+        use_env_api_key = selected_model_config.uses_env_api_key
+        env_api_key = model_config.get_env_api_key(selected_model)
+        missing_model_env = model_config.missing_env_for_model(selected_model)
         user_api_key = ""
-        if use_env_key_for_qwen:
-            if env_qwen_key:
-                st.caption(
-                    _tr(
-                        "",
-                        "",
-                    )
-                )
-            else:
+        if use_env_api_key:
+            if missing_model_env:
+                missing_text = ", ".join(missing_model_env)
                 st.warning(
                     _tr(
-                        "未检测到 .env 中的 DASHSCOPE_API_KEY，激活会失败。",
-                        "DASHSCOPE_API_KEY not found in .env; activation will fail.",
+                        f"未检测到 .env 中的 {missing_text}，激活会失败。",
+                        f"{missing_text} not found in .env; activation will fail.",
                     )
                 )
         else:
@@ -2257,19 +2384,20 @@ def render_sidebar():
             if st.button(
                 _tr("激活", "Activate"),
                 key="activate_btn",
-                use_container_width=True,
+                width="stretch",
                 type="secondary",
                 disabled=not username_ready,
             ):
                 effective_api_key = ""
                 can_activate = True
-                if use_env_key_for_qwen:
-                    effective_api_key = env_qwen_key
-                    if not effective_api_key:
+                if use_env_api_key:
+                    effective_api_key = env_api_key
+                    if missing_model_env or not effective_api_key:
+                        missing_text = ", ".join(missing_model_env or [selected_model_config.api_key_env or "API key"])
                         st.error(
                             _tr(
-                                "请先在 .env 中配置 DASHSCOPE_API_KEY。",
-                                "Please set DASHSCOPE_API_KEY in .env first.",
+                                f"请先在 .env 中配置 {missing_text}。",
+                                f"Please set {missing_text} in .env first.",
                             )
                         )
                         can_activate = False
@@ -2303,7 +2431,7 @@ def render_sidebar():
             if st.button(
                 _tr("新建", "New"),
                 key="reset_btn",
-                use_container_width=True,
+                width="stretch",
                 type="secondary",
                 disabled=not username_ready,
             ):
@@ -2336,7 +2464,7 @@ def render_sidebar():
             if st.button(
                 _tr("中断", "Stop"),
                 key="interrupt_current_run_btn",
-                use_container_width=True,
+                width="stretch",
                 type="secondary",
                 help=_tr("请求立即中断当前回答。", "Request immediate interruption of the current run."),
             ):
@@ -2406,9 +2534,17 @@ def render_sidebar():
                 df_cases['Label'] = df_cases['Label'].fillna("Unnamed Task").astype(str)
                 categories = {}
                 for _, row in df_cases.iterrows():
-                    cat = row['Category'].strip().title() 
-                    if cat not in categories: categories[cat] = []
-                    categories[cat].append({"label": row['Label'].strip(), "query": str(row['Case']).strip()})
+                    case_id = _test_case_id_from_row(row)
+                    case = _localized_test_case(
+                        row['Category'].strip(),
+                        row['Label'].strip(),
+                        str(row['Case']).strip(),
+                        case_id,
+                    )
+                    cat = case["category"]
+                    if cat not in categories:
+                        categories[cat] = []
+                    categories[cat].append(case)
 
                 for cat, cases in categories.items():
                     with st.expander(f"{cat}", expanded=False):
@@ -2418,7 +2554,8 @@ def render_sidebar():
                                 f"<div style='color:#cfe1ff;font-size:0.95rem;line-height:1.55;'>{case['query']}</div>",
                                 unsafe_allow_html=True,
                             )
-                            if st.button(_tr("运行用例", "Run Case"), key=f"run_case_{cat}_{i}", use_container_width=True):
+                            case_key = case["id"] or f"{cat}_{i}"
+                            if st.button(_tr("运行用例", "Run Case"), key=f"run_case_{case_key}", width="stretch"):
                                 st.session_state["pending_question"] = case["query"]
                                 st.rerun()
             except Exception as e:
@@ -2485,7 +2622,7 @@ def render_download_center():
                             file_name=f"{f.stem}.zip",
                             mime="application/zip",
                             key=f"dl_in_{f.name}",
-                            use_container_width=True,
+                            width="stretch",
                         )
                     else:
                         with open(f, "rb") as file_data:
@@ -2494,7 +2631,7 @@ def render_download_center():
                                 data=file_data,
                                 file_name=f.name,
                                 key=f"dl_in_{f.name}",
-                                use_container_width=True,
+                                width="stretch",
                             )
             else:
                 st.caption(_tr("暂无", "Empty"))
@@ -2509,7 +2646,7 @@ def render_download_center():
                             file_name=f"{f.stem}.zip",
                             mime="application/zip",
                             key=f"dl_out_{f.name}",
-                            use_container_width=True,
+                            width="stretch",
                         )
                     else:
                         with open(f, "rb") as file_data:
@@ -2518,7 +2655,7 @@ def render_download_center():
                                 data=file_data,
                                 file_name=f.name,
                                 key=f"dl_out_{f.name}",
-                                use_container_width=True,
+                                width="stretch",
                             )
             else:
                 st.caption(_tr("暂无", "Empty"))
@@ -2598,7 +2735,7 @@ def render_file_understanding_panel():
         )
     )
 
-    if st.sidebar.button(_tr("理解并注入上下文", "Analyze and Inject Context"), use_container_width=True):
+    if st.sidebar.button(_tr("理解并注入上下文", "Analyze and Inject Context"), width="stretch"):
         if not selected_files:
             st.sidebar.warning(_tr("请至少选择一个文件。", "Please select at least one file."))
         else:
@@ -2639,7 +2776,7 @@ def render_file_understanding_panel():
             st.sidebar.markdown(
                 f"- `{row.get('source_file')}` | {row.get('chunks', 0)} chunks"
             )
-        if st.sidebar.button(_tr("清空注入上下文", "Clear Injected Context"), use_container_width=True):
+        if st.sidebar.button(_tr("清空注入上下文", "Clear Injected Context"), width="stretch"):
             app_logic.clear_injected_context()
             st.sidebar.success(_tr("已清空。", "Cleared."))
             st.rerun()
@@ -2685,7 +2822,7 @@ def show_history(
             try:
                 df = pd.read_csv(content)
                 with st.expander(_tr(f"查看统计表: {file_name}", f"View statistics table: {file_name}"), expanded=False):
-                    st.dataframe(df, use_container_width=True)
+                    st.dataframe(df, width="stretch")
             except Exception as e:
                 st.error(_tr(f"读取表格失败 {file_name}: {e}", f"Failed to load table {file_name}: {e}"))
     scroll_to_bottom()
@@ -2713,12 +2850,18 @@ def render_map_view():
 
     geo_files = sorted(geo_files, key=lambda p: p.stat().st_mtime)
     option_keys = {str(p): p for p in geo_files}
-    current_tif = st.session_state.get("current_map_tif")
-    preferred = next((f for f in geo_files if current_tif and str(f) == str(current_tif)), None)
+    pending_focus = str(st.session_state.get("pending_map_focus_layer") or "")
+    pending_layer = option_keys.get(pending_focus) if pending_focus else None
+    if pending_focus:
+        st.session_state["pending_map_focus_layer"] = None
+    current_layer = st.session_state.get("current_map_layer") or st.session_state.get("current_map_tif")
+    preferred = next((f for f in geo_files if current_layer and str(f) == str(current_layer)), None)
     default_layer = preferred or geo_files[-1]
 
     raw_selected = st.session_state.get("selected_layers")
-    if raw_selected is None:
+    if pending_layer is not None:
+        sanitized_selected = [pending_layer]
+    elif raw_selected is None:
         sanitized_selected = [default_layer]
     else:
         if not isinstance(raw_selected, list):
@@ -2735,10 +2878,9 @@ def render_map_view():
     selected_layers = st.multiselect(
         _tr("选择显示图层", "Select Layers to Display"),
         options=geo_files,
-        default=sanitized_selected,
         format_func=lambda x: f"[{x.parent.name}] {x.name}",
+        key="selected_layers",
     )
-    st.session_state["selected_layers"] = selected_layers
 
     layer_signature = build_layer_signature(selected_layers)
     policy_state = advance_map_view_state(
@@ -2756,7 +2898,7 @@ def render_map_view():
         st.warning(_tr("请至少选择一个图层进行可视化。", "Please select at least one layer to visualize."))
         m = folium.Map(location=default_map_center, zoom_start=default_map_zoom, control_scale=True, tiles=None)
         folium.TileLayer("CartoDB dark_matter", name="Dark Canvas", show=True).add_to(m)
-        st_folium(m, width=None, height=520, use_container_width=True, key=f"{map_component_key}_empty")
+        st_folium(m, width="stretch", height=520, key=f"{map_component_key}_empty")
         return
 
     if "layer_styles" not in st.session_state:
@@ -2950,7 +3092,7 @@ def render_map_view():
         m.zoom_start = default_map_zoom
 
     folium.LayerControl().add_to(m)
-    map_output = st_folium(m, width=None, height=540, use_container_width=True, key=map_component_key)
+    map_output = st_folium(m, width="stretch", height=540, key=map_component_key)
 
     if map_output and map_output.get("last_clicked"):
         click_lat = map_output["last_clicked"]["lat"]
@@ -3519,7 +3661,7 @@ def render_reasoning_map(events, interactive: bool = True, show_sub_steps: bool 
     if not interactive:
         dot = _build_reasoning_dot(payload)
         if dot:
-            st.graphviz_chart(dot, use_container_width=True)
+            st.graphviz_chart(dot, width="stretch")
         return
 
     elements = payload["nodes"] + payload["edges"]
@@ -3832,8 +3974,6 @@ def _classify_code_assistant_stage(tool_name, tool_payload):
         return ""
 
     status = _status_from_payload(tool_payload)
-    if name == "save_geospatial_script_tool":
-        return "Draft Received"
     if name in {"geocode_cot_validation_tool", "execute_geospatial_script_tool"}:
         if status == "success":
             return "Success"
@@ -3955,11 +4095,11 @@ def _render_output_preview():
     if suffix == ".csv":
         try:
             df = pd.read_csv(selected)
-            st.dataframe(df, use_container_width=True, height=360)
+            st.dataframe(df, width="stretch", height=360)
         except Exception as e:
             st.error(_tr(f"预览失败 {selected.name}: {e}", f"Failed to preview {selected.name}: {e}"))
     elif suffix in [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"]:
-        st.image(str(selected), use_container_width=True)
+        st.image(str(selected), width="stretch")
     elif suffix in [".tif", ".tiff"]:
         with rasterio.open(selected) as src:
             st.caption(f"CRS: {src.crs} | Size: {src.width} x {src.height} | Bands: {src.count}")
@@ -3983,7 +4123,7 @@ def _render_output_preview():
                         f"Attribute table preview (first {preview_rows} rows)",
                     )
                 )
-                st.dataframe(table_df.head(preview_rows), use_container_width=True, height=360)
+                st.dataframe(table_df.head(preview_rows), width="stretch", height=360)
         except Exception as e:
             st.error(_tr(f"预览失败 {selected.name}: {e}", f"Failed to preview {selected.name}: {e}"))
     elif suffix == ".py":
@@ -4034,7 +4174,7 @@ def _render_output_preview():
                 )
             )
             if rows:
-                st.dataframe(pd.DataFrame(rows), use_container_width=True, height=360)
+                st.dataframe(pd.DataFrame(rows), width="stretch", height=360)
             else:
                 st.info(_tr("JSONL 文件为空。", "JSONL file is empty."))
         except Exception as e:
@@ -4064,7 +4204,7 @@ def _render_output_preview():
                 st.caption(_tr(f"ZIP 内文件数: {len(names)}", f"ZIP entries: {len(names)}"))
                 st.dataframe(
                     pd.DataFrame({"file": names}),
-                    use_container_width=True,
+                    width="stretch",
                     height=360,
                     hide_index=True,
                 )
@@ -4204,12 +4344,19 @@ def _render_subagent_lifecycle_cards(logs: list, is_running: bool, last_terminal
     st.markdown("</div>", unsafe_allow_html=True)
 
 
+def _rerun_app():
+    try:
+        st.rerun(scope="app")
+    except TypeError:
+        st.rerun()
+
+
 def render_content_layout():
     """Render dual-column layout: chat and analysis/map/results."""
     workspace = storage_manager.get_workspace(st.session_state.get("thread_id", "debug"))
     _ = app_logic.consume_active_run_events()
     if bool(st.session_state.pop("ui_force_refresh_once", False)):
-        st.rerun()
+        _rerun_app()
     # st.markdown(
     #     f"<div class='ntl-card'>"
     #     f"<b>{_tr('工作空间', 'Workspace')}</b><br><span style='color:#61717a;font-size:0.88rem;'>{workspace}</span></div>",
@@ -4407,6 +4554,8 @@ def render_content_layout():
                     with reasoning_live_placeholder.container():
                         with st.expander(_tr("本轮推理过程", "Reasoning Flow"), expanded=True):
                             render_reasoning_content(st.session_state.analysis_logs)
+                if bool(st.session_state.get("ui_force_refresh_once", False)):
+                    _rerun_app()
 
             @st.fragment(run_every=3.6)
             def _streaming_live_fragment_graph():
@@ -4438,4 +4587,3 @@ def render_content_layout():
 
             _streaming_live_fragment_main()
             _streaming_live_fragment_graph()
-

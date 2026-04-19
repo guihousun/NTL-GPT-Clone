@@ -30,7 +30,7 @@
       "avg_confidence": 0.65,
       "last_used": "2026-02-28T18:30:00Z",
       "failure_patterns": ["protocol_violation_skipped_ntl_workflow_guidance"],
-      "notes": "FAILED: Skipped NTL-workflow-guidance, only 50km buffer, incomplete analysis"
+      "notes": "FAILED: Skipped ntl-workflow-guidance, only 50km buffer, incomplete analysis"
     },
     "earthquake_ntl_impact_q20_corrected": {
       "task_description": "Myanmar 2025 earthquake NTL impact (Q20 workflow compliant)",
@@ -68,41 +68,56 @@
       "data_quality_note": "No valid VNP46A2 pixels available for Tibet Dingri region (28.50°N, 87.45°E) during January 2025 due to high-altitude remote location, winter snow/ice masking, and limited VIIRS swath coverage",
       "notes": "SUCCESS: Full Q20 workflow compliance. NTL-based damage assessment not feasible due to data availability limitations in Himalayan region. Official damage statistics documented instead."
     },
-    "daily_ntl_animation_fuding_2020": {
-      "task_description": "Fuding City daily NTL change animation (2020-01-01 to 2020-01-07) with unified rendering",
+    "earthquake_ntl_impact_q20_with_visualization": {
+      "task_description": "Myanmar 2025 earthquake NTL impact assessment + visualization charts (Q20 extended)",
       "usage_count": 1,
       "success_rate": 1.0,
-      "avg_confidence": 0.95,
-      "last_used": "2026-03-01T12:00:00Z",
-      "failure_patterns": ["path_resolution_error_with_storage_manager"],
-      "resolution_applied": "storage_manager_with_fallback_to_relative_paths",
-      "workflow_source": "data_retrieval_preprocessing + custom_visualization",
-      "compliance_checklist": ["data_searcher_retrieval", "vnp46a2_daily", "unified_brightness_range", "same_colormap_all_frames", "png_frames_generated", "gif_animation_created"],
-      "output_files": ["fuding_ntl_2020-01-01.png", "fuding_ntl_2020-01-02.png", "fuding_ntl_2020-01-03.png", "fuding_ntl_2020-01-04.png", "fuding_ntl_2020-01-05.png", "fuding_ntl_2020-01-06.png", "fuding_ntl_2020-01-07.png", "fuding_ntl_20200101_20200107_animation.gif"],
+      "avg_confidence": 0.97,
+      "last_used": "2026-04-19T23:16:00Z",
+      "failure_patterns": ["band_name_mismatch_BRDF_Corrected_Radiance_vs_DNB_BRDF_Corrected_NTL"],
+      "resolution_applied": "code_assistant_light_fix_band_rename",
+      "workflow_source": "event_impact_assessment.json -> Q20",
+      "compliance_checklist": ["router_queried", "multi_scale_25_50_100km", "first_night_rule", "usgs_sources_cited", "csv_json_outputs", "impact_report_generated", "visualization_charts_generated"],
+      "output_files": ["Myanmar_Earthquake_ANTL_2025.csv", "Impact_Assessment_Report.json", "myanmar_earthquake_impact_v1.py", "Myanmar_Earthquake_Impact_Charts.png", "Myanmar_Earthquake_ANTL_Comparison.png"],
       "technical_details": {
         "dataset": "NASA/VIIRS/002/VNP46A2",
-        "band": "Gap_Filled_DNB_BRDF_Corrected_NTL",
+        "band": "DNB_BRDF_Corrected_NTL",
         "spatial_resolution": "500m",
-        "temporal_range": "2020-01-01 to 2020-01-07 (7 days)",
-        "unified_brightness_range": [0.0, 113.228],
-        "colormap": "custom NTL (black->blue->green->yellow->white)",
-        "frame_duration_ms": 800,
-        "loop": "infinite"
+        "gee_project": "empyrean-caster-430308-m2",
+        "first_night_date": "2025-03-29",
+        "event_date": "2025-03-28",
+        "event_magnitude": 7.7,
+        "epicenter": "22.011N, 95.936E",
+        "buffers_km": [25, 50, 100],
+        "pre_event_window": "2025-03-14 to 2025-03-21",
+        "recovery_window": "2025-04-04 to 2025-04-11",
+        "visualization": {
+          "dashboard_charts": "4-panel (ANTL bars, drop %, recovery trajectory, recovery ratio)",
+          "comparison_chart": "grouped bar chart by period and buffer",
+          "style": "dark theme (#1a1a2e background), 150 DPI, value labels"
+        },
+        "key_metrics": {
+          "25km_first_night_drop_pct": -42.1,
+          "25km_recovery_ratio_pct": 70.4,
+          "severity_classification_25km": "SEVERE",
+          "severity_classification_50km": "MILD",
+          "severity_classification_100km": "MILD"
+        }
       },
-      "notes": "SUCCESS: Daily NTL animation generated with unified rendering parameters. All 7 frames use same brightness range and colormap for visual consistency. Script includes fallback mechanism for path resolution."
+      "notes": "SUCCESS: Q20 workflow executed with full compliance + visualization extension. Band name corrected (contract said BRDF-Corrected_Radiance, actual is DNB_BRDF_Corrected_NTL). Generated 4-panel impact dashboard + comparison bar chart. 25km epicenter zone showed severe initial impact (-42.1%) with strong partial recovery (70.4%)."
     }
   },
   "global_metrics": {
-    "total_executions": 9,
-    "overall_success_rate": 0.889,
-    "avg_confidence": 0.895,
-    "escalation_rate": 0.111,
-    "learning_count": 4,
+    "total_executions": 10,
+    "overall_success_rate": 0.90,
+    "avg_confidence": 0.902,
+    "escalation_rate": 0.10,
+    "learning_count": 5,
     "noise_filter_rate": 1.0,
     "trends": {
-      "success_rate_7d": [1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-      "confidence_7d": [0.85, 0.92, 0.65, 0.95, 0.97, 0.90, 0.90, 0.95, 0.90],
-      "escalation_rate_7d": [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+      "success_rate_7d": [1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+      "confidence_7d": [0.85, 0.92, 0.65, 0.95, 0.97, 0.90, 0.90, 0.95, 0.90, 0.97],
+      "escalation_rate_7d": [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     }
   },
   "execution_log": [
@@ -222,6 +237,39 @@
         "task_level": "L2",
         "code_assistant_execution": true,
         "all_frames_same_rendering": true
+      }
+    },
+    {
+      "timestamp": "2026-04-19T23:16:00Z",
+      "task_id": "myanmar_earthquake_2025_q20_with_visualization",
+      "workflow_used": "event_impact_assessment.json -> Q20",
+      "status": "success",
+      "confidence": 0.97,
+      "issues": ["band_name_mismatch_BRDF_Corrected_Radiance_vs_DNB_BRDF_Corrected_NTL"],
+      "resolution": "code_assistant_light_fix_band_rename",
+      "user_satisfaction": null,
+      "output_artifacts": [
+        "Myanmar_Earthquake_ANTL_2025.csv",
+        "Impact_Assessment_Report.json",
+        "myanmar_earthquake_impact_v1.py",
+        "Myanmar_Earthquake_Impact_Charts.png",
+        "Myanmar_Earthquake_ANTL_Comparison.png",
+        "myanmar_earthquake_visualization.py"
+      ],
+      "key_findings": [
+        "25km buffer: -42.1% first-night drop (SEVERE), 70.4% recovery ratio",
+        "50km buffer: -12.3% first-night drop (MILD), 7.6% recovery ratio",
+        "100km buffer: -11.5% first-night drop (MILD), -145.3% recovery ratio (continued decline)",
+        "Epicenter zone most severely impacted but also showed strongest recovery"
+      ],
+      "workflow_compliance": {
+        "router_queried": true,
+        "matching_workflow": "Q20",
+        "multi_scale_buffers": [25, 50, 100],
+        "first_night_rule_applied": true,
+        "first_night_date": "2025-03-29",
+        "usgs_sources_cited": true,
+        "outputs_generated": ["Myanmar_Earthquake_ANTL_2025.csv", "Impact_Assessment_Report.json", "Myanmar_Earthquake_Impact_Charts.png", "Myanmar_Earthquake_ANTL_Comparison.png"]
       }
     }
   ]

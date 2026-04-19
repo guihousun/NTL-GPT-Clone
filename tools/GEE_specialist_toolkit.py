@@ -2,18 +2,34 @@ from __future__ import annotations
 
 import calendar
 import json
+import os
 import re
 import requests
 import time
 from html import unescape
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from typing import Dict, List, Literal, Optional, Tuple
 
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
+from dotenv import dotenv_values
 
-REQUIRED_GEE_PROJECT = "empyrean-caster-430308-m2"
+DEFAULT_GEE_PROJECT = "empyrean-caster-430308-m2"
+
+
+def _configured_gee_project_id() -> str:
+    dotenv_path = Path(__file__).resolve().parents[1] / ".env"
+    project_id = ""
+    if dotenv_path.exists():
+        project_id = str(dotenv_values(dotenv_path).get("GEE_DEFAULT_PROJECT_ID") or "").strip()
+    if not project_id:
+        project_id = str(os.getenv("GEE_DEFAULT_PROJECT_ID") or "").strip()
+    return project_id or DEFAULT_GEE_PROJECT
+
+
+REQUIRED_GEE_PROJECT = _configured_gee_project_id()
 EE_CATALOG_PAGE = "https://developers.google.com/earth-engine/datasets/catalog"
 _CATALOG_CACHE: Dict[str, object] = {"items": [], "fetched_at": 0.0}
 _DATASET_ID_CACHE: Dict[str, str] = {}

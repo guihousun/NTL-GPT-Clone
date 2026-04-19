@@ -13,7 +13,7 @@
 - **问题识别**:
   - 1 个冗余技能 (`ntl-kb-task-level-protocol`)
   - 1 个不完整文档 (`ntl-gdp-regression-analysis` 在第 99 行截断)
-  - 2 个技能存在功能重叠 (`gee-routing-blueprint-strategy` 和 `NTL-workflow-guidance`)
+  - 2 个技能存在功能重叠 (`gee-routing-blueprint-strategy` 和 `ntl-workflow-guidance`)
   - 1 个技能缺少关键代码示例 (`gee-ntl-date-boundary-handling` 缺少时区处理)
 
 ### 重构后状态
@@ -203,7 +203,7 @@ utc_time = convert_timezone("2025-03-29 15:30:00", "Asia/Yangon", "UTC")
 
 ### 5. 简化为纯映射功能
 
-#### `NTL-workflow-guidance`
+#### `ntl-workflow-guidance`
 
 **重构重点**: 移除重叠的路由逻辑，专注于意图识别和工作流 JSON 映射
 
@@ -254,7 +254,7 @@ Task level classification (L1/L2/L3) is also handled by `gee-routing-blueprint-s
 ### 质性改进
 
 1. **消除冗余**: `ntl-kb-task-level-protocol` 的协议逻辑现在整合到主路由技能中
-2. **明确职责**: `gee-routing-blueprint-strategy` 负责所有路由决策，`NTL-workflow-guidance` 专注于意图映射
+2. **明确职责**: `gee-routing-blueprint-strategy` 负责所有路由决策，`ntl-workflow-guidance` 专注于意图映射
 3. **补全缺失**: `ntl-gdp-regression-analysis` 现在提供完整的回归建模工作流
 4. **增强实用**: `gee-ntl-date-boundary-handling` 新增时区处理代码，支持真实场景
 5. **可维护性**: 技能间依赖关系清晰，减少维护成本
@@ -282,7 +282,7 @@ Task level classification (L1/L2/L3) is also handled by `gee-routing-blueprint-s
 │   ├── 轻修复边界定义
 │   └── 结构化失败移交
 │
-└── NTL-workflow-guidance (纯意图映射)
+└── ntl-workflow-guidance (纯意图映射)
     ├── 意图分类 -> 工作流 JSON 映射
     ├── [新增] 与其他技能的集成说明
     └── 后置学习规则
@@ -299,12 +299,12 @@ Task level classification (L1/L2/L3) is also handled by `gee-routing-blueprint-s
 
 ## 📝 演进日志
 
-所有变更已记录到 `/skills/NTL-workflow-guidance/references/evolution_log.jsonl`:
+所有变更已记录到 `/skills/ntl-workflow-guidance/references/evolution_log.jsonl`:
 
 1. **skill_consolidation**: 合并 `ntl-kb-task-level-protocol` 到 `gee-routing-blueprint-strategy`
 2. **skill_enhancement**: 为 `gee-ntl-date-boundary-handling` 添加时区处理代码
 3. **skill_completion**: 补全 `ntl-gdp-regression-analysis` 截断的文档
-4. **skill_simplification**: 简化 `NTL-workflow-guidance` 为纯映射功能
+4. **skill_simplification**: 简化 `ntl-workflow-guidance` 为纯映射功能
 
 每条记录包含:
 - `timestamp`: 变更时间戳
@@ -335,7 +335,7 @@ Task level classification (L1/L2/L3) is also handled by `gee-routing-blueprint-s
 - [x] `gee-routing-blueprint-strategy` 已整合任务级别协议逻辑
 - [x] `ntl-gdp-regression-analysis` 文档已补全 (从 99 行扩展到 242 行)
 - [x] `gee-ntl-date-boundary-handling` 已添加时区处理代码
-- [x] `NTL-workflow-guidance` 已简化为纯映射功能
+- [x] `ntl-workflow-guidance` 已简化为纯映射功能
 - [x] `evolution_log.jsonl` 已记录所有变更
 - [x] 所有技能文件语法正确，无截断
 - [x] 技能间依赖关系清晰，无循环依赖

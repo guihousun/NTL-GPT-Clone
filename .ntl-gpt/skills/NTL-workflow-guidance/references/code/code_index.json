@@ -8,7 +8,7 @@
       "task_id": "Q24",
       "case_id": "Q24_fuding_daily_ntl_animation_v2",
       "title": "Fuding daily NTL animation with georeferenced scale bar",
-      "path": "/skills/NTL-workflow-guidance/references/code/data_retrieval_preprocessing/Q24_fuding_daily_ntl_animation_v2.py",
+      "path": "/skills/ntl-workflow-guidance/references/code/data_retrieval_preprocessing/Q24_fuding_daily_ntl_animation_v2.py",
       "status": "verified_success",
       "tags": [
         "vnp46a2",
@@ -29,7 +29,7 @@
       "task_id": "Q25",
       "case_id": "Q25_official_vj_dnb_fullchain_iran",
       "title": "Official VJ102/VJ103 full chain for Iran",
-      "path": "/skills/NTL-workflow-guidance/references/code/data_retrieval_preprocessing/Q25_official_vj_dnb_fullchain_iran.py",
+      "path": "/skills/ntl-workflow-guidance/references/code/data_retrieval_preprocessing/Q25_official_vj_dnb_fullchain_iran.py",
       "status": "verified_success",
       "tags": [
         "official-source",
@@ -51,7 +51,7 @@
       "task_id": "Q26",
       "case_id": "Q26_vj102_vj103_preprocess_storage_paths",
       "title": "VJ102/VJ103 preprocess-only flow with storage-manager paths",
-      "path": "/skills/NTL-workflow-guidance/references/code/data_retrieval_preprocessing/Q26_vj102_vj103_preprocess_storage_paths.py",
+      "path": "/skills/ntl-workflow-guidance/references/code/data_retrieval_preprocessing/Q26_vj102_vj103_preprocess_storage_paths.py",
       "status": "verified_success",
       "tags": [
         "official-source",
@@ -72,7 +72,7 @@
       "task_id": "Q21",
       "case_id": "Q21_iran_conflict_official_vj_workflow",
       "title": "Iran conflict assessment with official VJ102/VJ103 + INSS + report rebuild",
-      "path": "/skills/NTL-workflow-guidance/references/code/event_impact_assessment/Q21_iran_conflict_official_vj_workflow.py",
+      "path": "/skills/ntl-workflow-guidance/references/code/event_impact_assessment/Q21_iran_conflict_official_vj_workflow.py",
       "status": "verified_success",
       "tags": [
         "event-impact",
@@ -93,7 +93,7 @@
       "task_id": "Q22",
       "case_id": "Q22_iran_vj146a1_tehran_hormuz_workflow",
       "title": "Iran VJ146A1 strict QA workflow for Tehran and Hormuz local-topic maps",
-      "path": "/skills/NTL-workflow-guidance/references/code/event_impact_assessment/Q22_iran_vj146a1_tehran_hormuz_workflow.py",
+      "path": "/skills/ntl-workflow-guidance/references/code/event_impact_assessment/Q22_iran_vj146a1_tehran_hormuz_workflow.py",
       "status": "verified_pattern",
       "tags": [
         "event-impact",

@@ -1,6 +1,6 @@
-﻿from dotenv import load_dotenv
+from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 import logging
 
@@ -29,7 +29,7 @@ def _safe_recover_runtime_health() -> bool:
 
 def main():
     st.set_page_config(
-        page_title="NTL-GPT: Multi-Agent Nighttime Light Analysis",
+        page_title="NTL-Claw: Multi-Agent Nighttime Light Analysis",
         page_icon=":robot:",
         layout="wide",
     )
@@ -60,7 +60,7 @@ def main():
         st.session_state["ui_lang"] = lang
 
     with top_left:
-        title = "NTL-GPT: Multi-Agent Nighttime Light Remote Sensing" if st.session_state["ui_lang"] == "EN" else "NTL-GPT：夜间灯光遥感多智能体系统"
+        title = "NTL-Claw: Multi-Agent Nighttime Light Remote Sensing" if st.session_state["ui_lang"] == "EN" else "NTL-Claw：夜间灯光遥感多智能体系统"
         desc = (
             "A cloud trial edition for end-to-end NTL analysis. It supports data search, preprocessing, modeling, and geospatial result generation through coordinated agents."
             if st.session_state["ui_lang"] == "EN"
@@ -99,7 +99,7 @@ def main():
                 <div style="margin-top:8px;border:1px solid rgba(148,190,255,0.55);border-radius:10px;
                 background:linear-gradient(180deg, rgba(14,28,58,0.88), rgba(8,16,35,0.9));
                 padding:10px 12px;color:#f1f6ff;font-weight:600;">
-                    Please click <b>Activate</b> in the sidebar to start NTL-GPT.
+                    Please click <b>Activate</b> in the sidebar to start NTL-Claw.
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -110,7 +110,7 @@ def main():
                 <div style="margin-top:8px;border:1px solid rgba(148,190,255,0.55);border-radius:10px;
                 background:linear-gradient(180deg, rgba(14,28,58,0.88), rgba(8,16,35,0.9));
                 padding:10px 12px;color:#f1f6ff;font-weight:600;">
-                    请在左侧边栏点击 <b>Activate</b> 启动 NTL-GPT。
+                    请在左侧边栏点击 <b>Activate</b> 启动 NTL-Claw。
                 </div>
                 """,
                 unsafe_allow_html=True,

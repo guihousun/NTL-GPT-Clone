@@ -20,10 +20,21 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.config import var_child_runnable_config
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
+from dotenv import dotenv_values
 
 from storage_manager import current_thread_id, storage_manager
 
-REQUIRED_GEE_PROJECT = "empyrean-caster-430308-m2"
+DEFAULT_GEE_PROJECT = "empyrean-caster-430308-m2"
+
+
+def _gee_project_id() -> str:
+    dotenv_path = Path(__file__).resolve().parents[1] / ".env"
+    project_id = ""
+    if dotenv_path.exists():
+        project_id = str(dotenv_values(dotenv_path).get("GEE_DEFAULT_PROJECT_ID") or "").strip()
+    if not project_id:
+        project_id = str(os.getenv("GEE_DEFAULT_PROJECT_ID") or "").strip()
+    return project_id or DEFAULT_GEE_PROJECT
 
 GLOBAL_EXEC_CONTEXTS: Dict[str, Dict[str, Any]] = {}
 
@@ -94,17 +105,6 @@ FORBIDDEN_COMMAND_PATTERNS = [
     re.compile(r"apply_patch", flags=re.IGNORECASE),
 ]
 
-READABLE_WORKSPACE_EXTENSIONS = {
-    ".py",
-    ".json",
-    ".md",
-    ".csv",
-    ".tsv",
-    ".xlsx",
-    ".xls",
-    ".xlsm",
-}
-
 VIRTUAL_INPUT_PREFIXES = ("/shared/", "/data/raw/", "/memories/")
 VIRTUAL_OUTPUT_PREFIXES = ("/data/processed/",)
 
@@ -126,25 +126,10 @@ class GeoCodeCOTBlockInput(BaseModel):
     )
 
 
-class SaveScriptInput(BaseModel):
-    script_content: str = Field(
-        ...,
-        description="Python script content to persist under the current thread workspace outputs.",
-    )
-    script_name: Optional[str] = Field(
-        default=None,
-        description="Optional script filename. .py will be appended automatically when missing.",
-    )
-    overwrite: bool = Field(
-        default=False,
-        description="Whether to overwrite an existing script when script_name already exists.",
-    )
-
-
 class ExecuteScriptInput(BaseModel):
     script_name: str = Field(
         ...,
-        description="Script filename previously saved by save_geospatial_script_tool (for example analysis_plan.py).",
+        description="Workspace-relative .py script filename in current thread inputs/outputs, for example analysis_plan.py.",
     )
     script_location: str = Field(
         default="auto",
@@ -158,43 +143,6 @@ class ExecuteScriptInput(BaseModel):
         default=False,
         description="If True, bypass dedupe skip and force re-execution even if script content is unchanged.",
     )
-
-
-class ReadWorkspaceFileInput(BaseModel):
-    file_name: str = Field(
-        ...,
-        description="Logical filename in current thread workspace. Absolute paths and parent traversal are prohibited.",
-    )
-    location: str = Field(
-        default="auto",
-        description="Read location: auto|outputs|inputs. auto prefers outputs first, then inputs.",
-    )
-
-
-def _read_workspace_content_by_extension(path: Path, ext: str) -> Tuple[str, str]:
-    normalized_ext = (ext or "").lower()
-    if normalized_ext in {".xlsx", ".xls", ".xlsm"}:
-        try:
-            import pandas as pd  # Local import to avoid adding heavy import cost on non-table reads.
-        except Exception as exc:  # noqa: BLE001
-            raise RuntimeError(f"pandas is required to read '{normalized_ext}' files: {exc}") from exc
-
-        try:
-            workbook = pd.ExcelFile(path)
-            if not workbook.sheet_names:
-                return "", "text/csv"
-            first_sheet = workbook.sheet_names[0]
-            df = pd.read_excel(path, sheet_name=first_sheet)
-            csv_content = df.to_csv(index=False)
-            return csv_content, "text/csv"
-        except Exception as exc:  # noqa: BLE001
-            raise RuntimeError(f"Failed to parse Excel workbook: {exc}") from exc
-
-    if normalized_ext in {".csv", ".tsv"}:
-        return path.read_text(encoding="utf-8"), "text/plain"
-
-    return path.read_text(encoding="utf-8"), "text/plain"
-
 
 def _sanitize_ansi(text: str) -> str:
     return re.sub(r"\x1b\[[0-9;]*m", "", text or "")
@@ -530,6 +478,54 @@ def _normalize_workspace_logical_path(
     return "/".join([root, *sanitized_parts])
 
 
+def _normalize_script_request_path(path_value: str, *, thread_id: str) -> str:
+    raw = str(path_value or "").strip().replace("\\", "/")
+    if raw.startswith("/data/processed/"):
+        raw = "outputs/" + raw[len("/data/processed/") :].strip("/")
+    elif raw.startswith("/data/raw/"):
+        raw = "inputs/" + raw[len("/data/raw/") :].strip("/")
+    elif raw.startswith("/outputs/"):
+        raw = "outputs/" + raw[len("/outputs/") :].strip("/")
+    elif raw.startswith("/inputs/"):
+        raw = "inputs/" + raw[len("/inputs/") :].strip("/")
+
+    workspace = storage_manager.get_workspace(thread_id).resolve()
+    is_windows_abs = bool(re.match(r"^[A-Za-z]:/", raw))
+    if is_windows_abs or raw.startswith("/"):
+        candidate = Path(raw).resolve()
+        for root in ("outputs", "inputs"):
+            root_dir = (workspace / root).resolve()
+            try:
+                rel = candidate.relative_to(root_dir)
+                rel_text = str(rel).replace("\\", "/")
+                return _normalize_workspace_logical_path(
+                    f"{root}/{rel_text}",
+                    default_root="outputs",
+                    required_suffix=".py",
+                    allow_roots=("inputs", "outputs"),
+                )
+            except ValueError:
+                continue
+        try:
+            rel = candidate.relative_to(workspace)
+            safe_rel = storage_manager._safe_workspace_relative_path(str(rel).replace("\\", "/"))
+            sanitized_parts = _sanitize_workspace_path_parts(tuple(safe_rel.parts))
+            if not sanitized_parts:
+                raise ValueError("Path is invalid after sanitization.")
+            if not sanitized_parts[-1].lower().endswith(".py"):
+                sanitized_parts[-1] = f"{sanitized_parts[-1]}.py"
+            return "/".join(["workspace", *sanitized_parts])
+        except ValueError:
+            raise ValueError("Script path must be workspace-relative or inside the current thread workspace.") from None
+
+    return _normalize_workspace_logical_path(
+        raw,
+        default_root="outputs",
+        required_suffix=".py",
+        allow_roots=("inputs", "outputs"),
+    )
+
+
 def _workspace_logical_name(resolved_path: Path, *, thread_id: str, root: str) -> str:
     workspace = storage_manager.get_workspace(thread_id)
     root_dir = (workspace / root).resolve()
@@ -545,43 +541,48 @@ def _persist_script(
     script_name: Optional[str] = None,
     *,
     prefix: str,
+    default_root: str = "outputs",
+    allow_roots: Tuple[str, ...] = ("outputs",),
     overwrite: bool = False,
 ) -> Tuple[str, str]:
     thread_id = str(current_thread_id.get() or "debug").strip() or "debug"
     logical_path = _normalize_workspace_logical_path(
         script_name,
-        default_root="outputs",
+        default_root=default_root,
         auto_name_prefix=prefix,
         required_suffix=".py",
-        allow_roots=("outputs",),
+        allow_roots=allow_roots,
     )
     script_path = storage_manager.resolve_workspace_relative_path(
         logical_path,
         thread_id=thread_id,
-        default_root="outputs",
+        default_root=default_root,
         create_parent=True,
-        allow_memory=False,
+        allow_memory="memory" in allow_roots,
     )
 
     if script_path.exists() and not overwrite and script_name:
         logical_path = _normalize_workspace_logical_path(
             None,
-            default_root="outputs",
+            default_root=default_root,
             auto_name_prefix=prefix,
             required_suffix=".py",
-            allow_roots=("outputs",),
+            allow_roots=allow_roots,
         )
         script_path = storage_manager.resolve_workspace_relative_path(
             logical_path,
             thread_id=thread_id,
-            default_root="outputs",
+            default_root=default_root,
             create_parent=True,
-            allow_memory=False,
+            allow_memory="memory" in allow_roots,
         )
 
     script_path.parent.mkdir(parents=True, exist_ok=True)
     script_path.write_text(script_content, encoding="utf-8")
-    return _workspace_logical_name(script_path, thread_id=thread_id, root="outputs"), str(script_path)
+    logical_name = _workspace_logical_name(script_path, thread_id=thread_id, root=default_root)
+    if default_root != "outputs":
+        logical_name = f"{default_root}/{logical_name}"
+    return logical_name, str(script_path)
 
 
 def _append_run_history(event: Dict[str, Any]) -> None:
@@ -853,7 +854,7 @@ def _preflight_checks(code: str, strict_mode: bool) -> Dict[str, Any]:
 
         if "ee.Initialize(" in code and "project=" not in code:
             warnings.append(
-                f"ee.Initialize() missing explicit project parameter. Recommended: ee.Initialize(project='{REQUIRED_GEE_PROJECT}')."
+                f"ee.Initialize() missing explicit project parameter. Recommended: ee.Initialize(project='{_gee_project_id()}')."
             )
 
         for asset in assets:
@@ -925,8 +926,14 @@ def _derive_fix_suggestions(error_type: Optional[str], error_message: Optional[s
             fixes.append("Use sandbox-relative paths from workspace root, e.g. inputs/xxx and outputs/yyy.")
             fixes.append("If portability is needed, switch to storage_manager.resolve_input_path/resolve_output_path.")
 
-    if "eeexception" in et or "earth engine" in msg:
-        fixes.append(f"Ensure ee.Initialize(project='{REQUIRED_GEE_PROJECT}') is called before GEE operations.")
+    if "user_project_denied" in msg or "serviceusage.serviceusageconsumer" in msg:
+        fixes.append(
+            "GEE project authorization failed. Use an authorized GEE_DEFAULT_PROJECT_ID or grant the active account "
+            "serviceusage.serviceUsageConsumer on the configured Google Cloud project."
+        )
+        fixes.append("Do not change datasets, bands, or analysis logic to work around this IAM/project error.")
+    elif "eeexception" in et or "earth engine" in msg:
+        fixes.append(f"Ensure ee.Initialize(project='{_gee_project_id()}') is called before GEE operations.")
         fixes.append("Verify asset IDs and band names against Earth Engine catalog before execution.")
 
     if "permission" in msg or "access" in msg:
@@ -969,6 +976,10 @@ def _build_error_handling_policy(
         "administrative",
         "permission",
         "access denied",
+        "user_project_denied",
+        "serviceusage.serviceusageconsumer",
+        "serviceusageconsumer",
+        "project",
         "authentication",
         "authorization",
         "credential",
@@ -1016,6 +1027,9 @@ def _build_error_handling_policy(
                 "The failure likely requires strategy/data/boundary or permission decision outside local code debugging."
             ),
             "decision_options": [
+                "set_or_replace_GEE_DEFAULT_PROJECT_ID_with_an_authorized_project",
+                "grant_serviceusage.serviceUsageConsumer_to_the_active_GEE_credential",
+                "enable_required_Google_Cloud_and_Earth_Engine_APIs_for_the_project",
                 "ask_engineer_for_additional_data_or_boundary_confirmation",
                 "ask_engineer_to_switch_method_or_toolchain",
                 "ask_engineer_to_request_user_clarification_if_constraints_are_missing",
@@ -1069,7 +1083,7 @@ def _execute_code(code_block: str) -> Tuple[bool, str, Optional[str], Optional[s
     user_globals = _get_thread_context()
     bootstrap = (
         "import ee\n"
-        f"project_id = '{REQUIRED_GEE_PROJECT}'\n"
+        f"project_id = {_gee_project_id()!r}\n"
         "try:\n"
         "    ee.Initialize(project=project_id)\n"
         "except Exception:\n"
@@ -1172,7 +1186,7 @@ def _execute_code_in_subprocess_sandbox(
 
     bootstrap = (
         "import ee\n"
-        f"project_id = '{REQUIRED_GEE_PROJECT}'\n"
+        f"project_id = {_gee_project_id()!r}\n"
         "try:\n"
         "    ee.Initialize(project=project_id)\n"
         "except Exception:\n"
@@ -1246,6 +1260,8 @@ def GEE_GeoCode_COT_Validation(
             block_script_name, block_script_path = _persist_script(
                 code_block,
                 prefix="cot_block",
+                default_root="memory",
+                allow_roots=("memory",),
                 overwrite=False,
             )
         except Exception as exc:  # noqa: BLE001
@@ -1353,353 +1369,6 @@ def GEE_GeoCode_COT_Validation(
             current_thread_id.reset(token)
 
 
-def save_geospatial_script(
-    script_content: str,
-    script_name: Optional[str] = None,
-    overwrite: bool = False,
-    config: Optional[RunnableConfig] = None,
-) -> str:
-    token = _bind_thread_from_config(config)
-    try:
-        if not script_content or not script_content.strip():
-            policy = _build_error_handling_policy(
-                "EmptyScriptError",
-                "script_content is empty.",
-                preflight=None,
-                fix_suggestions=None,
-            )
-            return json.dumps(
-                {
-                    "status": "fail",
-                    "error_type": "EmptyScriptError",
-                    "error_message": "script_content is empty.",
-                    "error_handling_policy": policy,
-                },
-                indent=2,
-                ensure_ascii=False,
-            )
-
-        thread_ctx = _get_thread_context()
-        normalized_content_hash = hashlib.sha256(_normalize_whitespace(script_content).encode("utf-8")).hexdigest()
-        saved_by_hash = thread_ctx.setdefault("__ntl_saved_script_by_hash", {})
-        cached_entry = saved_by_hash.get(normalized_content_hash)
-        if isinstance(cached_entry, dict) and not overwrite:
-            cached_name = str(cached_entry.get("script_name") or "")
-            cached_path = str(cached_entry.get("script_path") or "")
-            requested_name = (
-                os.path.basename((script_name or "").strip()) if (script_name and script_name.strip()) else ""
-            )
-            if cached_name and cached_path and Path(cached_path).exists():
-                # Reuse existing script when content is unchanged to avoid redundant save loops.
-                if (not requested_name) or (requested_name.lower() == cached_name.lower()):
-                    preflight = _preflight_checks(script_content, strict_mode=False)
-                    return json.dumps(
-                        {
-                            "status": "success",
-                            "script_name": cached_name,
-                            "script_path": cached_path,
-                            "bytes": len(script_content.encode("utf-8")),
-                            "preflight_score": preflight["score"],
-                            "preflight_warnings": preflight["warnings"],
-                            "dedupe": {
-                                "reused_existing_script": True,
-                                "content_hash": normalized_content_hash,
-                            },
-                        },
-                        indent=2,
-                        ensure_ascii=False,
-                    )
-
-        try:
-            saved_script_name, saved_script_path = _persist_script(
-                script_content,
-                script_name=script_name,
-                prefix="analysis_script",
-                overwrite=overwrite,
-            )
-        except Exception as exc:  # noqa: BLE001
-            policy = _build_error_handling_policy(
-                "ScriptPersistError",
-                str(exc),
-                preflight=None,
-                fix_suggestions=None,
-            )
-            return json.dumps(
-                {
-                    "status": "fail",
-                    "error_type": "ScriptPersistError",
-                    "error_message": str(exc),
-                    "traceback": traceback.format_exc(),
-                    "error_handling_policy": policy,
-                },
-                indent=2,
-                ensure_ascii=False,
-            )
-
-        preflight = _preflight_checks(script_content, strict_mode=False)
-        saved_by_hash[normalized_content_hash] = {
-            "script_name": saved_script_name,
-            "script_path": saved_script_path,
-        }
-        thread_ctx["__ntl_last_saved_script_hash"] = normalized_content_hash
-        thread_ctx["__ntl_last_saved_script_name"] = saved_script_name
-        thread_ctx["__ntl_last_saved_script_path"] = saved_script_path
-        _append_run_history(
-            {
-                "timestamp": _timestamp(),
-                "tool": "save_geospatial_script_tool",
-                "status": "success",
-                "script_name": saved_script_name,
-                "script_path": saved_script_path,
-                "thread_id": current_thread_id.get(),
-            }
-        )
-        return json.dumps(
-            {
-                "status": "success",
-                "script_name": saved_script_name,
-                "script_path": saved_script_path,
-                "bytes": len(script_content.encode("utf-8")),
-                "preflight_score": preflight["score"],
-                "preflight_warnings": preflight["warnings"],
-            },
-            indent=2,
-            ensure_ascii=False,
-        )
-    finally:
-        if token is not None:
-            current_thread_id.reset(token)
-
-
-def read_workspace_file(
-    file_name: str,
-    location: str = "auto",
-    config: Optional[RunnableConfig] = None,
-) -> str:
-    token = _bind_thread_from_config(config)
-    try:
-        normalized_location = str(location or "auto").strip().lower()
-        if normalized_location not in {"auto", "outputs", "inputs"}:
-            policy = _build_error_handling_policy(
-                "InvalidLocationError",
-                f"Unsupported location '{location}'. Use one of: auto|outputs|inputs.",
-                preflight=None,
-                fix_suggestions=None,
-            )
-            return json.dumps(
-                {
-                    "status": "fail",
-                    "error_type": "InvalidLocationError",
-                    "error_message": f"Unsupported location '{location}'. Use one of: auto|outputs|inputs.",
-                    "error_handling_policy": policy,
-                },
-                indent=2,
-                ensure_ascii=False,
-            )
-
-        raw_name = str(file_name or "").strip()
-        if not raw_name:
-            policy = _build_error_handling_policy(
-                "InvalidFileNameError",
-                "file_name is required.",
-                preflight=None,
-                fix_suggestions=None,
-            )
-            return json.dumps(
-                {
-                    "status": "fail",
-                    "error_type": "InvalidFileNameError",
-                    "error_message": "file_name is required.",
-                    "error_handling_policy": policy,
-                },
-                indent=2,
-                ensure_ascii=False,
-            )
-
-        if re.match(r"^[A-Za-z]:[\\/]", raw_name) or raw_name.startswith(("/", "\\")):
-            policy = _build_error_handling_policy(
-                "InvalidFileNameError",
-                "Absolute paths are not allowed. Provide a workspace-relative path only.",
-                preflight=None,
-                fix_suggestions=None,
-            )
-            return json.dumps(
-                {
-                    "status": "fail",
-                    "error_type": "InvalidFileNameError",
-                    "error_message": "Absolute paths are not allowed. Provide a workspace-relative path only.",
-                    "error_handling_policy": policy,
-                },
-                indent=2,
-                ensure_ascii=False,
-            )
-
-        if ".." in raw_name.replace("\\", "/"):
-            policy = _build_error_handling_policy(
-                "InvalidFileNameError",
-                "Parent traversal is not allowed in workspace-relative paths.",
-                preflight=None,
-                fix_suggestions=None,
-            )
-            return json.dumps(
-                {
-                    "status": "fail",
-                    "error_type": "InvalidFileNameError",
-                    "error_message": "Parent traversal is not allowed in workspace-relative paths.",
-                    "error_handling_policy": policy,
-                },
-                indent=2,
-                ensure_ascii=False,
-            )
-
-        thread_id = str(current_thread_id.get() or "debug").strip() or "debug"
-        try:
-            requested_rel = storage_manager._safe_workspace_relative_path(raw_name.lstrip("/"))
-            effective_name = str(requested_rel).replace("\\", "/")
-        except Exception as exc:  # noqa: BLE001
-            policy = _build_error_handling_policy(
-                "InvalidFileNameError",
-                str(exc),
-                preflight=None,
-                fix_suggestions=None,
-            )
-            return json.dumps(
-                {
-                    "status": "fail",
-                    "error_type": "InvalidFileNameError",
-                    "error_message": str(exc),
-                    "error_handling_policy": policy,
-                },
-                indent=2,
-                ensure_ascii=False,
-            )
-
-        ext = Path(effective_name).suffix.lower()
-        if ext not in READABLE_WORKSPACE_EXTENSIONS:
-            allowed = ", ".join(sorted(READABLE_WORKSPACE_EXTENSIONS))
-            policy = _build_error_handling_policy(
-                "UnsupportedFileTypeError",
-                f"Unsupported extension '{ext}'. Allowed extensions: {allowed}",
-                preflight=None,
-                fix_suggestions=None,
-            )
-            return json.dumps(
-                {
-                    "status": "fail",
-                    "error_type": "UnsupportedFileTypeError",
-                    "error_message": f"Unsupported extension '{ext}'. Allowed extensions: {allowed}",
-                    "file_name": effective_name,
-                    "error_handling_policy": policy,
-                },
-                indent=2,
-                ensure_ascii=False,
-            )
-
-        candidate_paths: List[Tuple[str, Path]] = []
-        if normalized_location in {"auto", "outputs"}:
-            candidate_paths.append(
-                (
-                    "outputs",
-                    storage_manager.resolve_workspace_relative_path(
-                        effective_name,
-                        thread_id=thread_id,
-                        default_root="outputs",
-                        allow_memory=False,
-                    ),
-                )
-            )
-        if normalized_location in {"auto", "inputs"}:
-            candidate_paths.append(
-                (
-                    "inputs",
-                    storage_manager.resolve_workspace_relative_path(
-                        effective_name,
-                        thread_id=thread_id,
-                        default_root="inputs",
-                        allow_memory=False,
-                    ),
-                )
-            )
-
-        resolved_location: Optional[str] = None
-        resolved_path: Optional[Path] = None
-        for candidate_location, candidate_path in candidate_paths:
-            if candidate_path.exists():
-                resolved_location = candidate_location
-                resolved_path = candidate_path
-                break
-
-        if resolved_path is None or resolved_location is None:
-            policy = _build_error_handling_policy(
-                "FileNotFoundError",
-                f"File '{effective_name}' not found in current workspace ({normalized_location}).",
-                preflight=None,
-                fix_suggestions=None,
-            )
-            return json.dumps(
-                {
-                    "status": "fail",
-                    "error_type": "FileNotFoundError",
-                    "error_message": f"File '{effective_name}' not found in current workspace ({normalized_location}).",
-                    "file_name": effective_name,
-                    "location": normalized_location,
-                    "error_handling_policy": policy,
-                },
-                indent=2,
-                ensure_ascii=False,
-            )
-
-        try:
-            content, content_format = _read_workspace_content_by_extension(resolved_path, ext)
-        except Exception as exc:  # noqa: BLE001
-            policy = _build_error_handling_policy(
-                type(exc).__name__,
-                str(exc),
-                preflight=None,
-                fix_suggestions=None,
-            )
-            return json.dumps(
-                {
-                    "status": "fail",
-                    "error_type": type(exc).__name__,
-                    "error_message": str(exc),
-                    "file_name": effective_name,
-                    "resolved_path": str(resolved_path),
-                    "location": resolved_location,
-                    "error_handling_policy": policy,
-                },
-                indent=2,
-                ensure_ascii=False,
-            )
-
-        payload = {
-            "status": "success",
-            "file_name": effective_name,
-            "resolved_path": str(resolved_path),
-            "location": resolved_location,
-            "bytes": len(content.encode("utf-8")),
-            "line_count": len(content.splitlines()),
-            "sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
-            "content_format": content_format,
-            "content": content,
-        }
-        _append_run_history(
-            {
-                "timestamp": _timestamp(),
-                "tool": "read_workspace_file_tool",
-                "status": "success",
-                "file_name": effective_name,
-                "resolved_path": str(resolved_path),
-                "location": resolved_location,
-                "thread_id": current_thread_id.get(),
-            }
-        )
-        return json.dumps(payload, indent=2, ensure_ascii=False)
-    finally:
-        if token is not None:
-            current_thread_id.reset(token)
-
-
 def execute_geospatial_script(
     script_name: str,
     script_location: str = "auto",
@@ -1739,12 +1408,19 @@ def execute_geospatial_script(
                 ensure_ascii=False,
             )
         requested_script = str(script_name or "").strip()
+        request_for_root_detection = requested_script.replace("\\", "/").lstrip("/")
+        has_explicit_script_root = (
+            request_for_root_detection.startswith(("outputs/", "inputs/", "data/processed/", "data/raw/"))
+            or requested_script.replace("\\", "/").startswith(
+                ("/outputs/", "/inputs/", "/data/processed/", "/data/raw/")
+            )
+            or bool(re.match(r"^[A-Za-z]:[\\/]", requested_script))
+            or (requested_script.startswith(("/", "\\")) and not requested_script.startswith(("/data/", "/outputs/", "/inputs/")))
+        )
         try:
-            normalized_request = _normalize_workspace_logical_path(
+            normalized_request = _normalize_script_request_path(
                 requested_script,
-                default_root="outputs",
-                required_suffix=".py",
-                allow_roots=("inputs", "outputs"),
+                thread_id=thread_id,
             )
         except Exception as exc:  # noqa: BLE001
             policy = _build_error_handling_policy(
@@ -1772,8 +1448,13 @@ def execute_geospatial_script(
         requested_location = str(script_location or "auto").strip().lower()
         if requested_location not in {"auto", "inputs", "outputs"}:
             requested_location = "auto"
-        effective_location = requested_root if requested_root in {"inputs", "outputs"} else requested_location
+        effective_location = (
+            requested_root
+            if has_explicit_script_root and requested_root in {"inputs", "outputs", "workspace"}
+            else requested_location
+        )
         thread_ctx = _get_thread_context()
+        workspace = storage_manager.get_workspace(thread_id)
 
         output_script_path = storage_manager.resolve_workspace_relative_path(
             logical_script_name,
@@ -1791,12 +1472,30 @@ def execute_geospatial_script(
             "outputs": output_script_path,
             "inputs": input_script_path,
         }
+        workspace_script_path: Optional[Path] = None
+        try:
+            workspace_root = workspace.resolve()
+            workspace_candidate = (workspace / logical_script_name).resolve()
+            if (
+                workspace_candidate != (workspace_root / "inputs").resolve()
+                and workspace_candidate != (workspace_root / "outputs").resolve()
+                and str(workspace_candidate).startswith(str(workspace_root) + os.sep)
+                and not str(workspace_candidate).startswith(str((workspace_root / "inputs").resolve()) + os.sep)
+                and not str(workspace_candidate).startswith(str((workspace_root / "outputs").resolve()) + os.sep)
+                and not str(workspace_candidate).startswith(str((workspace_root / "memory").resolve()) + os.sep)
+            ):
+                workspace_script_path = workspace_candidate
+                candidates["workspace"] = workspace_script_path
+        except Exception:
+            workspace_script_path = None
         if effective_location == "outputs":
             ordered_locations = ["outputs"]
         elif effective_location == "inputs":
             ordered_locations = ["inputs"]
+        elif effective_location == "workspace":
+            ordered_locations = ["workspace"]
         else:
-            ordered_locations = ["outputs", "inputs"]
+            ordered_locations = ["outputs", "inputs", "workspace"]
 
         script_path: Optional[Path] = None
         resolved_location = ""
@@ -1808,7 +1507,6 @@ def execute_geospatial_script(
                 break
 
         if script_path is None:
-            workspace = storage_manager.get_workspace(thread_id)
             available_scripts = [
                 str(p.relative_to(workspace / "outputs")).replace("\\", "/")
                 for p in sorted((workspace / "outputs").rglob("*.py"))
@@ -1817,6 +1515,12 @@ def execute_geospatial_script(
                 [
                     str(p.relative_to(workspace / "inputs")).replace("\\", "/")
                     for p in sorted((workspace / "inputs").rglob("*.py"))
+                ]
+            )
+            available_scripts.extend(
+                [
+                    str(p.relative_to(workspace)).replace("\\", "/")
+                    for p in sorted(workspace.glob("*.py"))
                 ]
             )
             last_saved_script_name = str(thread_ctx.get("__ntl_last_saved_script_name") or "").strip() or None
@@ -1849,7 +1553,44 @@ def execute_geospatial_script(
                 ensure_ascii=False,
             )
 
-        script_content = script_path.read_text(encoding="utf-8")
+        script_content = script_path.read_text(encoding="utf-8-sig")
+        if not script_content.strip():
+            policy = _build_error_handling_policy(
+                "EmptyScriptError",
+                f"Script '{logical_script_name}' is empty.",
+                preflight=None,
+                fix_suggestions=["Write a complete Python script before execution."],
+            )
+            result = {
+                "status": "fail",
+                "stdout": "",
+                "error_type": "EmptyScriptError",
+                "error_message": f"Script '{logical_script_name}' is empty.",
+                "traceback": None,
+                "script_name": logical_script_name,
+                "script_path": str(script_path),
+                "script_location": resolved_location or effective_location,
+                "code": script_content,
+                "fix_suggestions": ["Write a complete Python script before execution."],
+                "error_handling_policy": policy,
+                "path_protocol_mode": path_mode,
+                "path_protocol_enforcement": path_protocol_enforcement,
+                "execution_skipped": True,
+                "artifact_audit": empty_audit,
+                "runtime_path_rewrite": no_runtime_rewrite,
+            }
+            _append_run_history(
+                {
+                    "timestamp": _timestamp(),
+                    "tool": "execute_geospatial_script_tool",
+                    "status": "fail",
+                    "reason": "empty_script",
+                    "script_name": logical_script_name,
+                    "script_path": str(script_path),
+                    "thread_id": current_thread_id.get(),
+                }
+            )
+            return json.dumps(result, indent=2, ensure_ascii=False)
         preflight = _preflight_checks(script_content, strict_mode=enforced_strict_mode)
         # Security and integrity blocking errors are always enforced.
         preflight_blocking_enabled = bool(preflight.get("blocking_errors"))
@@ -2099,29 +1840,6 @@ GeoCode_COT_Validation_tool = StructuredTool.from_function(
         "one minimal code block and returns structured JSON with pass/fail, logs, traceback, and fix suggestions."
     ),
     args_schema=GeoCodeCOTBlockInput,
-)
-
-
-save_geospatial_script_tool = StructuredTool.from_function(
-    save_geospatial_script,
-    name="save_geospatial_script_tool",
-    description=(
-        "Persist Python geospatial code to a thread-scoped .py file under workspace outputs, "
-        "and return script metadata for later execution/auditing."
-    ),
-    args_schema=SaveScriptInput,
-)
-
-
-read_workspace_file_tool = StructuredTool.from_function(
-    read_workspace_file,
-    name="read_workspace_file_tool",
-    description=(
-        "Read a workspace file (.py/.json/.md/.csv/.tsv/.xlsx/.xls/.xlsm) from current thread workspace "
-        "(outputs or inputs) and return content with metadata. Excel files are converted to CSV text "
-        "from the first sheet."
-    ),
-    args_schema=ReadWorkspaceFileInput,
 )
 
 

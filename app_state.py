@@ -1,9 +1,9 @@
 import streamlit as st
 
 import history_store
+from model_config import MODEL_OPTIONS
 from storage_manager import storage_manager
 
-MODEL_OPTIONS = ["qwen3.5-plus", "gpt-5-mini", "gpt-5.1"]
 RECURSION_LIMIT = 101
 CHAT_CONTAINER_HEIGHT = 600
 ANALYSIS_CONTAINER_HEIGHT = 600
@@ -92,6 +92,8 @@ def init_app():
     st.session_state.setdefault("run_last_rendered_event_seq", 0)
     st.session_state.setdefault("pending_model_change", None)
     st.session_state.setdefault("pending_activate_request", None)
+    st.session_state.setdefault("ui_force_refresh_once", False)
+    st.session_state.setdefault("pending_map_focus_layer", None)
 
 
 def reset_chat():

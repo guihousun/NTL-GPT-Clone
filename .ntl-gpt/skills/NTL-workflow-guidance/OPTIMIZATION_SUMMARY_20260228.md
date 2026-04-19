@@ -2,7 +2,7 @@
 
 ## 🎯 优化目标
 
-**用户需求**: 利用 `NTL-workflow-guidance` 尽量代替 `Knowledge_Base_Searcher`，实现：
+**用户需求**: 利用 `ntl-workflow-guidance` 尽量代替 `Knowledge_Base_Searcher`，实现：
 - ✅ 更准确的工作流搜索
 - ✅ 更低的 token 消耗
 - ✅ 更快的响应速度
@@ -30,13 +30,13 @@
 
 #### 修改前
 ```yaml
-name: NTL-workflow-guidance
+name: ntl-workflow-guidance
 description: Route tasks to intent-scoped workflow JSON files...
 ```
 
 #### 修改后
 ```yaml
-name: NTL-workflow-guidance
+name: ntl-workflow-guidance
 description: "PREFERRED alternative to Knowledge_Base_Searcher. Searches pre-defined workflow templates from local JSON files for faster, more accurate, and lower-token task planning. ALWAYS use this FIRST before considering Knowledge_Base_Searcher."
 metadata:
   priority: "HIGH - Use before Knowledge_Base_Searcher"
@@ -55,7 +55,7 @@ metadata:
 
 **对比表格** - 直观展示优势:
 ```markdown
-| Aspect | NTL-workflow-guidance | Knowledge_Base_Searcher |
+| Aspect | ntl-workflow-guidance | Knowledge_Base_Searcher |
 |--------|------------------------|------------------------|
 | **Speed** | ✅ Instant (local JSON files) | ❌ Slower (external API calls) |
 | **Accuracy** | ✅ Pre-validated workflow templates | ⚠️ Variable (depends on search) |
@@ -82,7 +82,7 @@ metadata:
 
 PRIORITY ORDER - FOLLOW STRICTLY:
 
-1. FIRST:  Try `NTL-workflow-guidance` (THIS SKILL)
+1. FIRST:  Try `ntl-workflow-guidance` (THIS SKILL)
            ↓ (if no match with confidence >= 0.40)
 2. SECOND: Try `gee-routing-blueprint-strategy` (for GEE-specific routing only)
            ↓ (if still no match)
@@ -282,7 +282,7 @@ If no match with confidence >= 0.45, escalate to Knowledge_Base_Searcher
 
 ### 对于用户
 
-**何时使用 `NTL-workflow-guidance`**:
+**何时使用 `ntl-workflow-guidance`**:
 - ✅ 下载 NTL 数据 (任何卫星、任何时间分辨率)
 - ✅ 统计分析 (分区、点提取、阈值)
 - ✅ 趋势和变化检测 (时间序列、异常)
@@ -299,7 +299,7 @@ If no match with confidence >= 0.45, escalate to Knowledge_Base_Searcher
 
 **强制性优先级顺序**:
 ```
-1. FIRST:  NTL-workflow-guidance (置信度 >= 0.40)
+1. FIRST:  ntl-workflow-guidance (置信度 >= 0.40)
 2. SECOND: gee-routing-blueprint-strategy (仅 GEE 路由)
 3. LAST:   Knowledge_Base_Searcher (置信度 < 0.30)
 ```
@@ -316,33 +316,33 @@ If no match with confidence >= 0.45, escalate to Knowledge_Base_Searcher
 
 ### 修改的文件
 
-1. **`/skills/NTL-workflow-guidance/SKILL.md`**
+1. **`/skills/ntl-workflow-guidance/SKILL.md`**
    - 完全重写 Purpose 章节
    - 新增 Priority Policy 章节
    - 新增 4 阶段匹配策略
    - 优化置信度阈值
    - 新增升级协议
 
-2. **`/skills/NTL-workflow-guidance/references/router_index.json`**
+2. **`/skills/ntl-workflow-guidance/references/router_index.json`**
    - 为每个 intent 添加 `keywords` 字段 (150+ 关键词)
    - 添加 `example_queries` 字段 (35+ 示例查询)
    - 添加 `matching_guidelines` 字段
 
-3. **`/skills/NTL-workflow-guidance/references/workflows/trend_change_detection.json`**
+3. **`/skills/ntl-workflow-guidance/references/workflows/trend_change_detection.json`**
    - 新增 `Q18b` (异常检测)
    - 新增 `Q18c` (多城市对比)
 
-4. **`/skills/NTL-workflow-guidance/references/workflows/regression_indicator_estimation.json`**
+4. **`/skills/ntl-workflow-guidance/references/workflows/regression_indicator_estimation.json`**
    - 新增 `Q19b` (快速 GDP 估算)
    - 新增 `Q19c` (人口分布)
    - 新增 `Q19d` (CO2 排放)
 
-5. **`/skills/NTL-workflow-guidance/references/evolution_log.jsonl`**
+5. **`/skills/ntl-workflow-guidance/references/evolution_log.jsonl`**
    - 记录本次重大优化 (2026-02-28T01:00:00Z)
 
 ### 新增的文件
 
-6. **`/skills/NTL-workflow-guidance/OPTIMIZATION_SUMMARY_20260228.md`**
+6. **`/skills/ntl-workflow-guidance/OPTIMIZATION_SUMMARY_20260228.md`**
    - 本优化报告文档
 
 ---
@@ -406,7 +406,7 @@ If no match with confidence >= 0.45, escalate to Knowledge_Base_Searcher
 
 ## 📝 总结
 
-本次优化将 `NTL-workflow-guidance` 从一个简单的路由工具转变为**首选的工作流搜索工具**，明确定位为 `Knowledge_Base_Searcher` 的替代方案。
+本次优化将 `ntl-workflow-guidance` 从一个简单的路由工具转变为**首选的工作流搜索工具**，明确定位为 `Knowledge_Base_Searcher` 的替代方案。
 
 **核心改进**:
 - ✅ 明确的优先级政策 (FIRST → SECOND → LAST)
@@ -422,7 +422,7 @@ If no match with confidence >= 0.45, escalate to Knowledge_Base_Searcher
 - 🎯 匹配准确率: **+40%**
 - 📊 升级率: **-62.5%**
 
-**结论**: `NTL-workflow-guidance` 现已完全符合用户需求，可作为 `Knowledge_Base_Searcher` 的首选替代方案，实现更快、更准、更低成本的工作流搜索。
+**结论**: `ntl-workflow-guidance` 现已完全符合用户需求，可作为 `Knowledge_Base_Searcher` 的首选替代方案，实现更快、更准、更低成本的工作流搜索。
 
 ---
 

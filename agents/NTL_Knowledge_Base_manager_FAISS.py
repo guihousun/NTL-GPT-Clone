@@ -153,9 +153,9 @@ if __name__ == "__main__":
     collection_name2 = "Solution_RAG"
     collection_name3 = "Code_RAG"
 
-    persistent_directory1 = r"C:\NTL-CHAT\NTL-GPT\RAG_Faiss\Literature_RAG"
-    persistent_directory2 = r"C:\NTL-CHAT\NTL-GPT\RAG_Faiss\Solution_RAG"
-    persistent_directory3 = r"C:\NTL-CHAT\NTL-GPT\RAG_Faiss\Code_RAG"
+    persistent_directory1 = r"C:\NTL-CHAT\NTL-Claw\RAG_Faiss\Literature_RAG"
+    persistent_directory2 = r"C:\NTL-CHAT\NTL-Claw\RAG_Faiss\Solution_RAG"
+    persistent_directory3 = r"C:\NTL-CHAT\NTL-Claw\RAG_Faiss\Code_RAG"
 
     rag_db1 = RAGDatabase(persistent_directory1, collection_name1)
     # rag_db2 = RAGDatabase(persistent_directory2, collection_name2)

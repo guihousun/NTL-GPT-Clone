@@ -1170,7 +1170,7 @@ def _NTL_Knowledge_Searcher(
         if empty_store_payload and empty_store_payload.get("store") == "Code_RAG":
             notice = (
                 "code corpus unavailable: Code_RAG currently has no indexed documents. "
-                "Rebuild command: conda run -n NTL-GPT python agents/NTL_Knowledge_Base_manager.py "
+                "Rebuild command: conda run -n NTL-Claw python agents/NTL_Knowledge_Base_manager.py "
                 "--profile code --code-guide-dir RAG/code_guide --tool-dir tools "
                 "--persist-dir RAG/Code_RAG --collection-name Code_RAG --reset "
                 "--report-path RAG/Code_RAG/rebuild_report.json"

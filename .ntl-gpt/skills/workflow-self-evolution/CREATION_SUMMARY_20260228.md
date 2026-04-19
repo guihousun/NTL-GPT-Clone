@@ -9,7 +9,7 @@
 **新技能**: `workflow-self-evolution`  
 **定位**: 元能力技能 (Meta-Capability Skill)  
 **版本**: v1.0.0  
-**状态**: ✅ 已完成并集成到 NTL-workflow-guidance
+**状态**: ✅ 已完成并集成到 ntl-workflow-guidance
 
 ---
 
@@ -138,7 +138,7 @@ if trigger.is_active():
 
 | 技能 | 集成状态 | 集成方式 |
 |------|---------|---------|
-| **NTL-workflow-guidance** | ✅ 已完成 | 强制调用 `update_metrics()` 和 `make_learning_decision()` |
+| **ntl-workflow-guidance** | ✅ 已完成 | 强制调用 `update_metrics()` 和 `make_learning_decision()` |
 | workflow-self-evolution | ✅ 自身 | 核心功能 |
 
 ### 待集成技能 (未来)
@@ -196,7 +196,7 @@ def execute_task(task):
 
 ### 本周 (2026-02-28 ~ 2026-03-06)
 
-- [ ] **NTL-workflow-guidance** 实际调用新技能 (已完成框架集成)
+- [ ] **ntl-workflow-guidance** 实际调用新技能 (已完成框架集成)
 - [ ] 收集实际运行数据验证 81% 噪音过滤率
 - [ ] 调整失败分类阈值 (基于实际数据)
 - [ ] 创建质量指标仪表板 (可视化)
@@ -234,7 +234,7 @@ def execute_task(task):
 
 ```
 5 个业务技能:
-├── NTL-workflow-guidance
+├── ntl-workflow-guidance
 ├── gee-routing-blueprint-strategy
 ├── gee-ntl-date-boundary-handling
 ├── ntl-gdp-regression-analysis
@@ -255,7 +255,7 @@ def execute_task(task):
 └── workflow-self-evolution (自进化框架) ← 新增
 
 4 个业务技能:
-├── NTL-workflow-guidance (工作流搜索) ✅ 已集成
+├── ntl-workflow-guidance (工作流搜索) ✅ 已集成
 ├── gee-routing-blueprint-strategy (GEE 路由)
 ├── gee-ntl-date-boundary-handling (日期/边界)
 └── ntl-gdp-regression-analysis (GDP-NTL 回归)
@@ -277,7 +277,7 @@ def execute_task(task):
 - [x] metrics.json 基础结构创建
 - [x] failure_log.jsonl schema 定义
 - [x] learning_log.jsonl schema 定义
-- [x] NTL-workflow-guidance 集成示例代码
+- [x] ntl-workflow-guidance 集成示例代码
 - [x] evolution_log 记录创建历史
 - [ ] 实际运行验证 (下一步)
 - [ ] 81% 噪音过滤率验证 (下一步)

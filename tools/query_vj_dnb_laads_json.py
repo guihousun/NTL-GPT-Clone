@@ -22,6 +22,8 @@ SUPPORTED_SOURCES = {
     # Gridded (L3-like) daily products.
     "VJ146A1",
     "VJ146A2",
+    "VNP46A1",
+    "VNP46A2",
     # Optional NRT variants (if available in CMR by short_name).
     "VJ102DNB_NRT",
     "VJ146A1_NRT",

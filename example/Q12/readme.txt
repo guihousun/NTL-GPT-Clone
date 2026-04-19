@@ -1,5 +1,5 @@
 1.Input NTL_Shanghai_NPP-VIIRS-Like_2018.tif.
-2.NTL-GPT will apply a SVM classification method to the NTL image to extract built-up areas.
+2.NTL-Claw will apply a SVM classification method to the NTL image to extract built-up areas.
 3.Compare the resulting binary map with real_sh.tif using metrics such as overall accuracy, F1-score, or spatial overlap.
 
 The real_sh.tif layer is sampled from the MGUP (2018), which is part of the dataset described in:

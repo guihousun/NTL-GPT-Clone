@@ -360,7 +360,7 @@
       "chinese_font_support": "matplotlib.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei']",
       "path_resolution": "Use relative paths (inputs/outputs) for sandbox compatibility",
       "self_evolution_applied": true,
-      "code_reference_index": "/skills/NTL-workflow-guidance/references/code/code_index.json",
+      "code_reference_index": "/skills/ntl-workflow-guidance/references/code/code_index.json",
       "visual_annotation_quality": "north arrow explicitly marked as north-up indicator; scale bar estimated from georeferenced width"
     },
     "execution_example": {
@@ -379,7 +379,7 @@
     "code_examples": [
       {
         "case_id": "Q24_fuding_daily_ntl_animation_v2",
-        "path": "/skills/NTL-workflow-guidance/references/code/data_retrieval_preprocessing/Q24_fuding_daily_ntl_animation_v2.py",
+        "path": "/skills/ntl-workflow-guidance/references/code/data_retrieval_preprocessing/Q24_fuding_daily_ntl_animation_v2.py",
         "status": "verified_success",
         "usage": "reference_implementation",
         "notes": [
@@ -468,7 +468,7 @@
     "code_examples": [
       {
         "case_id": "Q26_vj102_vj103_preprocess_storage_paths",
-        "path": "/skills/NTL-workflow-guidance/references/code/data_retrieval_preprocessing/Q26_vj102_vj103_preprocess_storage_paths.py",
+        "path": "/skills/ntl-workflow-guidance/references/code/data_retrieval_preprocessing/Q26_vj102_vj103_preprocess_storage_paths.py",
         "status": "verified_success",
         "usage": "reference_implementation"
       }

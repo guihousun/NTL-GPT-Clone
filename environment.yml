@@ -1,4 +1,4 @@
-name: NTL-GPT-stable
+name: NTL-Claw-stable
 channels:
   - conda-forge
   - defaults
