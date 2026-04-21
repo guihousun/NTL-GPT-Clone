@@ -912,10 +912,10 @@ cross_sensor_calibration_dmsp_viirs_tool = StructuredTool.from_function(
 
         ### Example Input:
         calibrate_dmsp_to_viirs(
-            dmsp_folder='C:/NTL_GPT/DMSP/',
-            viirs_folder='C:/NTL_GPT/VIIRS/',
-            aux_data_path='C:/NTL_GPT/aux_vars_2013.tif',
-            output_folder='C:/NTL_GPT/Calibrated_NTL/'
+            dmsp_folder='C:/NTL-Claw/DMSP/',
+            viirs_folder='C:/NTL-Claw/VIIRS/',
+            aux_data_path='C:/NTL-Claw/aux_vars_2013.tif',
+            output_folder='C:/NTL-Claw/Calibrated_NTL/'
         )
         """
     ),
@@ -1034,7 +1034,6 @@ if __name__ == "__main__":
     #     "sdr_input_dir": input_sdr_dir,
     #     "sdr_output_dir": output_sdr_dir
     # })
-
 
 
 

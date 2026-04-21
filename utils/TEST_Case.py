@@ -61,7 +61,7 @@ TEST_CASES = [
     {"cat": "NTL application and modeling", "label": "SDG 7.1.1 electricity access (VIIRS + LandScan)",
      "query": "Please use the 2020 NPP-VIIRS nighttime light imagery and LandScan population data to measure the population with access to electricity, in accordance with the methodology for SDG Indicator 7.1.1 (Proportion of population with access to electricity)."},
     {"cat": "NTL application and modeling", "label": "RRLI & RBLI + streetlight type (SDGSAT-1)",
-     "query": "Compute the Ratio Red Light Index (RRLI) and Ratio Blue Light Index (RBLI) based on the SDGSAT-1 GLI NTL imagery located at .\\NTL_GPT\\Night_data\\SDGSAT-1\\SDG_rgb.tif. Then, classify the streetlight types."},
+     "query": "Compute the Ratio Red Light Index (RRLI) and Ratio Blue Light Index (RBLI) based on the SDGSAT-1 GLI NTL imagery located at .\\NTL-Claw\\Night_data\\SDGSAT-1\\SDG_rgb.tif. Then, classify the streetlight types."},
 ]
 
 CATEGORIES = ["Data retrieval and preprocessing",

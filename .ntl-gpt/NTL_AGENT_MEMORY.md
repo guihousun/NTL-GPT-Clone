@@ -1,6 +1,6 @@
 # NTL Agent Memory
 
-This file is dedicated to NTL-GPT runtime memory and must not be mixed with Codex workspace policies.
+This file is dedicated to NTL-Claw runtime memory and must not be mixed with Codex workspace policies.
 
 ## Scope
 - Domain: nighttime light (NTL) geospatial workflows.

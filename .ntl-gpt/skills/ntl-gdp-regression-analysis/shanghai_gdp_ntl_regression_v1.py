@@ -1,7 +1,7 @@
 """
 Shanghai GDP-NTL Regression Analysis (2013-2022)
 Models: Linear, Log-Linear, Quadratic, Power, Exponential
-Author: NTL-GPT Code_Assistant
+Author: NTL-Claw Code_Assistant
 """
 import pandas as pd
 import numpy as np
