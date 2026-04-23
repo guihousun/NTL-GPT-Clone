@@ -106,18 +106,54 @@
       },
       "notes": "SUCCESS: Q20 workflow executed with full compliance + visualization extension. Band name corrected (contract said BRDF-Corrected_Radiance, actual is DNB_BRDF_Corrected_NTL). Generated 4-panel impact dashboard + comparison bar chart. 25km epicenter zone showed severe initial impact (-42.1%) with strong partial recovery (70.4%)."
     }
+    "country_scale_province_ntl_statistics": {
+      "task_description": "China 2020 annual mean NTL for all 34 provincial-level administrative regions via GEE reduceRegions",
+      "usage_count": 1,
+      "success_rate": 1.0,
+      "avg_confidence": 0.88,
+      "last_used": "2026-04-22T00:00:00Z",
+      "failure_patterns": [
+        "NTL_annual_image_null_NOAA_VIIRS_DNB_ANNUAL_V22_2020_not_accessible",
+        "maxPixels_not_valid_for_reduceRegions",
+        "geoBoundaries_CHN_excludes_Taiwan"
+      ],
+      "resolution_applied": "v2_monthly_composite_fallback + removed_maxPixels + v3_taiwan_polygon_addition",
+      "workflow_source": "statistical_analysis.json (adapted for country-scale)",
+      "task_level": "L3",
+      "task_level_reason_codes": ["country_or_multi_province", "no_built_in_complete_match", "custom_GEE_reduceRegions_required"],
+      "gee_project": "empyrean-caster-430308-m2",
+      "ntl_source": "NOAA/VIIRS/DNB/MONTHLY_V1/VCMSLCFG (2020 12-month mean composite)",
+      "ntl_band": "avg_rad",
+      "boundary_source": "WM/geoLab/geoBoundaries/600/ADM1 (shapeGroup=CHN) + manual Taiwan polygon",
+      "province_count": 34,
+      "compliance_checklist": [
+        "gee_server_side_reduceRegions",
+        "maxPixels_removed_from_reduceRegions",
+        "monthly_composite_fallback_for_annual",
+        "taiwan_explicitly_included",
+        "ranked_csv_output"
+      ],
+      "output_files": ["china_province_ntl_2020.csv", "china_province_ntl_2020_v2.py", "china_province_ntl_2020_v3.py"],
+      "key_lessons": [
+        "NOAA/VIIRS/DNB/ANNUAL_V22/2020 not directly accessible as ee.Image; use monthly composite .mean() as reliable fallback",
+        "ee.Image.reduceRegions does NOT accept maxPixels or tileScale params (only reduceRegion does)",
+        "geoBoundaries ADM1 shapeGroup=CHN returns 33 features excluding Taiwan; Taiwan must be added as explicit ee.Feature polygon",
+        "Country-scale tasks MUST use GEE server-side reduceRegions; never download country-scale rasters (>50MB limit)"
+      ],
+      "notes": "SUCCESS: 34 provinces ranked by 2020 ANTL. Taiwan included at rank 9 (2.41). Required 3 script iterations (v1->v2->v3) to resolve dataset, parameter, and boundary issues."
+    }
   },
   "global_metrics": {
-    "total_executions": 10,
-    "overall_success_rate": 0.90,
-    "avg_confidence": 0.902,
-    "escalation_rate": 0.10,
-    "learning_count": 5,
+    "total_executions": 11,
+    "overall_success_rate": 0.909,
+    "avg_confidence": 0.899,
+    "escalation_rate": 0.091,
+    "learning_count": 6,
     "noise_filter_rate": 1.0,
     "trends": {
-      "success_rate_7d": [1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-      "confidence_7d": [0.85, 0.92, 0.65, 0.95, 0.97, 0.90, 0.90, 0.95, 0.90, 0.97],
-      "escalation_rate_7d": [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+      "success_rate_7d": [1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+      "confidence_7d": [0.85, 0.92, 0.65, 0.95, 0.97, 0.90, 0.90, 0.95, 0.90, 0.97, 0.88],
+      "escalation_rate_7d": [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     }
   },
   "execution_log": [
@@ -270,6 +306,41 @@
         "first_night_date": "2025-03-29",
         "usgs_sources_cited": true,
         "outputs_generated": ["Myanmar_Earthquake_ANTL_2025.csv", "Impact_Assessment_Report.json", "Myanmar_Earthquake_Impact_Charts.png", "Myanmar_Earthquake_ANTL_Comparison.png"]
+      }
+    },
+    {
+      "timestamp": "2026-04-22T00:00:00Z",
+      "task_id": "china_34_province_ntl_2020_ranking",
+      "workflow_used": "statistical_analysis (adapted for country-scale L3)",
+      "status": "success",
+      "confidence": 0.88,
+      "issues": [
+        "v1_NTL_annual_image_null_ANNUAL_V22_2020_not_accessible",
+        "v2_maxPixels_invalid_for_reduceRegions",
+        "v3_geoBoundaries_CHN_excludes_Taiwan"
+      ],
+      "resolution": "v2_monthly_composite_fallback + removed_maxPixels + v3_taiwan_polygon_addition",
+      "user_satisfaction": null,
+      "output_artifacts": [
+        "china_province_ntl_2020.csv",
+        "china_province_ntl_2020_v2.py",
+        "china_province_ntl_2020_v3.py"
+      ],
+      "key_findings": [
+        "34 provinces ranked by 2020 ANTL",
+        "Top 3: Macau (79.70), Shanghai (20.49), Hong Kong (16.01)",
+        "Taiwan rank 9 (2.41), close to Guangdong (2.43)",
+        "Bottom 3: Qinghai (0.33), Tibet (0.31), Inner Mongolia (0.41)"
+      ],
+      "workflow_compliance": {
+        "router_queried": true,
+        "matching_workflow": "statistical_analysis.json (country-scale adaptation)",
+        "gee_server_side_reduceRegions": true,
+        "task_level": "L3",
+        "task_level_reason_codes": ["country_or_multi_province", "no_built_in_complete_match", "custom_GEE_reduceRegions_required"],
+        "monthly_composite_fallback": true,
+        "taiwan_explicitly_included": true,
+        "outputs_generated": ["china_province_ntl_2020.csv"]
       }
     }
   ]

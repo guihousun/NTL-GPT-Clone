@@ -26,8 +26,9 @@ Query `NTL_Knowledge_Base` for:
 ### Step 2: Data Retrieval Strategy
 
 #### 2.1 NTL Data (Data_Searcher)
-- **Dataset**: NPP-VIIRS-Like (2000-2024) for long-term trends
-- **Temporal Coverage**: Validate requested year range (e.g., 2013-2022)
+- **Dataset**: Prefer the annual NTL dataset selected by `/skills/gee-dataset-selection/`; common long-term default is `projects/sat-io/open-datasets/npp-viirs-ntl`.
+- **Temporal Coverage**: Validate requested year range with `dataset_latest_availability_tool` or `GEE_dataset_metadata_tool` before retrieval/analysis.
+- **Period Semantics**: For annual products, treat `system:time_start` anchor dates as annual period anchors. For example, `latest_available_date = 2024-01-01` means `latest_available_period = 2024`, not a single-day cutoff.
 - **Spatial Boundary**: Shanghai administrative boundary (SHP/GeoJSON)
 - **Product Type**: Annual composite (NOT daily/monthly aggregation)
 - **Output**: ANTL values per year (via `NTL_raster_statistics` tool)
@@ -235,7 +236,7 @@ Final output must include:
 
 | Issue | Solution |
 |-------|----------|
-| NTL date range mismatch | Use NPP-VIIRS-Like (2000-2024) for 2013-2022 |
+| NTL date range mismatch | Use `/skills/gee-dataset-selection/` and `dataset_latest_availability_tool`; compare requested years to `latest_available_period`, not a literal annual anchor date |
 | GDP data in current vs constant prices | Specify in analysis; use constant prices for real growth |
 | Log transformation with zero/negative values | Add small constant (e.g., +1) before log |
 | Overfitting with polynomial models | Prefer parsimonious models; check AIC/BIC |

@@ -2,8 +2,9 @@
 GEE Python Script for Myanmar Earthquake 2025 ANTL Impact Assessment
 Multi-period, multi-buffer analysis using VNP46A2 daily NTL data
 
-Event: 2025-03-28, Mw 7.7, Epicenter: 21.996°N, 95.926°E
-First night: 2025-03-29 (event occurred at 12:50 local time, after VIIRS ~01:30 overpass)
+Event: 2025-03-28, Mw 7.7, Epicenter: 21.996 deg N, 95.926 deg E
+Local first-night label: 2025-03-29 (event occurred at 12:50 MMT, after local nighttime overpass)
+UTC-indexed first-night image/file date: 2025-03-28 (candidate local acquisition around 2025-03-29 00:30-02:30 MMT maps to roughly 2025-03-28 18:00-20:00 UTC)
 """
 
 import ee
@@ -31,10 +32,14 @@ BUFFERS = {
 }
 
 # Analysis periods
-# Note: first_night is 2025-03-29 because event occurred at 12:50 local time (after VIIRS ~01:30 overpass on day D)
+# Note: local first-night is 2025-03-29 because the event occurred at 12:50 MMT
+# after the local nighttime overpass on day D. For UTC-indexed daily images/files,
+# the corresponding UTC-indexed acquisition/file date is 2025-03-28.
+# Do not claim an exact local acquisition time unless UTC_Time or official
+# metadata confirms it.
 PERIODS = {
     "baseline": {"start": "2025-03-14", "end": "2025-03-21"},  # event-14d to event-7d (end-exclusive in GEE)
-    "first_night": {"start": "2025-03-29", "end": "2025-03-30"},  # single night: filterDate is end-exclusive
+    "first_night": {"start": "2025-03-28", "end": "2025-03-29"},  # UTC-indexed first-night image date; end-exclusive
     "recovery": {"start": "2025-04-04", "end": "2025-04-11"}  # event+7d to event+14d (end-exclusive in GEE)
 }
 

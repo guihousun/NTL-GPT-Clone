@@ -1,287 +1,98 @@
 ---
 name: ntl-workflow-guidance
-description: "PREFERRED alternative to Knowledge_Base_Searcher. Searches pre-defined workflow templates from local JSON files for faster, more accurate, and lower-token task planning. ALWAYS use this FIRST before considering Knowledge_Base_Searcher."
+description: Preferred workflow-selection skill for NTL-Claw tasks. Use first for NTL retrieval, statistics, trend, event impact, urban extraction, regression/indicator, and validation workflows before calling Knowledge_Base_Searcher.
 allowed-tools: "NTL_Solution_Knowledge"
-license: "Proprietary"
 metadata:
   schema: "ntl.workflow.intent.router.v1"
   router_index: "/skills/ntl-workflow-guidance/references/router_index.json"
   workflows_root: "/skills/ntl-workflow-guidance/references/workflows"
   code_root: "/skills/ntl-workflow-guidance/references/code"
-  learning_mode: "posterior_only"
-  priority: "HIGH - Use before Knowledge_Base_Searcher"
 ---
 
-# Workflow Intent Router (Preferred Workflow Search)
+# NTL Workflow Guidance
 
-## 🎯 Primary Goal
+Use this skill to select a reusable workflow template. It is the first stop for standard NTL tasks; use `Knowledge_Base_Searcher` only when no matching workflow exists or methodology research is genuinely needed.
 
-**Replace Knowledge_Base_Searcher for most task planning scenarios.**
+## Read Order
 
-This skill is your **FIRST CHOICE** for task planning and workflow selection.
-
-### Why This Skill is Better Than Knowledge_Base_Searcher
-
-| Aspect | ntl-workflow-guidance | Knowledge_Base_Searcher |
-|--------|------------------------|------------------------|
-| **Speed** | ✅ Instant (local JSON files) | ❌ Slower (external API calls) |
-| **Accuracy** | ✅ Pre-validated workflow templates | ⚠️ Variable (depends on search) |
-| **Token Cost** | ✅ Very low (no external queries) | ❌ High (multiple API calls) |
-| **Determinism** | ✅ Same input → same output | ⚠️ May vary by search results |
-| **Tool Sequences** | ✅ Exact, tested sequences | ⚠️ May need validation |
-
-### When to Use This Skill
-
-**ALWAYS try this skill FIRST for:**
-- Task planning and workflow selection
-- Finding step-by-step procedures for NTL analysis
-- Identifying appropriate tools and their parameters
-- Standard analysis scenarios (retrieval, statistics, trend, event impact, etc.)
-
-**Only fall back to Knowledge_Base_Searcher if:**
-- No matching workflow found after fuzzy matching (confidence < 0.40)
-- User request is completely novel (no pre-defined template exists)
-- Workflow requires methodology research beyond template scope
-- User explicitly asks for research/literature review
-
-### Workflow Coverage
-
-This skill covers 7 major intent categories with pre-defined templates:
-1. **Data Retrieval & Preprocessing** - Download, calibration, destriping
-2. **Statistical Analysis** - Zonal stats, point extraction, threshold analysis
-3. **Trend & Change Detection** - Time-series, Mann-Kendall, anomaly detection
-4. **Event Impact Assessment** - Disasters, conflicts, infrastructure damage
-5. **Urban Extraction & Structure** - Built-up areas, urban centers, polycentric analysis
-6. **Regression Indicator Estimation** - GDP, population, CO2, electrification
-7. **Quality Validation & Misc** - Cross-sensor harmonization, validation
-
-## 🚀 Priority Policy (MANDATORY)
-
-**PRIORITY ORDER - FOLLOW STRICTLY:**
-
-```
-1. FIRST:  Try `ntl-workflow-guidance` (THIS SKILL)
-           ↓ (if no match with confidence >= 0.40)
-2. SECOND: Try `gee-routing-blueprint-strategy` (for GEE-specific routing only)
-           ↓ (if still no match)
-3. LAST:   Use `Knowledge_Base_Searcher` ONLY for:
-           - Novel methodology research
-           - Unprecedented task types
-           - Workflow evolution proposals
-```
-
-**DO NOT:**
-- ❌ Skip this skill and go directly to Knowledge_Base_Searcher
-- ❌ Use Knowledge_Base_Searcher for tasks covered by existing workflows
-- ❌ Escalate without first attempting fuzzy matching and multi-workflow composition
-
-**ESCALATION CHECKLIST (before using Knowledge_Base_Searcher):**
-- [ ] Tried exact match on `task_id` and `task_name`
-- [ ] Tried fuzzy matching on `task_name + description + category`
-- [ ] Checked if request can be composed from multiple existing workflows
-- [ ] Verified confidence score < 0.40
-- [ ] Documented why no existing workflow matches
-
----
-
-## Mandatory Execution Order
-
-### Stage 1: Intent Classification
 1. Read `/skills/ntl-workflow-guidance/references/router_index.json`.
-2. Classify the user request into one `intent_id` using:
-   - **Primary**: Lexical similarity on `intent_name + source_categories`
-   - **Secondary**: Keyword matching on user task description
-   - **Tertiary**: Category hierarchy matching
-
-### Stage 2: Workflow Selection
+2. Choose one `intent_id`.
 3. Read only the mapped file under `/skills/ntl-workflow-guidance/references/workflows/<intent_id>.json`.
-4. Select one executable workflow task using multi-stage matching:
-   - **Stage 2a**: Exact match on `task_id` (if user provides specific ID)
-   - **Stage 2b**: Fuzzy match on `task_name` (threshold: 0.60)
-   - **Stage 2c**: Combined similarity on `task_name + description` (threshold: 0.40)
-   - **Stage 2d**: If no match, check composability from multiple workflows
+4. Select the best task or compose a small sequence from two tasks.
+5. Return a workflow contract; do not execute tools from inside this skill.
 
-### Stage 3: Output Generation
-5. Return workflow contract payload:
-   ```json
-   {
-     "task_id": "...",
-     "task_name": "...",
-     "category": "...",
-     "description": "...",
-     "steps": [...],
-     "output": "...",
-     "confidence": 0.xx,
-     "match_type": "exact|fuzzy|composed",
-     "source_workflow_file": "..."
-   }
-   ```
+Do not full-scan all workflow JSON files unless the router index is missing or corrupted.
 
-**IMPORTANT**: Do not full-scan every workflow file in one pass unless router index is missing/corrupted.
+## Intent Coverage
 
-## Intent IDs (Coverage Map)
+- `data_retrieval_preprocessing`
+- `statistical_analysis`
+- `trend_change_detection`
+- `event_impact_assessment`
+- `urban_extraction_structure`
+- `regression_indicator_estimation`
+- `quality_validation_misc`
 
-### Current Intent Coverage (7 categories, 50+ pre-defined workflows)
+## Matching Rules
 
-| Intent ID | Intent Name | Coverage | Example Tasks |
-|-----------|-------------|----------|---------------|
-| `data_retrieval_preprocessing` | Data Retrieval & Preprocessing | ✅ Complete | Download NTL, destriping, calibration, geocoding |
-| `statistical_analysis` | Statistical Analysis | ✅ Complete | Zonal stats, point extraction, threshold analysis |
-| `trend_change_detection` | Trend & Change Detection | ✅ Complete | Time-series, Mann-Kendall, anomaly detection |
-| `regression_indicator_estimation` | Regression Indicator Estimation | ✅ Complete | GDP, population, CO2, DEI estimation |
-| `event_impact_assessment` | Event Impact Assessment | ✅ Complete | Earthquake, flood, conflict, blackout analysis |
-| `urban_extraction_structure` | Urban Extraction & Structure | ✅ Complete | Built-up area, urban centers, polycentric analysis |
-| `quality_validation_misc` | Quality Validation & Misc | ✅ Complete | Cross-sensor harmonization, validation |
+- Exact task ID/name match: confidence `0.90-1.00`.
+- Strong semantic match: confidence `0.70-0.89`.
+- Usable but adapted template: confidence `0.40-0.69`.
+- No useful match: return `status: "no_match"` and then consider `Knowledge_Base_Searcher`.
 
-### Intent Expansion Roadmap (Planned)
+Before escalating, check whether the user request can be composed from existing retrieval + analysis workflows.
 
-| Intent ID | Intent Name | Status | Target Coverage |
-|-----------|-------------|--------|-----------------|
-| `road_infrastructure_extraction` | Road & Infrastructure Extraction | 🔶 Planned | Road networks, settlement mapping |
-| `electrification_monitoring` | Electrification Monitoring | 🔶 Planned | SDG 7.1.1 indicators, grid access |
-| `conflict_humanitarian` | Conflict & Humanitarian Monitoring | 🔶 Planned | Conflict damage, refugee camps |
-| `seasonal_temporal_analysis` | Seasonal & Temporal Analysis | 🔶 Planned | Monthly composites, seasonal patterns |
+## Template Adaptation Gate
 
-**Note**: If user request matches a planned intent, return closest existing match + note about future coverage.
+Treat workflow JSON entries as templates, not scripts.
 
-## 🎯 Selection Rules (Enhanced)
+Before returning a workflow, classify spatial scope:
 
-### Multi-Stage Matching Strategy
+- `single_city_or_smaller`
+- `single_province`
+- `country_or_multi_province`
 
-**Stage 1: Exact Match (Priority: HIGHEST)**
-- Match on `task_id` if user provides specific ID (e.g., "Q11", "Q20")
-- Match on exact `task_name` string
-- Confidence: 1.0 (guaranteed match)
+If a matched workflow uses `NTL_download_tool` + local boundary download + `NTL_raster_statistics`, but the user asks for country-scale, all-province, multi-province, or province-level ranking/statistics:
 
-**Stage 2: Fuzzy Match on Task Name (Priority: HIGH)**
-- Use fuzzy string matching (Levenshtein/Jaro-Winkler) on `task_name`
-- Threshold: `similarity >= 0.60`
-- Confidence: `0.70 - 0.95` (based on similarity score)
-- Example: "Calculate average NTL" matches "Calculate mean nighttime light"
+- Do not recommend country-scale GeoTIFF download as the primary path.
+- Do not recommend bulk provincial shapefile download for local zonal statistics.
+- Require GEE server-side `ee.Image.reduceRegions()` over a cloud-hosted administrative `FeatureCollection`.
+- Return/export only a CSV/table result.
+- Include `adaptation_reason` and `replaced_steps` in the workflow contract.
 
-**Stage 3: Combined Similarity (Priority: MEDIUM)**
-- Combined scoring on `task_name + description + category`
-- Use TF-IDF + cosine similarity or BM25
-- Threshold: `similarity >= 0.40`
-- Confidence: `0.40 - 0.70` (based on similarity score)
-- Example: "Find brightest district" matches "Identify district with highest average NTL"
+Small-country file retrieval is different: if the user asks to download a GeoTIFF for a small country or AOI, direct download may be attempted. Switch to server-side only after actual export-size/output failure.
 
-**Stage 4: Workflow Composition (Priority: LOW)**
-- If no single workflow matches, check if request can be composed from multiple workflows
-- Example: "Download NTL and calculate trend" = `data_retrieval` + `trend_detection`
-- Confidence: `0.30 - 0.50` (based on composition complexity)
-- Return composed workflow with clear step sequencing
+## Workflow Contract
 
-### Confidence Thresholds and Actions
+Return a compact object with:
 
-| Confidence Range | Match Quality | Action |
-|-----------------|---------------|--------|
-| **0.80 - 1.00** | Excellent | Return workflow with high confidence |
-| **0.60 - 0.79** | Good | Return workflow, note minor differences |
-| **0.40 - 0.59** | Fair | Return best match with uncertainty note |
-| **0.30 - 0.39** | Poor | Attempt workflow composition |
-| **< 0.30** | No Match | Escalate to Knowledge_Base_Searcher |
-
-### Escalation Protocol
-
-**BEFORE escalating to Knowledge_Base_Searcher:**
-
-1. ✅ Verify all 4 matching stages completed
-2. ✅ Document which stages failed and why
-3. ✅ Check if request is novel or just poorly phrased
-4. ✅ Suggest rephrasing if query is ambiguous
-
-**Escalation Payload Format:**
 ```json
 {
-  "status": "no_match",
-  "attempted_stages": ["exact", "fuzzy", "combined", "composition"],
-  "best_confidence": 0.25,
-  "best_match_task_id": "Q11",
-  "escalation_reason": "novel_methodology_required",
-  "suggested_kb_query": "methodology for NTL-based poverty estimation",
-  "recommendation": "Use Knowledge_Base_Searcher for methodology research"
+  "schema": "ntl.workflow.contract.v1",
+  "status": "matched|adapted|composed|no_match",
+  "intent_id": "...",
+  "task_id": "...",
+  "task_name": "...",
+  "confidence": 0.0,
+  "task_level": "L1|L2|L3",
+  "recommended_agent_sequence": ["Data_Searcher", "Code_Assistant"],
+  "steps": [],
+  "required_tools": [],
+  "prohibited_paths": [],
+  "adaptation_reason": null,
+  "source_workflow_file": "/skills/ntl-workflow-guidance/references/workflows/<intent_id>.json"
 }
 ```
 
-## Integration with Other Skills
+## Coordination With Other Skills
 
-### Meta-Capability Skills (Call These)
-- **workflow-self-evolution**: **USER-GATED** - Provides intelligent failure filtering, learning decisions, version control, and quality metrics. Ask user after task execution whether to apply evolution updates.
-  - This is a SKILL protocol, NOT a Python import/module.
-  - Integration method: file I/O + tool calls (`read_file`, `write_file`, `edit_file`).
-  - When: After task execution, only if user confirms.
-  - Why: Enable continuous improvement with 81% noise filtering
-  - See: `/skills/workflow-self-evolution/INTEGRATION_EXAMPLE.md`
+- Use `/skills/ntl-capability-routing/` to understand runtime tool ownership and delegation.
+- Use `/skills/gee-routing-blueprint-strategy/` for Data_Searcher direct download vs server-side GEE route decisions.
+- Use `/skills/gee-python-server-side-workflow/` when the selected workflow needs a runnable GEE Python server-side script.
+- Use `/skills/gee-ntl-date-boundary-handling/` only for daily/event windows, first-night logic, timezone, or event AOI details.
+- Use `/skills/code-generation-execution-loop/` when a saved script will be validated/executed.
+- Use `/skills/workflow-self-evolution/` only after task completion and user approval.
 
-### Business Skills (Collaborate)
-- **gee-routing-blueprint-strategy**: Handles GEE retrieval path decisions and task_level classification.
-- **code-generation-execution-loop**: Handles script execution after workflow selection.
-- **gee-ntl-date-boundary-handling**: Provides date/boundary handling for event impact workflows.
-- **ntl-gdp-regression-analysis**: Provides regression modeling for indicator estimation workflows.
+## Evolution Boundary
 
-### Integration Pattern
-
-```text
-1) Execute workflow task and collect execution result.
-2) Ask user whether to run self-evolution for this completed run.
-3) If user confirms:
-   - update `/skills/workflow-self-evolution/references/metrics.json`
-   - on failure append `/skills/workflow-self-evolution/references/failure_log.jsonl`
-   - if learning is needed, backup/patch target workflow JSON and append:
-     - `/skills/workflow-self-evolution/references/learning_log.jsonl`
-     - `/skills/ntl-workflow-guidance/references/evolution_log.jsonl`
-4) Formal workflow improvement must directly modify:
-   - `/skills/ntl-workflow-guidance/references/workflows/<intent_id>.json`
-   and include `_evolution` annotations in changed/new items.
-5) Never use fake imports like `from skills.workflow_self_evolution import ...`.
-```
-
-## Posterior Learning Rules (after task completion only)
-- Run phase: read-only, no workflow mutation.
-- Learn phase:
-  - Formal writeback only when:
-    - execution `status == success`, and
-    - `artifact_audit.pass == true`.
-  - Mutation is **agent-decision + agent-landing** only (no runtime auto-mutation).
-  - Role split is mandatory:
-    - `Code_Assistant`: proposal-only (`ntl.workflow.evolution.proposal.v1`), no direct file edits.
-    - `NTL_Engineer`: only role allowed to decide and write formal workflow mutations.
-  - Engineer directly edits:
-    - `/skills/ntl-workflow-guidance/references/workflows/<intent_id>.json`
-    - `/skills/ntl-workflow-guidance/references/evolution_log.jsonl`
-  - Engineer must write `_evolution` note into the changed/added workflow item.
-  - Writing only `workflow-self-evolution` logs is insufficient; target workflow JSON must be updated for persistent guidance fixes.
-- Failure or interruption:
-  - Engineer may write candidate evidence to
-    `/skills/ntl-workflow-guidance/references/evolution_candidates.jsonl`
-  - do not mutate formal workflow files.
-- Candidate-to-formal promotion:
-  - when a later run reaches `success + artifact_audit.pass=true`,
-    the agent may promote prior same-intent candidate evidence into formal workflow updates.
-
-## Safety Boundaries
-Allowed:
-- Small step ordering refinement.
-- Parameter default refinements.
-- Description clarifications.
-- New workflow append for genuinely new task type.
-
-Forbidden:
-- Unknown tool insertion.
-- Goal-changing rewrites.
-- Deleting key output definitions.
-
-## Formal Logs
-- Formal mutations: `/skills/ntl-workflow-guidance/references/evolution_log.jsonl`
-- Candidate-only records: `/skills/ntl-workflow-guidance/references/evolution_candidates.jsonl`
-
-## Successful Code Case Library
-- Store successful runnable scripts under:
-  - `/skills/ntl-workflow-guidance/references/code/<intent_id>/`
-- Maintain index:
-  - `/skills/ntl-workflow-guidance/references/code/code_index.json`
-- For each curated case, link it from the corresponding workflow task with fields like:
-  - `code_examples[]` (path, status, quality notes)
-- Use curated code as implementation guidance, not blind copy:
-  - validate inputs/outputs, CRS, dataset/band, and boundary/date constraints before reuse.
+This skill may identify that a workflow should be improved, but normal task execution is read-only. Formal workflow updates must follow `/skills/workflow-self-evolution/`.
