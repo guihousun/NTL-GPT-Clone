@@ -7,4 +7,3 @@ enableXsrfProtection = false
 
 [browser]
 gatherUsageStats = false
-serverAddress = "139.9.165.59"
