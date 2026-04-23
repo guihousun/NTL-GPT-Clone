@@ -4376,8 +4376,18 @@ def render_content_layout():
             chat_live_placeholder = st.empty()
             with chat_live_placeholder.container():
                 _render_chat_history_with_run_notice()
-        chat_input_value = get_user_input(disabled=_is_current_thread_stopping())
+        current_thread_running_for_input = _is_current_thread_running()
+        chat_input_value = get_user_input(disabled=False)
         user_question, chat_files = _extract_chat_input_text_and_files(chat_input_value)
+        if current_thread_running_for_input and (user_question or chat_files):
+            st.warning(
+                _tr(
+                    "当前回答尚未结束，本次输入未发送。请等待系统回答完成，或点击 Stop 后再发送。",
+                    "The current response is still running, so this input was not sent. Wait for the answer to finish or click Stop before sending.",
+                )
+            )
+            user_question = ""
+            chat_files = []
         if chat_files:
             thread_id = str(st.session_state.get("thread_id", "debug"))
             save_result = _save_chat_input_files_to_workspace(chat_files, thread_id)
@@ -4404,6 +4414,14 @@ def render_content_layout():
                 )
                 st.rerun()
         pending_question = st.session_state.pop("pending_question", None) if "pending_question" in st.session_state else None
+        if pending_question and current_thread_running_for_input:
+            st.warning(
+                _tr(
+                    "当前回答尚未结束，示例问题未发送。请等待系统回答完成，或点击 Stop 后再发送。",
+                    "The current response is still running, so the example prompt was not sent. Wait for the answer to finish or click Stop before sending.",
+                )
+            )
+            pending_question = None
         if pending_question and not user_question:
             user_question = pending_question
         runtime_notice = st.session_state.pop("runtime_recovered_notice", None)

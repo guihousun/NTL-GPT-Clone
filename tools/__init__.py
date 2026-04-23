@@ -47,6 +47,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "GEE_script_blueprint_tool": (".GEE_specialist_toolkit", "GEE_script_blueprint_tool"),
     "GEE_catalog_discovery_tool": (".GEE_specialist_toolkit", "GEE_catalog_discovery_tool"),
     "GEE_dataset_metadata_tool": (".GEE_specialist_toolkit", "GEE_dataset_metadata_tool"),
+    "dataset_latest_availability_tool": (".GEE_specialist_toolkit", "dataset_latest_availability_tool"),
     "NTL_estimate_indicator_provincial_tool": (
         ".NTL_estimate_indicator",
         "NTL_estimate_indicator_provincial_tool",
@@ -86,6 +87,7 @@ _GROUPS: dict[str, list[str]] = {
         "GEE_script_blueprint_tool",
         "GEE_catalog_discovery_tool",
         "GEE_dataset_metadata_tool",
+        "dataset_latest_availability_tool",
     ],
     "Code_tools": [
         "GeoCode_Knowledge_Recipes_tool",
@@ -116,6 +118,27 @@ _GROUPS: dict[str, list[str]] = {
         "SDGSAT1_index_tool",
         "vnci_index_tool",
         "uploaded_pdf_understanding_tool",
+    ],
+    "specialized_tool_catalog": [
+        "SDGSAT1_strip_removal_tool",
+        "SDGSAT1_radiometric_calibration_tool",
+        "VNP46A2_angular_correction_tool",
+        "dmsp_evi_preprocess_tool",
+        "urban_extraction_by_thresholding_tool",
+        "svm_urban_extraction_tool",
+        "electrified_detection_tool",
+        "otsu_road_extraction_tool",
+        "detect_urban_centres_tool",
+        "NTL_composite_local_tool",
+        "NTL_estimate_indicator_provincial_tool",
+        "DEI_estimate_city_tool",
+        "official_vj_dnb_fullchain_tool",
+        "official_vj_dnb_preprocess_tool",
+        "convert_vj102_vj103_precise_to_tif_tool",
+        "official_vj_dnb_gif_tool",
+        "official_ntl_ais_fusion_tool",
+        "SDGSAT1_index_tool",
+        "vnci_index_tool",
     ],
 }
 
@@ -172,6 +195,7 @@ class LazyToolCollection(Sequence[Any]):
 data_searcher_tools = LazyToolCollection(_GROUPS["data_searcher_tools"])
 Code_tools = LazyToolCollection(_GROUPS["Code_tools"])
 Engineer_tools = LazyToolCollection(_GROUPS["Engineer_tools"])
+specialized_tool_catalog = LazyToolCollection(_GROUPS["specialized_tool_catalog"])
 
 
 __all__ = sorted(list(_EXPORTS.keys()) + list(_GROUPS.keys()))

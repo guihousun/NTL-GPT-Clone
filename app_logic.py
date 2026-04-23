@@ -519,6 +519,7 @@ def request_stop_active_run(thread_id: Optional[str] = None, detach_session: boo
     if not tid:
         return False
     requested = False
+    requested_run_id = None
     with _RUN_REGISTRY_LOCK:
         run_id = _THREAD_ACTIVE_RUN.get(tid)
         if run_id:
@@ -526,11 +527,14 @@ def request_stop_active_run(thread_id: Optional[str] = None, detach_session: boo
             if control and str(control.get("state")) == "running":
                 control["stop_requested"] = True
                 requested = True
+                requested_run_id = run_id
+                if detach_session:
+                    _THREAD_ACTIVE_RUN.pop(tid, None)
     if requested:
         st.session_state["cancel_requested"] = True
         st.session_state["stopping"] = True
-    if detach_session and not requested:
-        # Keep backward-safe behavior only when no active run is found.
+    if detach_session:
+        # Release this browser session immediately; the worker will finish in the background.
         active_tid = str(st.session_state.get("active_run_thread_id") or "")
         if (not active_tid) or active_tid == tid:
             st.session_state["is_running"] = False
@@ -539,6 +543,7 @@ def request_stop_active_run(thread_id: Optional[str] = None, detach_session: boo
             st.session_state["active_run_id"] = None
             st.session_state["active_run_thread_id"] = None
             st.session_state["run_ended_ts"] = time.time()
+            st.session_state["detached_run_id"] = requested_run_id
     return requested
 
 
@@ -566,6 +571,18 @@ def start_user_run(user_question: str) -> dict[str, Any]:
         return {"started": False, "reason": "conversation_uninitialized"}
 
     run_thread_id = str(st.session_state.get("thread_id") or "debug")
+    active_session_run_id = str(st.session_state.get("active_run_id") or "").strip()
+    active_session_thread_id = str(st.session_state.get("active_run_thread_id") or "").strip()
+    if (
+        bool(st.session_state.get("is_running", False))
+        and active_session_run_id
+        and active_session_thread_id == run_thread_id
+    ):
+        return {
+            "started": False,
+            "reason": "thread_run_in_progress",
+            "run_id": active_session_run_id,
+        }
     with _RUN_REGISTRY_LOCK:
         active_run_id = _THREAD_ACTIVE_RUN.get(run_thread_id)
         if active_run_id:
@@ -798,7 +815,8 @@ def _worker_run_main(run_id: str) -> None:
         },
     )
     with _RUN_REGISTRY_LOCK:
-        _THREAD_ACTIVE_RUN.pop(run_thread_id, None)
+        if _THREAD_ACTIVE_RUN.get(run_thread_id) == run_id:
+            _THREAD_ACTIVE_RUN.pop(run_thread_id, None)
 
 
 def consume_active_run_events() -> bool:

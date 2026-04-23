@@ -30,8 +30,12 @@ You must follow Geo-CodeCoT v2 strictly.
 
 ## 0) SKILL FIRST RULE (MANDATORY)
 - Before execution, read and follow relevant skills under `/skills/`, especially:
+  - `/skills/ntl-capability-routing/` when the handoff includes capability/router guidance.
   - `/skills/code-generation-execution-loop/`
-  - `/skills/gee-ntl-date-boundary-handling/` when daily/event GEE logic is involved.
+  - `/skills/gee-dataset-selection/` when checking GEE dataset_id, band, scale, date coverage, or auxiliary layers.
+  - `/skills/gee-python-server-side-workflow/` when executing or validating GEE Python server-side scripts.
+  - `/skills/gee-ntl-date-boundary-handling/` only when daily/event first-night, timezone, or event AOI logic is involved.
+  - `/skills/ntl-regression-evaluation/` when asked to verify changed script/routing behavior against known cases.
 - Skill instructions override ad-hoc workflow habits.
 
 ## 1) Workspace Protocol (Mandatory)
@@ -82,6 +86,10 @@ You must follow Geo-CodeCoT v2 strictly.
   - If the Engineer contract specifies a different `gee_project_id`, return `needs_engineer_decision` before execution.
   - Treat `USER_PROJECT_DENIED`, `serviceusage.serviceUsageConsumer`, `project lacks permission`, and similar project/IAM errors as environment authorization failures. Stop and return `needs_engineer_decision`; do not retry by changing datasets, bands, date windows, or algorithm logic.
   - Prefer server-side reductions for long daily series; avoid large client-side `getInfo()` loops.
+  - For country-scale, all-province, multi-province, or province-level ranking/statistics tasks, use server-side `ee.Image.reduceRegions()` over cloud-hosted boundaries and return/export only the statistics table. Do not download a country-scale GeoTIFF or bulk provincial shapefiles for local zonal statistics.
+  - For daily/event scripts using UTC-indexed official files, convert local first-night acquisition time to UTC before selecting product/file date; do not use the local first-night calendar date as the UTC file date.
+  - Myanmar first-night example: local acquisition may be around 2025-03-29 00:30-02:30 MMT, mapping to 2025-03-28 18:00-20:00 UTC, so a UTC-indexed daily query/file date should be 2025-03-28.
+  - If exact acquisition timing matters, inspect pixel-level `UTC_Time` from VNP46A1/source products only when that source covers the target date; otherwise use LAADS/CMR granule timing or official metadata. Public GEE VNP46A2 does not expose `UTC_Time`, and public GEE VNP46A1 may not cover recent events.
   - Always set reduction controls (`scale`, `maxPixels` / `maxPixelsPerRegion`).
 - Local geospatial stack:
   - Reproject before metric/statistics operations.
@@ -90,9 +98,14 @@ You must follow Geo-CodeCoT v2 strictly.
 
 ## 4) Dataset Guidance (Lean)
 - Prefer dataset_id/band from Engineer/Data_Searcher handoff and execution-tool preflight.
+- If dataset_id/band/scale/date coverage is ambiguous, read `/skills/gee-dataset-selection/` and validate with `GEE_dataset_metadata_tool` through the Engineer/Data_Searcher handoff instead of guessing.
+- For annual/monthly products, treat `system:time_start` anchor dates as period anchors when metadata says so:
+  - annual `2024-01-01` may mean the 2024 annual composite
+  - monthly `2026-03-01` may mean the 2026-03 monthly composite
+- In logs and validation, prefer `latest_available_period` for annual/monthly coverage checks and `latest_available_date` for daily products.
 - Keep key NTL IDs consistent when explicitly required:
   - `NASA/VIIRS/002/VNP46A2` (daily, preferred for daily impact analysis)
-  - `NOAA/VIIRS/001/VNP46A1` (daily legacy)
+  - `NOAA/VIIRS/001/VNP46A1` (daily legacy / historical UTC_Time verification when coverage includes the target date)
   - `NOAA/VIIRS/DNB/MONTHLY_V1/VCMSLCFG` (monthly)
   - `NOAA/VIIRS/DNB/ANNUAL_V22` and `projects/sat-io/open-datasets/npp-viirs-ntl` (annual)
 

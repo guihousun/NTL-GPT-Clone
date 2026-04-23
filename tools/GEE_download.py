@@ -5,6 +5,8 @@ import re
 import json
 import math
 import calendar
+import contextlib
+import io
 from datetime import datetime, timedelta
 from typing import Optional, Literal
 
@@ -186,8 +188,10 @@ def _resolve_geoboundaries_country_group(country_collection, country_name: str) 
     return str(first_feature.get("shapeGroup").getInfo() or "").strip() or None
 
 
-def _error_result(message: str) -> dict:
-    return {"output_files": [], "error": message}
+def _error_result(message: str, **extra) -> dict:
+    payload = {"status": "error", "output_files": [], "error": message}
+    payload.update({k: v for k, v in extra.items() if v is not None})
+    return payload
 
 
 def _ensure_tif_suffix(filename: str) -> str:
@@ -386,7 +390,6 @@ def ntl_download_tool(
 ):
     try:
         thread_id = _resolve_thread_id_from_config(config)
-        _ensure_ee_initialized()
 
         # Backward-compatible aliases from legacy callers.
         if dataset_name is None and collection_name:
@@ -400,6 +403,8 @@ def ntl_download_tool(
         out_name = _ensure_tif_suffix(out_name)
         bbox_input = _coalesce_bbox_input(bbox, box, kwargs)
         bbox_values = _parse_bbox_input(bbox_input)
+
+        _ensure_ee_initialized()
 
         national_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/World_countries")
         province_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/province")
@@ -582,6 +587,7 @@ def ntl_download_tool(
 
         images_list = NTL_collection.toList(num_images)
         exported_files = []
+        export_errors = []
 
         for i in range(num_images):
             image = ee.Image(images_list.get(i))
@@ -601,23 +607,65 @@ def ntl_download_tool(
             abs_input = storage_manager.resolve_input_path(filename, thread_id=thread_id)
             os.makedirs(os.path.dirname(abs_input), exist_ok=True)
 
+            stdout_buf = io.StringIO()
+            stderr_buf = io.StringIO()
             try:
-                geemap.ee_export_image(
-                    ee_object=image,
-                    filename=abs_input,
-                    scale=500,
-                    region=region.geometry(),
-                    crs="EPSG:4326",
-                    file_per_band=False,
+                with contextlib.redirect_stdout(stdout_buf), contextlib.redirect_stderr(stderr_buf):
+                    geemap.ee_export_image(
+                        ee_object=image,
+                        filename=abs_input,
+                        scale=500,
+                        region=region.geometry(),
+                        crs="EPSG:4326",
+                        file_per_band=False,
+                    )
+
+                captured = "\n".join(
+                    part.strip()
+                    for part in (stdout_buf.getvalue(), stderr_buf.getvalue())
+                    if part and part.strip()
                 )
+                file_ok = os.path.exists(abs_input) and os.path.getsize(abs_input) > 0
+                export_failed_text = (
+                    "An error occurred while downloading" in captured
+                    or "Total request size" in captured
+                    or "must be less than or equal to 50331648" in captured
+                )
+                if export_failed_text or not file_ok:
+                    if file_ok and export_failed_text:
+                        try:
+                            os.remove(abs_input)
+                        except OSError:
+                            pass
+                    export_errors.append(captured or f"Export did not create output file: {filename}")
+                    continue
+
                 exported_files.append(filename)
-            except Exception:
+            except Exception as exc:
+                captured = "\n".join(
+                    part.strip()
+                    for part in (str(exc), stdout_buf.getvalue(), stderr_buf.getvalue())
+                    if part and part.strip()
+                )
+                export_errors.append(captured or repr(exc))
                 continue
 
         if not exported_files:
-            return _error_result("Export failed for all target images.")
+            joined_errors = "\n".join(export_errors)
+            last_error = export_errors[-1] if export_errors else "unknown export error"
+            size_limit_hit = "Total request size" in joined_errors or "50331648" in joined_errors
+            return _error_result(
+                f"Export failed for all target images. Last error: {last_error}",
+                error_type="gee_download_size_limit" if size_limit_hit else "gee_export_failed",
+                recommended_execution_mode="gee_server_side" if size_limit_hit else None,
+                recommended_method=(
+                    "Use server-side GEE reduction/export table instead of local raster download."
+                    if size_limit_hit
+                    else None
+                ),
+            )
 
-        return {"output_files": exported_files}
+        return {"status": "success", "output_files": exported_files}
 
     except Exception as e:
         return _error_result(f"NTL_download_tool failed: {e}")
@@ -632,7 +680,10 @@ NTL_download_tool = StructuredTool.from_function(
         "Supports either administrative region matching (study_area + scale_level) or direct bbox/box AOI (minx,miny,maxx,maxy). "
         "Outside China, administrative matching uses GEE geoBoundaries (WM/geoLab/geoBoundaries/600, ADM0-ADM4). "
         "Annual datasets: NPP-VIIRS-Like/NPP-VIIRS/DMSP-OLS; monthly fixed NOAA_VCMSLCFG; daily VNP46A2/VNP46A1. "
-        "For long daily ranges, switch to server-side GEE script mode."
+        "Country-scale downloads are allowed for file-focused small AOIs, but if GEE reports a request-size/export "
+        "limit or no output file is created, treat the download as failed and switch to server-side GEE. "
+        "Do not use local raster download as the primary path for national/multi-province statistics; use server-side "
+        "reduceRegions/table workflow instead. For long daily ranges, switch to server-side GEE script mode."
     ),
     args_schema=NightlightDataInput,
 )
