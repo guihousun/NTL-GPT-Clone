@@ -3,6 +3,7 @@ import re
 import time
 import threading
 import uuid
+from pathlib import Path
 from typing import Any, Optional
 
 import streamlit as st
@@ -12,12 +13,88 @@ import app_agents
 import app_state
 import file_context_service
 import history_store
-from storage_manager import current_thread_id, storage_manager
+from runtime_governance import (
+    ASSISTANT_ID,
+    build_runtime_metadata,
+    build_run_limit_snapshot,
+)
+from storage_manager import (
+    current_gee_encrypted_refresh_token,
+    current_gee_project_id,
+    current_gee_token_scopes,
+    current_thread_id,
+    storage_manager,
+)
 
 
 _RUN_REGISTRY_LOCK = threading.RLock()
 _RUN_REGISTRY: dict[str, dict[str, Any]] = {}
 _THREAD_ACTIVE_RUN: dict[str, str] = {}
+OUTPUT_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+
+
+def _workspace_relative_ref(path: Path, workspace: Path) -> str:
+    try:
+        return path.resolve().relative_to(workspace.resolve()).as_posix()
+    except Exception:
+        return str(path)
+
+
+def _normalize_artifact_ref(value: Any, workspace: Path) -> str:
+    raw = str(value or "").strip().replace("\\", "/")
+    if not raw:
+        return ""
+    try:
+        p = Path(raw)
+        if p.is_absolute():
+            return _workspace_relative_ref(p, workspace)
+    except Exception:
+        pass
+    return raw
+
+
+def _running_controls_locked(user_id: Optional[str] = None) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    wanted_user = str(user_id or "").strip()
+    for control in _RUN_REGISTRY.values():
+        if str(control.get("state")) != "running":
+            continue
+        if wanted_user and str(control.get("user_id") or "") != wanted_user:
+            continue
+        rows.append(control)
+    return rows
+
+
+def get_run_limit_snapshot(user_id: Optional[str] = None) -> dict[str, int]:
+    with _RUN_REGISTRY_LOCK:
+        controls = list(_RUN_REGISTRY.values())
+    return build_run_limit_snapshot(controls, user_id=str(user_id or "").strip())
+
+
+def _run_limit_rejection_locked(user_id: str) -> Optional[dict[str, Any]]:
+    snapshot = build_run_limit_snapshot(_running_controls_locked(), user_id=user_id)
+    global_limit = int(snapshot["global_limit"] or 0)
+    if global_limit:
+        active_count = int(snapshot["global_active"] or 0)
+        if active_count >= global_limit:
+            return {
+                "started": False,
+                "reason": "global_run_limit_reached",
+                "active_runs": active_count,
+                "limit": global_limit,
+            }
+
+    user_limit = int(snapshot["user_limit"] or 0)
+    if user_limit:
+        user_active_count = int(snapshot["user_active"] or 0)
+        if user_active_count >= user_limit:
+            return {
+                "started": False,
+                "reason": "user_run_limit_reached",
+                "active_runs": user_active_count,
+                "limit": user_limit,
+            }
+    return None
 
 
 def _ensure_runtime_state_defaults() -> None:
@@ -166,7 +243,8 @@ def _collect_recent_outputs(
     since_ts: Optional[float] = None,
 ):
     tid = str(thread_id or st.session_state.get("thread_id") or current_thread_id.get() or "debug")
-    out_dir = storage_manager.get_workspace(tid) / "outputs"
+    workspace = storage_manager.get_workspace(tid)
+    out_dir = workspace / "outputs"
     if not out_dir.exists():
         return
     now = time.time()
@@ -183,13 +261,37 @@ def _collect_recent_outputs(
                 pass
         return (now - mtime) < seconds
 
-    for f in out_dir.glob("*.png"):
-        if _is_run_output(f):
-            st.session_state.chat_history.append(("assistant_img", str(f)))
-            try:
-                history_store.append_chat_record(tid, role="assistant_img", content=str(f), kind="image")
-            except Exception:
-                pass
+    existing_image_refs: set[str] = set()
+    for role, content in st.session_state.get("chat_history", []):
+        if str(role) == "assistant_img":
+            ref = _normalize_artifact_ref(content, workspace)
+            if ref:
+                existing_image_refs.add(ref)
+    try:
+        for row in history_store.load_chat_records(tid, limit=1000):
+            if str(row.get("role", "")) == "assistant_img":
+                ref = _normalize_artifact_ref(row.get("content", ""), workspace)
+                if ref:
+                    existing_image_refs.add(ref)
+    except Exception:
+        pass
+
+    image_files = [
+        f
+        for f in out_dir.rglob("*")
+        if f.is_file() and f.suffix.lower() in OUTPUT_IMAGE_SUFFIXES and _is_run_output(f)
+    ]
+    image_files.sort(key=lambda p: (p.stat().st_mtime if p.exists() else 0, _workspace_relative_ref(p, workspace)))
+    for f in image_files:
+        rel_ref = _workspace_relative_ref(f, workspace)
+        if rel_ref in existing_image_refs:
+            continue
+        st.session_state.chat_history.append(("assistant_img", rel_ref))
+        existing_image_refs.add(rel_ref)
+        try:
+            history_store.append_chat_record(tid, role="assistant_img", content=rel_ref, kind="image")
+        except Exception:
+            pass
 
     for f in out_dir.glob("*.csv"):
         if _is_run_output(f):
@@ -547,15 +649,41 @@ def request_stop_active_run(thread_id: Optional[str] = None, detach_session: boo
     return requested
 
 
-def _build_run_payload(user_question: str, run_thread_id: str) -> tuple[dict, dict]:
+def _build_run_payload(user_question: str, run_thread_id: str, user_id: str) -> tuple[dict, dict]:
     context_system_msg = _build_injected_context_system_message(user_question, run_thread_id)
     state_messages = []
     if context_system_msg:
         state_messages.append({"role": "system", "content": context_system_msg})
+    gee_pipeline_mode = str(st.session_state.get("gee_pipeline_mode") or "default").strip() or "default"
+    gee_project_id = str(st.session_state.get("gee_effective_project_id") or st.session_state.get("gee_project_id") or "").strip()
+    gee_profile_source = str(st.session_state.get("gee_profile_source") or "default").strip() or "default"
+    if gee_project_id:
+        state_messages.append(
+            {
+                "role": "system",
+                "content": (
+                    "Runtime GEE pipeline context:\n"
+                    f"- gee_pipeline_mode: {gee_pipeline_mode}\n"
+                    f"- gee_profile_source: {gee_profile_source}\n"
+                    f"- gee_project_id: {gee_project_id}\n"
+                    f"- For Earth Engine Python scripts, initialize with ee.Initialize(project={gee_project_id!r}).\n"
+                    "- If this project is denied by IAM/API/quota, report it as GEE configuration work."
+                ),
+            }
+        )
     state_messages.append({"role": "user", "content": user_question})
     state = {"messages": state_messages}
+    metadata = build_runtime_metadata(
+        assistant_id=ASSISTANT_ID,
+        user_id=user_id,
+        thread_id=run_thread_id,
+        gee_pipeline_mode=gee_pipeline_mode,
+        gee_project_id=gee_project_id,
+        gee_profile_source=gee_profile_source,
+    )
     config = {
-        "configurable": {"thread_id": run_thread_id},
+        "configurable": metadata,
+        "metadata": metadata,
         "recursion_limit": app_state.RECURSION_LIMIT,
     }
     return state, config
@@ -571,6 +699,7 @@ def start_user_run(user_question: str) -> dict[str, Any]:
         return {"started": False, "reason": "conversation_uninitialized"}
 
     run_thread_id = str(st.session_state.get("thread_id") or "debug")
+    run_user_id = str(st.session_state.get("user_id") or "guest")
     active_session_run_id = str(st.session_state.get("active_run_id") or "").strip()
     active_session_thread_id = str(st.session_state.get("active_run_thread_id") or "").strip()
     if (
@@ -589,21 +718,17 @@ def start_user_run(user_question: str) -> dict[str, Any]:
             active_control = _RUN_REGISTRY.get(active_run_id)
             if active_control and str(active_control.get("state")) == "running":
                 return {"started": False, "reason": "thread_run_in_progress", "run_id": active_run_id}
-
-    _append_analysis_history_snapshot()
-    st.session_state["analysis_logs"] = []
-    st.session_state["last_question"] = question
-    st.session_state["is_running"] = True
-    st.session_state["stopping"] = False
-    st.session_state["cancel_requested"] = False
+        limit_rejection = _run_limit_rejection_locked(run_user_id)
+        if limit_rejection:
+            return limit_rejection
 
     run_id = uuid.uuid4().hex
-    state, config = _build_run_payload(question, run_thread_id)
+    state, config = _build_run_payload(question, run_thread_id, run_user_id)
     now = time.time()
     control = {
         "run_id": run_id,
         "thread_id": run_thread_id,
-        "user_id": str(st.session_state.get("user_id") or "guest"),
+        "user_id": run_user_id,
         "question": question,
         "conversation": conversation,
         "state_payload": state,
@@ -618,10 +743,31 @@ def start_user_run(user_question: str) -> dict[str, Any]:
         "ui_lang": str(st.session_state.get("ui_lang", "EN") or "EN"),
         "analysis_logs": [],
     }
+    try:
+        profile = history_store.get_user_gee_profile(run_user_id)
+        if profile.get("source") == "user" and profile.get("oauth_connected"):
+            control["gee_encrypted_refresh_token"] = str(profile.get("encrypted_refresh_token") or "")
+            control["gee_token_scopes"] = str(profile.get("token_scopes") or "")
+    except Exception:
+        pass
     with _RUN_REGISTRY_LOCK:
+        active_run_id = _THREAD_ACTIVE_RUN.get(run_thread_id)
+        if active_run_id:
+            active_control = _RUN_REGISTRY.get(active_run_id)
+            if active_control and str(active_control.get("state")) == "running":
+                return {"started": False, "reason": "thread_run_in_progress", "run_id": active_run_id}
+        limit_rejection = _run_limit_rejection_locked(run_user_id)
+        if limit_rejection:
+            return limit_rejection
         _RUN_REGISTRY[run_id] = control
         _THREAD_ACTIVE_RUN[run_thread_id] = run_id
 
+    _append_analysis_history_snapshot()
+    st.session_state["analysis_logs"] = []
+    st.session_state["last_question"] = question
+    st.session_state["is_running"] = True
+    st.session_state["stopping"] = False
+    st.session_state["cancel_requested"] = False
     st.session_state["active_run_id"] = run_id
     st.session_state["active_run_thread_id"] = run_thread_id
     st.session_state["run_last_rendered_event_seq"] = 0
@@ -671,6 +817,9 @@ def _worker_run_main(run_id: str) -> None:
 
     _emit_run_event(run_id, "status", {"state": "running"})
     token = current_thread_id.set(run_thread_id)
+    gee_token = current_gee_project_id.set(str(config.get("configurable", {}).get("gee_project_id") or ""))
+    gee_refresh_token = current_gee_encrypted_refresh_token.set(str(control.get("gee_encrypted_refresh_token") or ""))
+    gee_scopes_token = current_gee_token_scopes.set(str(control.get("gee_token_scopes") or ""))
     try:
         seen_message_fingerprints: set[str] = set()
         for existing_msg in _get_state_messages(conversation, config):
@@ -722,6 +871,9 @@ def _worker_run_main(run_id: str) -> None:
         run_exception = err
     finally:
         current_thread_id.reset(token)
+        current_gee_project_id.reset(gee_token)
+        current_gee_encrypted_refresh_token.reset(gee_refresh_token)
+        current_gee_token_scopes.reset(gee_scopes_token)
 
     preferred_agents = ["NTL_Engineer"]
     if not final_answer and last_event and "messages" in last_event:

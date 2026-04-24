@@ -47,6 +47,7 @@ from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 # --- 3. 项目内部依赖 ---
 import app_state 
 import app_logic
+import gee_auth
 import history_store
 import model_config
 from storage_manager import storage_manager
@@ -82,10 +83,110 @@ def _tr(zh: str, en: str) -> str:
 
 
 APP_ROOT = Path(__file__).resolve().parent
+IMAGE_PREVIEW_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
+IMAGE_DATA_LINK_MAX_BYTES = 16 * 1024 * 1024
 
 
 def _project_path(*parts: str) -> Path:
     return APP_ROOT.joinpath(*parts)
+
+
+def _image_mime_type(path: Path) -> str:
+    suffix = path.suffix.lower()
+    if suffix in {".jpg", ".jpeg"}:
+        return "image/jpeg"
+    if suffix == ".png":
+        return "image/png"
+    if suffix == ".gif":
+        return "image/gif"
+    if suffix == ".webp":
+        return "image/webp"
+    if suffix == ".bmp":
+        return "image/bmp"
+    return "application/octet-stream"
+
+
+def _resolve_workspace_artifact_ref(ref: str, thread_id: str | None = None) -> Path:
+    raw = str(ref or "").strip()
+    if not raw:
+        raise ValueError("Empty artifact path.")
+    path = Path(raw)
+    if path.is_absolute():
+        return path
+    workspace = storage_manager.get_workspace(thread_id or st.session_state.get("thread_id", "debug"))
+    return storage_manager.resolve_workspace_relative_path(
+        raw,
+        thread_id=thread_id or st.session_state.get("thread_id", "debug"),
+        default_root="outputs",
+        create_parent=False,
+    )
+
+
+def _artifact_display_ref(path: Path, thread_id: str | None = None) -> str:
+    workspace = storage_manager.get_workspace(thread_id or st.session_state.get("thread_id", "debug"))
+    try:
+        return path.resolve().relative_to(workspace.resolve()).as_posix()
+    except Exception:
+        return str(path)
+
+
+def _image_data_uri(path: Path) -> str | None:
+    try:
+        if path.stat().st_size > IMAGE_DATA_LINK_MAX_BYTES:
+            return None
+        encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+        return f"data:{_image_mime_type(path)};base64,{encoded}"
+    except Exception:
+        return None
+
+
+def _render_image_artifact(
+    image_ref: str | Path,
+    *,
+    key_prefix: str,
+    caption: str | None = None,
+    thread_id: str | None = None,
+) -> None:
+    try:
+        path = _resolve_workspace_artifact_ref(str(image_ref), thread_id=thread_id)
+    except Exception as exc:
+        st.warning(_tr(f"图像路径无效: {exc}", f"Invalid image path: {exc}"))
+        return
+
+    if not path.exists() or not path.is_file():
+        st.warning(_tr(f"图像文件不存在: {image_ref}", f"Image file not found: {image_ref}"))
+        return
+
+    file_name = path.name
+    display_ref = _artifact_display_ref(path, thread_id=thread_id)
+    safe_name = html.escape(file_name)
+    safe_ref = html.escape(display_ref)
+    data_uri = _image_data_uri(path)
+
+    st.markdown(
+        f"""
+        <div class="ntl-image-card">
+          <div class="ntl-image-card-head">
+            <div class="ntl-image-title" title="{safe_ref}">{safe_name}</div>
+            <div class="ntl-image-actions">
+              {f'<a href="{data_uri}" target="_blank" rel="noopener">Open</a>' if data_uri else ''}
+              {f'<a href="{data_uri}" download="{safe_name}">Download</a>' if data_uri else ''}
+            </div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.image(str(path), width="stretch", caption=caption)
+    if data_uri is None:
+        with path.open("rb") as fh:
+            st.download_button(
+                _tr("下载原图", "Download original"),
+                data=fh,
+                file_name=file_name,
+                mime=_image_mime_type(path),
+                key=f"{key_prefix}_download_{hashlib.md5(str(path).encode('utf-8')).hexdigest()}",
+            )
 
 
 def _normalize_monitor_base_url(raw: Optional[str], default: str) -> str:
@@ -736,6 +837,46 @@ def inject_css():
     }
     .bot-badge { background: #0f172a; border: 1px solid rgba(255,255,255,0.35); }
     .user-badge { background: #1d4ed8; border: 1px solid rgba(255,255,255,0.35); }
+    .ntl-image-card {
+        margin: 0.55rem 0 0.25rem 0;
+        padding: 0.45rem 0.55rem;
+        border: 1px solid rgba(180, 201, 255, 0.26);
+        border-radius: 8px;
+        background: rgba(9, 20, 42, 0.42);
+    }
+    .ntl-image-card-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        min-width: 0;
+    }
+    .ntl-image-title {
+        color: #e7eefc;
+        font-size: 0.86rem;
+        line-height: 1.25;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+    }
+    .ntl-image-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        flex: 0 0 auto;
+    }
+    .ntl-image-actions a {
+        color: #b9cdfb !important;
+        font-size: 0.78rem;
+        line-height: 1;
+        text-decoration: none !important;
+    }
+    .ntl-image-actions a:hover {
+        color: #ffffff !important;
+        text-decoration: underline !important;
+        text-underline-offset: 3px;
+    }
     .stExpander { border: 1px solid var(--ntl-border); border-radius: 10px; }
     .stCode { border-radius: 10px; }
     [data-testid="stSidebar"] {
@@ -986,6 +1127,28 @@ def inject_css():
     [data-testid="stSidebar"] .stButton > button[kind="secondary"] span {
         color: #dce8ff !important;
     }
+    [data-testid="stSidebar"] div[class*="st-key-thread_open_btn_v3_"] button {
+        min-height: 2.35rem !important;
+        padding: 0.18rem 0.7rem !important;
+        border-radius: 14px !important;
+        justify-content: flex-start !important;
+        text-align: left !important;
+        overflow: hidden !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-thread_open_btn_v3_"] button p,
+    [data-testid="stSidebar"] div[class*="st-key-thread_open_btn_v3_"] button span {
+        width: 100% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-thread_rename_menu_v3_"] button,
+    [data-testid="stSidebar"] div[class*="st-key-thread_delete_menu_v3_"] button {
+        min-height: 2rem !important;
+        padding: 0.1rem 0.7rem !important;
+        border-radius: 10px !important;
+        font-size: 0.9rem !important;
+    }
     [data-testid="stSidebar"] .stButton > button[kind="tertiary"] {
         border: 1px solid rgba(255, 125, 125, 0.55) !important;
         background: linear-gradient(180deg, rgba(67, 20, 26, 0.88), rgba(45, 16, 24, 0.90)) !important;
@@ -1153,6 +1316,207 @@ def inject_css():
     .ntl-thread-status-value {
         color: #f1f6ff;
         font-weight: 600;
+    }
+    .ntl-thread-quota-row {
+        display: flex;
+        gap: 0.45rem;
+        flex-wrap: wrap;
+        margin-top: 0.38rem;
+    }
+    .ntl-thread-quota-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.28rem;
+        padding: 0.16rem 0.46rem;
+        border-radius: 999px;
+        background: rgba(15, 29, 58, 0.88);
+        border: 1px solid rgba(120, 162, 255, 0.28);
+        color: #dce8ff;
+        font-size: 0.76rem;
+        line-height: 1.1;
+    }
+    .ntl-thread-quota-pill strong {
+        color: #f4f8ff;
+        font-weight: 700;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-thread_item_btn_v4_"] button,
+    [data-testid="stSidebar"] div[class*="st-key-thread_current_btn_v4_"] button {
+        min-height: 2.02rem !important;
+        padding: 0.05rem 0.62rem !important;
+        border-radius: 10px !important;
+        justify-content: flex-start !important;
+        text-align: left !important;
+        box-shadow: none !important;
+        transition: background 120ms ease, border-color 120ms ease !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-thread_item_btn_v4_"] button {
+        background: transparent !important;
+        border: 1px solid transparent !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-thread_item_btn_v4_"] button:hover {
+        background: rgba(255,255,255,0.06) !important;
+        border-color: rgba(255,255,255,0.08) !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-thread_current_btn_v4_"] button {
+        background: rgba(111, 168, 255, 0.14) !important;
+        border: 1px solid rgba(129, 178, 255, 0.24) !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-thread_current_btn_v4_"] button:hover {
+        background: rgba(111, 168, 255, 0.18) !important;
+        border-color: rgba(150, 194, 255, 0.30) !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-thread_item_btn_v4_"] button p,
+    [data-testid="stSidebar"] div[class*="st-key-thread_item_btn_v4_"] button span,
+    [data-testid="stSidebar"] div[class*="st-key-thread_current_btn_v4_"] button p,
+    [data-testid="stSidebar"] div[class*="st-key-thread_current_btn_v4_"] button span {
+        width: 100% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        color: #e7efff !important;
+        -webkit-text-fill-color: #e7efff !important;
+        font-size: 0.95rem !important;
+        line-height: 1.1 !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-thread_rename_inline_v6_"] button,
+    [data-testid="stSidebar"] div[class*="st-key-thread_delete_inline_v6_"] button {
+        min-height: 1rem !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+        font-size: 0.72rem !important;
+        background: transparent !important;
+        border: none !important;
+        outline: none !important;
+        box-shadow: none !important;
+        justify-content: flex-end !important;
+        text-align: right !important;
+        min-width: auto !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-thread_rename_inline_v6_"] [data-testid="stBaseButton-secondary"],
+    [data-testid="stSidebar"] div[class*="st-key-thread_delete_inline_v6_"] [data-testid="stBaseButton-secondary"] {
+        background: transparent !important;
+        border: none !important;
+        outline: none !important;
+        box-shadow: none !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-thread_rename_inline_v6_"] button p,
+    [data-testid="stSidebar"] div[class*="st-key-thread_rename_inline_v6_"] button span {
+        color: rgba(219, 232, 255, 0.88) !important;
+        -webkit-text-fill-color: rgba(219, 232, 255, 0.88) !important;
+        font-weight: 500 !important;
+        font-size: 0.72rem !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-thread_delete_inline_v6_"] button p,
+    [data-testid="stSidebar"] div[class*="st-key-thread_delete_inline_v6_"] button span {
+        color: rgba(255, 174, 174, 0.88) !important;
+        -webkit-text-fill-color: rgba(255, 174, 174, 0.88) !important;
+        font-weight: 500 !important;
+        font-size: 0.72rem !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-thread_rename_inline_v6_"] button:hover,
+    [data-testid="stSidebar"] div[class*="st-key-thread_delete_inline_v6_"] button:hover {
+        background: transparent !important;
+        border: 0 !important;
+        text-decoration: underline !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-rename_thread_input_v7_"] input {
+        min-height: 2rem !important;
+        border-radius: 10px !important;
+        padding: 0.18rem 0.7rem !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-rename_thread_save_v7_"] button,
+    [data-testid="stSidebar"] div[class*="st-key-rename_thread_cancel_v7_"] button {
+        min-height: 1.45rem !important;
+        padding: 0.08rem 0.58rem !important;
+        border-radius: 999px !important;
+        font-size: 0.72rem !important;
+        box-shadow: none !important;
+        justify-content: flex-end !important;
+        text-align: right !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-rename_thread_save_v7_"] button {
+        background: rgba(111, 168, 255, 0.16) !important;
+        border: 1px solid rgba(129, 178, 255, 0.28) !important;
+        outline: none !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-rename_thread_save_v7_"] button p,
+    [data-testid="stSidebar"] div[class*="st-key-rename_thread_save_v7_"] button span {
+        color: rgba(219, 232, 255, 0.9) !important;
+        -webkit-text-fill-color: rgba(219, 232, 255, 0.9) !important;
+        font-weight: 500 !important;
+        font-size: 0.68rem !important;
+        line-height: 1 !important;
+        letter-spacing: 0.01em !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-rename_thread_cancel_v7_"] button {
+        background: transparent !important;
+        border: none !important;
+        outline: none !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-rename_thread_cancel_v7_"] button p,
+    [data-testid="stSidebar"] div[class*="st-key-rename_thread_cancel_v7_"] button span {
+        color: rgba(194, 207, 232, 0.8) !important;
+        -webkit-text-fill-color: rgba(194, 207, 232, 0.8) !important;
+        font-weight: 500 !important;
+        font-size: 0.68rem !important;
+        line-height: 1 !important;
+        letter-spacing: 0.01em !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-rename_thread_save_v7_"] button:hover {
+        background: rgba(111, 168, 255, 0.22) !important;
+        border-color: rgba(150, 194, 255, 0.34) !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-rename_thread_cancel_v7_"] button:hover {
+        background: transparent !important;
+        border: none !important;
+        text-decoration: underline !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-delete_thread_confirm_v8_"] button,
+    [data-testid="stSidebar"] div[class*="st-key-delete_thread_cancel_v8_"] button {
+        min-height: 1.45rem !important;
+        padding: 0.08rem 0.58rem !important;
+        border-radius: 999px !important;
+        font-size: 0.72rem !important;
+        box-shadow: none !important;
+        justify-content: flex-end !important;
+        text-align: right !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-delete_thread_confirm_v8_"] button {
+        background: rgba(140, 34, 42, 0.22) !important;
+        border: 1px solid rgba(255, 120, 120, 0.24) !important;
+        outline: none !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-delete_thread_confirm_v8_"] button p,
+    [data-testid="stSidebar"] div[class*="st-key-delete_thread_confirm_v8_"] button span {
+        color: rgba(255, 174, 174, 0.92) !important;
+        -webkit-text-fill-color: rgba(255, 174, 174, 0.92) !important;
+        font-weight: 500 !important;
+        font-size: 0.68rem !important;
+        line-height: 1 !important;
+        letter-spacing: 0.01em !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-delete_thread_cancel_v8_"] button {
+        background: transparent !important;
+        border: none !important;
+        outline: none !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-delete_thread_cancel_v8_"] button p,
+    [data-testid="stSidebar"] div[class*="st-key-delete_thread_cancel_v8_"] button span {
+        color: rgba(194, 207, 232, 0.8) !important;
+        -webkit-text-fill-color: rgba(194, 207, 232, 0.8) !important;
+        font-weight: 500 !important;
+        font-size: 0.68rem !important;
+        line-height: 1 !important;
+        letter-spacing: 0.01em !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-delete_thread_confirm_v8_"] button:hover {
+        background: rgba(140, 34, 42, 0.28) !important;
+        border-color: rgba(255, 138, 138, 0.30) !important;
+    }
+    [data-testid="stSidebar"] div[class*="st-key-delete_thread_cancel_v8_"] button:hover {
+        background: transparent !important;
+        border: none !important;
+        text-decoration: underline !important;
     }
     .ntl-status-text.active {
         color: #b4ffe0;
@@ -2159,6 +2523,94 @@ def render_uploaded_understanding_output(raw_content, tool_name: str = ""):
 # SECTION E: Sidebar, Download, Upload
 # ==============================================================================
 
+def _apply_authenticated_sidebar_session(account: dict) -> None:
+    user_id = str(account.get("user_id") or "").strip()
+    username = str(account.get("username") or "").strip()
+    if not user_id or not username:
+        raise ValueError("Authenticated account is missing user identity.")
+    st.cache_resource.clear()
+    app_state.apply_authenticated_user(user_id, username)
+    st.rerun()
+
+
+def _logout_sidebar_session() -> None:
+    if st.session_state.get("is_running", False):
+        app_logic.request_stop_active_run(detach_session=True)
+    st.cache_resource.clear()
+    app_state.clear_authenticated_user()
+    st.rerun()
+
+
+def _render_auth_panel() -> None:
+    _handle_gee_oauth_callback("")
+    st.info(
+        _tr(
+            "请先注册或登录。账号与线程历史、长期记忆、并发配额都会绑定到真实 user_id。",
+            "Register or log in first. Threads, memory, and quotas are bound to the real user_id.",
+        )
+    )
+    login_tab, register_tab = st.tabs([_tr("登录", "Login"), _tr("注册", "Register")])
+
+    with login_tab:
+        with st.form("sidebar_login_form", clear_on_submit=False):
+            login_username = st.text_input(
+                _tr("用户名（仅英文）", "Username (only English)"),
+                key="auth_login_username",
+            )
+            login_password = st.text_input(
+                _tr("密码", "Password"),
+                type="password",
+                key="auth_login_password",
+            )
+            login_submitted = st.form_submit_button(_tr("登录", "Login"), use_container_width=True)
+        if login_submitted:
+            try:
+                account = history_store.authenticate_user(login_username, login_password)
+            except (RuntimeError, ValueError) as exc:
+                st.error(_sanitize_paths_in_text(str(exc)))
+            else:
+                if not account:
+                    st.error(_tr("用户名或密码错误。", "Invalid username or password."))
+                else:
+                    _apply_authenticated_sidebar_session(account)
+
+    with register_tab:
+        with st.form("sidebar_register_form", clear_on_submit=False):
+            register_username = st.text_input(
+                _tr("用户名（仅英文）", "Username (only English)"),
+                key="auth_register_username",
+            )
+            register_password = st.text_input(
+                _tr("密码（至少 8 位）", "Password (min 8 chars)"),
+                type="password",
+                key="auth_register_password",
+            )
+            register_password_confirm = st.text_input(
+                _tr("确认密码", "Confirm password"),
+                type="password",
+                key="auth_register_password_confirm",
+            )
+            register_submitted = st.form_submit_button(_tr("注册", "Register"), use_container_width=True)
+        if register_submitted:
+            if register_password != register_password_confirm:
+                st.error(_tr("两次输入的密码不一致。", "Passwords do not match."))
+            else:
+                try:
+                    account = history_store.register_user(register_username, register_password)
+                except (RuntimeError, ValueError) as exc:
+                    st.error(_sanitize_paths_in_text(str(exc)))
+                else:
+                    migrated_from = str(account.get("legacy_migrated_from") or "").strip()
+                    if migrated_from:
+                        st.success(
+                            _tr(
+                                f"注册成功，已接管 legacy 用户 `{migrated_from}` 的历史线程和记忆。",
+                                f"Registered successfully. Legacy data from `{migrated_from}` has been attached to this account.",
+                            )
+                        )
+                    _apply_authenticated_sidebar_session(account)
+
+
 def render_sidebar():
     """Render all sidebar controls."""
     with st.sidebar:
@@ -2221,6 +2673,8 @@ def render_sidebar():
             )
 
         if username_ready:
+            _render_gee_pipeline_panel(current_user_id)
+
             user_threads = history_store.list_user_threads(current_user_id, limit=100)
             thread_ids = [str(row.get("thread_id")) for row in user_threads if row.get("thread_id")]
             thread_ids = [tid for tid in thread_ids if tid]
@@ -2495,8 +2949,15 @@ def render_sidebar():
                 st.success(_tr("已应用待生效设置。", "Queued settings applied."))
                 st.rerun()
 
+        _render_sidebar_thread_history_list(current_user_id, current_tid, user_threads)
+
         status = _tr("已激活", "Active") if st.session_state.get("initialized") else _tr("未激活", "Inactive")
         status_class = "active" if st.session_state.get("initialized") else "inactive"
+        limit_snapshot = app_logic.get_run_limit_snapshot(current_user_id)
+        global_limit = int(limit_snapshot.get("global_limit", 0) or 0)
+        user_limit = int(limit_snapshot.get("user_limit", 0) or 0)
+        global_usage = f"{int(limit_snapshot.get('global_active', 0) or 0)}/{global_limit}" if global_limit else f"{int(limit_snapshot.get('global_active', 0) or 0)}/∞"
+        user_usage = f"{int(limit_snapshot.get('user_active', 0) or 0)}/{user_limit}" if user_limit else f"{int(limit_snapshot.get('user_active', 0) or 0)}/∞"
         st.markdown(
             (
                 "<div class='ntl-thread-status-row'>"
@@ -2504,6 +2965,10 @@ def render_sidebar():
                 f"<span class='ntl-thread-status-value'>{st.session_state.thread_id}</span></span>"
                 f"<span class='ntl-thread-status-item'><span>{_tr('状态', 'Status')}:</span>"
                 f"<span class='ntl-status-text {status_class}'>{status}</span></span>"
+                "</div>"
+                "<div class='ntl-thread-quota-row'>"
+                f"<span class='ntl-thread-quota-pill'><span>MAX_RUNS</span><strong>{global_usage}</strong></span>"
+                f"<span class='ntl-thread-quota-pill'><span>MAX_RUNS_PER_USER</span><strong>{user_usage}</strong></span>"
                 "</div>"
             ),
             unsafe_allow_html=True,
@@ -2560,6 +3025,976 @@ def render_sidebar():
                                 st.rerun()
             except Exception as e:
                 st.error(f"Failed to load test case files: {e}")
+
+def render_sidebar():
+    """Render sidebar with authenticated user accounts."""
+    with st.sidebar:
+        st.subheader(_tr("NTL-Claw 控制台", "NTL-Claw Console"))
+
+        if not st.session_state.get("authenticated"):
+            _render_auth_panel()
+            return
+
+        workspace = storage_manager.get_workspace(st.session_state.get("thread_id", "debug"))
+        current_user_id = str(st.session_state.get("user_id", "") or "").strip()
+        current_user_name = str(st.session_state.get("user_name", "") or "").strip()
+        st.caption(f"{_tr('当前用户', 'Current user')}: {current_user_name}")
+        if st.button(_tr("退出登录", "Logout"), key="logout_btn_v2", width="stretch"):
+            _logout_sidebar_session()
+
+        _render_gee_pipeline_panel(current_user_id)
+
+        user_threads = history_store.list_user_threads(current_user_id, limit=100)
+        thread_ids = [str(row.get("thread_id")) for row in user_threads if row.get("thread_id")]
+        thread_ids = [tid for tid in thread_ids if tid]
+        current_tid = str(st.session_state.get("thread_id", "debug") or "debug")
+
+        if not thread_ids:
+            new_thread_id = history_store.generate_thread_id(current_user_id)
+            app_state.set_active_thread(new_thread_id)
+            history_store.bind_thread_to_user(current_user_id, new_thread_id)
+            st.rerun()
+
+        if current_tid not in thread_ids:
+            app_state.set_active_thread(thread_ids[0])
+            st.rerun()
+
+        thread_label_map = {}
+        for row in user_threads:
+            tid = str(row.get("thread_id", "")).strip()
+            if not tid:
+                continue
+            question = str(row.get("last_question", "") or "").strip()
+            question_short = (question[:28] + "...") if len(question) > 28 else question
+            thread_label_map[tid] = f"{tid} | {question_short}" if question_short else tid
+
+        default_idx = thread_ids.index(current_tid) if current_tid in thread_ids else 0
+        thread_sel_col, thread_del_col = st.columns([0.84, 0.16], gap="small")
+        with thread_sel_col:
+            selected_tid = st.selectbox(
+                _tr("历史线程", "History Threads"),
+                options=thread_ids,
+                index=default_idx,
+                format_func=lambda tid: thread_label_map.get(tid, tid),
+                key="sidebar_thread_selector_v2",
+                label_visibility="visible",
+            )
+        with thread_del_col:
+            st.markdown("<div style='height: 1.78rem;'></div>", unsafe_allow_html=True)
+            if st.button(
+                "🗑",
+                key="delete_selected_thread_inline_trigger_v2",
+                help=_tr("删除当前选中线程", "Delete selected thread"),
+                width="stretch",
+            ):
+                st.session_state["confirm_delete_selected_thread_inline_v2"] = True
+
+        if selected_tid != current_tid:
+            if st.session_state.get("is_running", False):
+                app_logic.request_stop_active_run(thread_id=current_tid)
+            app_state.set_active_thread(selected_tid)
+            history_store.bind_thread_to_user(current_user_id, selected_tid)
+            st.rerun()
+
+        if st.session_state.get("confirm_delete_selected_thread_inline_v2", False):
+            st.warning(
+                _tr(
+                    f"删除线程 `{selected_tid}`？该操作会删除历史与线程文件。",
+                    f"Delete thread `{selected_tid}`? This will remove history and workspace files.",
+                )
+            )
+            confirm_cols = st.columns([1, 1], gap="small")
+            with confirm_cols[0]:
+                if st.button(
+                    _tr("确认删除", "Confirm Delete"),
+                    key="delete_selected_thread_inline_confirm_btn_v2",
+                    width="stretch",
+                ):
+                    if st.session_state.get("is_running", False):
+                        app_logic.request_stop_active_run(thread_id=selected_tid, detach_session=True)
+
+                    delete_result = history_store.delete_user_thread(
+                        current_user_id,
+                        selected_tid,
+                        delete_workspace=True,
+                    )
+                    remaining = history_store.list_user_threads(current_user_id, limit=100)
+                    remaining_ids = [str(row.get("thread_id")) for row in remaining if row.get("thread_id")]
+
+                    if not remaining_ids:
+                        new_thread_id = history_store.generate_thread_id(current_user_id)
+                        history_store.bind_thread_to_user(current_user_id, new_thread_id)
+                        app_state.set_active_thread(new_thread_id)
+                    else:
+                        app_state.set_active_thread(remaining_ids[0])
+
+                    st.session_state["confirm_delete_selected_thread_inline_v2"] = False
+                    if delete_result.get("deleted"):
+                        st.success(_tr("线程已删除。", "Thread deleted."))
+                    else:
+                        st.warning(_tr("未找到可删除的线程记录。", "No thread record was deleted."))
+                    st.rerun()
+            with confirm_cols[1]:
+                if st.button(
+                    _tr("取消", "Cancel"),
+                    key="delete_selected_thread_inline_cancel_btn_v2",
+                    width="stretch",
+                ):
+                    st.session_state["confirm_delete_selected_thread_inline_v2"] = False
+                    st.rerun()
+
+        current_model = st.session_state.get("cfg_model", app_state.MODEL_OPTIONS[0])
+        if current_model not in app_state.MODEL_OPTIONS:
+            current_model = app_state.MODEL_OPTIONS[0]
+            st.session_state["cfg_model"] = current_model
+        if st.session_state.get("model_selector") not in app_state.MODEL_OPTIONS:
+            st.session_state["model_selector"] = current_model
+        selected_model = st.selectbox(
+            _tr("模型", "Model"),
+            app_state.MODEL_OPTIONS,
+            index=app_state.MODEL_OPTIONS.index(current_model),
+            key="model_selector",
+        )
+        current_thread_running = _is_current_thread_running()
+        current_thread_stopping = _is_current_thread_stopping()
+        if selected_model != current_model:
+            if current_thread_running and not current_thread_stopping:
+                st.session_state["pending_model_change"] = selected_model
+                st.session_state["model_selector"] = current_model
+                st.info(
+                    _tr(
+                        "模型变更已暂存，将在当前任务结束后生效。",
+                        "Model change queued and will apply after current run finishes.",
+                    )
+                )
+            else:
+                st.session_state["cfg_model"] = selected_model
+                st.session_state["pending_model_change"] = None
+                current_model = selected_model
+        pending_model = str(st.session_state.get("pending_model_change") or "").strip()
+        if pending_model and current_thread_running and not current_thread_stopping:
+            st.caption(_tr(f"待生效模型: {pending_model}", f"Pending model: {pending_model}"))
+        selected_model = current_model
+
+        selected_model_config = model_config.get_model_config(selected_model)
+        key_label = selected_model_config.key_label
+        use_env_api_key = selected_model_config.uses_env_api_key
+        env_api_key = model_config.get_env_api_key(selected_model)
+        missing_model_env = model_config.missing_env_for_model(selected_model)
+        user_api_key = ""
+        if use_env_api_key:
+            if missing_model_env:
+                missing_text = ", ".join(missing_model_env)
+                st.warning(
+                    _tr(
+                        f"未检测到 .env 中的 {missing_text}，激活会失败。",
+                        f"{missing_text} not found in .env; activation will fail.",
+                    )
+                )
+        else:
+            user_api_key = st.text_input(
+                label=_tr(f"输入 {key_label}", f"Enter {key_label}"),
+                type="password",
+                help=_tr("激活系统所必需。", "Required to activate the agent system."),
+                key="user_api_key_input",
+            )
+
+        action_cols = st.columns(3, gap="small")
+        with action_cols[0]:
+            if st.button(
+                _tr("激活", "Activate"),
+                key="activate_btn_v2",
+                width="stretch",
+                type="secondary",
+            ):
+                effective_api_key = ""
+                can_activate = True
+                if use_env_api_key:
+                    effective_api_key = env_api_key
+                    if missing_model_env or not effective_api_key:
+                        missing_text = ", ".join(missing_model_env or [selected_model_config.api_key_env or "API key"])
+                        st.error(
+                            _tr(
+                                f"请先在 .env 中配置 {missing_text}。",
+                                f"Please set {missing_text} in .env first.",
+                            )
+                        )
+                        can_activate = False
+                else:
+                    effective_api_key = (user_api_key or "").strip()
+                    if not effective_api_key:
+                        st.error(_tr(f"请输入 {key_label}！", f"Please enter your {key_label}!"))
+                        can_activate = False
+
+                if can_activate and effective_api_key:
+                    if current_thread_running and not current_thread_stopping:
+                        st.session_state["pending_activate_request"] = {
+                            "user_api_key": effective_api_key,
+                            "model": selected_model,
+                        }
+                        st.info(
+                            _tr(
+                                "激活请求已暂存，将在当前任务结束后自动生效。",
+                                "Activate request queued and will apply after current run finishes.",
+                            )
+                        )
+                    else:
+                        st.session_state["user_api_key"] = effective_api_key
+                        st.session_state["initialized"] = True
+                        app_logic.ensure_conversation_initialized()
+                        st.success(_tr("已激活！", "Activated!"))
+                        st.rerun()
+
+        with action_cols[1]:
+            if st.button(
+                _tr("新建", "New"),
+                key="reset_btn_v2",
+                width="stretch",
+                type="secondary",
+            ):
+                if st.session_state.get("is_running", False):
+                    app_logic.request_stop_active_run()
+                st.cache_resource.clear()
+                st.session_state["initialized"] = False
+                st.session_state.chat_history = []
+                st.session_state.analysis_logs = []
+                st.session_state.analysis_history = []
+                st.session_state.last_question = ""
+                st.session_state["cancel_requested"] = False
+                st.session_state["stopping"] = False
+
+                if "user_api_key" in st.session_state:
+                    del st.session_state["user_api_key"]
+
+                new_thread_id = history_store.generate_thread_id(current_user_id)
+                app_state.set_active_thread(new_thread_id)
+                history_store.bind_thread_to_user(current_user_id, new_thread_id)
+                st.warning(_tr("已创建新会话。", "New session created."))
+                st.rerun()
+
+        with action_cols[2]:
+            if st.button(
+                _tr("中断", "Stop"),
+                key="interrupt_current_run_btn_v2",
+                width="stretch",
+                type="secondary",
+                help=_tr("请求立即中断当前回答。", "Request immediate interruption of the current run."),
+            ):
+                if st.session_state.get("is_running", False):
+                    app_logic.request_stop_active_run(detach_session=True)
+                    st.rerun()
+
+        if (not current_thread_running) or current_thread_stopping:
+            pending_model = str(st.session_state.get("pending_model_change") or "").strip()
+            if pending_model and pending_model in app_state.MODEL_OPTIONS:
+                st.session_state["cfg_model"] = pending_model
+                st.session_state["model_selector"] = pending_model
+                st.session_state["pending_model_change"] = None
+            pending_activate = st.session_state.get("pending_activate_request")
+            if isinstance(pending_activate, dict):
+                pending_key = str(pending_activate.get("user_api_key") or "").strip()
+                pending_model_from_activate = str(pending_activate.get("model") or "").strip()
+                if pending_model_from_activate in app_state.MODEL_OPTIONS:
+                    st.session_state["cfg_model"] = pending_model_from_activate
+                    st.session_state["model_selector"] = pending_model_from_activate
+                if pending_key:
+                    st.session_state["user_api_key"] = pending_key
+                    st.session_state["initialized"] = True
+                    app_logic.ensure_conversation_initialized()
+                st.session_state["pending_activate_request"] = None
+                st.success(_tr("待生效设置已应用。", "Queued settings applied."))
+                st.rerun()
+
+        _render_sidebar_thread_history_list(current_user_id, current_tid, user_threads)
+
+        status = _tr("已激活", "Active") if st.session_state.get("initialized") else _tr("未激活", "Inactive")
+        status_class = "active" if st.session_state.get("initialized") else "inactive"
+        limit_snapshot = app_logic.get_run_limit_snapshot(current_user_id)
+        global_limit = int(limit_snapshot.get("global_limit", 0) or 0)
+        user_limit = int(limit_snapshot.get("user_limit", 0) or 0)
+        global_usage = (
+            f"{int(limit_snapshot.get('global_active', 0) or 0)}/{global_limit}"
+            if global_limit
+            else f"{int(limit_snapshot.get('global_active', 0) or 0)}/∞"
+        )
+        user_usage = (
+            f"{int(limit_snapshot.get('user_active', 0) or 0)}/{user_limit}"
+            if user_limit
+            else f"{int(limit_snapshot.get('user_active', 0) or 0)}/∞"
+        )
+        st.markdown(
+            (
+                "<div class='ntl-thread-status-row'>"
+                f"<span class='ntl-thread-status-item'><span>{_tr('线程 ID', 'Thread ID')}:</span>"
+                f"<span class='ntl-thread-status-value'>{st.session_state.thread_id}</span></span>"
+                f"<span class='ntl-thread-status-item'><span>{_tr('状态', 'Status')}:</span>"
+                f"<span class='ntl-status-text {status_class}'>{status}</span></span>"
+                "</div>"
+                "<div class='ntl-thread-quota-row'>"
+                f"<span class='ntl-thread-quota-pill'><span>MAX_RUNS</span><strong>{global_usage}</strong></span>"
+                f"<span class='ntl-thread-quota-pill'><span>MAX_RUNS_PER_USER</span><strong>{user_usage}</strong></span>"
+                "</div>"
+            ),
+            unsafe_allow_html=True,
+        )
+        st.markdown("<hr style='margin: 8px 0;'>", unsafe_allow_html=True)
+
+        with st.expander("NTL Data Availability", expanded=False):
+            _render_data_availability_block()
+
+        with st.expander(_tr("测试用例", "Test Cases"), expanded=False):
+            try:
+                case_files = list(_TEST_CASE_FILES)
+                loaded_names = []
+                frames = []
+                for fp in case_files:
+                    if fp.exists():
+                        frames.append(pd.read_excel(fp))
+                        loaded_names.append(fp.name)
+
+                if not frames:
+                    expected = ", ".join(str(p) for p in case_files)
+                    raise FileNotFoundError(f"No test case file found. Expected one of: {expected}")
+
+                df_cases = pd.concat(frames, ignore_index=True)
+                df_cases = df_cases.dropna(subset=["Case"])
+                df_cases = df_cases.drop_duplicates(subset=["Case"], keep="first")
+                df_cases["Category"] = df_cases["Category"].fillna("General").astype(str)
+                df_cases["Label"] = df_cases["Label"].fillna("Unnamed Task").astype(str)
+                categories = {}
+                for _, row in df_cases.iterrows():
+                    case_id = _test_case_id_from_row(row)
+                    case = _localized_test_case(
+                        row["Category"].strip(),
+                        row["Label"].strip(),
+                        str(row["Case"]).strip(),
+                        case_id,
+                    )
+                    cat = case["category"]
+                    if cat not in categories:
+                        categories[cat] = []
+                    categories[cat].append(case)
+
+                for cat, cases in categories.items():
+                    with st.expander(f"{cat}", expanded=False):
+                        for i, case in enumerate(cases, 1):
+                            st.markdown(f"**{i}. {case['label']}**")
+                            st.markdown(
+                                f"<div style='color:#cfe1ff;font-size:0.95rem;line-height:1.55;'>{case['query']}</div>",
+                                unsafe_allow_html=True,
+                            )
+                            case_key = case["id"] or f"{cat}_{i}"
+                            if st.button(_tr("运行用例", "Run Case"), key=f"run_case_v2_{case_key}", width="stretch"):
+                                st.session_state["pending_question"] = case["query"]
+                                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to load test case files: {e}")
+
+
+def _render_sidebar_thread_history_list(current_user_id: str, current_tid: str, user_threads: list[dict]) -> None:
+    st.session_state.setdefault("sidebar_threads_show_all", False)
+    st.session_state.setdefault("sidebar_thread_rename_target", "")
+    st.session_state.setdefault("sidebar_thread_delete_target", "")
+    st.session_state.setdefault("sidebar_thread_menu_target", "")
+    st.session_state.setdefault("sidebar_thread_rename_input", "")
+
+    st.markdown(f"**{_tr('历史线程', 'History Threads')}**")
+    show_all_threads = bool(st.session_state.get("sidebar_threads_show_all", False))
+    rename_target = str(st.session_state.get("sidebar_thread_rename_target", "") or "").strip()
+    delete_target = str(st.session_state.get("sidebar_thread_delete_target", "") or "").strip()
+    menu_target = str(st.session_state.get("sidebar_thread_menu_target", "") or "").strip()
+    visible_threads = user_threads if show_all_threads else user_threads[: history_store.DEFAULT_THREAD_LIST_LIMIT]
+
+    for row in visible_threads:
+        tid = str(row.get("thread_id", "")).strip()
+        if not tid:
+            continue
+        title = history_store.resolve_thread_title(row)
+        is_current = tid == current_tid
+        button_key = f"thread_current_btn_v4_{tid}" if is_current else f"thread_item_btn_v4_{tid}"
+        if st.button(
+            title,
+            key=button_key,
+            width="stretch",
+            type="secondary",
+            help=title,
+        ):
+            if is_current:
+                st.session_state["sidebar_thread_menu_target"] = "" if menu_target == tid else tid
+                st.session_state["sidebar_thread_delete_target"] = ""
+                st.session_state["sidebar_thread_rename_target"] = ""
+                st.rerun()
+            else:
+                if st.session_state.get("is_running", False):
+                    app_logic.request_stop_active_run(thread_id=current_tid)
+                st.session_state["sidebar_thread_menu_target"] = ""
+                st.session_state["sidebar_thread_delete_target"] = ""
+                st.session_state["sidebar_thread_rename_target"] = ""
+                app_state.set_active_thread(tid)
+                history_store.bind_thread_to_user(current_user_id, tid)
+                st.rerun()
+
+        if menu_target == tid and is_current:
+            menu_cols = st.columns([0.56, 0.18, 0.18], gap="small")
+            with menu_cols[1]:
+                if st.button(_tr("重命名", "Rename"), key=f"thread_rename_inline_v6_{tid}"):
+                    st.session_state["sidebar_thread_rename_target"] = tid
+                    st.session_state["sidebar_thread_delete_target"] = ""
+                    st.session_state["sidebar_thread_rename_input"] = title
+                    st.rerun()
+            with menu_cols[2]:
+                if st.button(_tr("删除", "Delete"), key=f"thread_delete_inline_v6_{tid}"):
+                    st.session_state["sidebar_thread_delete_target"] = tid
+                    st.session_state["sidebar_thread_rename_target"] = ""
+                    st.rerun()
+
+        if rename_target == tid:
+            current_draft = str(st.session_state.get("sidebar_thread_rename_input", "") or title)
+            new_title = st.text_input(
+                _tr("线程标题", "Thread title"),
+                value=current_draft,
+                key=f"rename_thread_input_v7_{tid}",
+                label_visibility="collapsed",
+                placeholder=_tr("输入线程标题", "Enter thread title"),
+            )
+            st.session_state["sidebar_thread_rename_input"] = new_title
+            rename_cols = st.columns([0.62, 0.18, 0.20], gap="small")
+            with rename_cols[1]:
+                if st.button(_tr("保存", "Save"), key=f"rename_thread_save_v7_{tid}"):
+                    try:
+                        history_store.rename_user_thread(current_user_id, tid, new_title)
+                    except ValueError as exc:
+                        st.warning(str(exc))
+                    else:
+                        st.session_state["sidebar_thread_rename_target"] = ""
+                        st.session_state["sidebar_thread_rename_input"] = ""
+                        st.session_state["sidebar_thread_menu_target"] = ""
+                        st.rerun()
+            with rename_cols[2]:
+                if st.button(_tr("取消", "Cancel"), key=f"rename_thread_cancel_v7_{tid}"):
+                    st.session_state["sidebar_thread_rename_target"] = ""
+                    st.session_state["sidebar_thread_rename_input"] = ""
+                    st.session_state["sidebar_thread_menu_target"] = ""
+                    st.rerun()
+
+        if delete_target == tid:
+            st.caption(
+                _tr(
+                    f"删除 `{title}`？该操作会移除历史和工作区文件。",
+                    f"Delete `{title}`? This removes history and workspace files.",
+                )
+            )
+            delete_cols = st.columns([0.56, 0.16, 0.20], gap="small")
+            with delete_cols[1]:
+                if st.button(_tr("删除", "Delete"), key=f"delete_thread_confirm_v8_{tid}"):
+                    if st.session_state.get("is_running", False):
+                        app_logic.request_stop_active_run(thread_id=tid, detach_session=True)
+                    delete_result = history_store.delete_user_thread(
+                        current_user_id,
+                        tid,
+                        delete_workspace=True,
+                    )
+                    remaining = history_store.list_user_threads(current_user_id, limit=100)
+                    remaining_ids = [str(item.get("thread_id")) for item in remaining if item.get("thread_id")]
+                    if not remaining_ids:
+                        new_thread_id = history_store.generate_thread_id(current_user_id)
+                        history_store.bind_thread_to_user(current_user_id, new_thread_id)
+                        app_state.set_active_thread(new_thread_id)
+                    elif tid == current_tid:
+                        app_state.set_active_thread(remaining_ids[0])
+                    st.session_state["sidebar_thread_delete_target"] = ""
+                    st.session_state["sidebar_thread_menu_target"] = ""
+                    if delete_result.get("deleted"):
+                        st.success(_tr("线程已删除。", "Thread deleted."))
+                    else:
+                        st.warning(_tr("未找到可删除的线程记录。", "No thread record was deleted."))
+                    st.rerun()
+            with delete_cols[2]:
+                if st.button(_tr("取消", "Cancel"), key=f"delete_thread_cancel_v8_{tid}"):
+                    st.session_state["sidebar_thread_delete_target"] = ""
+                    st.session_state["sidebar_thread_menu_target"] = ""
+                    st.rerun()
+
+    if len(user_threads) > history_store.DEFAULT_THREAD_LIST_LIMIT:
+        toggle_label = _tr("收起", "Show less") if show_all_threads else _tr("查看更多", "Show more")
+        if st.button(toggle_label, key="sidebar_threads_toggle_btn_v3", width="stretch"):
+            st.session_state["sidebar_threads_show_all"] = not show_all_threads
+            st.rerun()
+
+
+def _validate_gee_project_for_current_runtime(project_id: str) -> tuple[bool, str]:
+    value = str(project_id or "").strip()
+    if not value:
+        return False, "Project ID is empty."
+    try:
+        import ee
+
+        ee.Initialize(project=value)
+        return True, ""
+    except Exception as exc:  # noqa: BLE001
+        return False, str(exc)
+
+
+def _query_param_value(name: str) -> str:
+    try:
+        raw = st.query_params.get(name, "")
+    except Exception:
+        return ""
+    if isinstance(raw, list):
+        return str(raw[0] if raw else "").strip()
+    return str(raw or "").strip()
+
+
+def _clear_gee_oauth_query_params() -> None:
+    try:
+        if "gee_oauth" in st.query_params:
+            del st.query_params["gee_oauth"]
+        if "code" in st.query_params:
+            del st.query_params["code"]
+        if "state" in st.query_params:
+            del st.query_params["state"]
+        if "error" in st.query_params:
+            del st.query_params["error"]
+    except Exception:
+        pass
+
+
+def _handle_gee_oauth_callback(current_user_id: str) -> None:
+    expected_state = str(st.session_state.get("gee_oauth_state") or "")
+    state = _query_param_value("state")
+    if _query_param_value("gee_oauth") != "1" and not expected_state and not state:
+        return
+    error = _query_param_value("error")
+    if error:
+        st.error(f"Google OAuth failed: {error}")
+        _clear_gee_oauth_query_params()
+        return
+    code = _query_param_value("code")
+    if not code:
+        return
+    try:
+        profile = gee_auth.complete_oauth_callback(
+            user_id=current_user_id,
+            code=code,
+            expected_state=expected_state,
+            received_state=state,
+            history_store_module=history_store,
+        )
+        connected_user_id = str(profile.get("user_id") or current_user_id)
+        st.session_state["gee_oauth_state"] = ""
+        st.session_state["gee_oauth_url"] = ""
+        app_state.sync_gee_profile_state(connected_user_id)
+        st.success("认证成功，请关闭此页面，回到原来的网页。")
+        components.html(gee_auth.popup_close_html("认证成功，请关闭此页面，回到原来的网页。"), height=160)
+    except Exception as exc:  # noqa: BLE001
+        existing_profile = {}
+        try:
+            state_payload = gee_auth.verify_oauth_state(state) if state else {}
+            existing_user_id = str(state_payload.get("user_id") or current_user_id or "").strip()
+            if existing_user_id:
+                existing_profile = history_store.get_user_gee_profile(existing_user_id)
+        except Exception:
+            existing_profile = {}
+        message = gee_auth.oauth_failure_message(exc, existing_profile=existing_profile)
+        st.error(message)
+        components.html(gee_auth.popup_close_html(message), height=160)
+    finally:
+        _clear_gee_oauth_query_params()
+        st.stop()
+
+
+def _validate_gee_project_with_profile(project_id: str, profile: dict) -> tuple[bool, str]:
+    value = str(project_id or "").strip()
+    if not value:
+        return False, "Project ID is empty."
+    try:
+        import ee
+
+        encrypted = str(profile.get("encrypted_refresh_token") or "").strip()
+        if encrypted:
+            refresh_token = gee_auth.decrypt_refresh_token(encrypted)
+            scopes = str(profile.get("token_scopes") or "").split() or None
+            credentials = gee_auth.credentials_from_refresh_token(refresh_token, scopes=scopes)
+            ee.Initialize(credentials=credentials, project=value)
+        else:
+            ee.Initialize(project=value)
+        return True, ""
+    except Exception as exc:  # noqa: BLE001
+        return False, str(exc)
+
+
+def _render_gee_pipeline_panel(current_user_id: str) -> None:
+    _handle_gee_oauth_callback(current_user_id)
+    profile = app_state.sync_gee_profile_state(current_user_id)
+    default_project = str(profile.get("default_project_id") or "").strip()
+    current_project = str(profile.get("gee_project_id") or "").strip()
+    current_mode = str(profile.get("mode") or "default").strip()
+    mode_options = ["default", "user"]
+    mode_labels = {
+        "default": "Default pipeline",
+        "user": "My GEE pipeline (recommended)",
+    }
+
+    with st.expander("GEE Pipeline", expanded=False):
+        st.caption(f"Active: {mode_labels.get(current_mode, current_mode)}")
+        st.caption(f"Project: {profile.get('effective_project_id') or 'not configured'}")
+        last_error = str(profile.get("last_error") or "").strip()
+        if last_error:
+            st.caption(f"Last error: {last_error}")
+        if profile.get("oauth_connected"):
+            st.caption(f"Google account: {profile.get('google_email') or 'connected'}")
+        elif current_mode == "user":
+            st.caption("Google OAuth is required before user-owned GEE execution is fully isolated.")
+
+        selected_mode = st.radio(
+            "Pipeline",
+            mode_options,
+            index=mode_options.index(current_mode) if current_mode in mode_options else 0,
+            format_func=lambda value: mode_labels.get(value, value),
+            key="gee_pipeline_mode_input_v1",
+            label_visibility="collapsed",
+        )
+        user_project = st.text_input(
+            "GEE Project ID",
+            value=current_project,
+            placeholder="my-earthengine-project",
+            key="gee_project_id_input_v1",
+            help="Use your own Earth Engine enabled Google Cloud project. OAuth credentials will be added in the next stage.",
+        )
+        st.caption(f"Default project: {default_project or 'not configured'}")
+
+        oauth_connected = bool(profile.get("oauth_connected"))
+        oauth_label = gee_auth.oauth_action_label(oauth_connected, selected_mode)
+        if not gee_auth.oauth_configured():
+            st.caption("OAuth not configured. Set GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, and NTL_TOKEN_ENCRYPTION_KEY.")
+        elif oauth_label:
+            if st.button(oauth_label, key="gee_oauth_connect_btn_v2", width="stretch"):
+                state = gee_auth.generate_oauth_state(current_user_id)
+                st.session_state["gee_oauth_state"] = state
+                oauth_url = gee_auth.build_authorization_url(state)
+                st.session_state["gee_oauth_url"] = oauth_url
+                components.html(gee_auth.popup_authorization_html(oauth_url), height=0)
+
+        if st.button("Save & Validate", key="gee_profile_save_validate_btn_v1", width="stretch"):
+            target_project = user_project.strip() if selected_mode == "user" else ""
+            if selected_mode == "user" and not target_project:
+                history_store.save_user_gee_profile(
+                    current_user_id,
+                    mode=selected_mode,
+                    gee_project_id=target_project,
+                    status="default",
+                    last_error="User pipeline needs a GEE Project ID.",
+                )
+                app_state.sync_gee_profile_state(current_user_id)
+                st.warning("User pipeline needs a GEE Project ID. Falling back to default.")
+                st.rerun()
+
+            saved_profile = history_store.save_user_gee_profile(
+                current_user_id,
+                mode=selected_mode,
+                gee_project_id=target_project,
+                status="configured",
+                last_error="",
+            )
+            project_to_validate = target_project if selected_mode == "user" else default_project
+            validation_profile = saved_profile if selected_mode == "user" else {}
+            ok, error = _validate_gee_project_with_profile(project_to_validate, validation_profile)
+            history_store.save_user_gee_profile(
+                current_user_id,
+                mode=selected_mode,
+                gee_project_id=target_project,
+                status="validated" if ok else "error",
+                last_error="" if ok else error[:500],
+                validated_at=int(time.time()) if ok else 0,
+            )
+            app_state.sync_gee_profile_state(current_user_id)
+            if ok:
+                st.success("GEE pipeline saved and validated.")
+            else:
+                st.error("GEE validation failed. Check project ID, API enablement, and IAM.")
+            st.rerun()
+
+
+def render_sidebar():
+    """Render sidebar with authenticated user accounts."""
+    with st.sidebar:
+        st.subheader(_tr("NTL-Claw 控制台", "NTL-Claw Console"))
+
+        if not st.session_state.get("authenticated"):
+            _render_auth_panel()
+            return
+
+        workspace = storage_manager.get_workspace(st.session_state.get("thread_id", "debug"))
+        current_user_id = str(st.session_state.get("user_id", "") or "").strip()
+        current_user_name = str(st.session_state.get("user_name", "") or "").strip()
+        st.caption(f"{_tr('当前用户', 'Current user')}: {current_user_name}")
+        if st.button(_tr("退出登录", "Logout"), key="logout_btn_v3", width="stretch"):
+            _logout_sidebar_session()
+
+        _render_gee_pipeline_panel(current_user_id)
+
+        user_threads = history_store.list_user_threads(current_user_id, limit=100)
+        thread_ids = [str(row.get("thread_id")) for row in user_threads if row.get("thread_id")]
+        thread_ids = [tid for tid in thread_ids if tid]
+        current_tid = str(st.session_state.get("thread_id", "debug") or "debug")
+
+        if not thread_ids:
+            new_thread_id = history_store.generate_thread_id(current_user_id)
+            app_state.set_active_thread(new_thread_id)
+            history_store.bind_thread_to_user(current_user_id, new_thread_id)
+            st.rerun()
+
+        if current_tid not in thread_ids:
+            app_state.set_active_thread(thread_ids[0])
+            st.rerun()
+
+        current_model = st.session_state.get("cfg_model", app_state.MODEL_OPTIONS[0])
+        if current_model not in app_state.MODEL_OPTIONS:
+            current_model = app_state.MODEL_OPTIONS[0]
+            st.session_state["cfg_model"] = current_model
+        if st.session_state.get("model_selector") not in app_state.MODEL_OPTIONS:
+            st.session_state["model_selector"] = current_model
+        selected_model = st.selectbox(
+            _tr("模型", "Model"),
+            app_state.MODEL_OPTIONS,
+            index=app_state.MODEL_OPTIONS.index(current_model),
+            key="model_selector",
+        )
+        current_thread_running = _is_current_thread_running()
+        current_thread_stopping = _is_current_thread_stopping()
+        if selected_model != current_model:
+            if current_thread_running and not current_thread_stopping:
+                st.session_state["pending_model_change"] = selected_model
+                st.session_state["model_selector"] = current_model
+                st.info(
+                    _tr(
+                        "模型变更已暂存，将在当前任务结束后生效。",
+                        "Model change queued and will apply after current run finishes.",
+                    )
+                )
+            else:
+                st.session_state["cfg_model"] = selected_model
+                st.session_state["pending_model_change"] = None
+                current_model = selected_model
+        pending_model = str(st.session_state.get("pending_model_change") or "").strip()
+        if pending_model and current_thread_running and not current_thread_stopping:
+            st.caption(_tr(f"待生效模型: {pending_model}", f"Pending model: {pending_model}"))
+        selected_model = current_model
+
+        selected_model_config = model_config.get_model_config(selected_model)
+        key_label = selected_model_config.key_label
+        use_env_api_key = selected_model_config.uses_env_api_key
+        env_api_key = model_config.get_env_api_key(selected_model)
+        missing_model_env = model_config.missing_env_for_model(selected_model)
+        user_api_key = ""
+        if use_env_api_key:
+            if missing_model_env:
+                missing_text = ", ".join(missing_model_env)
+                st.warning(
+                    _tr(
+                        f"未检测到 .env 中的 {missing_text}，激活会失败。",
+                        f"{missing_text} not found in .env; activation will fail.",
+                    )
+                )
+        else:
+            user_api_key = st.text_input(
+                label=_tr(f"输入 {key_label}", f"Enter {key_label}"),
+                type="password",
+                help=_tr("激活系统所必需。", "Required to activate the agent system."),
+                key="user_api_key_input",
+            )
+
+        action_cols = st.columns(3, gap="small")
+        with action_cols[0]:
+            if st.button(
+                _tr("激活", "Activate"),
+                key="activate_btn_v3",
+                width="stretch",
+                type="secondary",
+            ):
+                effective_api_key = ""
+                can_activate = True
+                if use_env_api_key:
+                    effective_api_key = env_api_key
+                    if missing_model_env or not effective_api_key:
+                        missing_text = ", ".join(missing_model_env or [selected_model_config.api_key_env or "API key"])
+                        st.error(
+                            _tr(
+                                f"请先在 .env 中配置 {missing_text}。",
+                                f"Please set {missing_text} in .env first.",
+                            )
+                        )
+                        can_activate = False
+                else:
+                    effective_api_key = (user_api_key or "").strip()
+                    if not effective_api_key:
+                        st.error(_tr(f"请输入 {key_label}！", f"Please enter your {key_label}!"))
+                        can_activate = False
+
+                if can_activate and effective_api_key:
+                    if current_thread_running and not current_thread_stopping:
+                        st.session_state["pending_activate_request"] = {
+                            "user_api_key": effective_api_key,
+                            "model": selected_model,
+                        }
+                        st.info(
+                            _tr(
+                                "激活请求已暂存，将在当前任务结束后自动生效。",
+                                "Activate request queued and will apply after current run finishes.",
+                            )
+                        )
+                    else:
+                        st.session_state["user_api_key"] = effective_api_key
+                        st.session_state["initialized"] = True
+                        app_logic.ensure_conversation_initialized()
+                        st.success(_tr("已激活！", "Activated!"))
+                        st.rerun()
+
+        with action_cols[1]:
+            if st.button(
+                _tr("新建", "New"),
+                key="reset_btn_v3",
+                width="stretch",
+                type="secondary",
+            ):
+                if st.session_state.get("is_running", False):
+                    app_logic.request_stop_active_run()
+                st.cache_resource.clear()
+                st.session_state["initialized"] = False
+                st.session_state.chat_history = []
+                st.session_state.analysis_logs = []
+                st.session_state.analysis_history = []
+                st.session_state.last_question = ""
+                st.session_state["cancel_requested"] = False
+                st.session_state["stopping"] = False
+
+                if "user_api_key" in st.session_state:
+                    del st.session_state["user_api_key"]
+
+                new_thread_id = history_store.generate_thread_id(current_user_id)
+                app_state.set_active_thread(new_thread_id)
+                history_store.bind_thread_to_user(current_user_id, new_thread_id)
+                st.warning(_tr("已创建新会话。", "New session created."))
+                st.rerun()
+
+        with action_cols[2]:
+            if st.button(
+                _tr("中断", "Stop"),
+                key="interrupt_current_run_btn_v3",
+                width="stretch",
+                type="secondary",
+                help=_tr("请求立即中断当前回答。", "Request immediate interruption of the current run."),
+            ):
+                if st.session_state.get("is_running", False):
+                    app_logic.request_stop_active_run(detach_session=True)
+                    st.rerun()
+
+        if (not current_thread_running) or current_thread_stopping:
+            pending_model = str(st.session_state.get("pending_model_change") or "").strip()
+            if pending_model and pending_model in app_state.MODEL_OPTIONS:
+                st.session_state["cfg_model"] = pending_model
+                st.session_state["model_selector"] = pending_model
+                st.session_state["pending_model_change"] = None
+            pending_activate = st.session_state.get("pending_activate_request")
+            if isinstance(pending_activate, dict):
+                pending_key = str(pending_activate.get("user_api_key") or "").strip()
+                pending_model_from_activate = str(pending_activate.get("model") or "").strip()
+                if pending_model_from_activate in app_state.MODEL_OPTIONS:
+                    st.session_state["cfg_model"] = pending_model_from_activate
+                    st.session_state["model_selector"] = pending_model_from_activate
+                if pending_key:
+                    st.session_state["user_api_key"] = pending_key
+                    st.session_state["initialized"] = True
+                    app_logic.ensure_conversation_initialized()
+                st.session_state["pending_activate_request"] = None
+                st.success(_tr("待生效设置已应用。", "Queued settings applied."))
+                st.rerun()
+
+        _render_sidebar_thread_history_list(current_user_id, current_tid, user_threads)
+
+        status = _tr("已激活", "Active") if st.session_state.get("initialized") else _tr("未激活", "Inactive")
+        status_class = "active" if st.session_state.get("initialized") else "inactive"
+        limit_snapshot = app_logic.get_run_limit_snapshot(current_user_id)
+        global_limit = int(limit_snapshot.get("global_limit", 0) or 0)
+        user_limit = int(limit_snapshot.get("user_limit", 0) or 0)
+        global_usage = (
+            f"{int(limit_snapshot.get('global_active', 0) or 0)}/{global_limit}"
+            if global_limit
+            else f"{int(limit_snapshot.get('global_active', 0) or 0)}/∞"
+        )
+        user_usage = (
+            f"{int(limit_snapshot.get('user_active', 0) or 0)}/{user_limit}"
+            if user_limit
+            else f"{int(limit_snapshot.get('user_active', 0) or 0)}/∞"
+        )
+        st.markdown(
+            (
+                "<div class='ntl-thread-status-row'>"
+                f"<span class='ntl-thread-status-item'><span>{_tr('线程 ID', 'Thread ID')}:</span>"
+                f"<span class='ntl-thread-status-value'>{st.session_state.thread_id}</span></span>"
+                f"<span class='ntl-thread-status-item'><span>{_tr('状态', 'Status')}:</span>"
+                f"<span class='ntl-status-text {status_class}'>{status}</span></span>"
+                "</div>"
+                "<div class='ntl-thread-quota-row'>"
+                f"<span class='ntl-thread-quota-pill'><span>MAX_RUNS</span><strong>{global_usage}</strong></span>"
+                f"<span class='ntl-thread-quota-pill'><span>MAX_RUNS_PER_USER</span><strong>{user_usage}</strong></span>"
+                "</div>"
+            ),
+            unsafe_allow_html=True,
+        )
+        st.markdown("<hr style='margin: 8px 0;'>", unsafe_allow_html=True)
+
+        with st.expander("NTL Data Availability", expanded=False):
+            _render_data_availability_block()
+
+        with st.expander(_tr("测试用例", "Test Cases"), expanded=False):
+            try:
+                case_files = list(_TEST_CASE_FILES)
+                loaded_names = []
+                frames = []
+                for fp in case_files:
+                    if fp.exists():
+                        frames.append(pd.read_excel(fp))
+                        loaded_names.append(fp.name)
+
+                if not frames:
+                    expected = ", ".join(str(p) for p in case_files)
+                    raise FileNotFoundError(f"No test case file found. Expected one of: {expected}")
+
+                df_cases = pd.concat(frames, ignore_index=True)
+                df_cases = df_cases.dropna(subset=["Case"])
+                df_cases = df_cases.drop_duplicates(subset=["Case"], keep="first")
+                df_cases["Category"] = df_cases["Category"].fillna("General").astype(str)
+                df_cases["Label"] = df_cases["Label"].fillna("Unnamed Task").astype(str)
+                categories = {}
+                for _, row in df_cases.iterrows():
+                    case_id = _test_case_id_from_row(row)
+                    case = _localized_test_case(
+                        row["Category"].strip(),
+                        row["Label"].strip(),
+                        str(row["Case"]).strip(),
+                        case_id,
+                    )
+                    cat = case["category"]
+                    if cat not in categories:
+                        categories[cat] = []
+                    categories[cat].append(case)
+
+                for cat, cases in categories.items():
+                    with st.expander(f"{cat}", expanded=False):
+                        for i, case in enumerate(cases, 1):
+                            st.markdown(f"**{i}. {case['label']}**")
+                            st.markdown(
+                                f"<div style='color:#cfe1ff;font-size:0.95rem;line-height:1.55;'>{case['query']}</div>",
+                                unsafe_allow_html=True,
+                            )
+                            case_key = case["id"] or f"{cat}_{i}"
+                            if st.button(_tr("运行用例", "Run Case"), key=f"run_case_v3_{case_key}", width="stretch"):
+                                st.session_state["pending_question"] = case["query"]
+                                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to load test case files: {e}")
+
 
 def render_download_center():
     """Render input/output download center in sidebar."""
@@ -2815,8 +4250,12 @@ def show_history(
         elif role == "assistant":
             st.write(BOT_TEMPLATE.replace("{{MSG}}", content), unsafe_allow_html=True)
         elif role == "assistant_img":
-            file_name = os.path.basename(content)
-            st.image(content, width=600, caption=_tr(f"图像结果: {file_name}", f"Plot: {file_name}"))
+            file_name = Path(str(content)).name or os.path.basename(str(content))
+            _render_image_artifact(
+                content,
+                key_prefix=f"chat_img_{i}",
+                caption=_tr(f"图像结果: {file_name}", f"Plot: {file_name}"),
+            )
         elif role == "assistant_table":
             file_name = os.path.basename(content)
             try:
@@ -4085,12 +5524,14 @@ def _render_output_workspace_mismatch_notice():
 def _render_output_preview():
     workspace = storage_manager.get_workspace(st.session_state.get("thread_id", "debug"))
     output_dir = workspace / "outputs"
-    files = [f for f in output_dir.glob("*.*") if f.is_file()] if output_dir.exists() else []
+    files = [f for f in output_dir.rglob("*") if f.is_file()] if output_dir.exists() else []
+    files = sorted(files, key=lambda p: (p.parent.as_posix(), p.name.lower()))
     if not files:
         st.info(_tr("暂无输出文件。", "No output files available."))
         return
 
     selected = st.selectbox(_tr("预览输出文件", "Preview Output"), options=files, format_func=lambda p: p.name)
+    st.caption(_artifact_display_ref(selected))
     suffix = selected.suffix.lower()
     if suffix == ".csv":
         try:
@@ -4098,8 +5539,12 @@ def _render_output_preview():
             st.dataframe(df, width="stretch", height=360)
         except Exception as e:
             st.error(_tr(f"预览失败 {selected.name}: {e}", f"Failed to preview {selected.name}: {e}"))
-    elif suffix in [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"]:
-        st.image(str(selected), width="stretch")
+    elif suffix in IMAGE_PREVIEW_SUFFIXES:
+        _render_image_artifact(
+            selected,
+            key_prefix="output_preview",
+            caption=_tr(f"预览: {selected.name}", f"Preview: {selected.name}"),
+        )
     elif suffix in [".tif", ".tiff"]:
         with rasterio.open(selected) as src:
             st.caption(f"CRS: {src.crs} | Size: {src.width} x {src.height} | Bands: {src.count}")
@@ -4537,6 +5982,23 @@ def render_content_layout():
                 reason = str(run_result.get("reason") or "")
                 if reason == "thread_run_in_progress":
                     st.info(_tr("当前线程已有运行中的任务。", "A task is already running for this thread."))
+                elif reason in {"global_run_limit_reached", "user_run_limit_reached"}:
+                    limit = run_result.get("limit", "?")
+                    active_runs = run_result.get("active_runs", "?")
+                    scope_cn = "当前用户" if reason == "user_run_limit_reached" else "系统"
+                    scope_en = "user" if reason == "user_run_limit_reached" else "system"
+                    toast_text = _tr(
+                        f"{scope_cn}并发任务数已达上限（{active_runs}/{limit}）。",
+                        f"The {scope_en} active run limit is reached ({active_runs}/{limit}).",
+                    )
+                    if hasattr(st, "toast"):
+                        st.toast(toast_text, icon="⚠️")
+                    st.warning(
+                        _tr(
+                            f"{scope_cn}并发任务数已达上限（{active_runs}/{limit}），请等待运行中的任务完成。",
+                            f"The {scope_en} active run limit is reached ({active_runs}/{limit}). Please wait for a running task to finish.",
+                        )
+                    )
                 elif reason == "conversation_uninitialized":
                     st.warning(
                         _tr(

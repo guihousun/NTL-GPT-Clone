@@ -43,6 +43,7 @@ dependencies:
       - geemap==0.36.1
       - google-api-python-client==2.178.0
       - google-cloud-bigquery==3.40.0
+      - cryptography==46.0.7
       - db-dtypes==1.5.0
       - langchain==1.2.10
       - langchain-core==1.2.16
@@ -56,9 +57,11 @@ dependencies:
       - langgraph==1.0.9
       - langgraph-prebuilt==1.0.8
       - langgraph-checkpoint==3.0.1
+      - langgraph-checkpoint-postgres==3.0.1
       - langgraph-sdk==0.3.3
       - langgraph-supervisor==0.0.31
       - opencv-python==4.13.0.92
+      - psycopg-binary==3.3.3
       - pmdarima==2.0.4
       - pymannkendall==1.4.3
       - pyresample==1.35.0

@@ -22,12 +22,24 @@ from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 from dotenv import dotenv_values
 
-from storage_manager import current_thread_id, storage_manager
+from storage_manager import (
+    current_gee_encrypted_refresh_token,
+    current_gee_project_id,
+    current_gee_token_scopes,
+    current_thread_id,
+    storage_manager,
+)
 
 DEFAULT_GEE_PROJECT = "empyrean-caster-430308-m2"
 
 
 def _gee_project_id() -> str:
+    context_project_id = str(current_gee_project_id.get() or "").strip()
+    if context_project_id:
+        return context_project_id
+    active_project_id = str(os.getenv("NTL_ACTIVE_GEE_PROJECT_ID", "") or "").strip()
+    if active_project_id:
+        return active_project_id
     dotenv_path = Path(__file__).resolve().parents[1] / ".env"
     project_id = ""
     if dotenv_path.exists():
@@ -35,6 +47,35 @@ def _gee_project_id() -> str:
     if not project_id:
         project_id = str(os.getenv("GEE_DEFAULT_PROJECT_ID") or "").strip()
     return project_id or DEFAULT_GEE_PROJECT
+
+
+def _active_gee_credentials():
+    encrypted = str(current_gee_encrypted_refresh_token.get() or os.getenv("NTL_ACTIVE_GEE_ENCRYPTED_REFRESH_TOKEN", "") or "").strip()
+    if not encrypted:
+        return None
+    import gee_auth
+
+    refresh_token = gee_auth.decrypt_refresh_token(encrypted)
+    scopes_text = str(current_gee_token_scopes.get() or os.getenv("NTL_ACTIVE_GEE_TOKEN_SCOPES", "") or "").strip()
+    scopes = scopes_text.split() if scopes_text else None
+    return gee_auth.credentials_from_refresh_token(refresh_token, scopes=scopes)
+
+
+def _patch_ee_initialize_for_active_credentials(code_block: str) -> str:
+    if not str(current_gee_encrypted_refresh_token.get() or os.getenv("NTL_ACTIVE_GEE_ENCRYPTED_REFRESH_TOKEN", "") or "").strip():
+        return code_block
+    code = str(code_block or "")
+    code = re.sub(
+        r"ee\.Initialize\(\s*project\s*=",
+        "ee.Initialize(credentials=ntl_ee_credentials, project=",
+        code,
+    )
+    code = re.sub(
+        r"ee\.Initialize\(\s*\)",
+        "ee.Initialize(credentials=ntl_ee_credentials, project=project_id)",
+        code,
+    )
+    return code
 
 GLOBAL_EXEC_CONTEXTS: Dict[str, Dict[str, Any]] = {}
 
@@ -1081,14 +1122,17 @@ def _execute_code(code_block: str) -> Tuple[bool, str, Optional[str], Optional[s
         return _execute_code_in_subprocess_sandbox(code_block)
 
     user_globals = _get_thread_context()
+    user_globals["_active_gee_credentials"] = _active_gee_credentials
     bootstrap = (
         "import ee\n"
         f"project_id = {_gee_project_id()!r}\n"
+        "ntl_ee_credentials = _active_gee_credentials()\n"
         "try:\n"
-        "    ee.Initialize(project=project_id)\n"
+        "    ee.Initialize(credentials=ntl_ee_credentials, project=project_id) if ntl_ee_credentials else ee.Initialize(project=project_id)\n"
         "except Exception:\n"
         "    pass\n"
     )
+    code_block = _patch_ee_initialize_for_active_credentials(code_block)
 
     buf = io.StringIO()
     try:
@@ -1153,6 +1197,15 @@ def _build_sandbox_env(thread_id: str, code_path: Path) -> Dict[str, str]:
     env["PYTHONUTF8"] = "1"
     env["NTL_THREAD_ID"] = str(thread_id)
     env["NTL_CODE_PATH"] = str(code_path)
+    active_project_id = str(current_gee_project_id.get() or "").strip()
+    if active_project_id:
+        env["NTL_ACTIVE_GEE_PROJECT_ID"] = active_project_id
+    encrypted_refresh_token = str(current_gee_encrypted_refresh_token.get() or "").strip()
+    if encrypted_refresh_token:
+        env["NTL_ACTIVE_GEE_ENCRYPTED_REFRESH_TOKEN"] = encrypted_refresh_token
+    token_scopes = str(current_gee_token_scopes.get() or "").strip()
+    if token_scopes:
+        env["NTL_ACTIVE_GEE_TOKEN_SCOPES"] = token_scopes
     return env
 
 
@@ -1186,12 +1239,21 @@ def _execute_code_in_subprocess_sandbox(
 
     bootstrap = (
         "import ee\n"
+        "import os\n"
         f"project_id = {_gee_project_id()!r}\n"
+        "ntl_ee_credentials = None\n"
+        "encrypted = os.environ.get('NTL_ACTIVE_GEE_ENCRYPTED_REFRESH_TOKEN', '').strip()\n"
+        "if encrypted:\n"
+        "    import gee_auth\n"
+        "    refresh_token = gee_auth.decrypt_refresh_token(encrypted)\n"
+        "    scopes = os.environ.get('NTL_ACTIVE_GEE_TOKEN_SCOPES', '').split() or None\n"
+        "    ntl_ee_credentials = gee_auth.credentials_from_refresh_token(refresh_token, scopes=scopes)\n"
         "try:\n"
-        "    ee.Initialize(project=project_id)\n"
+        "    ee.Initialize(credentials=ntl_ee_credentials, project=project_id) if ntl_ee_credentials else ee.Initialize(project=project_id)\n"
         "except Exception:\n"
         "    pass\n"
     )
+    code_block = _patch_ee_initialize_for_active_credentials(code_block)
     runner = (
         "import os\n"
         "import traceback\n"

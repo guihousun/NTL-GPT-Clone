@@ -65,6 +65,7 @@ RAG/Solution_RAG.zip
 RAG/*.zip
 RAG/code_guide/earthengine-api-master/
 RAG/code_guide/pytest/
+RAG/code_guide/tools_latest_runtime/
 
 # Local credentials
 tools/bigquery/*.json

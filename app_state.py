@@ -1,4 +1,5 @@
 import streamlit as st
+from pathlib import Path
 
 import history_store
 from model_config import MODEL_OPTIONS
@@ -14,16 +15,56 @@ def _new_thread_id_for_user(user_id: str) -> str:
     return history_store.generate_thread_id(user_id)
 
 
+def _pending_thread_id() -> str:
+    return _new_thread_id_for_user("pending")
+
+
 def _load_chat_history_for_thread(thread_id: str):
     records = history_store.load_chat_records(thread_id, limit=400)
+    workspace = storage_manager.get_workspace(thread_id)
     out = []
     for row in records:
         role = str(row.get("role", "")).strip()
         content = str(row.get("content", "") or "")
         if not role or not content.strip():
             continue
+        if role == "assistant_img":
+            try:
+                content_path = Path(content)
+                if content_path.is_absolute():
+                    content = content_path.resolve().relative_to(workspace.resolve()).as_posix()
+            except Exception:
+                pass
         out.append((role, content))
     return out
+
+
+def sync_gee_profile_state(user_id: str | None = None) -> dict:
+    uid = str(user_id or st.session_state.get("user_id", "") or "").strip()
+    if not uid:
+        profile = {
+            "mode": "default",
+            "gee_project_id": "",
+            "effective_project_id": "",
+            "source": "default",
+            "status": "unvalidated",
+            "last_error": "",
+            "default_project_id": "",
+            "user_project_configured": False,
+        }
+    else:
+        profile = history_store.get_user_gee_profile(uid)
+    st.session_state["gee_pipeline_mode"] = str(profile.get("mode") or "default")
+    st.session_state["gee_project_id"] = str(profile.get("gee_project_id") or "")
+    st.session_state["gee_effective_project_id"] = str(profile.get("effective_project_id") or "")
+    st.session_state["gee_profile_source"] = str(profile.get("source") or "default")
+    st.session_state["gee_profile_status"] = str(profile.get("status") or "unvalidated")
+    st.session_state["gee_profile_last_error"] = str(profile.get("last_error") or "")
+    st.session_state["gee_default_project_id"] = str(profile.get("default_project_id") or "")
+    st.session_state["gee_user_project_configured"] = bool(profile.get("user_project_configured"))
+    st.session_state["gee_oauth_connected"] = bool(profile.get("oauth_connected"))
+    st.session_state["gee_google_email"] = str(profile.get("google_email") or "")
+    return profile
 
 
 def set_active_thread(thread_id: str):
@@ -46,36 +87,48 @@ def init_app():
     st.session_state.setdefault("initialized", False)
     st.session_state.setdefault("chat_history", [])
     st.session_state.setdefault("run_counter", 0)
-
-    user_identity_migrated = False
-    existing_user_id = str(st.session_state.get("user_id", "") or "").strip()
-    if not existing_user_id or history_store.is_reserved_user_id(existing_user_id):
-        st.session_state["user_id"] = history_store.generate_anonymous_user_id()
-        st.session_state["user_name"] = ""
-        user_identity_migrated = True
-    else:
-        st.session_state.setdefault("user_name", history_store.user_display_name(existing_user_id))
-        current_user_name = str(st.session_state.get("user_name", "") or "").strip()
-        if not current_user_name or history_store.is_reserved_user_name(current_user_name):
-            if str(existing_user_id).startswith("anon-"):
-                st.session_state["user_name"] = ""
-            else:
-                st.session_state["user_name"] = history_store.user_display_name(existing_user_id)
+    st.session_state.setdefault("authenticated", False)
+    st.session_state.setdefault("auth_user_id", "")
+    st.session_state.setdefault("auth_username", "")
 
     st.session_state.setdefault("injected_context_top_n", 4)
     st.session_state.setdefault("injected_context_max_chars", 6000)
 
-    if "thread_id" not in st.session_state or user_identity_migrated:
-        st.session_state.thread_id = _new_thread_id_for_user(st.session_state["user_id"])
+    authed_user_id = str(st.session_state.get("auth_user_id", "") or "").strip()
+    authed_username = str(st.session_state.get("auth_username", "") or "").strip()
+    if not st.session_state.get("authenticated") or not authed_user_id:
+        st.session_state["authenticated"] = False
+        st.session_state["auth_user_id"] = ""
+        st.session_state["auth_username"] = ""
+        st.session_state["user_id"] = ""
+        st.session_state["user_name"] = ""
+        sync_gee_profile_state("")
+        st.session_state["initialized"] = False
+        if not str(st.session_state.get("thread_id", "") or "").strip():
+            st.session_state.thread_id = _pending_thread_id()
+        st.session_state.user_workspace = storage_manager.get_workspace(st.session_state.thread_id)
         st.session_state["chat_history"] = []
+    else:
+        st.session_state["user_id"] = authed_user_id
+        st.session_state["user_name"] = authed_username or history_store.user_display_name(authed_user_id)
+        current_thread_id = str(st.session_state.get("thread_id", "") or "").strip()
+        if (not current_thread_id) or (not history_store.thread_belongs_to_user(authed_user_id, current_thread_id)):
+            known_threads = history_store.list_user_threads(authed_user_id, limit=100)
+            if known_threads:
+                st.session_state.thread_id = str(known_threads[0].get("thread_id") or "")
+            else:
+                st.session_state.thread_id = _new_thread_id_for_user(authed_user_id)
+                history_store.bind_thread_to_user(authed_user_id, st.session_state.thread_id)
+            st.session_state["chat_history"] = []
 
-    st.session_state.user_workspace = storage_manager.get_workspace(st.session_state.thread_id)
-    history_store.ensure_user_profile(
-        st.session_state["user_id"], st.session_state.get("user_name", "")
-    )
-    history_store.bind_thread_to_user(st.session_state["user_id"], st.session_state.thread_id)
-    if not st.session_state.get("chat_history"):
-        st.session_state.chat_history = _load_chat_history_for_thread(st.session_state.thread_id)
+        st.session_state.user_workspace = storage_manager.get_workspace(st.session_state.thread_id)
+        history_store.ensure_user_profile(
+            st.session_state["user_id"], st.session_state.get("user_name", "")
+        )
+        history_store.bind_thread_to_user(st.session_state["user_id"], st.session_state.thread_id)
+        sync_gee_profile_state(st.session_state["user_id"])
+        if not st.session_state.get("chat_history"):
+            st.session_state.chat_history = _load_chat_history_for_thread(st.session_state.thread_id)
 
     st.session_state.setdefault("analysis_logs", [])
     st.session_state.setdefault("analysis_history", [])
@@ -94,6 +147,48 @@ def init_app():
     st.session_state.setdefault("pending_activate_request", None)
     st.session_state.setdefault("ui_force_refresh_once", False)
     st.session_state.setdefault("pending_map_focus_layer", None)
+
+
+def apply_authenticated_user(user_id: str, username: str) -> None:
+    st.session_state["authenticated"] = True
+    st.session_state["auth_user_id"] = str(user_id or "").strip()
+    st.session_state["auth_username"] = str(username or "").strip()
+    st.session_state["user_id"] = st.session_state["auth_user_id"]
+    st.session_state["user_name"] = st.session_state["auth_username"]
+    st.session_state["initialized"] = False
+    st.session_state["pending_activate_request"] = None
+    st.session_state["pending_model_change"] = None
+    sync_gee_profile_state(st.session_state["auth_user_id"])
+    if "user_api_key" in st.session_state:
+        del st.session_state["user_api_key"]
+
+    known_threads = history_store.list_user_threads(st.session_state["auth_user_id"], limit=100)
+    if known_threads:
+        set_active_thread(str(known_threads[0].get("thread_id") or ""))
+    else:
+        new_thread_id = _new_thread_id_for_user(st.session_state["auth_user_id"])
+        set_active_thread(new_thread_id)
+        history_store.bind_thread_to_user(st.session_state["auth_user_id"], new_thread_id)
+
+
+def clear_authenticated_user() -> None:
+    st.session_state["authenticated"] = False
+    st.session_state["auth_user_id"] = ""
+    st.session_state["auth_username"] = ""
+    st.session_state["user_id"] = ""
+    st.session_state["user_name"] = ""
+    st.session_state["initialized"] = False
+    st.session_state["chat_history"] = []
+    st.session_state["analysis_logs"] = []
+    st.session_state["analysis_history"] = []
+    st.session_state["last_question"] = ""
+    st.session_state["pending_activate_request"] = None
+    st.session_state["pending_model_change"] = None
+    sync_gee_profile_state("")
+    st.session_state["thread_id"] = _pending_thread_id()
+    st.session_state["user_workspace"] = storage_manager.get_workspace(st.session_state["thread_id"])
+    if "user_api_key" in st.session_state:
+        del st.session_state["user_api_key"]
 
 
 def reset_chat():

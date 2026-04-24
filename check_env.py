@@ -20,9 +20,22 @@ OPTIONAL_ENV = [
     "MINIMAX_API_KEY",
     "MINIMAX_Coding_URL",
     "GEE_DEFAULT_PROJECT_ID",
+    "GOOGLE_OAUTH_CLIENT_ID",
+    "GOOGLE_OAUTH_CLIENT_SECRET",
+    "GOOGLE_OAUTH_REDIRECT_URI",
+    "GOOGLE_OAUTH_SCOPES",
+    "NTL_TOKEN_ENCRYPTION_KEY",
     "EARTHDATA_TOKEN",
     "NTL_TOOL_PROFILE",
+    "NTL_USER_DATA_DIR",
+    "NTL_SHARED_DATA_DIR",
     "NTL_CONTEXTILY_TMP",
+    "NTL_MAX_ACTIVE_RUNS",
+    "NTL_MAX_ACTIVE_RUNS_PER_USER",
+    "NTL_LANGGRAPH_POSTGRES_URL",
+    "NTL_LANGGRAPH_POSTGRES_AUTO_SETUP",
+    "NTL_DEEPAGENTS_MEMORY_BACKEND",
+    "NTL_MEMORY_NAMESPACE_SCOPE",
 ]
 
 CORE_IMPORTS = {
@@ -89,14 +102,34 @@ def _check_imports() -> tuple[list[str], list[str]]:
     return ok, failed
 
 
+def _check_optional_postgres(env_snapshot: dict[str, str]) -> list[str]:
+    postgres_url = str(env_snapshot.get("NTL_LANGGRAPH_POSTGRES_URL") or os.getenv("NTL_LANGGRAPH_POSTGRES_URL") or "").strip()
+    if not postgres_url:
+        return []
+
+    failed = []
+    for module_name in ("langgraph.checkpoint.postgres", "langgraph.store.postgres"):
+        try:
+            importlib.import_module(module_name)
+        except Exception as exc:  # noqa: BLE001
+            failed.append(f"{module_name}: {exc}")
+    try:
+        from deepagents.backends import StoreBackend  # noqa: F401
+    except Exception as exc:  # noqa: BLE001
+        failed.append(f"deepagents.backends.StoreBackend: {exc}")
+    return failed
+
+
 def main() -> int:
     print("NTL-Claw stable environment check")
     print(f"Repository: {ROOT}")
     print(f"Python: {sys.executable}")
 
+    env_snapshot = _load_dotenv_snapshot()
     missing_env, optional_present = _check_env()
     missing_files = _check_files()
     ok_imports, failed_imports = _check_imports()
+    failed_postgres = _check_optional_postgres(env_snapshot)
 
     _print("Required env vars", [f"{name}: {'OK' if name not in missing_env else 'MISSING'}" for name in REQUIRED_ENV])
     _print("Optional env vars", [f"{name}: {'SET' if name in optional_present else 'EMPTY'}" for name in OPTIONAL_ENV])
@@ -104,14 +137,18 @@ def main() -> int:
 
     if missing_files:
         _print("Missing files", missing_files)
+    if failed_postgres:
+        _print("Optional Postgres persistence", failed_postgres)
 
     print("")
-    if missing_env or missing_files or failed_imports:
+    if missing_env or missing_files or failed_imports or failed_postgres:
         print("Result: NOT READY")
         if missing_env:
             print("Action: fill required values in .env before starting the app.")
         if failed_imports:
             print("Action: recreate the conda environment with `conda env create -f environment.yml`.")
+        if failed_postgres:
+            print("Action: install optional Postgres persistence with `pip install langgraph-checkpoint-postgres` or clear NTL_LANGGRAPH_POSTGRES_URL.")
         return 1
 
     print("Result: READY")

@@ -40,9 +40,22 @@ Optional:
 - `MINIMAX_API_KEY`
 - `MINIMAX_Coding_URL`
 - `GEE_DEFAULT_PROJECT_ID`
+- `GOOGLE_OAUTH_CLIENT_ID`
+- `GOOGLE_OAUTH_CLIENT_SECRET`
+- `GOOGLE_OAUTH_REDIRECT_URI`
+- `GOOGLE_OAUTH_SCOPES`
+- `NTL_TOKEN_ENCRYPTION_KEY`
 - `EARTHDATA_TOKEN`
 - `NTL_TOOL_PROFILE`
+- `NTL_USER_DATA_DIR`
+- `NTL_SHARED_DATA_DIR`
 - `NTL_CONTEXTILY_TMP`
+- `NTL_MAX_ACTIVE_RUNS`
+- `NTL_MAX_ACTIVE_RUNS_PER_USER`
+- `NTL_LANGGRAPH_POSTGRES_URL`
+- `NTL_LANGGRAPH_POSTGRES_AUTO_SETUP`
+- `NTL_DEEPAGENTS_MEMORY_BACKEND`
+- `NTL_MEMORY_NAMESPACE_SCOPE`
 
 ## Main Capabilities
 
@@ -57,6 +70,21 @@ Additional setup for Google Earth Engine:
 - set `GEE_DEFAULT_PROJECT_ID`
 - authenticate locally with Earth Engine if needed
 
+GEE pipeline selection:
+
+- `Default pipeline` uses the hosted project from `GEE_DEFAULT_PROJECT_ID` and remains the fallback path.
+- `My GEE pipeline` lets each logged-in user save a personal GEE Project ID from the sidebar.
+- If Google OAuth is configured, users can connect their Google account and the refresh token is encrypted with `NTL_TOKEN_ENCRYPTION_KEY`.
+- `GOOGLE_OAUTH_REDIRECT_URI` defaults to `http://localhost:8501`; for deployment, set it to the production Streamlit URL and add the same URI to the Google Cloud OAuth client.
+- Each run injects the effective `gee_project_id` into LangGraph metadata and the runtime system context so generated GEE scripts use `ee.Initialize(project="...")`.
+- Generated-code execution receives the current user's encrypted refresh token through thread-local runtime context and initializes Earth Engine with user credentials when available.
+
+Generate a Fernet encryption key for OAuth token storage:
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
 ## Runtime Execution Model
 
 NTL-Claw intentionally does not enable remote DeepAgents sandbox providers by default. Google Earth Engine authentication, local credential caches, GDAL/PROJ/Rasterio/GeoPandas native libraries, local RAG assets, `base_data`, and per-thread workspaces are expected to be available on the host machine.
@@ -67,6 +95,33 @@ Generated geospatial code is executed through the project-local subprocess works
 - `tools/NTL_Code_generation.py` runs generated code in a subprocess with the current thread workspace as the working directory.
 - Relative `inputs/...` and `outputs/...` paths resolve under `user_data/<thread_id>/`.
 - This is not a vendor-hosted secure sandbox; safety relies on preflight checks, path protocol enforcement, subprocess timeouts, and workspace scoping.
+- `/shared/...` maps to `base_data/...` and is routed through a read-only backend; generated outputs must go to `/outputs/...`.
+
+## Multi-User Runtime Model
+
+The local Streamlit runtime isolates work by `thread_id`:
+
+- each thread uses its own `user_data/<thread_id>/inputs`, `outputs`, `memory`, and `history` folders
+- one run at a time is allowed per thread
+- different threads can run concurrently in background Python threads
+- global and per-user active-run limits are controlled by `NTL_MAX_ACTIVE_RUNS` and `NTL_MAX_ACTIVE_RUNS_PER_USER`
+
+Development mode uses in-process LangGraph state:
+
+- `MemorySaver` for checkpoints
+- `InMemoryStore` for LangGraph store
+- filesystem-backed `/memories/...` under each thread workspace
+
+Production persistence can be enabled with:
+
+```bash
+NTL_LANGGRAPH_POSTGRES_URL=postgresql://user:password@host:5432/dbname
+NTL_LANGGRAPH_POSTGRES_AUTO_SETUP=1
+NTL_DEEPAGENTS_MEMORY_BACKEND=auto
+NTL_MEMORY_NAMESPACE_SCOPE=thread
+```
+
+When `NTL_LANGGRAPH_POSTGRES_URL` is set, NTL-Claw uses LangGraph `PostgresSaver` and `PostgresStore`. With `NTL_DEEPAGENTS_MEMORY_BACKEND=auto`, `/memories/...` is routed to DeepAgents `StoreBackend` and namespaced as `(assistant_id, user_id, thread_id)` by default. Set `NTL_MEMORY_NAMESPACE_SCOPE=user` only if cross-thread user memory sharing is desired and concurrent memory writes are acceptable for that deployment.
 
 Additional setup for official VIIRS downloads:
 

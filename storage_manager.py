@@ -5,6 +5,9 @@ from typing import Any, Dict, Optional
 
 # Thread-scoped context used across LangGraph/Deep Agents execution.
 current_thread_id = contextvars.ContextVar("thread_id", default="debug")
+current_gee_project_id = contextvars.ContextVar("gee_project_id", default="")
+current_gee_encrypted_refresh_token = contextvars.ContextVar("gee_encrypted_refresh_token", default="")
+current_gee_token_scopes = contextvars.ContextVar("gee_token_scopes", default="")
 
 
 class StorageManager:

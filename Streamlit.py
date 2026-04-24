@@ -39,7 +39,6 @@ def main():
     _safe_recover_runtime_health()
 
     app_ui.inject_css()
-    app_logic.ensure_conversation_initialized()
 
     st.session_state.setdefault("ui_lang", "EN")
     if st.session_state.get("ui_lang") == "中文":
@@ -89,6 +88,34 @@ def main():
         )
 
     app_ui.render_sidebar()
+    current_thread_id.set(st.session_state.thread_id)
+
+    if not st.session_state.get("authenticated"):
+        if st.session_state["ui_lang"] == "EN":
+            st.markdown(
+                """
+                <div style="margin-top:8px;border:1px solid rgba(148,190,255,0.55);border-radius:10px;
+                background:linear-gradient(180deg, rgba(14,28,58,0.88), rgba(8,16,35,0.9));
+                padding:10px 12px;color:#f1f6ff;font-weight:600;">
+                    Please register or log in from the sidebar to access your threads and memory.
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                """
+                <div style="margin-top:8px;border:1px solid rgba(148,190,255,0.55);border-radius:10px;
+                background:linear-gradient(180deg, rgba(14,28,58,0.88), rgba(8,16,35,0.9));
+                padding:10px 12px;color:#f1f6ff;font-weight:600;">
+                    请先在侧边栏注册或登录，再访问你的线程历史和长期记忆。
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        return
+
+    app_logic.ensure_conversation_initialized()
     app_ui.render_download_center()
     app_ui.render_file_uploader()
 
