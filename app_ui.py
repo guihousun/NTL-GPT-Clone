@@ -5,6 +5,7 @@ import hashlib
 import ast
 import html
 import io
+import shutil
 import zipfile
 import base64
 import textwrap
@@ -140,6 +141,72 @@ def _image_data_uri(path: Path) -> str | None:
         return None
 
 
+def _should_render_image_as_html_gif(image_ref: str | Path) -> bool:
+    return Path(str(image_ref or "")).suffix.lower() == ".gif"
+
+
+def _code_language_label(language: str) -> str:
+    lang = str(language or "text").strip().lower()
+    return {
+        "python": "Python script",
+        "py": "Python script",
+        "json": "JSON",
+        "geojson": "GeoJSON",
+        "csv": "CSV",
+        "powershell": "PowerShell",
+        "bash": "Shell",
+        "markdown": "Markdown",
+        "yaml": "YAML",
+        "text": "Text",
+    }.get(lang, lang.upper() if lang else "Text")
+
+
+def _static_code_block_html(code_text: str, *, language: str = "text", title: str = "") -> str:
+    safe_code = html.escape(str(code_text or ""))
+    safe_lang = html.escape(_code_language_label(language))
+    safe_title = html.escape(str(title or ""))
+    lang_class = re.sub(r"[^a-z0-9_-]+", "-", str(language or "text").strip().lower()).strip("-") or "text"
+    title_html = f'<span class="ntl-code-title">{safe_title}</span>' if safe_title else ""
+    return f"""
+    <div class="ntl-code-block ntl-code-kind-{html.escape(lang_class)}">
+      <div class="ntl-code-head">
+        <span class="ntl-code-lang">{safe_lang}</span>
+        {title_html}
+      </div>
+      <pre><code>{safe_code}</code></pre>
+    </div>
+    """
+
+
+def _render_static_code_block(code_text: str, *, language: str = "text", title: str = "") -> None:
+    lang = str(language or "text").strip().lower()
+    if lang in {"python", "py"}:
+        st.code(
+            str(code_text or ""),
+            language="python",
+            line_numbers=False,
+            wrap_lines=True,
+            height="content",
+            width="stretch",
+        )
+        return
+    st.markdown(
+        _static_code_block_html(code_text, language=language, title=title),
+        unsafe_allow_html=True,
+    )
+
+
+def _json_block_text(payload) -> str:
+    try:
+        return json.dumps(_sanitize_paths_in_obj(payload), ensure_ascii=False, indent=2)
+    except Exception:
+        return _sanitize_paths_in_text(str(payload))
+
+
+def _render_static_json_block(payload, *, title: str = "JSON") -> None:
+    _render_static_code_block(_json_block_text(payload), language="json", title=title)
+
+
 def _render_image_artifact(
     image_ref: str | Path,
     *,
@@ -177,7 +244,20 @@ def _render_image_artifact(
         """,
         unsafe_allow_html=True,
     )
-    st.image(str(path), width="stretch", caption=caption)
+    if data_uri:
+        safe_caption = html.escape(str(caption or ""))
+        preview_class = "ntl-animated-gif" if _should_render_image_as_html_gif(path) else "ntl-image-preview"
+        st.markdown(
+            f"""
+            <figure class="{preview_class}">
+              <img src="{data_uri}" alt="{safe_caption or safe_name}" loading="eager">
+              {f'<figcaption>{safe_caption}</figcaption>' if safe_caption else ''}
+            </figure>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.image(str(path), caption=caption, width="stretch")
     if data_uri is None:
         with path.open("rb") as fh:
             st.download_button(
@@ -210,12 +290,38 @@ elif ("127.0.0.1" in MONITOR_UI_URL) or ("localhost" in MONITOR_UI_URL):
 else:
     MONITOR_API_URL = f"{MONITOR_UI_URL}api/latest"
 _NTL_AVAIL_SNAPSHOT_KEY = "ntl_data_availability_snapshot_v1"
-_NTL_SCAN_SCRIPT_PATH = _project_path("experiments", "official_daily_ntl_fastpath", "scan_ntl_availability.py")
+_NTL_SCAN_SCRIPT_CANDIDATES = [
+    _project_path("experiments", "official_daily_ntl_fastpath", "scan_ntl_availability.py"),
+    _project_path("experiments", "official_daily_ntl_fastpath", "scan_official_ntl_availability.py"),
+]
+_NTL_SCAN_SCRIPT_PATH = next((p for p in _NTL_SCAN_SCRIPT_CANDIDATES if p.exists()), _NTL_SCAN_SCRIPT_CANDIDATES[0])
 _NTL_SCAN_OUTPUT_DIR = _project_path("experiments", "official_daily_ntl_fastpath", "workspace_monitor", "outputs")
 _NTL_SCAN_TIMEOUT_SECONDS = 160
 _NTL_SCAN_REFRESH_SECONDS = 3600
 _NTL_SCAN_LOCK_FILE = _NTL_SCAN_OUTPUT_DIR / ".ntl_availability_refresh.lock"
 _NTL_SCAN_LOCK_STALE_SECONDS = max(_NTL_SCAN_TIMEOUT_SECONDS * 2, 600)
+
+
+def _env_float(name: str, default: float, *, min_value: float, max_value: float) -> float:
+    try:
+        value = float(str(os.getenv(name, "") or "").strip() or default)
+    except (TypeError, ValueError):
+        return default
+    return max(min_value, min(max_value, value))
+
+
+_STREAMING_MAIN_REFRESH_SECONDS = _env_float(
+    "NTL_STREAMING_MAIN_REFRESH_SECONDS",
+    3.0,
+    min_value=1.0,
+    max_value=30.0,
+)
+_STREAMING_GRAPH_REFRESH_SECONDS = _env_float(
+    "NTL_STREAMING_GRAPH_REFRESH_SECONDS",
+    15.0,
+    min_value=2.0,
+    max_value=60.0,
+)
 _TEST_CASE_FILES = [_project_path("example", "test_cases_mini.xlsx")]
 _TEST_CASE_CATEGORY_EN = {
     "data retrieval and preprocessing": "Data Retrieval and Preprocessing",
@@ -877,8 +983,315 @@ def inject_css():
         text-decoration: underline !important;
         text-underline-offset: 3px;
     }
-    .stExpander { border: 1px solid var(--ntl-border); border-radius: 10px; }
+    .ntl-animated-gif {
+        margin: 0.35rem 0 0.55rem 0;
+        overflow: hidden;
+        border-radius: 8px;
+        background: rgba(5, 10, 22, 0.78);
+        border: 1px solid rgba(180, 201, 255, 0.24);
+    }
+    .ntl-animated-gif img {
+        display: block;
+        width: 100%;
+        height: auto;
+    }
+    .ntl-image-preview {
+        margin: 0.35rem 0 0.55rem 0;
+        overflow: hidden;
+        border-radius: 8px;
+        background: rgba(5, 10, 22, 0.78);
+        border: 1px solid rgba(180, 201, 255, 0.24);
+    }
+    .ntl-image-preview img {
+        display: block;
+        width: 100%;
+        height: auto;
+    }
+    .ntl-image-preview figcaption {
+        padding: 0.34rem 0.55rem 0.42rem 0.55rem;
+        color: #cfdaf0;
+        font-size: 0.78rem;
+        text-align: center;
+    }
+    .ntl-animated-gif figcaption {
+        padding: 0.34rem 0.55rem 0.42rem 0.55rem;
+        color: #cfdaf0;
+        font-size: 0.78rem;
+        text-align: center;
+    }
+    .stExpander { border: 1px solid rgba(160, 184, 235, 0.35); border-radius: 10px; }
+    [data-testid="stAppViewContainer"] [data-testid="stExpander"] details {
+        background: rgba(8, 14, 29, 0.84) !important;
+        border: 1px solid rgba(160, 184, 235, 0.35) !important;
+        border-radius: 10px !important;
+        color: #eaf1ff !important;
+    }
+    [data-testid="stAppViewContainer"] [data-testid="stExpander"] summary {
+        background: rgba(14, 24, 48, 0.96) !important;
+        border-radius: 9px !important;
+        color: #eaf1ff !important;
+    }
+    [data-testid="stAppViewContainer"] [data-testid="stExpander"] details[open] > summary {
+        border-bottom: 1px solid rgba(160, 184, 235, 0.24) !important;
+        border-bottom-left-radius: 0 !important;
+        border-bottom-right-radius: 0 !important;
+    }
+    [data-testid="stAppViewContainer"] [data-testid="stExpander"] summary *,
+    [data-testid="stAppViewContainer"] [data-testid="stExpander"] details * {
+        color: #eaf1ff !important;
+        -webkit-text-fill-color: #eaf1ff !important;
+    }
+    [data-testid="stAppViewContainer"] [data-testid="stExpander"] svg {
+        fill: #dbe8ff !important;
+    }
     .stCode { border-radius: 10px; }
+    .stCode pre,
+    .stCode pre div,
+    .stCode pre code,
+    .stCode pre span {
+        background: #081222 !important;
+        color: #eaf1ff !important;
+        -webkit-text-fill-color: #eaf1ff !important;
+        border-radius: 10px !important;
+        text-shadow: none !important;
+    }
+    .stMarkdown :not(pre) > code,
+    [data-testid="stMarkdownContainer"] :not(pre) > code {
+        display: inline;
+        max-width: 100%;
+        background: rgba(151, 196, 255, 0.18) !important;
+        color: #dbeafe !important;
+        -webkit-text-fill-color: #dbeafe !important;
+        border: 1px solid rgba(151, 196, 255, 0.24) !important;
+        border-radius: 5px !important;
+        padding: 0.08rem 0.28rem !important;
+        font-size: 0.88em !important;
+        font-weight: 650 !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
+        box-decoration-break: clone;
+        -webkit-box-decoration-break: clone;
+    }
+    .stMarkdown h1,
+    .stMarkdown h2,
+    .stMarkdown h3,
+    .stMarkdown h4,
+    .stMarkdown h5,
+    .stMarkdown h6,
+    [data-testid="stMarkdownContainer"] h1,
+    [data-testid="stMarkdownContainer"] h2,
+    [data-testid="stMarkdownContainer"] h3,
+    [data-testid="stMarkdownContainer"] h4,
+    [data-testid="stMarkdownContainer"] h5,
+    [data-testid="stMarkdownContainer"] h6 {
+        color: #f8fbff !important;
+        -webkit-text-fill-color: #f8fbff !important;
+        letter-spacing: 0 !important;
+    }
+    .stJson,
+    [data-testid="stJson"],
+    [data-testid="stJson"] *,
+    .stJson *,
+    .object-key-val,
+    .object-key-val *,
+    .variable-row,
+    .variable-row * {
+        background: #071021 !important;
+        color: #dbeafe !important;
+        -webkit-text-fill-color: #dbeafe !important;
+        text-shadow: none !important;
+    }
+    [data-testid="stJson"],
+    .stJson {
+        border: 1px solid rgba(151, 196, 255, 0.24) !important;
+        border-radius: 10px !important;
+        overflow: auto !important;
+    }
+    .ntl-code-block {
+        margin: 0.45rem 0 0.7rem 0;
+        border-radius: 10px;
+        border: 1px solid rgba(151, 196, 255, 0.28);
+        background: linear-gradient(180deg, rgba(8, 18, 34, 0.98), rgba(5, 12, 26, 0.98));
+        overflow: hidden;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+    .ntl-code-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        padding: 0.52rem 0.68rem;
+        background: linear-gradient(90deg, rgba(27, 53, 96, 0.94), rgba(15, 31, 63, 0.94));
+        border-bottom: 1px solid rgba(151, 196, 255, 0.20);
+        min-width: 0;
+    }
+    .ntl-code-lang {
+        color: #bfdbfe !important;
+        -webkit-text-fill-color: #bfdbfe !important;
+        font-weight: 780;
+        font-size: 0.76rem;
+        letter-spacing: 0;
+    }
+    .ntl-code-title {
+        min-width: 0;
+        color: #eaf1ff !important;
+        -webkit-text-fill-color: #eaf1ff !important;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+        font-size: 0.76rem;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        white-space: normal;
+        text-align: right;
+    }
+    .ntl-code-block pre {
+        margin: 0;
+        padding: 0.78rem 0.86rem;
+        max-height: 620px;
+        overflow-x: hidden;
+        overflow-y: auto;
+        background: #071021;
+        color: #eaf1ff !important;
+        -webkit-text-fill-color: #eaf1ff !important;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+        font-size: 0.82rem;
+        line-height: 1.58;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        tab-size: 4;
+    }
+    .ntl-code-block code {
+        background: transparent !important;
+        color: inherit !important;
+        -webkit-text-fill-color: inherit !important;
+        border: 0 !important;
+        padding: 0 !important;
+        font: inherit !important;
+        white-space: inherit !important;
+        overflow-wrap: inherit !important;
+        word-break: inherit !important;
+    }
+    .ntl-code-kind-text pre,
+    .ntl-code-kind-csv pre,
+    .ntl-code-kind-json pre,
+    .ntl-code-kind-geojson pre {
+        max-height: 320px;
+    }
+    .ntl-code-kind-text {
+        border-color: rgba(151, 196, 255, 0.20);
+        background: rgba(5, 14, 31, 0.72);
+    }
+    .ntl-code-kind-text .ntl-code-head {
+        padding: 0.42rem 0.58rem;
+        background: rgba(31, 62, 111, 0.72);
+    }
+    .ntl-code-kind-text pre {
+        padding: 0.62rem 0.68rem;
+        font-size: 0.79rem;
+        line-height: 1.46;
+    }
+    .ntl-tool-card {
+        margin: 0 0 0.5rem 0;
+        padding: 0.72rem;
+        border: 1px solid rgba(160, 184, 235, 0.28);
+        border-radius: 9px;
+        background: linear-gradient(180deg, rgba(13, 28, 57, 0.88), rgba(7, 15, 32, 0.88));
+        color: #eaf1ff;
+        font-size: 0.88rem;
+        line-height: 1.45;
+    }
+    .ntl-tool-card-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 0.46rem;
+    }
+    .ntl-tool-title {
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+        font-weight: 750;
+        letter-spacing: 0;
+    }
+    .ntl-tool-count {
+        color: #98b8f8 !important;
+        -webkit-text-fill-color: #98b8f8 !important;
+        font-size: 0.74rem;
+        white-space: nowrap;
+    }
+    .ntl-file-list {
+        display: grid;
+        gap: 0.36rem;
+    }
+    .ntl-file-row {
+        display: grid;
+        grid-template-columns: minmax(4.8rem, 7.6rem) minmax(0, 1fr);
+        align-items: center;
+        gap: 0.62rem;
+        padding: 0.38rem 0.5rem;
+        border-radius: 8px;
+        background: rgba(68, 103, 173, 0.22);
+        border: 1px solid rgba(160, 184, 235, 0.18);
+        min-width: 0;
+    }
+    .ntl-file-kind {
+        color: #b9d7ff !important;
+        -webkit-text-fill-color: #b9d7ff !important;
+        font-weight: 720;
+        font-size: 0.77rem;
+        line-height: 1.15;
+    }
+    .ntl-file-path {
+        color: #dbe8ff !important;
+        -webkit-text-fill-color: #dbe8ff !important;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+        font-size: 0.76rem;
+        line-height: 1.28;
+        word-break: break-word;
+        min-width: 0;
+    }
+    .ntl-change-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+    .ntl-change-pane {
+        min-width: 0;
+        padding: 0.48rem;
+        border-radius: 8px;
+        border: 1px solid rgba(160, 184, 235, 0.18);
+        background: rgba(4, 10, 22, 0.48);
+    }
+    .ntl-change-label {
+        display: block;
+        margin-bottom: 0.28rem;
+        color: #9fb9ef !important;
+        -webkit-text-fill-color: #9fb9ef !important;
+        font-size: 0.72rem;
+        font-weight: 720;
+        text-transform: uppercase;
+    }
+    .ntl-change-text {
+        margin: 0;
+        color: #eaf1ff !important;
+        -webkit-text-fill-color: #eaf1ff !important;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+        font-size: 0.74rem;
+        line-height: 1.35;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    .ntl-tool-message {
+        margin-top: 0.5rem;
+        color: #cfdaf0 !important;
+        -webkit-text-fill-color: #cfdaf0 !important;
+        font-size: 0.82rem;
+    }
     [data-testid="stSidebar"] {
         min-width: 290px !important;
         max-width: 360px !important;
@@ -1016,6 +1429,22 @@ def inject_css():
     [data-testid="stSidebar"] .stDownloadButton button { min-height: 30px !important; }
     div[data-testid="stRadio"] label p { font-size: 0.78rem !important; }
     /* Language switch (CN / EN) contrast */
+    div[class*="st-key-ui_lang_switch"] [role="radiogroup"] {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        justify-content: flex-end !important;
+        gap: 0.35rem !important;
+        min-width: 5.4rem !important;
+    }
+    div[class*="st-key-ui_lang_switch"] [role="radiogroup"] label {
+        display: inline-flex !important;
+        align-items: center !important;
+        white-space: nowrap !important;
+        margin: 0 !important;
+        width: auto !important;
+    }
     [data-testid="stRadio"] label,
     [data-testid="stRadio"] label p,
     [data-testid="stRadio"] label span,
@@ -1380,10 +1809,10 @@ def inject_css():
     }
     [data-testid="stSidebar"] div[class*="st-key-thread_rename_inline_v6_"] button,
     [data-testid="stSidebar"] div[class*="st-key-thread_delete_inline_v6_"] button {
-        min-height: 1rem !important;
+        min-height: 0.72rem !important;
         padding: 0 !important;
         border-radius: 0 !important;
-        font-size: 0.72rem !important;
+        font-size: 0.66rem !important;
         background: transparent !important;
         border: none !important;
         outline: none !important;
@@ -1391,6 +1820,7 @@ def inject_css():
         justify-content: flex-end !important;
         text-align: right !important;
         min-width: auto !important;
+        line-height: 0.9 !important;
     }
     [data-testid="stSidebar"] div[class*="st-key-thread_rename_inline_v6_"] [data-testid="stBaseButton-secondary"],
     [data-testid="stSidebar"] div[class*="st-key-thread_delete_inline_v6_"] [data-testid="stBaseButton-secondary"] {
@@ -1404,14 +1834,16 @@ def inject_css():
         color: rgba(219, 232, 255, 0.88) !important;
         -webkit-text-fill-color: rgba(219, 232, 255, 0.88) !important;
         font-weight: 500 !important;
-        font-size: 0.72rem !important;
+        font-size: 0.66rem !important;
+        line-height: 0.9 !important;
     }
     [data-testid="stSidebar"] div[class*="st-key-thread_delete_inline_v6_"] button p,
     [data-testid="stSidebar"] div[class*="st-key-thread_delete_inline_v6_"] button span {
         color: rgba(255, 174, 174, 0.88) !important;
         -webkit-text-fill-color: rgba(255, 174, 174, 0.88) !important;
         font-weight: 500 !important;
-        font-size: 0.72rem !important;
+        font-size: 0.66rem !important;
+        line-height: 0.9 !important;
     }
     [data-testid="stSidebar"] div[class*="st-key-thread_rename_inline_v6_"] button:hover,
     [data-testid="stSidebar"] div[class*="st-key-thread_delete_inline_v6_"] button:hover {
@@ -1427,12 +1859,14 @@ def inject_css():
     [data-testid="stSidebar"] div[class*="st-key-rename_thread_save_v7_"] button,
     [data-testid="stSidebar"] div[class*="st-key-rename_thread_cancel_v7_"] button {
         min-height: 1.45rem !important;
+        min-width: 3.7rem !important;
         padding: 0.08rem 0.58rem !important;
         border-radius: 999px !important;
         font-size: 0.72rem !important;
         box-shadow: none !important;
         justify-content: flex-end !important;
         text-align: right !important;
+        white-space: nowrap !important;
     }
     [data-testid="stSidebar"] div[class*="st-key-rename_thread_save_v7_"] button {
         background: rgba(111, 168, 255, 0.16) !important;
@@ -1474,12 +1908,14 @@ def inject_css():
     [data-testid="stSidebar"] div[class*="st-key-delete_thread_confirm_v8_"] button,
     [data-testid="stSidebar"] div[class*="st-key-delete_thread_cancel_v8_"] button {
         min-height: 1.45rem !important;
+        min-width: 3.7rem !important;
         padding: 0.08rem 0.58rem !important;
         border-radius: 999px !important;
         font-size: 0.72rem !important;
         box-shadow: none !important;
         justify-content: flex-end !important;
         text-align: right !important;
+        white-space: nowrap !important;
     }
     [data-testid="stSidebar"] div[class*="st-key-delete_thread_confirm_v8_"] button {
         background: rgba(140, 34, 42, 0.22) !important;
@@ -1578,6 +2014,208 @@ def inject_css():
     [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button span {
         color: #dce8ff !important;
         -webkit-text-fill-color: #dce8ff !important;
+    }
+    /* Reasoning panel hierarchy: distinguish user, agent, and tool text without leaving the night-console theme. */
+    [data-testid="stAppViewContainer"] [data-testid="stExpander"] details {
+        background: rgba(6, 13, 29, 0.88) !important;
+        border: 1px solid rgba(132, 168, 255, 0.28) !important;
+        border-radius: 12px !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 10px 22px rgba(0,0,0,0.18) !important;
+    }
+    [data-testid="stAppViewContainer"] [data-testid="stExpander"] summary,
+    [data-testid="stAppViewContainer"] [data-testid="stExpander"] details > summary {
+        background: linear-gradient(180deg, rgba(13, 27, 58, 0.96), rgba(7, 16, 36, 0.96)) !important;
+        border-radius: 11px !important;
+        border-bottom: 1px solid rgba(132, 168, 255, 0.22) !important;
+        color: #eaf1ff !important;
+        -webkit-text-fill-color: #eaf1ff !important;
+    }
+    [data-testid="stAppViewContainer"] [data-testid="stExpander"] details[open] > summary {
+        border-bottom-left-radius: 0 !important;
+        border-bottom-right-radius: 0 !important;
+    }
+    [data-testid="stAppViewContainer"] [data-testid="stExpander"] summary p,
+    [data-testid="stAppViewContainer"] [data-testid="stExpander"] summary span,
+    [data-testid="stAppViewContainer"] [data-testid="stExpander"] summary svg {
+        color: #eaf1ff !important;
+        fill: #dbeafe !important;
+        -webkit-text-fill-color: #eaf1ff !important;
+        font-weight: 720 !important;
+    }
+    [data-testid="stAppViewContainer"] [data-testid="stExpander"] details p,
+    [data-testid="stAppViewContainer"] [data-testid="stExpander"] details li,
+    [data-testid="stAppViewContainer"] [data-testid="stExpander"] details span,
+    [data-testid="stAppViewContainer"] [data-testid="stExpander"] details div {
+        color: #dbeafe !important;
+        -webkit-text-fill-color: #dbeafe !important;
+    }
+    .ntl-reasoning-header {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        grid-template-areas:
+            "kind title"
+            "kind subtitle";
+        align-items: center;
+        column-gap: 0.58rem;
+        row-gap: 0.08rem;
+        margin: 0.42rem 0 0.36rem 0;
+        padding: 0.42rem 0.56rem 0.44rem 0.56rem;
+        border-left: 3px solid var(--ntl-reasoning-accent);
+        border-radius: 9px;
+        background: linear-gradient(90deg, rgba(14, 29, 61, 0.72), rgba(7, 15, 33, 0.28));
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+    .ntl-reasoning-header-plain {
+        display: flex;
+        align-items: center;
+        gap: 0.62rem;
+        min-height: 3.1rem;
+        padding-top: 0.46rem;
+        padding-bottom: 0.46rem;
+    }
+    .ntl-reasoning-kind {
+        grid-area: kind;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 2.48rem;
+        min-height: 1.22rem;
+        padding: 0.14rem 0.34rem;
+        border-radius: 999px;
+        border: 1px solid color-mix(in srgb, var(--ntl-reasoning-accent) 62%, transparent);
+        background: color-mix(in srgb, var(--ntl-reasoning-accent) 16%, transparent);
+        color: var(--ntl-reasoning-accent) !important;
+        -webkit-text-fill-color: var(--ntl-reasoning-accent) !important;
+        font-size: 0.66rem;
+        line-height: 1;
+        font-weight: 820;
+        text-align: center;
+        letter-spacing: 0;
+    }
+    .ntl-reasoning-title {
+        grid-area: title;
+        min-width: 0;
+        align-self: center;
+        color: #f8fbff !important;
+        -webkit-text-fill-color: #f8fbff !important;
+        font-weight: 760;
+        font-size: 0.94rem;
+        line-height: 1.16;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        letter-spacing: 0;
+    }
+    .ntl-reasoning-subtitle {
+        grid-area: subtitle;
+        color: #9fb8df !important;
+        -webkit-text-fill-color: #9fb8df !important;
+        font-size: 0.74rem;
+        line-height: 1.18;
+        font-weight: 600;
+        letter-spacing: 0;
+    }
+    .ntl-reasoning-text {
+        margin: 0.18rem 0 0.58rem 0.72rem;
+        padding: 0.52rem 0.66rem;
+        border-left: 1px solid color-mix(in srgb, var(--ntl-reasoning-accent) 48%, rgba(132,168,255,0.15));
+        border-radius: 0 8px 8px 0;
+        background:
+            linear-gradient(90deg, color-mix(in srgb, var(--ntl-reasoning-accent) 10%, transparent), rgba(4, 10, 22, 0.34) 42%),
+            rgba(4, 10, 22, 0.34);
+        color: #dbeafe !important;
+        -webkit-text-fill-color: #dbeafe !important;
+        white-space: pre-wrap;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+        font-size: 0.91rem;
+        line-height: 1.55;
+    }
+    .ntl-reasoning-rich {
+        white-space: normal;
+    }
+    .ntl-reasoning-rich p {
+        margin: 0.1rem 0 0.52rem 0;
+        color: #dbeafe !important;
+        -webkit-text-fill-color: #dbeafe !important;
+    }
+    .ntl-reasoning-rich p:last-child,
+    .ntl-reasoning-rich ul:last-child,
+    .ntl-reasoning-rich table:last-child {
+        margin-bottom: 0;
+    }
+    .ntl-reasoning-md-heading {
+        margin: 0.1rem 0 0.48rem 0;
+        color: #f8fbff !important;
+        -webkit-text-fill-color: #f8fbff !important;
+        font-size: 1.02rem;
+        line-height: 1.22;
+        font-weight: 820;
+        letter-spacing: 0;
+    }
+    .ntl-reasoning-rich strong {
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+        font-weight: 790;
+    }
+    .ntl-reasoning-rich code {
+        display: inline-block;
+        max-width: 100%;
+        padding: 0.06rem 0.26rem;
+        border-radius: 5px;
+        border: 1px solid color-mix(in srgb, var(--ntl-reasoning-accent) 32%, rgba(151,196,255,0.18));
+        background: rgba(7, 18, 38, 0.88) !important;
+        color: #eaf6ff !important;
+        -webkit-text-fill-color: #eaf6ff !important;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+        font-size: 0.86em;
+        font-weight: 680;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+    .ntl-reasoning-rich ul {
+        margin: 0.2rem 0 0.58rem 1rem;
+        padding: 0;
+    }
+    .ntl-reasoning-rich li {
+        margin: 0.18rem 0;
+        color: #dbeafe !important;
+        -webkit-text-fill-color: #dbeafe !important;
+    }
+    .ntl-reasoning-rich table {
+        width: 100%;
+        margin: 0.36rem 0 0.68rem 0;
+        border-collapse: collapse;
+        border: 1px solid rgba(147, 197, 253, 0.24);
+        border-radius: 8px;
+        overflow: hidden;
+        background: rgba(5, 14, 31, 0.58);
+        table-layout: fixed;
+    }
+    .ntl-reasoning-rich th,
+    .ntl-reasoning-rich td {
+        padding: 0.42rem 0.48rem;
+        border-bottom: 1px solid rgba(147, 197, 253, 0.14);
+        color: #dbeafe !important;
+        -webkit-text-fill-color: #dbeafe !important;
+        font-size: 0.84rem;
+        line-height: 1.35;
+        vertical-align: top;
+        overflow-wrap: anywhere;
+    }
+    .ntl-reasoning-rich th {
+        background: color-mix(in srgb, var(--ntl-reasoning-accent) 18%, rgba(13, 27, 58, 0.96));
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+        font-weight: 760;
+    }
+    .ntl-reasoning-rich tr:last-child td {
+        border-bottom: 0;
+    }
+    .ntl-reasoning-divider {
+        height: 1px;
+        margin: 0.64rem 0;
+        background: linear-gradient(90deg, rgba(125, 167, 232, 0), rgba(125, 167, 232, 0.36), rgba(125, 167, 232, 0));
     }
     .ntl-step .streamlit-expanderHeader {
         font-weight: 600;
@@ -1865,7 +2503,7 @@ def _parse_literature_records_from_text(text: str) -> list[dict]:
 def render_kb_tool_output(raw_content, tool_name: str = ""):
     """Render KB tool outputs robustly (single JSON, multi-JSON, or plain literature text)."""
     if isinstance(raw_content, (dict, list)):
-        st.json(_sanitize_paths_in_obj(raw_content))
+        _render_static_json_block(raw_content, title="Knowledge JSON")
         return
     text = str(raw_content or "")
     if not text.strip():
@@ -1877,15 +2515,15 @@ def render_kb_tool_output(raw_content, tool_name: str = ""):
     except Exception:
         parsed = None
     if parsed is not None:
-        st.json(_sanitize_paths_in_obj(parsed))
+        _render_static_json_block(parsed, title="Knowledge JSON")
         return
 
     chunks, rest = _extract_all_json_chunks(text)
     if chunks:
         if len(chunks) == 1 and (not isinstance(rest, str) or not rest.strip()):
-            st.json(_sanitize_paths_in_obj(chunks[0]))
+            _render_static_json_block(chunks[0], title="Knowledge JSON")
         else:
-            st.json(_sanitize_paths_in_obj(chunks))
+            _render_static_json_block(chunks, title="Knowledge JSON")
             if isinstance(rest, str) and rest.strip():
                 st.caption(_sanitize_paths_in_text(rest))
         return
@@ -1894,7 +2532,7 @@ def render_kb_tool_output(raw_content, tool_name: str = ""):
     if "literature_knowledge" in tool_name_norm:
         records = _parse_literature_records_from_text(text)
         if records:
-            st.json(_sanitize_paths_in_obj(records))
+            _render_static_json_block(records, title="Literature JSON")
             return
 
     st.write(_sanitize_paths_in_text(text))
@@ -2002,12 +2640,209 @@ def render_label_human(msg):
 def render_bot_message(msg):
     st.write(BOT_TEMPLATE.replace("{{MSG}}", msg), unsafe_allow_html=True)
 
+
+def _reasoning_agent_meta(agent_name: str) -> dict:
+    normalized = str(agent_name or "AI").strip()
+    key = normalized.lower()
+    if key == "ntl_engineer":
+        return {
+            "label": "NTL_Engineer",
+            "role": "",
+            "accent": "#5eead4",
+            "tone": "teal",
+        }
+    if key == "code_assistant":
+        return {
+            "label": "Code_Assistant",
+            "role": "",
+            "accent": "#7dd3fc",
+            "tone": "blue",
+        }
+    if key == "data_searcher":
+        return {
+            "label": "Data_Searcher",
+            "role": "",
+            "accent": "#fbbf24",
+            "tone": "amber",
+        }
+    if key in {"knowledge_base_searcher", "knowledge_base_subagent"}:
+        return {
+            "label": normalized,
+            "role": "",
+            "accent": "#86efac",
+            "tone": "green",
+        }
+    return {
+        "label": normalized or "AI",
+        "role": "",
+        "accent": "#bfdbfe",
+        "tone": "default",
+    }
+
+
+def _reasoning_header_html(kind: str, title: str, subtitle: str = "", *, accent: str = "#bfdbfe") -> str:
+    safe_kind = html.escape(str(kind or "AI"))
+    safe_title = html.escape(str(title or ""))
+    safe_subtitle = html.escape(str(subtitle or ""))
+    safe_accent = html.escape(str(accent or "#bfdbfe"))
+    subtitle_html = f'<span class="ntl-reasoning-subtitle">{safe_subtitle}</span>' if safe_subtitle else ""
+    header_class = "ntl-reasoning-header ntl-reasoning-header-stacked" if safe_subtitle else "ntl-reasoning-header ntl-reasoning-header-plain"
+    return f"""
+    <div class="{header_class}" style="--ntl-reasoning-accent:{safe_accent};">
+      <span class="ntl-reasoning-kind">{safe_kind}</span>
+      <span class="ntl-reasoning-title">{safe_title}</span>
+      {subtitle_html}
+    </div>
+    """
+
+
+def _reasoning_text_html(text: str, *, accent: str = "#bfdbfe") -> str:
+    safe_text = html.escape(str(text or ""))
+    safe_accent = html.escape(str(accent or "#bfdbfe"))
+    return f"""
+    <div class="ntl-reasoning-text" style="--ntl-reasoning-accent:{safe_accent};">
+      {safe_text}
+    </div>
+    """
+
+
+def _reasoning_inline_html(text: str) -> str:
+    safe = html.escape(str(text or ""))
+    safe = re.sub(r"`([^`\n]+)`", r"<code>\1</code>", safe)
+    safe = re.sub(r"\*\*([^*\n]+)\*\*", r"<strong>\1</strong>", safe)
+    return safe
+
+
+_MARKDOWN_IMAGE_LINE_RE = re.compile(r"^\s*!\[[^\]]*\]\([^)]+\)\s*$")
+
+
+def _is_markdown_image_line(line: str) -> bool:
+    return bool(_MARKDOWN_IMAGE_LINE_RE.match(str(line or "")))
+
+
+def _is_markdown_table_separator(line: str) -> bool:
+    cells = [cell.strip() for cell in str(line or "").strip().strip("|").split("|")]
+    return bool(cells) and all(re.fullmatch(r":?-{2,}:?", cell or "") for cell in cells)
+
+
+def _is_markdown_table_row(line: str) -> bool:
+    stripped = str(line or "").strip()
+    return stripped.startswith("|") and stripped.endswith("|") and stripped.count("|") >= 2
+
+
+def _reasoning_table_html(lines: list[str]) -> str:
+    rows = [
+        [cell.strip() for cell in str(line or "").strip().strip("|").split("|")]
+        for line in lines
+        if _is_markdown_table_row(line) and not _is_markdown_table_separator(line)
+    ]
+    if not rows:
+        return ""
+    header = rows[0]
+    body = rows[1:]
+    head_html = "".join(f"<th>{_reasoning_inline_html(cell)}</th>" for cell in header)
+    body_html = "".join(
+        "<tr>" + "".join(f"<td>{_reasoning_inline_html(cell)}</td>" for cell in row) + "</tr>"
+        for row in body
+    )
+    return f"<table><thead><tr>{head_html}</tr></thead><tbody>{body_html}</tbody></table>"
+
+
+def _reasoning_rich_text_html(text: str, *, accent: str = "#bfdbfe") -> str:
+    raw = _sanitize_paths_in_text(str(text or ""))
+    safe_accent = html.escape(str(accent or "#bfdbfe"))
+    parts: list[str] = []
+    paragraph: list[str] = []
+    bullets: list[str] = []
+    table_lines: list[str] = []
+
+    def flush_paragraph() -> None:
+        if paragraph:
+            parts.append(f"<p>{'<br>'.join(_reasoning_inline_html(line) for line in paragraph)}</p>")
+            paragraph.clear()
+
+    def flush_bullets() -> None:
+        if bullets:
+            parts.append("<ul>" + "".join(f"<li>{_reasoning_inline_html(item)}</li>" for item in bullets) + "</ul>")
+            bullets.clear()
+
+    def flush_table() -> None:
+        if table_lines:
+            table_html = _reasoning_table_html(table_lines)
+            if table_html:
+                parts.append(table_html)
+            else:
+                paragraph.extend(table_lines)
+            table_lines.clear()
+
+    for line in raw.splitlines():
+        stripped = line.strip()
+        if _is_markdown_image_line(stripped):
+            flush_table()
+            flush_bullets()
+            flush_paragraph()
+            continue
+        if not stripped:
+            flush_table()
+            flush_bullets()
+            flush_paragraph()
+            continue
+        if _is_markdown_table_row(stripped):
+            flush_bullets()
+            flush_paragraph()
+            table_lines.append(stripped)
+            continue
+        flush_table()
+        heading = re.match(r"^#{1,4}\s+(.+)$", stripped)
+        if heading:
+            flush_bullets()
+            flush_paragraph()
+            parts.append(f'<div class="ntl-reasoning-md-heading">{_reasoning_inline_html(heading.group(1))}</div>')
+            continue
+        bullet = re.match(r"^[-*]\s+(.+)$", stripped)
+        if bullet:
+            flush_paragraph()
+            bullets.append(bullet.group(1))
+            continue
+        flush_bullets()
+        paragraph.append(stripped)
+
+    flush_table()
+    flush_bullets()
+    flush_paragraph()
+    body = "\n".join(parts) if parts else "<p></p>"
+    return f"""
+    <div class="ntl-reasoning-text ntl-reasoning-rich" style="--ntl-reasoning-accent:{safe_accent};">
+      {body}
+    </div>
+    """
+
+
+def _reasoning_divider_html() -> str:
+    return '<div class="ntl-reasoning-divider"></div>'
+
+
+def _render_reasoning_text(text: str, *, accent: str = "#bfdbfe", rich: bool = True) -> None:
+    html_text = (
+        _reasoning_rich_text_html(text, accent=accent)
+        if rich
+        else _reasoning_text_html(_sanitize_paths_in_text(str(text or "")), accent=accent)
+    )
+    st.markdown(html_text, unsafe_allow_html=True)
+
+
 def render_label_ai(agent_name):
-    color = "#0b5cab" if agent_name.lower() == "code_assistant" else "#0f766e"
-    st.markdown(f"<div style='color:{color};font-weight:700;font-size:16px;'>AI: {agent_name}</div>", unsafe_allow_html=True)
+    meta = _reasoning_agent_meta(agent_name)
+    st.markdown(
+        _reasoning_header_html("AI", meta["label"], meta["role"], accent=meta["accent"]),
+        unsafe_allow_html=True,
+    )
 
 def render_label_tool(tool_name):
-    st.markdown(f"<div style='color:#0b5cab;font-weight:700;font-size:15px;'>Tool ({tool_name}) Output:</div>", unsafe_allow_html=True)
+    st.markdown(
+        _reasoning_header_html("TOOL", str(tool_name or "tool"), _tr("工具输出", "Tool output"), accent="#93c5fd"),
+        unsafe_allow_html=True,
+    )
 
 def render_label_function(tool_name):
     st.markdown(f"<div style='color:#8a6f00;font-weight:700;font-size:15px;'>Function Call to `{tool_name}`:</div>", unsafe_allow_html=True)
@@ -2026,8 +2861,19 @@ def render_event_header(index):
     """, unsafe_allow_html=True)
 
 def render_event_human(content):
-    st.markdown("<div style='color:#8a1750;font-weight:700;font-size:16px;'>Human:</div>", unsafe_allow_html=True)
-    st.markdown(f"<div style='margin-left:15px;font-size:16px;'>{content}</div>", unsafe_allow_html=True)
+    st.markdown(
+        _reasoning_header_html("USER", _tr("用户请求", "Human query"), "", accent="#fb7185"),
+        unsafe_allow_html=True,
+    )
+    _render_reasoning_text(str(content or ""), accent="#fb7185")
+
+
+def render_event_instruction(content):
+    st.markdown(
+        _reasoning_header_html("TASK", _tr("子任务指令", "Agent instruction"), "", accent="#a78bfa"),
+        unsafe_allow_html=True,
+    )
+    _render_reasoning_text(str(content or ""), accent="#a78bfa")
 
 
 _CHAT_INPUT_FILE_TYPES = [
@@ -2086,7 +2932,36 @@ def _decode_chat_file_bytes(file_obj) -> bytes:
     raise ValueError("Unsupported chat file payload")
 
 
-def _save_chat_input_files_to_workspace(files, thread_id: str) -> dict:
+def _workspace_quota_error_message(quota_rejection: dict) -> str:
+    reason = str(quota_rejection.get("reason") or "")
+    projected = str(quota_rejection.get("projected_label") or quota_rejection.get("projected_bytes") or "?")
+    limit = str(quota_rejection.get("limit_label") or quota_rejection.get("limit_bytes") or "?")
+    if reason == "thread_workspace_quota_reached":
+        return _tr(
+            f"当前线程工作区配额已超限，预计占用 {projected} / {limit}。",
+            f"Thread workspace quota would be exceeded ({projected} / {limit}).",
+        )
+    if reason == "user_workspace_quota_reached":
+        return _tr(
+            f"当前用户工作区总配额已超限，预计占用 {projected} / {limit}。",
+            f"User workspace quota would be exceeded ({projected} / {limit}).",
+        )
+    return _tr("工作区配额不足。", "Workspace quota exceeded.")
+
+
+def _zip_member_target_paths(input_dir: Path, archive: zipfile.ZipFile) -> list[tuple[zipfile.ZipInfo, Path]]:
+    targets: list[tuple[zipfile.ZipInfo, Path]] = []
+    for info in archive.infolist():
+        if info.is_dir():
+            continue
+        rel = Path(str(info.filename or "").replace("\\", "/"))
+        if not rel.parts or rel.is_absolute() or ".." in rel.parts:
+            raise ValueError(f"Unsafe zip member path: {info.filename}")
+        targets.append((info, input_dir.joinpath(*rel.parts)))
+    return targets
+
+
+def _save_chat_input_files_to_workspace(files, thread_id: str, user_id: str = "") -> dict:
     workspace = storage_manager.get_workspace(thread_id)
     input_dir = workspace / "inputs"
     input_dir.mkdir(parents=True, exist_ok=True)
@@ -2102,8 +2977,13 @@ def _save_chat_input_files_to_workspace(files, thread_id: str) -> dict:
             continue
         target = _next_available_path(input_dir / name)
         try:
+            payload = _decode_chat_file_bytes(uploaded_file)
+            quota_rejection = app_logic._workspace_quota_rejection(thread_id, user_id, additional_bytes=len(payload))
+            if quota_rejection:
+                errors.append(f"{name}: {_workspace_quota_error_message(quota_rejection)}")
+                continue
             with open(target, "wb") as f:
-                f.write(_decode_chat_file_bytes(uploaded_file))
+                f.write(payload)
             saved.append(target.name)
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{name}: {exc}")
@@ -2158,7 +3038,7 @@ def render_data_searcher_output(raw_content):
         data, rest = _extract_json(raw_content)
 
     if not isinstance(data, dict):
-        if isinstance(rest, str) and rest.strip(): st.write(rest)
+        if isinstance(rest, str) and rest.strip(): _render_reasoning_text(rest, accent="#fbbf24")
         return
 
     # SCHEMA B: News / Events
@@ -2190,8 +3070,9 @@ def render_data_searcher_output(raw_content):
                     if s.get("URL"): st.markdown(f"- **URL**: [{s['URL']}]({s['URL']})")
                     if s.get("Snippet"): st.caption(s["Snippet"])
 
-        with _render_popover("View Raw JSON"): st.json(_sanitize_paths_in_obj(data))
-        if isinstance(rest, str) and rest.strip(): st.write(_sanitize_paths_in_text(rest))
+        with _render_popover("View Raw JSON"):
+            _render_static_json_block(data, title="Raw JSON")
+        if isinstance(rest, str) and rest.strip(): _render_reasoning_text(rest, accent="#fbbf24")
         return
 
     # Non-contract fallback: avoid rendering blank geospatial cards for guardrail/runtime payloads.
@@ -2223,10 +3104,11 @@ def render_data_searcher_output(raw_content):
         ).strip()
         st.warning(f"Data Searcher ({status})")
         if reason:
-            st.write(_sanitize_paths_in_text(reason))
-        with _render_popover("View Raw JSON"): st.json(_sanitize_paths_in_obj(data))
+            _render_reasoning_text(reason, accent="#fbbf24")
+        with _render_popover("View Raw JSON"):
+            _render_static_json_block(data, title="Raw JSON")
         if isinstance(rest, str) and rest.strip():
-            st.write(_sanitize_paths_in_text(rest))
+            _render_reasoning_text(rest, accent="#fbbf24")
         return
 
     # SCHEMA A: Geospatial Data Retrieval
@@ -2252,11 +3134,11 @@ def render_data_searcher_output(raw_content):
     with cols[0]:
         st.markdown("**Data Source**"); st.write(Data_source or "-")
         st.markdown("**Temporal Coverage**"); st.write(Temporal_coverage or "-")
-        st.markdown("**Product Identifier**"); st.code(Product or "-", language="text")
+        st.markdown("**Product Identifier**"); _render_static_code_block(Product or "-", language="text", title="Product")
     with cols[1]:
         st.markdown("**Spatial Coverage**"); st.write(Spatial_coverage or "-")
         st.markdown("**Spatial Resolution**"); st.write(Spatial_resolution or "-")
-        st.markdown("**Storage Location**"); st.code(Storage_location or "Local Workspace (inputs/)")
+        st.markdown("**Storage Location**"); _render_static_code_block(Storage_location or "Local Workspace (inputs/)", language="text", title="Storage")
 
     if Files_name:
         st.markdown("**Generated Output Files**")
@@ -2292,8 +3174,9 @@ def render_data_searcher_output(raw_content):
                 if item.get("Notes"):
                     st.caption(_sanitize_paths_in_text(str(item.get("Notes"))))
 
-    with _render_popover("View Raw JSON"): st.json(_sanitize_paths_in_obj(data))
-    if isinstance(rest, str) and rest.strip(): st.write(_sanitize_paths_in_text(rest))
+    with _render_popover("View Raw JSON"):
+        _render_static_json_block(data, title="Raw JSON")
+    if isinstance(rest, str) and rest.strip(): _render_reasoning_text(rest, accent="#fbbf24")
 
 
 def render_kb_output(kb_content):
@@ -2303,7 +3186,7 @@ def render_kb_output(kb_content):
     elif isinstance(kb_content, str): data, rest = _extract_json(kb_content)
 
     if not isinstance(data, dict):
-        if isinstance(rest, str) and rest.strip(): st.write(rest)
+        if isinstance(rest, str) and rest.strip(): _render_reasoning_text(rest, accent="#86efac")
         return
 
     normalized = _normalize_kb_payload(data)
@@ -2312,9 +3195,11 @@ def render_kb_output(kb_content):
         reason = normalized.get("reason") or normalized.get("message") or "No details provided."
         st.warning(f"Knowledge base ({status}): {_sanitize_paths_in_text(reason)}")
         if normalized.get("sources"):
-            with _render_popover("Sources"): st.json(_sanitize_paths_in_obj(normalized["sources"]))
-        with _render_popover("Raw JSON"): st.json(_sanitize_paths_in_obj(data))
-        if isinstance(rest, str) and rest.strip(): st.write(_sanitize_paths_in_text(rest))
+            with _render_popover("Sources"):
+                _render_static_json_block(normalized["sources"], title="Sources JSON")
+        with _render_popover("Raw JSON"):
+            _render_static_json_block(data, title="Raw JSON")
+        if isinstance(rest, str) and rest.strip(): _render_reasoning_text(rest, accent="#86efac")
         return
 
     if (
@@ -2325,9 +3210,11 @@ def render_kb_output(kb_content):
     ):
         st.warning(_sanitize_paths_in_text(f"Knowledge base: {normalized.get('reason') or normalized.get('message')}"))
         if normalized.get("sources"):
-            with _render_popover("Sources"): st.json(_sanitize_paths_in_obj(normalized["sources"]))
-        with _render_popover("Raw JSON"): st.json(_sanitize_paths_in_obj(data))
-        if isinstance(rest, str) and rest.strip(): st.write(_sanitize_paths_in_text(rest))
+            with _render_popover("Sources"):
+                _render_static_json_block(normalized["sources"], title="Sources JSON")
+        with _render_popover("Raw JSON"):
+            _render_static_json_block(data, title="Raw JSON")
+        if isinstance(rest, str) and rest.strip(): _render_reasoning_text(rest, accent="#86efac")
         return
 
     task = normalized.get("task_name") or normalized.get("task_id") or "Knowledge Base Task"
@@ -2375,7 +3262,8 @@ def render_kb_output(kb_content):
             main_info = note or desc
             
             if has_input:
-                with _render_popover(main_info or "Step Details"): st.json(_sanitize_paths_in_obj(step["input"]))
+                with _render_popover(main_info or "Step Details"):
+                    _render_static_json_block(step["input"], title="Step input")
             elif main_info:
                 st.markdown(
                     f"&nbsp;&nbsp;&nbsp;&nbsp;<span style='color:gray; font-size:0.95em;'>{_sanitize_paths_in_text(main_info)}</span>",
@@ -2386,7 +3274,8 @@ def render_kb_output(kb_content):
                 code_text = step.get("code") or step.get("Code_description")
                 if code_text:
                     lang = (step.get("language") or "python").lower()
-                    with _render_popover(f"View {lang} Code"): st.code(code_text, language=lang)
+                    with _render_popover(f"View {lang} Code"):
+                        _render_static_code_block(code_text, language=lang, title=f"{lang} code")
 
             if step.get("sources"):
                 srcs = step["sources"]
@@ -2407,9 +3296,10 @@ def render_kb_output(kb_content):
             if normalized.get(key):
                 summary[key] = normalized.get(key)
         if summary:
-            st.json(_sanitize_paths_in_obj(summary))
+            _render_static_json_block(summary, title="Summary JSON")
 
-    with _render_popover("Raw JSON"): st.json(_sanitize_paths_in_obj(data))
+    with _render_popover("Raw JSON"):
+        _render_static_json_block(data, title="Raw JSON")
     
     if normalized.get("supplementary_text"):
         st.markdown("---")
@@ -2515,7 +3405,7 @@ def render_uploaded_understanding_output(raw_content, tool_name: str = ""):
             st.info(_sanitize_paths_in_text(str(message)))
 
     with _render_popover("View Raw JSON"):
-        st.json(_sanitize_paths_in_obj(data))
+        _render_static_json_block(data, title="Raw JSON")
     if isinstance(rest, str) and rest.strip():
         st.write(_sanitize_paths_in_text(rest))
 
@@ -2562,7 +3452,7 @@ def _render_auth_panel() -> None:
                 type="password",
                 key="auth_login_password",
             )
-            login_submitted = st.form_submit_button(_tr("登录", "Login"), use_container_width=True)
+            login_submitted = st.form_submit_button(_tr("登录", "Login"), width="stretch")
         if login_submitted:
             try:
                 account = history_store.authenticate_user(login_username, login_password)
@@ -2590,7 +3480,7 @@ def _render_auth_panel() -> None:
                 type="password",
                 key="auth_register_password_confirm",
             )
-            register_submitted = st.form_submit_button(_tr("注册", "Register"), use_container_width=True)
+            register_submitted = st.form_submit_button(_tr("注册", "Register"), width="stretch")
         if register_submitted:
             if register_password != register_password_confirm:
                 st.error(_tr("两次输入的密码不一致。", "Passwords do not match."))
@@ -3434,8 +4324,8 @@ def _render_sidebar_thread_history_list(current_user_id: str, current_tid: str, 
                 history_store.bind_thread_to_user(current_user_id, tid)
                 st.rerun()
 
-        if menu_target == tid and is_current:
-            menu_cols = st.columns([0.56, 0.18, 0.18], gap="small")
+        if is_current:
+            menu_cols = st.columns([0.66, 0.15, 0.19], gap="small")
             with menu_cols[1]:
                 if st.button(_tr("重命名", "Rename"), key=f"thread_rename_inline_v6_{tid}"):
                     st.session_state["sidebar_thread_rename_target"] = tid
@@ -3450,32 +4340,43 @@ def _render_sidebar_thread_history_list(current_user_id: str, current_tid: str, 
 
         if rename_target == tid:
             current_draft = str(st.session_state.get("sidebar_thread_rename_input", "") or title)
-            new_title = st.text_input(
-                _tr("线程标题", "Thread title"),
-                value=current_draft,
-                key=f"rename_thread_input_v7_{tid}",
-                label_visibility="collapsed",
-                placeholder=_tr("输入线程标题", "Enter thread title"),
-            )
-            st.session_state["sidebar_thread_rename_input"] = new_title
-            rename_cols = st.columns([0.62, 0.18, 0.20], gap="small")
-            with rename_cols[1]:
-                if st.button(_tr("保存", "Save"), key=f"rename_thread_save_v7_{tid}"):
-                    try:
-                        history_store.rename_user_thread(current_user_id, tid, new_title)
-                    except ValueError as exc:
-                        st.warning(str(exc))
-                    else:
-                        st.session_state["sidebar_thread_rename_target"] = ""
-                        st.session_state["sidebar_thread_rename_input"] = ""
-                        st.session_state["sidebar_thread_menu_target"] = ""
-                        st.rerun()
-            with rename_cols[2]:
-                if st.button(_tr("取消", "Cancel"), key=f"rename_thread_cancel_v7_{tid}"):
+            with st.form(f"rename_thread_form_v7_{tid}", clear_on_submit=False):
+                new_title = st.text_input(
+                    _tr("线程标题", "Thread title"),
+                    value=current_draft,
+                    key=f"rename_thread_input_v7_{tid}",
+                    label_visibility="collapsed",
+                    placeholder=_tr("输入线程标题", "Enter thread title"),
+                )
+                st.session_state["sidebar_thread_rename_input"] = new_title
+                rename_cols = st.columns([0.46, 0.25, 0.29], gap="small")
+                with rename_cols[1]:
+                    save_submitted = st.form_submit_button(
+                        _tr("保存", "Save"),
+                        key=f"rename_thread_save_v7_{tid}",
+                    )
+                with rename_cols[2]:
+                    cancel_submitted = st.form_submit_button(
+                        _tr("取消", "Cancel"),
+                        key=f"rename_thread_cancel_v7_{tid}",
+                    )
+
+            if save_submitted:
+                try:
+                    history_store.rename_user_thread(current_user_id, tid, new_title)
+                except ValueError as exc:
+                    st.warning(str(exc))
+                else:
                     st.session_state["sidebar_thread_rename_target"] = ""
                     st.session_state["sidebar_thread_rename_input"] = ""
                     st.session_state["sidebar_thread_menu_target"] = ""
                     st.rerun()
+
+            if cancel_submitted:
+                st.session_state["sidebar_thread_rename_target"] = ""
+                st.session_state["sidebar_thread_rename_input"] = ""
+                st.session_state["sidebar_thread_menu_target"] = ""
+                st.rerun()
 
         if delete_target == tid:
             st.caption(
@@ -3484,7 +4385,7 @@ def _render_sidebar_thread_history_list(current_user_id: str, current_tid: str, 
                     f"Delete `{title}`? This removes history and workspace files.",
                 )
             )
-            delete_cols = st.columns([0.56, 0.16, 0.20], gap="small")
+            delete_cols = st.columns([0.44, 0.25, 0.31], gap="small")
             with delete_cols[1]:
                 if st.button(_tr("删除", "Delete"), key=f"delete_thread_confirm_v8_{tid}"):
                     if st.session_state.get("is_running", False):
@@ -4109,19 +5010,46 @@ def render_file_uploader():
     )
 
     if uploaded_files:
-        workspace = storage_manager.get_workspace(st.session_state.get("thread_id", "debug"))
+        thread_id = str(st.session_state.get("thread_id", "debug"))
+        user_id = str(st.session_state.get("user_id", "guest"))
+        workspace = storage_manager.get_workspace(thread_id)
         input_dir = workspace / "inputs"
         for uploaded_file in uploaded_files:
             target_path = input_dir / uploaded_file.name
             if not target_path.exists():
-                if uploaded_file.name.endswith(".zip"):
-                    with zipfile.ZipFile(uploaded_file, "r") as zip_ref:
-                        zip_ref.extractall(input_dir)
-                    st.sidebar.success(_tr(f"已解压：{uploaded_file.name}", f"Extracted: {uploaded_file.name}"))
-                else:
-                    with open(target_path, "wb") as f:
-                        f.write(uploaded_file.getbuffer())
-                st.sidebar.success(_tr(f"已上传：{uploaded_file.name}", f"Uploaded: {uploaded_file.name}"))
+                try:
+                    if uploaded_file.name.endswith(".zip"):
+                        with zipfile.ZipFile(uploaded_file, "r") as zip_ref:
+                            targets = _zip_member_target_paths(input_dir, zip_ref)
+                            projected_bytes = sum(max(0, int(info.file_size or 0)) for info, _target in targets)
+                            quota_rejection = app_logic._workspace_quota_rejection(
+                                thread_id,
+                                user_id,
+                                additional_bytes=projected_bytes,
+                            )
+                            if quota_rejection:
+                                st.sidebar.warning(_workspace_quota_error_message(quota_rejection))
+                                continue
+                            for info, member_target in targets:
+                                member_target.parent.mkdir(parents=True, exist_ok=True)
+                                with zip_ref.open(info, "r") as src, open(member_target, "wb") as dst:
+                                    shutil.copyfileobj(src, dst)
+                        st.sidebar.success(_tr(f"已解压：{uploaded_file.name}", f"Extracted: {uploaded_file.name}"))
+                    else:
+                        payload = uploaded_file.getbuffer()
+                        quota_rejection = app_logic._workspace_quota_rejection(
+                            thread_id,
+                            user_id,
+                            additional_bytes=len(payload),
+                        )
+                        if quota_rejection:
+                            st.sidebar.warning(_workspace_quota_error_message(quota_rejection))
+                            continue
+                        with open(target_path, "wb") as f:
+                            f.write(payload)
+                    st.sidebar.success(_tr(f"已上传：{uploaded_file.name}", f"Uploaded: {uploaded_file.name}"))
+                except Exception as exc:  # noqa: BLE001
+                    st.sidebar.error(_sanitize_paths_in_text(str(exc)))
 
 
 def render_file_understanding_panel():
@@ -4329,7 +5257,6 @@ def render_map_view():
         last_layer_sig_by_thread=last_layer_sig_by_thread,
         reset_nonce_by_thread=reset_nonce_by_thread,
     )
-    is_first_open = bool(policy_state["is_first_open"])
     map_nonce = int(policy_state["map_nonce"])
     map_component_key = f"main_map_{thread_id}_{map_nonce}"
 
@@ -4510,7 +5437,7 @@ def render_map_view():
         except Exception as e:
             st.error(_tr(f"图层加载失败 {file_path.name}: {e}", f"Error loading {file_path.name}: {e}"))
 
-    if overall_bounds and not is_first_open:
+    if overall_bounds:
         try:
             min_lat = min(b[0] for b in overall_bounds)
             min_lon = min(b[1] for b in overall_bounds)
@@ -4560,6 +5487,8 @@ def render_map_view():
 def _build_reasoning_sections(events):
     """Group adjacent messages for compact single-panel reasoning view."""
     grouped = []
+    tool_meta_by_id: dict[str, dict] = {}
+    seen_user_query = False
     for event in events:
         if not isinstance(event, dict):
             continue
@@ -4605,6 +5534,7 @@ def _build_reasoning_sections(events):
                 continue
 
             if isinstance(msg, AIMessage):
+                tool_meta_by_id.update(_extract_tool_call_metadata(msg))
                 agent = (msg.name or "AI")
                 if "(streaming)" in agent.lower():
                     # Skip transient streaming markers; final messages are rendered below.
@@ -4615,15 +5545,21 @@ def _build_reasoning_sections(events):
                     grouped.append({"kind": "ai", "agent": agent, "messages": [msg]})
             elif isinstance(msg, ToolMessage):
                 tool_name = msg.name or "tool"
+                tool_call_id = str(getattr(msg, "tool_call_id", "") or "").strip()
+                tool_meta = tool_meta_by_id.get(tool_call_id) if tool_call_id else None
                 if grouped and grouped[-1]["kind"] == "tool" and grouped[-1]["tool"] == tool_name:
                     grouped[-1]["messages"].append(msg)
                 else:
-                    grouped.append({"kind": "tool", "tool": tool_name, "messages": [msg]})
+                    grouped.append({"kind": "tool", "tool": tool_name, "messages": [msg], "tool_meta": {}})
+                if tool_meta:
+                    grouped[-1].setdefault("tool_meta", {})[tool_call_id] = tool_meta
             elif isinstance(msg, HumanMessage):
-                if grouped and grouped[-1]["kind"] == "human":
+                kind = "human" if not seen_user_query else "instruction"
+                seen_user_query = True
+                if grouped and grouped[-1]["kind"] == kind:
                     grouped[-1]["messages"].append(msg)
                 else:
-                    grouped.append({"kind": "human", "messages": [msg]})
+                    grouped.append({"kind": kind, "messages": [msg]})
     return grouped
 
 
@@ -4644,6 +5580,324 @@ def _dedupe_tool_messages(messages: list[ToolMessage]) -> list[ToolMessage]:
         seen.add(key)
         unique.append(msg)
     return unique
+
+
+_PYTHON_SUFFIXES = {".py", ".pyw", ".ipynb"}
+_CSV_SUFFIXES = {".csv", ".tsv"}
+_IMAGE_SUFFIXES_FOR_REF = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tif", ".tiff"}
+_VECTOR_SUFFIXES = {".shp", ".geojson", ".gpkg", ".kml"}
+
+
+def _classify_file_reference(path: str) -> dict:
+    """Return display metadata for a file path used by read_file/read_files."""
+    raw_path = str(path or "").strip()
+    normalized = raw_path.replace("\\", "/")
+    lower = normalized.lower()
+    suffix = Path(normalized).suffix.lower()
+
+    is_skill_path = (
+        "/skills/" in lower
+        or lower.startswith("skills/")
+        or lower.startswith("/skills/")
+        or ".ntl-gpt/skills/" in lower
+    )
+
+    if is_skill_path and suffix in {".md", ".markdown"}:
+        kind = "skill"
+        label = _tr("Skill 文件", "Skill file")
+        language = "markdown"
+    elif is_skill_path and suffix in _PYTHON_SUFFIXES:
+        kind = "python"
+        label = _tr("Skill Python 脚本", "Skill Python script")
+        language = "python"
+    elif is_skill_path and suffix in _CSV_SUFFIXES:
+        kind = "csv"
+        label = _tr("Skill CSV/TSV 表格", "Skill CSV/TSV table")
+        language = "csv"
+    elif is_skill_path and suffix in _IMAGE_SUFFIXES_FOR_REF:
+        kind = "image"
+        label = _tr("Skill 影像/图片", "Skill image/raster")
+        language = "text"
+    elif is_skill_path and suffix in _VECTOR_SUFFIXES:
+        kind = "vector"
+        label = _tr("Skill 矢量地理数据", "Skill vector geodata")
+        language = "json" if suffix == ".geojson" else "text"
+    elif is_skill_path and suffix in {".json", ".jsonl", ".ndjson"}:
+        kind = "json"
+        label = _tr("Skill JSON 数据", "Skill JSON data")
+        language = "json"
+    elif is_skill_path:
+        kind = "skill"
+        label = _tr("Skill 文件", "Skill file")
+        language = "text"
+    elif suffix in _PYTHON_SUFFIXES:
+        kind = "python"
+        label = _tr("Python 脚本", "Python script")
+        language = "python"
+    elif suffix in _CSV_SUFFIXES:
+        kind = "csv"
+        label = _tr("CSV/TSV 表格", "CSV/TSV table")
+        language = "csv"
+    elif suffix in _IMAGE_SUFFIXES_FOR_REF:
+        kind = "image"
+        label = _tr("影像/图片", "Image/raster")
+        language = "text"
+    elif suffix in _VECTOR_SUFFIXES:
+        kind = "vector"
+        label = _tr("矢量地理数据", "Vector geodata")
+        language = "json" if suffix == ".geojson" else "text"
+    elif suffix in {".json", ".jsonl", ".ndjson"}:
+        kind = "json"
+        label = _tr("JSON 数据", "JSON data")
+        language = "json"
+    elif suffix in {".md", ".markdown"}:
+        kind = "markdown"
+        label = _tr("Markdown 文档", "Markdown document")
+        language = "markdown"
+    else:
+        kind = "file"
+        label = _tr("文件", "File")
+        language = "text"
+
+    return {
+        "path": raw_path,
+        "display_path": normalized,
+        "name": Path(normalized).name or normalized,
+        "kind": kind,
+        "label": label,
+        "language": language,
+    }
+
+
+def _looks_like_path(value: str) -> bool:
+    text = str(value or "").strip()
+    if not text or "\n" in text:
+        return False
+    suffix = Path(text.replace("\\", "/")).suffix.lower()
+    return bool(suffix) or "/" in text or "\\" in text
+
+
+def _extract_paths_from_tool_args(args) -> list[str]:
+    paths: list[str] = []
+
+    def add(value) -> None:
+        if isinstance(value, str) and _looks_like_path(value):
+            paths.append(value)
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                add(item)
+
+    if isinstance(args, dict):
+        for key in (
+            "file_path",
+            "file_paths",
+            "path",
+            "paths",
+            "files",
+            "file",
+            "target_file",
+            "target_files",
+        ):
+            if key in args:
+                add(args.get(key))
+    else:
+        add(args)
+
+    seen = set()
+    out = []
+    for path in paths:
+        normalized = str(path).strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        out.append(normalized)
+    return out
+
+
+def _extract_change_preview_from_tool_args(args) -> dict:
+    if not isinstance(args, dict):
+        return {}
+    before = None
+    after = None
+    for key in ("old_string", "old_str", "old", "before", "search"):
+        if isinstance(args.get(key), str):
+            before = args.get(key)
+            break
+    for key in ("new_string", "new_str", "new", "after", "replace"):
+        if isinstance(args.get(key), str):
+            after = args.get(key)
+            break
+    preview = {}
+    if before is not None:
+        preview["before"] = str(before)
+    if after is not None:
+        preview["after"] = str(after)
+    return preview
+
+
+def _normalize_tool_call(raw_call) -> tuple[str, str, object] | None:
+    if not isinstance(raw_call, dict):
+        return None
+    call_id = str(raw_call.get("id") or raw_call.get("tool_call_id") or "").strip()
+    name = str(raw_call.get("name") or "").strip()
+    args = raw_call.get("args")
+    function = raw_call.get("function")
+    if isinstance(function, dict):
+        name = name or str(function.get("name") or "").strip()
+        raw_args = function.get("arguments")
+        if isinstance(raw_args, str):
+            try:
+                args = json.loads(raw_args)
+            except Exception:
+                args = raw_args
+        elif raw_args is not None:
+            args = raw_args
+    if not call_id or not name:
+        return None
+    return call_id, name, args
+
+
+def _extract_tool_call_metadata(msg: AIMessage) -> dict:
+    """Extract display metadata from AI tool call arguments."""
+    metadata: dict[str, dict] = {}
+    raw_calls = []
+    tool_calls = getattr(msg, "tool_calls", None)
+    if isinstance(tool_calls, list):
+        raw_calls.extend(tool_calls)
+    additional = getattr(msg, "additional_kwargs", None)
+    if isinstance(additional, dict) and isinstance(additional.get("tool_calls"), list):
+        raw_calls.extend(additional.get("tool_calls") or [])
+
+    for raw_call in raw_calls:
+        normalized = _normalize_tool_call(raw_call)
+        if normalized is None:
+            continue
+        call_id, name, args = normalized
+        file_refs = []
+        name_norm = str(name).strip().lower()
+        if name_norm in {"read_file", "read_files", "edit_file", "write_file"}:
+            file_refs = [_classify_file_reference(path) for path in _extract_paths_from_tool_args(args)]
+        metadata[call_id] = {
+            "name": name,
+            "args": args,
+            "file_refs": file_refs,
+        }
+        if name_norm == "edit_file":
+            metadata[call_id]["change_preview"] = _extract_change_preview_from_tool_args(args)
+    return metadata
+
+
+def _looks_like_code_assistant_code(text: str) -> bool:
+    """Keep real scripts in code blocks while rendering prose as readable Markdown."""
+    raw = str(text or "").strip()
+    if not raw:
+        return False
+    if raw.startswith("```"):
+        return True
+    code_markers = (
+        "import ",
+        "from ",
+        "def ",
+        "class ",
+        "if __name__",
+        "with ",
+        "for ",
+        "while ",
+        "try:",
+    )
+    lines = [line for line in raw.splitlines() if line.strip()]
+    if any(line.lstrip().startswith(code_markers) for line in lines):
+        return True
+    indented = sum(1 for line in lines if line.startswith(("    ", "\t")))
+    assignments = sum(1 for line in lines if re.match(r"^[A-Za-z_][A-Za-z0-9_]*\s*=", line.strip()))
+    return len(lines) >= 3 and (indented >= 1 or assignments >= 2)
+
+
+def _render_read_file_tool_output(raw_content, metadata: dict | None = None) -> None:
+    meta = metadata or {}
+    refs = [ref for ref in meta.get("file_refs", []) if isinstance(ref, dict)]
+    tool_name = str(meta.get("name") or "read_file")
+    title = _tr("读取文件", "Read file") if tool_name == "read_file" else _tr("读取多个文件", "Read files")
+    _render_tool_file_card(title, refs)
+    language = "text"
+    if refs:
+        language = str(refs[0].get("language") or "text")
+    title_ref = ""
+    if refs:
+        title_ref = str(refs[0].get("display_path") or refs[0].get("path") or "")
+    _render_static_code_block(
+        _sanitize_paths_in_text(str(raw_content or "")),
+        language=language,
+        title=title_ref,
+    )
+
+
+def _render_tool_file_card(title: str, refs: list[dict], *, message: str = "") -> None:
+    safe_title = html.escape(str(title or "Tool output"))
+    count = len(refs)
+    count_text = _tr(f"{count} 个文件", f"{count} file{'s' if count != 1 else ''}") if count else _tr("未识别文件", "No file detected")
+    rows = []
+    if refs:
+        for ref in refs:
+            label = html.escape(str(ref.get("label") or "File"))
+            path = html.escape(str(ref.get("display_path") or ref.get("path") or ""))
+            rows.append(
+                f"<div class='ntl-file-row'><span class='ntl-file-kind'>{label}</span><span class='ntl-file-path'>{path}</span></div>"
+            )
+    else:
+        rows.append(
+            "<div class='ntl-file-row'><span class='ntl-file-kind'>File</span>"
+            f"<span class='ntl-file-path'>{html.escape(_tr('未从工具参数中找到文件路径。', 'No file path was found in the tool arguments.'))}</span></div>"
+        )
+    safe_message = html.escape(message.strip()) if isinstance(message, str) and message.strip() else ""
+    st.markdown(
+        f"""
+        <div class="ntl-tool-card">
+          <div class="ntl-tool-card-head">
+            <span class="ntl-tool-title">{safe_title}</span>
+            <span class="ntl-tool-count">{html.escape(count_text)}</span>
+          </div>
+          <div class="ntl-file-list">{''.join(rows)}</div>
+          {f'<div class="ntl-tool-message">{safe_message}</div>' if safe_message else ''}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _truncate_tool_preview(text: str, max_chars: int = 520) -> str:
+    value = str(text or "")
+    if len(value) <= max_chars:
+        return value
+    return value[: max_chars - 1].rstrip() + "..."
+
+
+def _render_edit_file_tool_output(raw_content, metadata: dict | None = None) -> None:
+    meta = metadata or {}
+    refs = [ref for ref in meta.get("file_refs", []) if isinstance(ref, dict)]
+    _render_tool_file_card(_tr("修改文件", "Edit file"), refs, message=str(raw_content or ""))
+    change = meta.get("change_preview") if isinstance(meta.get("change_preview"), dict) else {}
+    before = change.get("before")
+    after = change.get("after")
+    if before is None and after is None:
+        return
+    before_html = html.escape(_truncate_tool_preview(str(before or "")))
+    after_html = html.escape(_truncate_tool_preview(str(after or "")))
+    st.markdown(
+        f"""
+        <div class="ntl-change-grid">
+          <div class="ntl-change-pane">
+            <span class="ntl-change-label">{html.escape(_tr('修改前', 'Before'))}</span>
+            <pre class="ntl-change-text">{before_html}</pre>
+          </div>
+          <div class="ntl-change-pane">
+            <span class="ntl-change-label">{html.escape(_tr('修改后', 'After'))}</span>
+            <pre class="ntl-change-text">{after_html}</pre>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def _normalize_content_to_text(content) -> str:
@@ -4928,6 +6182,15 @@ def _build_reasoning_graph_payload(events, show_sub_steps: bool = False):
             last_tool_cluster = None
             continue
 
+        if kind == "instruction":
+            human_idx += 1
+            node_id = f"task_{human_idx}"
+            add_node(node_id, "Agent Instruction", "instruction")
+            add_edge(last_anchor, node_id, "handoff_edge")
+            last_anchor = node_id
+            last_tool_cluster = None
+            continue
+
         if kind == "ai":
             agent = str(step.get("agent") or "AI")
             node_id = _agent_node_id(agent)
@@ -5036,27 +6299,29 @@ def _build_reasoning_dot(payload: dict) -> str:
     lines = [
         "digraph ReasoningMap {",
         "rankdir=LR;",
-        'graph [bgcolor="#ffffff", splines=true, overlap=false];',
-        'node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=10];',
-        'edge [color="#475569"];',
+        'graph [bgcolor="#071021", splines=true, overlap=false];',
+        'node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=10, fontcolor="#eaf1ff", color="#6b86bd", penwidth=1.4];',
+        'edge [color="#7da7e8", fontcolor="#eaf1ff"];',
     ]
     for node in nodes:
         data = node.get("data", {})
         node_id = str(data.get("id", "n")).replace("-", "_")
         label = _escape_dot_label(data.get("label") or node_id)
         kind = str(data.get("kind", "default"))
-        fill = "#f1f5f9"
+        fill = "#162b52"
         if kind == "human":
-            fill = "#dbeafe"
+            fill = "#1f4f7a"
         elif kind == "ai":
-            fill = "#dcfce7"
+            fill = "#17635b"
         elif kind == "tool":
-            fill = "#fef3c7"
+            fill = "#29476f"
         elif kind == "tool_kb":
-            fill = "#ccfbf1"
+            fill = "#215f68"
+        elif kind == "instruction":
+            fill = "#3f3170"
         elif kind == "system":
-            fill = "#e2e8f0"
-        lines.append(f'{node_id} [label="{label}", fillcolor="{fill}"];')
+            fill = "#26384f"
+        lines.append(f'{node_id} [label="{label}", fillcolor="{fill}", fontcolor="#eaf1ff"];')
     for edge in edges:
         data = edge.get("data", {})
         src = str(data.get("source", "")).replace("-", "_")
@@ -5089,6 +6354,129 @@ def _compute_reasoning_graph_signature(events) -> str:
         last_text = str(last_event)
     last_hash = hashlib.sha1(last_text.encode("utf-8", errors="ignore")).hexdigest()[:12]
     return f"{len(events)}:{last_hash}"
+
+
+_STREAMING_CHAT_SIG_KEY = "_streaming_chat_last_sig"
+_STREAMING_LIFECYCLE_SIG_KEY = "_streaming_lifecycle_last_sig"
+_STREAMING_REASONING_SIG_KEY = "_streaming_reasoning_last_sig"
+
+
+def _normalize_streaming_signature_value(value):
+    if isinstance(value, (HumanMessage, AIMessage, ToolMessage)):
+        normalized = {
+            "type": value.__class__.__name__,
+            "content": getattr(value, "content", None),
+            "name": getattr(value, "name", None),
+            "id": getattr(value, "id", None),
+        }
+        if isinstance(value, AIMessage):
+            normalized["tool_calls"] = getattr(value, "tool_calls", None)
+        if isinstance(value, ToolMessage):
+            normalized["tool_call_id"] = getattr(value, "tool_call_id", None)
+        return normalized
+    if isinstance(value, dict):
+        return {
+            str(k): _normalize_streaming_signature_value(v)
+            for k, v in sorted(value.items(), key=lambda item: str(item[0]))
+        }
+    if isinstance(value, (list, tuple)):
+        return [_normalize_streaming_signature_value(v) for v in value]
+    return value
+
+
+def _stable_streaming_signature(payload) -> str:
+    normalized = _normalize_streaming_signature_value(payload)
+    try:
+        text = json.dumps(normalized, ensure_ascii=False, sort_keys=True, default=str)
+    except Exception:
+        text = str(normalized)
+    return hashlib.sha1(text.encode("utf-8", errors="ignore")).hexdigest()
+
+
+def _compute_streaming_chat_signature(chat_history, *, is_running: bool, run_last_terminal_kind: str) -> str:
+    return _stable_streaming_signature(
+        {
+            "chat_history": chat_history or [],
+            "is_running": bool(is_running),
+            "run_last_terminal_kind": str(run_last_terminal_kind or ""),
+        }
+    )
+
+
+def _compute_streaming_lifecycle_signature(analysis_logs, *, is_running: bool, run_last_terminal_kind: str) -> str:
+    return _stable_streaming_signature(
+        {
+            "analysis_logs": analysis_logs or [],
+            "is_running": bool(is_running),
+            "run_last_terminal_kind": str(run_last_terminal_kind or ""),
+        }
+    )
+
+
+def _compute_streaming_reasoning_signature(analysis_logs) -> str:
+    return _stable_streaming_signature({"analysis_logs": analysis_logs or []})
+
+
+def _state_get(state, key: str, default=None):
+    try:
+        return state.get(key, default)
+    except AttributeError:
+        try:
+            return state[key]
+        except Exception:
+            return default
+
+
+def _state_set(state, key: str, value) -> None:
+    try:
+        state[key] = value
+    except Exception:
+        setattr(state, key, value)
+
+
+def _current_streaming_live_signatures(state) -> dict:
+    logs = _state_get(state, "analysis_logs", []) or []
+    is_running = bool(_state_get(state, "is_running", False))
+    terminal_kind = str(_state_get(state, "run_last_terminal_kind", "") or "")
+    return {
+        "chat": _compute_streaming_chat_signature(
+            _state_get(state, "chat_history", []) or [],
+            is_running=is_running,
+            run_last_terminal_kind=terminal_kind,
+        ),
+        "lifecycle": _compute_streaming_lifecycle_signature(
+            logs,
+            is_running=is_running,
+            run_last_terminal_kind=terminal_kind,
+        ),
+        "reasoning": _compute_streaming_reasoning_signature(logs),
+    }
+
+
+def _remember_streaming_live_signatures(state=None) -> dict:
+    state = st.session_state if state is None else state
+    signatures = _current_streaming_live_signatures(state)
+    _state_set(state, _STREAMING_CHAT_SIG_KEY, signatures["chat"])
+    _state_set(state, _STREAMING_LIFECYCLE_SIG_KEY, signatures["lifecycle"])
+    _state_set(state, _STREAMING_REASONING_SIG_KEY, signatures["reasoning"])
+    return signatures
+
+
+def _compute_streaming_render_flags(state=None, *, events_consumed: bool) -> dict:
+    state = st.session_state if state is None else state
+    signatures = _current_streaming_live_signatures(state)
+    flags = {
+        "chat": signatures["chat"] != str(_state_get(state, _STREAMING_CHAT_SIG_KEY, "") or ""),
+        "lifecycle": signatures["lifecycle"] != str(_state_get(state, _STREAMING_LIFECYCLE_SIG_KEY, "") or ""),
+        "reasoning": signatures["reasoning"] != str(_state_get(state, _STREAMING_REASONING_SIG_KEY, "") or ""),
+    }
+    flags["any"] = bool(flags["chat"] or flags["lifecycle"] or flags["reasoning"])
+    if (not events_consumed) and not flags["any"]:
+        return flags
+    _state_set(state, _STREAMING_CHAT_SIG_KEY, signatures["chat"])
+    _state_set(state, _STREAMING_LIFECYCLE_SIG_KEY, signatures["lifecycle"])
+    _state_set(state, _STREAMING_REASONING_SIG_KEY, signatures["reasoning"])
+    return flags
 
 
 def render_reasoning_map(events, interactive: bool = True, show_sub_steps: bool = False):
@@ -5125,14 +6513,15 @@ def render_reasoning_map(events, interactive: bool = True, show_sub_steps: bool 
           container: root,
           elements: elements,
           style: [
-            {{ selector: "node", style: {{ "label": "data(label)", "font-size": 10, "color": "#111827", "text-wrap": "wrap", "text-max-width": 160, "shape": "round-rectangle", "background-color": "#f3f4f6", "border-width": 1, "border-color": "#6b7280" }} }},
-            {{ selector: "node.human", style: {{ "background-color": "#dbeafe" }} }},
-            {{ selector: "node.ai", style: {{ "background-color": "#dcfce7" }} }},
-            {{ selector: "node.tool", style: {{ "background-color": "#fef3c7" }} }},
-            {{ selector: "node.tool_kb", style: {{ "background-color": "#ccfbf1" }} }},
-            {{ selector: "edge", style: {{ "curve-style": "bezier", "target-arrow-shape": "triangle", "line-color": "#6b7280", "target-arrow-color": "#6b7280", "width": 1.4 }} }},
-            {{ selector: "edge.handoff_edge", style: {{ "line-color": "#1d4ed8", "target-arrow-color": "#1d4ed8", "width": 2.0 }} }},
-            {{ selector: "edge.return_edge", style: {{ "line-style": "dashed", "line-color": "#0f766e", "target-arrow-color": "#0f766e" }} }}
+            {{ selector: "node", style: {{ "label": "data(label)", "font-size": 11, "font-weight": 700, "color": "#eaf1ff", "text-outline-color": "#071021", "text-outline-width": 2, "text-wrap": "wrap", "text-max-width": 150, "shape": "round-rectangle", "background-color": "#162b52", "border-width": 1.4, "border-color": "#7da7e8" }} }},
+            {{ selector: "node.human", style: {{ "background-color": "#1f4f7a" }} }},
+            {{ selector: "node.ai", style: {{ "background-color": "#17635b" }} }},
+            {{ selector: "node.tool", style: {{ "background-color": "#29476f" }} }},
+            {{ selector: "node.tool_kb", style: {{ "background-color": "#215f68" }} }},
+            {{ selector: "node.instruction", style: {{ "background-color": "#3f3170" }} }},
+            {{ selector: "edge", style: {{ "curve-style": "bezier", "target-arrow-shape": "triangle", "line-color": "#7da7e8", "target-arrow-color": "#7da7e8", "width": 1.6 }} }},
+            {{ selector: "edge.handoff_edge", style: {{ "line-color": "#60a5fa", "target-arrow-color": "#60a5fa", "width": 2.2 }} }},
+            {{ selector: "edge.return_edge", style: {{ "line-style": "dashed", "line-color": "#2dd4bf", "target-arrow-color": "#2dd4bf" }} }}
           ],
           layout: {{ name: "breadthfirst", directed: true, padding: 20, spacingFactor: 1.15 }}
         }});
@@ -5156,18 +6545,22 @@ def render_reasoning_map(events, interactive: bool = True, show_sub_steps: bool 
 def _render_code_assistant_message(raw_content: str) -> None:
     """Render Code_Assistant message by content shape (JSON vs non-JSON)."""
     if isinstance(raw_content, (dict, list)):
-        st.json(_sanitize_paths_in_obj(raw_content))
+        _render_static_json_block(raw_content, title="Tool JSON")
         return
 
     raw_text = raw_content if isinstance(raw_content, str) else str(raw_content)
     parsed, rest = _extract_json(raw_text)
     if isinstance(parsed, (dict, list)):
         if isinstance(rest, str) and rest.strip():
-            st.write(_sanitize_paths_in_text(rest))
-        st.json(_sanitize_paths_in_obj(parsed))
+            _render_reasoning_text(rest, accent="#7dd3fc")
+        _render_static_json_block(parsed, title="Tool JSON")
         return
 
-    st.code(raw_text, language="python")
+    sanitized = _sanitize_paths_in_text(raw_text)
+    if _looks_like_code_assistant_code(sanitized):
+        _render_static_code_block(sanitized, language="python", title="Code_Assistant")
+    else:
+        _render_reasoning_text(sanitized, accent="#7dd3fc")
 
 
 def _extract_todos_payload(raw_content) -> list[dict]:
@@ -5287,9 +6680,14 @@ def render_reasoning_content(events):
         if step["kind"] == "human":
             for msg in step["messages"]:
                 render_event_human(msg.content)
-                st.markdown("<hr style='margin: 10px 0; border: 1px dashed #64748b;'>", unsafe_allow_html=True)
+                st.markdown(_reasoning_divider_html(), unsafe_allow_html=True)
+        elif step["kind"] == "instruction":
+            for msg in step["messages"]:
+                render_event_instruction(msg.content)
+                st.markdown(_reasoning_divider_html(), unsafe_allow_html=True)
         elif step["kind"] == "ai":
             agent_name = step["agent"]
+            agent_meta = _reasoning_agent_meta(agent_name)
             render_label_ai(agent_name)
             effective_messages = []
             for msg in step["messages"]:
@@ -5301,7 +6699,7 @@ def render_reasoning_content(events):
                 effective_messages.append(msg_content)
 
             if not effective_messages:
-                st.markdown("<hr style='margin: 10px 0; border: 1px dashed #64748b;'>", unsafe_allow_html=True)
+                st.markdown(_reasoning_divider_html(), unsafe_allow_html=True)
                 continue
 
             for msg_content in effective_messages:
@@ -5312,22 +6710,26 @@ def render_reasoning_content(events):
                 elif agent_name.lower() == "knowledge_base_searcher" or str(agent_name or "").strip().lower() == "knowledge_base_subagent":
                     render_kb_output(msg_content)
                 else:
-                    st.markdown(
-                        f"<div style='margin-left:15px;font-size:16px;'>{msg_content}</div>",
-                        unsafe_allow_html=True,
-                    )
-            st.markdown("<hr style='margin: 10px 0; border: 1px dashed #64748b;'>", unsafe_allow_html=True)
+                    _render_reasoning_text(msg_content, accent=agent_meta["accent"])
+            st.markdown(_reasoning_divider_html(), unsafe_allow_html=True)
         elif step["kind"] == "tool":
             tool_messages = _dedupe_tool_messages([m for m in step["messages"] if isinstance(m, ToolMessage)])
             for msg in tool_messages:
                 if msg.name and "NTL_Knowledge_Base" in msg.name:
                     # KB output is now rendered on Knowledge_Base_Searcher AI messages.
                     continue
-                exp_title = _tr(f"工具输出: {msg.name}", f"Tool Output: {msg.name}")
+                exp_title = _tr(f"工具输出 · {msg.name}", f"Tool Output · {msg.name}")
                 with st.expander(exp_title, expanded=False):
+                    render_label_tool(str(msg.name or "tool"))
                     tool_name_norm = str(msg.name or "").strip().lower()
+                    tool_call_id = str(getattr(msg, "tool_call_id", "") or "").strip()
+                    tool_meta = (step.get("tool_meta") or {}).get(tool_call_id, {})
                     if tool_name_norm == "write_todos":
                         render_write_todos_output(msg.content)
+                    elif tool_name_norm in {"read_file", "read_files"}:
+                        _render_read_file_tool_output(msg.content, tool_meta)
+                    elif tool_name_norm == "edit_file":
+                        _render_edit_file_tool_output(msg.content, tool_meta)
                     elif tool_name_norm in {
                         "uploaded_pdf_understanding_tool",
                         "uploaded_image_understanding_tool",
@@ -5348,10 +6750,10 @@ def render_reasoning_content(events):
                         render_kb_tool_output(msg.content, tool_name=str(msg.name or ""))
                     else:
                         try:
-                            st.json(_sanitize_paths_in_obj(json.loads(msg.content)))
+                            _render_static_json_block(json.loads(msg.content), title="Tool JSON")
                         except Exception:
-                            st.write(_sanitize_paths_in_text(str(msg.content)))
-            st.markdown("<hr style='margin: 10px 0; border: 1px dashed #64748b;'>", unsafe_allow_html=True)
+                            _render_reasoning_text(str(msg.content), accent="#93c5fd")
+            st.markdown(_reasoning_divider_html(), unsafe_allow_html=True)
         elif step["kind"] == "kb_progress":
             if has_final_kb_response:
                 continue
@@ -5361,13 +6763,14 @@ def render_reasoning_content(events):
             nodes = _build_kb_progress_nodes_from_records(records)
             if not nodes:
                 continue
-            exp_title = _tr("工具输出: NTL_Knowledge_Base", "Tool Output: NTL_Knowledge_Base")
+            exp_title = _tr("工具输出 · NTL_Knowledge_Base", "Tool Output · NTL_Knowledge_Base")
             with st.expander(exp_title, expanded=False):
+                render_label_tool("NTL_Knowledge_Base")
                 _render_kb_progress_nodes(
                     nodes,
                     _tr("NTL_Knowledge_Base_Searcher 节点进度（流式）", "NTL_Knowledge_Base_Searcher Node Progress (Streaming)"),
                 )
-            st.markdown("<hr style='margin: 10px 0; border: 1px dashed #64748b;'>", unsafe_allow_html=True)
+            st.markdown(_reasoning_divider_html(), unsafe_allow_html=True)
         elif step["kind"] == "custom_notice":
             for record in (step.get("records") or []):
                 if not isinstance(record, dict):
@@ -5392,7 +6795,7 @@ def render_reasoning_content(events):
                         f"Auto image understanding triggered: {', '.join(files) if files else 'image'}{suffix}",
                     )
                 st.info(msg)
-            st.markdown("<hr style='margin: 10px 0; border: 1px dashed #64748b;'>", unsafe_allow_html=True)
+            st.markdown(_reasoning_divider_html(), unsafe_allow_html=True)
 
 
 def _classify_code_assistant_stage(tool_name, tool_payload):
@@ -5503,7 +6906,7 @@ def _render_output_workspace_mismatch_notice():
     if recovered and migrated_paths:
         st.caption(_tr("已恢复文件：", "Recovered files:"))
         for p in migrated_paths:
-            st.code(p, language="text")
+            _render_static_code_block(p, language="text", title="Recovered file")
         note = str(latest.get("recovery_note") or "").strip()
         if note:
             st.caption(_sanitize_paths_in_text(note))
@@ -5512,13 +6915,13 @@ def _render_output_workspace_mismatch_notice():
     if out_paths:
         st.caption(_tr("实际落盘路径：", "Actual output paths:"))
         for p in out_paths:
-            st.code(p, language="text")
+            _render_static_code_block(p, language="text", title="Output path")
         dst = workspace or f"user_data/{st.session_state.get('thread_id', 'debug')}/outputs"
         copy_cmd = "\n".join(
             [f"Copy-Item \"{p}\" \"{dst}\" -Force" for p in out_paths]
         )
         st.caption(_tr("建议修复命令（可复制）：", "Suggested recovery commands (copy):"))
-        st.code(copy_cmd, language="powershell")
+        _render_static_code_block(copy_cmd, language="powershell", title="Recovery command")
 
 
 def _render_output_preview():
@@ -5574,21 +6977,21 @@ def _render_output_preview():
     elif suffix == ".py":
         try:
             code_text = selected.read_text(encoding="utf-8")
-            st.code(code_text, language="python")
+            _render_static_code_block(code_text, language="python", title=selected.name)
         except Exception:
             try:
                 code_text = selected.read_text(encoding="gbk")
-                st.code(code_text, language="python")
+                _render_static_code_block(code_text, language="python", title=selected.name)
             except Exception as e:
                 st.error(_tr(f"预览失败 {selected.name}: {e}", f"Failed to preview {selected.name}: {e}"))
     elif suffix in [".json", ".geojson"]:
         try:
             payload = json.loads(selected.read_text(encoding="utf-8"))
-            st.json(payload)
+            _render_static_json_block(payload, title=selected.name)
         except Exception:
             try:
                 text = selected.read_text(encoding="utf-8", errors="replace")
-                st.code(text, language="json")
+                _render_static_code_block(text, language="json", title=selected.name)
             except Exception as e:
                 st.error(_tr(f"预览失败 {selected.name}: {e}", f"Failed to preview {selected.name}: {e}"))
     elif suffix in [".jsonl", ".ndjson"]:
@@ -5835,7 +7238,8 @@ def render_content_layout():
             chat_files = []
         if chat_files:
             thread_id = str(st.session_state.get("thread_id", "debug"))
-            save_result = _save_chat_input_files_to_workspace(chat_files, thread_id)
+            user_id = str(st.session_state.get("user_id", "guest"))
+            save_result = _save_chat_input_files_to_workspace(chat_files, thread_id, user_id)
             saved = save_result.get("saved", []) or []
             errors = save_result.get("errors", []) or []
             if saved:
@@ -5945,6 +7349,9 @@ def render_content_layout():
                                     interactive=False,
                                     show_sub_steps=reasoning_graph_show_sub_steps,
                                 )
+                        st.session_state["reasoning_graph_last_sig"] = _compute_reasoning_graph_signature(
+                            st.session_state.analysis_logs
+                        )
                 except Exception as e:
                     st.error(_tr(f"图谱面板渲染异常: {e}", f"Graph panel render error: {e}"))
 
@@ -5959,6 +7366,8 @@ def render_content_layout():
                     _render_output_preview()
                 except Exception as e:
                     st.error(_tr(f"输出面板渲染异常: {e}", f"Outputs panel render error: {e}"))
+
+        _remember_streaming_live_signatures()
 
         if user_question:
             if not st.session_state.chat_history or st.session_state.chat_history[-1] != ("user", user_question):
@@ -5999,6 +7408,11 @@ def render_content_layout():
                             f"The {scope_en} active run limit is reached ({active_runs}/{limit}). Please wait for a running task to finish.",
                         )
                     )
+                elif reason in {"thread_workspace_quota_reached", "user_workspace_quota_reached"}:
+                    toast_text = _workspace_quota_error_message(run_result)
+                    if hasattr(st, "toast"):
+                        st.toast(toast_text, icon="💾")
+                    st.warning(toast_text)
                 elif reason == "conversation_uninitialized":
                     st.warning(
                         _tr(
@@ -6011,45 +7425,56 @@ def render_content_layout():
 
         graph_force_refresh_once = bool(st.session_state.get("reasoning_graph_force_refresh_once", False))
         if hasattr(st, "fragment") and (st.session_state.get("is_running", False) or graph_force_refresh_once):
-            @st.fragment(run_every=1.4)
+            @st.fragment(run_every=_STREAMING_MAIN_REFRESH_SECONDS)
             def _streaming_live_fragment_main():
                 was_running = bool(st.session_state.get("_streaming_was_running", False))
-                app_logic.consume_active_run_events()
+                events_consumed = app_logic.consume_active_run_events()
                 is_running_now = bool(st.session_state.get("is_running", False))
                 if was_running and not is_running_now:
                     st.session_state["reasoning_graph_force_refresh_once"] = True
                 st.session_state["_streaming_was_running"] = is_running_now
 
-                if chat_live_placeholder is not None:
+                render_flags = _compute_streaming_render_flags(
+                    st.session_state,
+                    events_consumed=events_consumed,
+                )
+                if (not render_flags["any"]) and not bool(st.session_state.get("ui_force_refresh_once", False)):
+                    return
+
+                if render_flags["chat"] and chat_live_placeholder is not None:
                     with chat_live_placeholder.container():
                         _render_chat_history_with_run_notice()
-                if lifecycle_placeholder is not None:
+                if render_flags["lifecycle"] and lifecycle_placeholder is not None:
                     with lifecycle_placeholder.container():
                         _render_subagent_lifecycle_cards(
                             st.session_state.get("analysis_logs", []),
                             is_running=is_running_now,
                             last_terminal_kind=str(st.session_state.get("run_last_terminal_kind", "") or ""),
                         )
-                if reasoning_live_placeholder is not None and st.session_state.get("analysis_logs"):
+                if render_flags["reasoning"] and reasoning_live_placeholder is not None and st.session_state.get("analysis_logs"):
                     with reasoning_live_placeholder.container():
                         with st.expander(_tr("本轮推理过程", "Reasoning Flow"), expanded=True):
                             render_reasoning_content(st.session_state.analysis_logs)
                 if bool(st.session_state.get("ui_force_refresh_once", False)):
                     _rerun_app()
 
-            @st.fragment(run_every=3.6)
+            @st.fragment(run_every=_STREAMING_GRAPH_REFRESH_SECONDS)
             def _streaming_live_fragment_graph():
+                force_refresh = bool(st.session_state.get("reasoning_graph_force_refresh_once", False))
                 if reasoning_graph_live_placeholder is None:
+                    if force_refresh:
+                        st.session_state["reasoning_graph_force_refresh_once"] = False
                     return
                 if not bool(st.session_state.get("reasoning_graph_refresh_enabled", True)):
                     return
                 logs = st.session_state.get("analysis_logs") or []
                 if not logs:
+                    if force_refresh:
+                        st.session_state["reasoning_graph_force_refresh_once"] = False
                     return
 
                 current_sig = _compute_reasoning_graph_signature(logs)
                 last_sig = str(st.session_state.get("reasoning_graph_last_sig", "") or "")
-                force_refresh = bool(st.session_state.get("reasoning_graph_force_refresh_once", False))
                 if (not force_refresh) and (current_sig == last_sig):
                     return
 

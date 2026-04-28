@@ -214,8 +214,8 @@ def main() -> None:
         "--sources",
         required=True,
         help=(
-            "comma list (e.g., VJ146A1,VJ146A2,VJ102DNB or "
-            "VJ102DNB,CLDMSK_L2_VIIRS_NOAA20) or nrt_priority"
+            "comma list (e.g., VNP46A1,VNP46A2,VNP46A3,VNP46A4) "
+            "or nrt_priority"
         ),
     )
     parser.add_argument("--start-date", required=True, help="YYYY-MM-DD")

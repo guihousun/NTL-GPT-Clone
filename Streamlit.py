@@ -44,7 +44,7 @@ def main():
     if st.session_state.get("ui_lang") == "中文":
         st.session_state["ui_lang"] = "CN"
 
-    top_left, top_right = st.columns([0.95, 0.05])
+    top_left, top_right = st.columns([0.90, 0.10])
     with top_right:
         is_running = bool(st.session_state.get("is_running", False))
         lang = st.radio(

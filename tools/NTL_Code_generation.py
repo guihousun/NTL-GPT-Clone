@@ -33,8 +33,26 @@ from storage_manager import (
 DEFAULT_GEE_PROJECT = "empyrean-caster-430308-m2"
 
 
+def _live_storage_context_value(name: str, imported_context_var: Any) -> str:
+    """Read contextvars robustly even if tests reload storage_manager after import."""
+    try:
+        value = imported_context_var.get()
+    except Exception:
+        value = ""
+    if str(value or "").strip():
+        return str(value or "").strip()
+    try:
+        live_module = __import__("storage_manager")
+        live_context_var = getattr(live_module, name, None)
+        if live_context_var is not None and live_context_var is not imported_context_var:
+            value = live_context_var.get()
+    except Exception:
+        value = ""
+    return str(value or "").strip()
+
+
 def _gee_project_id() -> str:
-    context_project_id = str(current_gee_project_id.get() or "").strip()
+    context_project_id = _live_storage_context_value("current_gee_project_id", current_gee_project_id)
     if context_project_id:
         return context_project_id
     active_project_id = str(os.getenv("NTL_ACTIVE_GEE_PROJECT_ID", "") or "").strip()
@@ -50,19 +68,29 @@ def _gee_project_id() -> str:
 
 
 def _active_gee_credentials():
-    encrypted = str(current_gee_encrypted_refresh_token.get() or os.getenv("NTL_ACTIVE_GEE_ENCRYPTED_REFRESH_TOKEN", "") or "").strip()
+    encrypted = (
+        _live_storage_context_value("current_gee_encrypted_refresh_token", current_gee_encrypted_refresh_token)
+        or str(os.getenv("NTL_ACTIVE_GEE_ENCRYPTED_REFRESH_TOKEN", "") or "").strip()
+    )
     if not encrypted:
         return None
     import gee_auth
 
     refresh_token = gee_auth.decrypt_refresh_token(encrypted)
-    scopes_text = str(current_gee_token_scopes.get() or os.getenv("NTL_ACTIVE_GEE_TOKEN_SCOPES", "") or "").strip()
+    scopes_text = (
+        _live_storage_context_value("current_gee_token_scopes", current_gee_token_scopes)
+        or str(os.getenv("NTL_ACTIVE_GEE_TOKEN_SCOPES", "") or "").strip()
+    )
     scopes = scopes_text.split() if scopes_text else None
     return gee_auth.credentials_from_refresh_token(refresh_token, scopes=scopes)
 
 
 def _patch_ee_initialize_for_active_credentials(code_block: str) -> str:
-    if not str(current_gee_encrypted_refresh_token.get() or os.getenv("NTL_ACTIVE_GEE_ENCRYPTED_REFRESH_TOKEN", "") or "").strip():
+    encrypted = (
+        _live_storage_context_value("current_gee_encrypted_refresh_token", current_gee_encrypted_refresh_token)
+        or str(os.getenv("NTL_ACTIVE_GEE_ENCRYPTED_REFRESH_TOKEN", "") or "").strip()
+    )
+    if not encrypted:
         return code_block
     code = str(code_block or "")
     code = re.sub(
@@ -396,6 +424,33 @@ def _build_artifact_audit(stdout: str, thread_id: Optional[str] = None) -> Dict[
         "auto_migration_success": False,
         "migrated_paths": [],
         "migration_failures": [],
+    }
+
+
+def _build_stdout_quality_audit(stdout: str) -> Dict[str, Any]:
+    """Detect successful exits that actually report empty geospatial results."""
+    text = str(stdout or "")
+    warnings: List[str] = []
+    patterns = [
+        (r"\b0\s+regions?\b", "0 regions"),
+        (r"\b0\s+features?\b", "0 features"),
+        (r"\b0\s+records?\b", "0 records"),
+        (r"\brows?\s*[:=]\s*0\b", "rows=0"),
+        (r"\brow_count\s*[:=]\s*0\b", "row_count=0"),
+        (r"\bfeatures?\s*[:=]\s*0\b", "features=0"),
+        (r"\bregions?\s*[:=]\s*0\b", "regions=0"),
+    ]
+    for pattern, label in patterns:
+        if re.search(pattern, text, flags=re.IGNORECASE):
+            warnings.append(
+                f"Execution log reports {label}; empty geospatial/statistical outputs must be treated as failure."
+            )
+    warnings = _dedupe_ordered(warnings)
+    return {
+        "pass": not warnings,
+        "warnings": warnings,
+        "error_type": "EmptyResultError" if warnings else None,
+        "error_message": warnings[0] if warnings else None,
     }
 
 
@@ -967,6 +1022,11 @@ def _derive_fix_suggestions(error_type: Optional[str], error_message: Optional[s
             fixes.append("Use sandbox-relative paths from workspace root, e.g. inputs/xxx and outputs/yyy.")
             fixes.append("If portability is needed, switch to storage_manager.resolve_input_path/resolve_output_path.")
 
+    if "emptyresulterror" in et or "0 regions" in msg or "rows=0" in msg:
+        fixes.append("Treat empty geospatial results as failed validation, not success.")
+        fixes.append("For reduceRegions outputs, verify boundary feature count and read reducer output property `mean`.")
+        fixes.append("For China 34 province-level tasks, validate exactly 34 rows including Taiwan, Hong Kong, and Macau.")
+
     if "user_project_denied" in msg or "serviceusage.serviceusageconsumer" in msg:
         fixes.append(
             "GEE project authorization failed. Use an authorized GEE_DEFAULT_PROJECT_ID or grant the active account "
@@ -1393,6 +1453,12 @@ def GEE_GeoCode_COT_Validation(
             return json.dumps(report, indent=2, ensure_ascii=False)
         runtime_code, runtime_path_rewrite = _rewrite_virtual_paths_for_runtime(code_block, thread_id=thread_id)
         ok, logs, etype, emsg, tb = _execute_code(runtime_code)
+        stdout_quality_audit = _build_stdout_quality_audit(logs)
+        if ok and not stdout_quality_audit.get("pass", True):
+            ok = False
+            etype = str(stdout_quality_audit.get("error_type") or "EmptyResultError")
+            emsg = str(stdout_quality_audit.get("error_message") or "Execution produced an empty result.")
+            tb = None
         fix_suggestions = _derive_fix_suggestions(etype, emsg) + preflight["recommendations"]
         report = {
             "status": "pass" if ok else "fail",
@@ -1414,6 +1480,7 @@ def GEE_GeoCode_COT_Validation(
             ),
             "execution_skipped": False,
             "runtime_path_rewrite": runtime_path_rewrite,
+            "stdout_quality_audit": stdout_quality_audit,
         }
         _append_run_history(
             {
@@ -1736,6 +1803,12 @@ def execute_geospatial_script(
         runtime_code, runtime_path_rewrite = _rewrite_virtual_paths_for_runtime(script_content, thread_id=thread_id)
         ok, logs, etype, emsg, tb = _execute_code(runtime_code)
         artifact_audit = _build_artifact_audit(logs, thread_id=thread_id)
+        stdout_quality_audit = _build_stdout_quality_audit(logs)
+        if ok and not stdout_quality_audit.get("pass", True):
+            ok = False
+            etype = str(stdout_quality_audit.get("error_type") or "EmptyResultError")
+            emsg = str(stdout_quality_audit.get("error_message") or "Execution produced an empty result.")
+            tb = None
         if ok:
             warning_messages: List[str] = []
             warning_policy: Optional[Dict[str, Any]] = None
@@ -1806,6 +1879,7 @@ def execute_geospatial_script(
                 ),
                 "artifact_audit": artifact_audit,
                 "runtime_path_rewrite": runtime_path_rewrite,
+                "stdout_quality_audit": stdout_quality_audit,
             }
             if warning_messages:
                 result["warnings"] = warning_messages
@@ -1875,6 +1949,7 @@ def execute_geospatial_script(
             "execution_skipped": False,
             "artifact_audit": artifact_audit,
             "runtime_path_rewrite": runtime_path_rewrite,
+            "stdout_quality_audit": stdout_quality_audit,
         }
         _append_run_history(
             {

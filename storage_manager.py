@@ -3,6 +3,8 @@ import os
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, Optional
 
+from runtime_governance import thread_workspace_quota_bytes, user_workspace_quota_bytes
+
 # Thread-scoped context used across LangGraph/Deep Agents execution.
 current_thread_id = contextvars.ContextVar("thread_id", default="debug")
 current_gee_project_id = contextvars.ContextVar("gee_project_id", default="")
@@ -219,6 +221,56 @@ class StorageManager:
             "inputs": [p.name for p in (workspace / "inputs").glob("*") if p.is_file()],
             "outputs": [p.name for p in (workspace / "outputs").glob("*") if p.is_file()],
             "memory": [p.name for p in (workspace / "memory").glob("*") if p.is_file()],
+        }
+
+    @staticmethod
+    def _tree_size_bytes(root: Path) -> int:
+        total = 0
+        if not root.exists():
+            return 0
+        for path in root.rglob("*"):
+            try:
+                if path.is_file():
+                    total += int(path.stat().st_size)
+            except Exception:
+                continue
+        return total
+
+    def workspace_usage_bytes(self, thread_id: Optional[str] = None) -> int:
+        workspace = self.get_workspace(thread_id)
+        return self._tree_size_bytes(workspace)
+
+    def aggregate_thread_usage_bytes(self, thread_ids: list[str]) -> int:
+        total = 0
+        seen: set[str] = set()
+        for raw_thread_id in thread_ids:
+            tid = str(raw_thread_id or "").strip()
+            if not tid or tid in seen:
+                continue
+            seen.add(tid)
+            total += self.workspace_usage_bytes(tid)
+        return total
+
+    def thread_quota_snapshot(self, thread_id: Optional[str] = None, *, additional_bytes: int = 0) -> Dict[str, int | bool]:
+        usage = self.workspace_usage_bytes(thread_id)
+        limit = max(0, int(thread_workspace_quota_bytes() or 0))
+        projected = usage + max(0, int(additional_bytes or 0))
+        return {
+            "usage_bytes": usage,
+            "limit_bytes": limit,
+            "projected_bytes": projected,
+            "allowed": (limit <= 0) or (projected <= limit),
+        }
+
+    def user_quota_snapshot(self, thread_ids: list[str], *, additional_bytes: int = 0) -> Dict[str, int | bool]:
+        usage = self.aggregate_thread_usage_bytes(thread_ids)
+        limit = max(0, int(user_workspace_quota_bytes() or 0))
+        projected = usage + max(0, int(additional_bytes or 0))
+        return {
+            "usage_bytes": usage,
+            "limit_bytes": limit,
+            "projected_bytes": projected,
+            "allowed": (limit <= 0) or (projected <= limit),
         }
 
     @staticmethod

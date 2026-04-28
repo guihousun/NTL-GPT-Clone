@@ -35,6 +35,7 @@ You must follow Geo-CodeCoT v2 strictly.
   - `/skills/gee-dataset-selection/` when checking GEE dataset_id, band, scale, date coverage, or auxiliary layers.
   - `/skills/gee-python-server-side-workflow/` when executing or validating GEE Python server-side scripts.
   - `/skills/gee-ntl-date-boundary-handling/` only when daily/event first-night, timezone, or event AOI logic is involved.
+  - `/skills/geospatial-visualization-cjk/` when generating charts/maps, especially if labels may contain Chinese text.
   - `/skills/ntl-regression-evaluation/` when asked to verify changed script/routing behavior against known cases.
 - Skill instructions override ad-hoc workflow habits.
 
@@ -109,8 +110,18 @@ You must follow Geo-CodeCoT v2 strictly.
   - `NOAA/VIIRS/DNB/MONTHLY_V1/VCMSLCFG` (monthly)
   - `NOAA/VIIRS/DNB/ANNUAL_V22` and `projects/sat-io/open-datasets/npp-viirs-ntl` (annual)
 
+## 4.1) CHINA 34 PROVINCE-LEVEL EXECUTION GUARDRAIL
+- For China 34 province-level NTL mean/ranking/statistics tasks, first read `/skills/gee-python-server-side-workflow/references/cases/china_province_annual_reduceRegions.py` and follow that pattern unless Engineer supplies a stricter contract.
+- Expected output is exactly 34 rows: 31 mainland province-level regions plus Taiwan, Hong Kong, and Macau.
+- For `projects/sat-io/open-datasets/npp-viirs-ntl`, select band `b1`. Do not select `avg_rad`; that is a monthly product band and will fail for this annual dataset.
+- If using `ee.Image.reduceRegions(..., reducer=ee.Reducer.mean())`, read `feature.get('mean')`; never feature.get('b1_mean') unless the reducer output was explicitly renamed to that exact property.
+- If geoBoundaries `shapeGroup='CHN'` is used, explicitly add Taiwan (`shapeGroup='TWN'`) and Hong Kong/Macau from suitable boundary sources, or use a verified China province asset containing all 34 units.
+- Treat `0 regions`, `rows=0`, empty CSV, missing Taiwan/Hong Kong/Macau, or row count not equal to 34 as execution failure. Do not return a success payload in those cases.
+- On `ScriptNotFoundError`, execute only after saving/re-saving the exact `.py` file; do not execute a guessed filename.
+
 ## 5) Output Requirements
 - Save outputs with standard formats: CSV (stats), PNG (visualization), TIF (raster).
+- For PNG/JPG visualization outputs, configure a CJK-capable Matplotlib font before plotting and verify Chinese labels are readable, not boxes.
 - Always return generated filenames and script metadata: `script_name`, `script_path`, execution status.
 - Workflow evolution authority belongs to `NTL_Engineer` only. You MUST NOT directly edit workflow or evolution log files.
 - If workflow refinement is needed, return proposal payload only using:

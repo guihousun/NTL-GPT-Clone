@@ -16,27 +16,61 @@ class SourceSpec:
 _SOURCE_REGISTRY: dict[str, SourceSpec] = {
     "VNP46A1": SourceSpec(
         short_name="VNP46A1",
-        processing_mode="gridded_tile_stats",
+        processing_mode="gridded_tile_clip",
         variable_candidates=(
-            "HDFEOS/GRIDS/VIIRS_Grid_DNB_2d/Data Fields/DNB_At_Sensor_Radiance",
-            "DNB_At_Sensor_Radiance",
+            "HDFEOS/GRIDS/VNP_Grid_DNB/Data Fields/DNB_At_Sensor_Radiance_500m",
             "DNB_At_Sensor_Radiance_500m",
+            "DNB_At_Sensor_Radiance",
         ),
         qa_variable_candidates={
             "QF_Cloud_Mask": (
                 "HDFEOS/GRIDS/VIIRS_Grid_DNB_2d/Data Fields/QF_Cloud_Mask",
+                "HDFEOS/GRIDS/VNP_Grid_DNB/Data Fields/QF_Cloud_Mask",
                 "QF_Cloud_Mask",
             ),
             "QF_DNB": (
                 "HDFEOS/GRIDS/VIIRS_Grid_DNB_2d/Data Fields/QF_DNB",
+                "HDFEOS/GRIDS/VNP_Grid_DNB/Data Fields/QF_DNB",
                 "QF_DNB",
             ),
-            "UTC_Time": (
-                "HDFEOS/GRIDS/VIIRS_Grid_DNB_2d/Data Fields/UTC_Time",
-                "UTC_Time",
+        },
+        night_only=False,
+    ),
+    "VNP46A2": SourceSpec(
+        short_name="VNP46A2",
+        processing_mode="gridded_tile_clip",
+        variable_candidates=(
+            "HDFEOS/GRIDS/VNP_Grid_DNB/Data Fields/Gap_Filled_DNB_BRDF-Corrected_NTL",
+            "Gap_Filled_DNB_BRDF-Corrected_NTL",
+            "Gap_Filled_DNB_BRDF_Corrected_NTL",
+            "DNB_BRDF-Corrected_NTL",
+        ),
+        qa_variable_candidates={
+            "Mandatory_Quality_Flag": (
+                "HDFEOS/GRIDS/VNP_Grid_DNB/Data Fields/Mandatory_Quality_Flag",
+                "Mandatory_Quality_Flag",
+            ),
+            "QF_Cloud_Mask": (
+                "HDFEOS/GRIDS/VNP_Grid_DNB/Data Fields/QF_Cloud_Mask",
+                "QF_Cloud_Mask",
+            ),
+            "Snow_Flag": (
+                "HDFEOS/GRIDS/VNP_Grid_DNB/Data Fields/Snow_Flag",
+                "Snow_Flag",
             ),
         },
-        default_qa_mode="balanced",
+        night_only=False,
+    ),
+    "VNP46A3": SourceSpec(
+        short_name="VNP46A3",
+        processing_mode="feasibility_only",
+        variable_candidates=(),
+        night_only=False,
+    ),
+    "VNP46A4": SourceSpec(
+        short_name="VNP46A4",
+        processing_mode="feasibility_only",
+        variable_candidates=(),
         night_only=False,
     ),
     "VJ146A1_NRT": SourceSpec(
@@ -136,11 +170,11 @@ _SOURCE_REGISTRY: dict[str, SourceSpec] = {
 
 
 def get_default_sources() -> list[str]:
-    return ["VNP46A1", "VJ146A2", "VJ146A1", "VJ102DNB"]
+    return ["VNP46A1", "VNP46A2", "VNP46A3", "VNP46A4"]
 
 
 def get_nrt_priority_sources() -> list[str]:
-    return ["VJ146A1_NRT", "VJ146A1", "VJ146A2", "VJ102DNB_NRT", "VJ102DNB"]
+    return ["VNP46A1", "VNP46A2", "VNP46A3", "VNP46A4"]
 
 
 def get_source_spec(source: str) -> SourceSpec:

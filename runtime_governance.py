@@ -13,11 +13,15 @@ MEMORY_NAMESPACE_SCOPE_ENV = "NTL_MEMORY_NAMESPACE_SCOPE"
 HISTORY_DB_URL_ENV = "NTL_HISTORY_DB_URL"
 MAX_ACTIVE_RUNS_ENV = "NTL_MAX_ACTIVE_RUNS"
 MAX_ACTIVE_RUNS_PER_USER_ENV = "NTL_MAX_ACTIVE_RUNS_PER_USER"
+THREAD_WORKSPACE_QUOTA_MB_ENV = "NTL_THREAD_WORKSPACE_QUOTA_MB"
+USER_WORKSPACE_QUOTA_MB_ENV = "NTL_USER_WORKSPACE_QUOTA_MB"
 GEE_DEFAULT_PROJECT_ID_ENV = "GEE_DEFAULT_PROJECT_ID"
 DEFAULT_GEE_PROJECT_ID = "empyrean-caster-430308-m2"
 
 DEFAULT_MAX_ACTIVE_RUNS = 10
 DEFAULT_MAX_ACTIVE_RUNS_PER_USER = 2
+DEFAULT_THREAD_WORKSPACE_QUOTA_MB = 500
+DEFAULT_USER_WORKSPACE_QUOTA_MB = 1024
 
 
 def _env_text(name: str) -> str:
@@ -66,6 +70,22 @@ def max_active_runs() -> int:
 
 def max_active_runs_per_user() -> int:
     return positive_int_env(MAX_ACTIVE_RUNS_PER_USER_ENV, DEFAULT_MAX_ACTIVE_RUNS_PER_USER)
+
+
+def thread_workspace_quota_mb() -> int:
+    return positive_int_env(THREAD_WORKSPACE_QUOTA_MB_ENV, DEFAULT_THREAD_WORKSPACE_QUOTA_MB)
+
+
+def user_workspace_quota_mb() -> int:
+    return positive_int_env(USER_WORKSPACE_QUOTA_MB_ENV, DEFAULT_USER_WORKSPACE_QUOTA_MB)
+
+
+def thread_workspace_quota_bytes() -> int:
+    return thread_workspace_quota_mb() * 1024 * 1024
+
+
+def user_workspace_quota_bytes() -> int:
+    return user_workspace_quota_mb() * 1024 * 1024
 
 
 def default_gee_project_id() -> str:

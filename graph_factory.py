@@ -308,6 +308,7 @@ Workspace protocol (canonical):
 - Treat `/shared/...` as read-only source data: read is allowed, write/overwrite is forbidden.
 - Runtime note: `/shared/...` is a virtual Deep Agents path and is runtime-mapped to local `base_data/...` during script execution.
 - For data discovery, prefer file tools first (for example `glob`) on virtual paths such as `/inputs/*` and `/shared/*` before asking for re-upload or re-download.
+- For any chart/map PNG output, use the `geospatial-visualization-cjk` skill. Configure a CJK-capable Matplotlib font before plotting Chinese labels, save figures under `/outputs/`, and verify labels are not rendered as boxes.
 
 Deep Agents virtual-path compatibility (alias mapping):
 - `/data/raw/<file>` -> `inputs/<file>`

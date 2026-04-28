@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import time
@@ -7,7 +8,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import streamlit as st
-from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, ToolMessage, message_to_dict
 
 import app_agents
 import app_state
@@ -31,6 +32,66 @@ _RUN_REGISTRY_LOCK = threading.RLock()
 _RUN_REGISTRY: dict[str, dict[str, Any]] = {}
 _THREAD_ACTIVE_RUN: dict[str, str] = {}
 OUTPUT_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+
+
+def _format_bytes(num_bytes: int) -> str:
+    size = max(0, int(num_bytes or 0))
+    units = ["B", "KB", "MB", "GB", "TB"]
+    value = float(size)
+    unit = units[0]
+    for unit in units:
+        if value < 1024.0 or unit == units[-1]:
+            break
+        value /= 1024.0
+    if unit == "B":
+        return f"{int(value)}{unit}"
+    return f"{value:.1f}{unit}"
+
+
+def _user_thread_ids(user_id: str, current_thread_id: str) -> list[str]:
+    tids: list[str] = []
+    uid = str(user_id or "").strip()
+    if uid:
+        try:
+            tids.extend(str(row.get("thread_id") or "").strip() for row in history_store.list_user_threads(uid, limit=0))
+        except Exception:
+            pass
+    tid = str(current_thread_id or "").strip()
+    if tid and tid not in tids:
+        tids.append(tid)
+    return [item for item in tids if item]
+
+
+def _workspace_quota_rejection(thread_id: str, user_id: str, *, additional_bytes: int = 0) -> Optional[dict[str, Any]]:
+    thread_snapshot = storage_manager.thread_quota_snapshot(thread_id, additional_bytes=additional_bytes)
+    if not bool(thread_snapshot.get("allowed", True)):
+        return {
+            "started": False,
+            "reason": "thread_workspace_quota_reached",
+            "usage_bytes": int(thread_snapshot.get("usage_bytes") or 0),
+            "projected_bytes": int(thread_snapshot.get("projected_bytes") or 0),
+            "limit_bytes": int(thread_snapshot.get("limit_bytes") or 0),
+            "usage_label": _format_bytes(int(thread_snapshot.get("usage_bytes") or 0)),
+            "projected_label": _format_bytes(int(thread_snapshot.get("projected_bytes") or 0)),
+            "limit_label": _format_bytes(int(thread_snapshot.get("limit_bytes") or 0)),
+        }
+
+    user_snapshot = storage_manager.user_quota_snapshot(
+        _user_thread_ids(user_id, thread_id),
+        additional_bytes=additional_bytes,
+    )
+    if not bool(user_snapshot.get("allowed", True)):
+        return {
+            "started": False,
+            "reason": "user_workspace_quota_reached",
+            "usage_bytes": int(user_snapshot.get("usage_bytes") or 0),
+            "projected_bytes": int(user_snapshot.get("projected_bytes") or 0),
+            "limit_bytes": int(user_snapshot.get("limit_bytes") or 0),
+            "usage_label": _format_bytes(int(user_snapshot.get("usage_bytes") or 0)),
+            "projected_label": _format_bytes(int(user_snapshot.get("projected_bytes") or 0)),
+            "limit_label": _format_bytes(int(user_snapshot.get("limit_bytes") or 0)),
+        }
+    return None
 
 
 def _workspace_relative_ref(path: Path, workspace: Path) -> str:
@@ -364,6 +425,26 @@ def _extract_tool_usage(logs: list) -> tuple[list[str], dict]:
     return sequence, counts
 
 
+def _json_safe_analysis_value(value: Any) -> Any:
+    if isinstance(value, BaseMessage):
+        return message_to_dict(value)
+    if isinstance(value, dict):
+        return {str(k): _json_safe_analysis_value(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe_analysis_value(item) for item in value]
+    try:
+        json.dumps(value, ensure_ascii=False)
+        return value
+    except Exception:
+        return str(value)
+
+
+def _serialize_analysis_logs(logs: list) -> list:
+    if not isinstance(logs, list):
+        return []
+    return [_json_safe_analysis_value(event) for event in logs if isinstance(event, dict)]
+
+
 def inject_selected_files_to_context(file_names: list[str], max_pages: int = 120) -> dict:
     thread_id = str(st.session_state.get("thread_id") or "debug")
     vlm_model_name = str(st.session_state.get("cfg_model") or "qwen3.5-plus")
@@ -448,6 +529,21 @@ def _collect_new_messages(payload, seen_fingerprints: set[str]) -> list[BaseMess
                 continue
             seen_fingerprints.add(fp)
             delta.append(msg)
+    return delta
+
+
+def _messages_not_seen_before_run(messages, initial_fingerprints: set[str]) -> list[BaseMessage]:
+    """Return state messages that were created during the current run only."""
+    if not isinstance(messages, list):
+        return []
+    initial = set(initial_fingerprints or set())
+    delta: list[BaseMessage] = []
+    for msg in messages:
+        if not isinstance(msg, BaseMessage):
+            continue
+        if _message_fingerprint(msg) in initial:
+            continue
+        delta.append(msg)
     return delta
 
 
@@ -712,6 +808,9 @@ def start_user_run(user_question: str) -> dict[str, Any]:
             "reason": "thread_run_in_progress",
             "run_id": active_session_run_id,
         }
+    quota_rejection = _workspace_quota_rejection(run_thread_id, run_user_id)
+    if quota_rejection:
+        return quota_rejection
     with _RUN_REGISTRY_LOCK:
         active_run_id = _THREAD_ACTIVE_RUN.get(run_thread_id)
         if active_run_id:
@@ -756,6 +855,9 @@ def start_user_run(user_question: str) -> dict[str, Any]:
             active_control = _RUN_REGISTRY.get(active_run_id)
             if active_control and str(active_control.get("state")) == "running":
                 return {"started": False, "reason": "thread_run_in_progress", "run_id": active_run_id}
+        quota_rejection = _workspace_quota_rejection(run_thread_id, run_user_id)
+        if quota_rejection:
+            return quota_rejection
         limit_rejection = _run_limit_rejection_locked(run_user_id)
         if limit_rejection:
             return limit_rejection
@@ -821,10 +923,11 @@ def _worker_run_main(run_id: str) -> None:
     gee_refresh_token = current_gee_encrypted_refresh_token.set(str(control.get("gee_encrypted_refresh_token") or ""))
     gee_scopes_token = current_gee_token_scopes.set(str(control.get("gee_token_scopes") or ""))
     try:
-        seen_message_fingerprints: set[str] = set()
+        initial_message_fingerprints: set[str] = set()
         for existing_msg in _get_state_messages(conversation, config):
             if isinstance(existing_msg, BaseMessage):
-                seen_message_fingerprints.add(_message_fingerprint(existing_msg))
+                initial_message_fingerprints.add(_message_fingerprint(existing_msg))
+        seen_message_fingerprints: set[str] = set(initial_message_fingerprints)
 
         for mode, payload, namespace in _iter_events(conversation, state, config):
             now = time.time()
@@ -879,7 +982,10 @@ def _worker_run_main(run_id: str) -> None:
     if not final_answer and last_event and "messages" in last_event:
         final_answer = _extract_meaningful_ai_text(last_event.get("messages"), preferred_agents=preferred_agents)
 
-    state_messages = _get_state_messages(conversation, config)
+    state_messages = _messages_not_seen_before_run(
+        _get_state_messages(conversation, config),
+        initial_message_fingerprints if "initial_message_fingerprints" in locals() else set(),
+    )
     preferred_from_state = _extract_meaningful_ai_text(state_messages, preferred_agents=preferred_agents)
     if preferred_from_state:
         final_answer = preferred_from_state
@@ -937,6 +1043,7 @@ def _worker_run_main(run_id: str) -> None:
                 "final_answer_excerpt": str(final_answer or "")[:300],
                 "tool_sequence": sequence,
                 "tool_calls_by_name": counts,
+                "analysis_logs": _serialize_analysis_logs(logs),
                 "status": status,
                 "duration_s": round(elapsed_s, 3),
             },

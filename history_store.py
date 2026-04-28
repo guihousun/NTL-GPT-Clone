@@ -31,10 +31,21 @@ MIN_PASSWORD_LENGTH = 8
 DEFAULT_THREAD_LIST_LIMIT = 8
 GEE_PIPELINE_MODES = {"default", "user"}
 DEFAULT_DB_CONNECT_TIMEOUT_S = 5
+USER_ROLE_USER = "user"
+USER_ROLE_ADMIN = "admin"
 
 
 def _now_ts() -> int:
     return int(time.time())
+
+
+def _admin_username_keys_from_env() -> set[str]:
+    raw = str(os.getenv("NTL_ADMIN_USERNAMES", "") or "")
+    return {normalize_user_id(item) for item in raw.split(",") if normalize_user_id(item)}
+
+
+def _initial_role_for_username(username_key: str) -> str:
+    return USER_ROLE_ADMIN if str(username_key or "").strip() in _admin_username_keys_from_env() else USER_ROLE_USER
 
 
 def _safe_read_json(path: Path, default: Any) -> Any:
@@ -229,7 +240,10 @@ def _db_setup() -> None:
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL,
                 last_login_at INTEGER NOT NULL DEFAULT 0,
-                is_active INTEGER NOT NULL DEFAULT 1
+                is_active INTEGER NOT NULL DEFAULT 1,
+                role TEXT NOT NULL DEFAULT 'user',
+                disabled_at INTEGER NOT NULL DEFAULT 0,
+                disabled_reason TEXT NOT NULL DEFAULT ''
             )
             """,
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_key ON users(username_key)",
@@ -300,6 +314,18 @@ def _db_setup() -> None:
             )
             """,
             "CREATE INDEX IF NOT EXISTS idx_injected_context_thread_updated ON injected_context(thread_id, updated_at DESC)",
+            """
+            CREATE TABLE IF NOT EXISTS admin_audit_logs (
+                row_id TEXT PRIMARY KEY,
+                ts INTEGER NOT NULL,
+                admin_user_id TEXT NOT NULL,
+                target_user_id TEXT NOT NULL,
+                action TEXT NOT NULL,
+                reason TEXT NOT NULL DEFAULT '',
+                payload_json TEXT NOT NULL DEFAULT '{}'
+            )
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_ts ON admin_audit_logs(ts DESC)",
         ]
     else:
         stmts = [
@@ -313,7 +339,10 @@ def _db_setup() -> None:
                 created_at BIGINT NOT NULL,
                 updated_at BIGINT NOT NULL,
                 last_login_at BIGINT NOT NULL DEFAULT 0,
-                is_active BOOLEAN NOT NULL DEFAULT TRUE
+                is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                role TEXT NOT NULL DEFAULT 'user',
+                disabled_at BIGINT NOT NULL DEFAULT 0,
+                disabled_reason TEXT NOT NULL DEFAULT ''
             )
             """,
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_key ON users(username_key)",
@@ -384,13 +413,62 @@ def _db_setup() -> None:
             )
             """,
             "CREATE INDEX IF NOT EXISTS idx_injected_context_thread_updated ON injected_context(thread_id, updated_at DESC)",
+            """
+            CREATE TABLE IF NOT EXISTS admin_audit_logs (
+                row_id TEXT PRIMARY KEY,
+                ts BIGINT NOT NULL,
+                admin_user_id TEXT NOT NULL,
+                target_user_id TEXT NOT NULL,
+                action TEXT NOT NULL,
+                reason TEXT NOT NULL DEFAULT '',
+                payload_json TEXT NOT NULL DEFAULT '{}'
+            )
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_ts ON admin_audit_logs(ts DESC)",
         ]
 
     for stmt in stmts:
         _db_execute(stmt)
+    _db_migrate_user_admin_columns_if_needed()
     _db_migrate_thread_columns_if_needed()
     _db_migrate_gee_profile_columns_if_needed()
+    _db_sync_admin_roles_from_env()
     _DB_READY.add(url)
+
+
+def _db_migrate_user_admin_columns_if_needed() -> None:
+    if _db_kind() == "sqlite":
+        alter_statements = [
+            "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'",
+            "ALTER TABLE users ADD COLUMN disabled_at INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN disabled_reason TEXT NOT NULL DEFAULT ''",
+        ]
+    elif _db_kind() == "postgres":
+        alter_statements = [
+            "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'",
+            "ALTER TABLE users ADD COLUMN disabled_at BIGINT NOT NULL DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN disabled_reason TEXT NOT NULL DEFAULT ''",
+        ]
+    else:
+        alter_statements = []
+    for stmt in alter_statements:
+        try:
+            _db_execute(stmt)
+        except Exception:
+            continue
+
+
+def _db_sync_admin_roles_from_env() -> None:
+    admin_keys = sorted(_admin_username_keys_from_env())
+    if not admin_keys:
+        return
+    ts = _now_ts()
+    for username_key in admin_keys:
+        _db_execute(
+            "UPDATE users SET role = ?, updated_at = ? WHERE username_key = ?",
+            "UPDATE users SET role = %s, updated_at = %s WHERE username_key = %s",
+            (USER_ROLE_ADMIN, ts, username_key),
+        )
 
 
 def _db_migrate_thread_columns_if_needed() -> None:
@@ -455,6 +533,10 @@ def _db_user_from_row(row: Any) -> Optional[Dict[str, Any]]:
         "updated_at": int(row[6] or 0),
         "last_login_at": int(row[7] or 0),
         "is_active": bool(row[8]),
+        "role": str(row[9] or USER_ROLE_USER),
+        "is_admin": str(row[9] or USER_ROLE_USER) == USER_ROLE_ADMIN,
+        "disabled_at": int(row[10] or 0),
+        "disabled_reason": str(row[11] or ""),
     }
 
 
@@ -462,14 +544,14 @@ def _db_get_user_by_username_key(username_key: str) -> Optional[Dict[str, Any]]:
     row = _db_fetchone(
         """
         SELECT user_id, username, username_key, password_hash, legacy_migrated_from,
-               created_at, updated_at, last_login_at, is_active
+               created_at, updated_at, last_login_at, is_active, role, disabled_at, disabled_reason
         FROM users
         WHERE username_key = ?
         LIMIT 1
         """,
         """
         SELECT user_id, username, username_key, password_hash, legacy_migrated_from,
-               created_at, updated_at, last_login_at, is_active
+               created_at, updated_at, last_login_at, is_active, role, disabled_at, disabled_reason
         FROM users
         WHERE username_key = %s
         LIMIT 1
@@ -483,14 +565,14 @@ def _db_get_user_by_user_id(user_id: str) -> Optional[Dict[str, Any]]:
     row = _db_fetchone(
         """
         SELECT user_id, username, username_key, password_hash, legacy_migrated_from,
-               created_at, updated_at, last_login_at, is_active
+               created_at, updated_at, last_login_at, is_active, role, disabled_at, disabled_reason
         FROM users
         WHERE user_id = ?
         LIMIT 1
         """,
         """
         SELECT user_id, username, username_key, password_hash, legacy_migrated_from,
-               created_at, updated_at, last_login_at, is_active
+               created_at, updated_at, last_login_at, is_active, role, disabled_at, disabled_reason
         FROM users
         WHERE user_id = %s
         LIMIT 1
@@ -509,16 +591,17 @@ def _db_insert_user(
     legacy_migrated_from: str = "",
 ) -> Dict[str, Any]:
     ts = _now_ts()
+    role = _initial_role_for_username(username_key)
     _db_execute(
         """
-        INSERT INTO users(user_id, username, username_key, password_hash, legacy_migrated_from, created_at, updated_at, last_login_at, is_active)
-        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO users(user_id, username, username_key, password_hash, legacy_migrated_from, created_at, updated_at, last_login_at, is_active, role, disabled_at, disabled_reason)
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         """
-        INSERT INTO users(user_id, username, username_key, password_hash, legacy_migrated_from, created_at, updated_at, last_login_at, is_active)
-        VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO users(user_id, username, username_key, password_hash, legacy_migrated_from, created_at, updated_at, last_login_at, is_active, role, disabled_at, disabled_reason)
+        VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
-        (user_id, username, username_key, password_hash, legacy_migrated_from, ts, ts, 0, True),
+        (user_id, username, username_key, password_hash, legacy_migrated_from, ts, ts, 0, True, role, 0, ""),
     )
     return _db_get_user_by_user_id(user_id) or {}
 
@@ -785,7 +868,33 @@ def _db_save_user_gee_oauth_token(
 
 def _db_upsert_user_thread(user_id: str, thread_id: str, meta: Optional[Dict[str, Any]] = None) -> None:
     ts = _now_ts()
-    meta = meta or {}
+    meta = dict(meta or {})
+    existing = _db_fetchone(
+        """
+        SELECT created_at, workspace, thread_title, thread_title_manual, last_question, last_answer_excerpt
+        FROM user_threads
+        WHERE thread_id = ?
+        LIMIT 1
+        """,
+        """
+        SELECT created_at, workspace, thread_title, thread_title_manual, last_question, last_answer_excerpt
+        FROM user_threads
+        WHERE thread_id = %s
+        LIMIT 1
+        """,
+        (str(thread_id),),
+    )
+    if existing:
+        existing_meta = {
+            "created_at": int(existing[0] or ts),
+            "workspace": str(existing[1] or ""),
+            "thread_title": str(existing[2] or ""),
+            "thread_title_manual": bool(existing[3]),
+            "last_question": str(existing[4] or ""),
+            "last_answer_excerpt": str(existing[5] or ""),
+        }
+        for key, value in existing_meta.items():
+            meta.setdefault(key, value)
     created_at = int(meta.get("created_at", ts) or ts)
     updated_at = int(meta.get("updated_at", ts) or ts)
     workspace = str(meta.get("workspace") or (BASE_DIR / str(thread_id)).as_posix())
@@ -1198,6 +1307,208 @@ def get_registered_user(user_id: str) -> Optional[Dict[str, Any]]:
     return _db_get_user_by_user_id(str(user_id or "").strip())
 
 
+def is_admin_user(user_id: str) -> bool:
+    _db_auth_required()
+    user = _db_get_user_by_user_id(str(user_id or "").strip())
+    return bool(user and user.get("is_active") and str(user.get("role") or "") == USER_ROLE_ADMIN)
+
+
+def _append_admin_audit(
+    *,
+    admin_user_id: str,
+    target_user_id: str,
+    action: str,
+    reason: str = "",
+    payload: Optional[Dict[str, Any]] = None,
+) -> None:
+    _db_execute(
+        """
+        INSERT INTO admin_audit_logs(row_id, ts, admin_user_id, target_user_id, action, reason, payload_json)
+        VALUES(?, ?, ?, ?, ?, ?, ?)
+        """,
+        """
+        INSERT INTO admin_audit_logs(row_id, ts, admin_user_id, target_user_id, action, reason, payload_json)
+        VALUES(%s, %s, %s, %s, %s, %s, %s)
+        """,
+        (
+            uuid.uuid4().hex,
+            _now_ts(),
+            str(admin_user_id or ""),
+            str(target_user_id or ""),
+            str(action or ""),
+            str(reason or ""),
+            json.dumps(payload or {}, ensure_ascii=False),
+        ),
+    )
+
+
+def set_user_disabled(
+    user_id: str,
+    *,
+    disabled: bool,
+    reason: str = "",
+    admin_user_id: str = "",
+) -> Dict[str, Any]:
+    _db_auth_required()
+    uid = str(user_id or "").strip()
+    if not _db_get_user_by_user_id(uid):
+        raise ValueError("Unknown user_id.")
+    ts = _now_ts()
+    active_value = not bool(disabled)
+    disabled_at = ts if disabled else 0
+    disabled_reason = str(reason or "") if disabled else ""
+    _db_execute(
+        """
+        UPDATE users
+        SET is_active = ?, disabled_at = ?, disabled_reason = ?, updated_at = ?
+        WHERE user_id = ?
+        """,
+        """
+        UPDATE users
+        SET is_active = %s, disabled_at = %s, disabled_reason = %s, updated_at = %s
+        WHERE user_id = %s
+        """,
+        (active_value, disabled_at, disabled_reason, ts, uid),
+    )
+    if admin_user_id:
+        _append_admin_audit(
+            admin_user_id=admin_user_id,
+            target_user_id=uid,
+            action="disable_user" if disabled else "enable_user",
+            reason=reason,
+        )
+    return _db_get_user_by_user_id(uid) or {}
+
+
+def list_admin_users(limit: int = 100) -> List[Dict[str, Any]]:
+    _db_auth_required()
+    rows = _db_fetchall(
+        """
+        SELECT
+            u.user_id, u.username, u.username_key, u.role, u.is_active, u.created_at, u.updated_at,
+            u.last_login_at, u.disabled_at, u.disabled_reason,
+            COALESCE(t.thread_count, 0),
+            COALESCE(g.mode, 'default'), COALESCE(g.gee_project_id, ''),
+            COALESCE(g.google_email, ''), COALESCE(g.encrypted_refresh_token, ''),
+            COALESCE(g.status, 'unvalidated'), COALESCE(g.last_error, ''), COALESCE(g.validated_at, 0),
+            COALESCE(g.updated_at, 0)
+        FROM users u
+        LEFT JOIN (
+            SELECT user_id, COUNT(*) AS thread_count
+            FROM user_threads
+            GROUP BY user_id
+        ) t ON t.user_id = u.user_id
+        LEFT JOIN user_gee_profiles g ON g.user_id = u.user_id
+        ORDER BY u.updated_at DESC
+        LIMIT ?
+        """,
+        """
+        SELECT
+            u.user_id, u.username, u.username_key, u.role, u.is_active, u.created_at, u.updated_at,
+            u.last_login_at, u.disabled_at, u.disabled_reason,
+            COALESCE(t.thread_count, 0),
+            COALESCE(g.mode, 'default'), COALESCE(g.gee_project_id, ''),
+            COALESCE(g.google_email, ''), COALESCE(g.encrypted_refresh_token, ''),
+            COALESCE(g.status, 'unvalidated'), COALESCE(g.last_error, ''), COALESCE(g.validated_at, 0),
+            COALESCE(g.updated_at, 0)
+        FROM users u
+        LEFT JOIN (
+            SELECT user_id, COUNT(*) AS thread_count
+            FROM user_threads
+            GROUP BY user_id
+        ) t ON t.user_id = u.user_id
+        LEFT JOIN user_gee_profiles g ON g.user_id = u.user_id
+        ORDER BY u.updated_at DESC
+        LIMIT %s
+        """,
+        (max(1, int(limit or 100)),),
+    )
+    out: List[Dict[str, Any]] = []
+    for row in rows:
+        gee_mode = str(row[11] or "default")
+        gee_project_id = str(row[12] or "")
+        out.append(
+            {
+                "user_id": str(row[0] or ""),
+                "username": str(row[1] or ""),
+                "username_key": str(row[2] or ""),
+                "role": str(row[3] or USER_ROLE_USER),
+                "is_admin": str(row[3] or USER_ROLE_USER) == USER_ROLE_ADMIN,
+                "is_active": bool(row[4]),
+                "created_at": int(row[5] or 0),
+                "updated_at": int(row[6] or 0),
+                "last_login_at": int(row[7] or 0),
+                "disabled_at": int(row[8] or 0),
+                "disabled_reason": str(row[9] or ""),
+                "thread_count": int(row[10] or 0),
+                "gee_mode": "user" if gee_mode == "user" and gee_project_id else "default",
+                "gee_project_id": gee_project_id,
+                "google_email": str(row[13] or ""),
+                "oauth_connected": bool(str(row[14] or "")),
+                "gee_status": str(row[15] or "unvalidated"),
+                "gee_last_error": str(row[16] or ""),
+                "gee_validated_at": int(row[17] or 0),
+                "gee_updated_at": int(row[18] or 0),
+            }
+        )
+    return out
+
+
+def reset_user_gee_pipeline(user_id: str, *, admin_user_id: str = "", reason: str = "") -> Dict[str, Any]:
+    _db_auth_required()
+    uid = str(user_id or "").strip()
+    if not _db_get_user_by_user_id(uid):
+        raise ValueError("Unknown user_id.")
+    ts = _now_ts()
+    _db_execute(
+        """
+        INSERT INTO user_gee_profiles(
+            user_id, mode, gee_project_id, google_email, encrypted_refresh_token, token_scopes,
+            token_updated_at, status, last_error, validated_at, updated_at
+        )
+        VALUES(?, 'default', '', '', '', '', 0, 'default', '', 0, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            mode='default',
+            gee_project_id='',
+            google_email='',
+            encrypted_refresh_token='',
+            token_scopes='',
+            token_updated_at=0,
+            status='default',
+            last_error='',
+            validated_at=0,
+            updated_at=excluded.updated_at
+        """,
+        """
+        INSERT INTO user_gee_profiles(
+            user_id, mode, gee_project_id, google_email, encrypted_refresh_token, token_scopes,
+            token_updated_at, status, last_error, validated_at, updated_at
+        )
+        VALUES(%s, 'default', '', '', '', '', 0, 'default', '', 0, %s)
+        ON CONFLICT(user_id) DO UPDATE SET
+            mode='default',
+            gee_project_id='',
+            google_email='',
+            encrypted_refresh_token='',
+            token_scopes='',
+            token_updated_at=0,
+            status='default',
+            last_error='',
+            validated_at=0,
+            updated_at=EXCLUDED.updated_at
+        """,
+        (uid, ts),
+    )
+    if admin_user_id:
+        _append_admin_audit(
+            admin_user_id=admin_user_id,
+            target_user_id=uid,
+            action="reset_gee_pipeline",
+            reason=reason,
+        )
+    return _db_get_user_gee_profile(uid)
+
+
 def get_user_gee_profile(user_id: str) -> Dict[str, Any]:
     _db_auth_required()
     uid = normalize_user_id(str(user_id or "").strip())
@@ -1575,6 +1886,63 @@ def append_turn_summary(thread_id: str, summary: Dict[str, Any]) -> None:
         _db_insert_turn_summary(thread_id, row)
         return
     _safe_append_jsonl(_turn_summary_jsonl_path(thread_id), row)
+
+
+def load_turn_summaries(thread_id: str, limit: int = 12) -> List[Dict[str, Any]]:
+    tid = str(thread_id or "").strip()
+    if not tid:
+        return []
+    if _db_enabled():
+        _db_setup()
+        _migrate_turn_summaries_from_file_if_needed(tid)
+        rows = _db_fetchall(
+            """
+            SELECT payload_json
+            FROM turn_summaries
+            WHERE thread_id = ?
+            ORDER BY ts ASC
+            """,
+            """
+            SELECT payload_json
+            FROM turn_summaries
+            WHERE thread_id = %s
+            ORDER BY ts ASC
+            """,
+            (tid,),
+        )
+        out: List[Dict[str, Any]] = []
+        for row in rows:
+            try:
+                payload = json.loads(str(row[0] or ""))
+            except Exception:
+                continue
+            if isinstance(payload, dict):
+                out.append(payload)
+        if limit > 0 and len(out) > limit:
+            return out[-limit:]
+        return out
+
+    path = _turn_summary_jsonl_path(tid)
+    if not path.exists():
+        return []
+    rows: List[Dict[str, Any]] = []
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            for line in f:
+                text = line.strip()
+                if not text:
+                    continue
+                try:
+                    obj = json.loads(text)
+                    if isinstance(obj, dict):
+                        rows.append(obj)
+                except Exception:
+                    continue
+    except Exception:
+        return []
+    if limit > 0 and len(rows) > limit:
+        return rows[-limit:]
+    return rows
 
 
 def load_injected_context_items(thread_id: str) -> List[Dict[str, Any]]:

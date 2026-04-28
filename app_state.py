@@ -1,5 +1,6 @@
 import streamlit as st
 from pathlib import Path
+from langchain_core.messages import messages_from_dict
 
 import history_store
 from model_config import MODEL_OPTIONS
@@ -39,6 +40,51 @@ def _load_chat_history_for_thread(thread_id: str):
     return out
 
 
+def _rehydrate_reasoning_message(value):
+    if not isinstance(value, dict):
+        return value
+    if "type" not in value or "data" not in value:
+        return value
+    try:
+        return messages_from_dict([value])[0]
+    except Exception:
+        return value
+
+
+def _rehydrate_analysis_logs(logs):
+    if not isinstance(logs, list):
+        return []
+    out = []
+    for event in logs:
+        if not isinstance(event, dict):
+            continue
+        restored = dict(event)
+        messages = restored.get("messages")
+        if isinstance(messages, list):
+            restored["messages"] = [_rehydrate_reasoning_message(item) for item in messages]
+        out.append(restored)
+    return out
+
+
+def _load_analysis_history_for_thread(thread_id: str, limit: int = 12):
+    rows = history_store.load_turn_summaries(thread_id, limit=limit)
+    history = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        logs = _rehydrate_analysis_logs(row.get("analysis_logs") or row.get("reasoning_logs") or [])
+        if not logs:
+            continue
+        history.append(
+            {
+                "question": str(row.get("question") or ""),
+                "logs": logs,
+                "created_at": int(row.get("ts") or row.get("created_at") or 0),
+            }
+        )
+    return history[-limit:] if limit > 0 else history
+
+
 def sync_gee_profile_state(user_id: str | None = None) -> dict:
     uid = str(user_id or st.session_state.get("user_id", "") or "").strip()
     if not uid:
@@ -72,7 +118,7 @@ def set_active_thread(thread_id: str):
     st.session_state.user_workspace = storage_manager.get_workspace(st.session_state.thread_id)
     st.session_state.chat_history = _load_chat_history_for_thread(st.session_state.thread_id)
     st.session_state.analysis_logs = []
-    st.session_state.analysis_history = []
+    st.session_state.analysis_history = _load_analysis_history_for_thread(st.session_state.thread_id)
     st.session_state.last_question = ""
     st.session_state["runtime_recovered_notice"] = None
 
@@ -100,6 +146,7 @@ def init_app():
         st.session_state["authenticated"] = False
         st.session_state["auth_user_id"] = ""
         st.session_state["auth_username"] = ""
+        st.session_state["auth_is_admin"] = False
         st.session_state["user_id"] = ""
         st.session_state["user_name"] = ""
         sync_gee_profile_state("")
@@ -111,6 +158,7 @@ def init_app():
     else:
         st.session_state["user_id"] = authed_user_id
         st.session_state["user_name"] = authed_username or history_store.user_display_name(authed_user_id)
+        st.session_state["auth_is_admin"] = history_store.is_admin_user(authed_user_id)
         current_thread_id = str(st.session_state.get("thread_id", "") or "").strip()
         if (not current_thread_id) or (not history_store.thread_belongs_to_user(authed_user_id, current_thread_id)):
             known_threads = history_store.list_user_threads(authed_user_id, limit=100)
@@ -129,6 +177,8 @@ def init_app():
         sync_gee_profile_state(st.session_state["user_id"])
         if not st.session_state.get("chat_history"):
             st.session_state.chat_history = _load_chat_history_for_thread(st.session_state.thread_id)
+        if not st.session_state.get("analysis_history"):
+            st.session_state.analysis_history = _load_analysis_history_for_thread(st.session_state.thread_id)
 
     st.session_state.setdefault("analysis_logs", [])
     st.session_state.setdefault("analysis_history", [])
@@ -153,6 +203,7 @@ def apply_authenticated_user(user_id: str, username: str) -> None:
     st.session_state["authenticated"] = True
     st.session_state["auth_user_id"] = str(user_id or "").strip()
     st.session_state["auth_username"] = str(username or "").strip()
+    st.session_state["auth_is_admin"] = history_store.is_admin_user(st.session_state["auth_user_id"])
     st.session_state["user_id"] = st.session_state["auth_user_id"]
     st.session_state["user_name"] = st.session_state["auth_username"]
     st.session_state["initialized"] = False
@@ -175,6 +226,7 @@ def clear_authenticated_user() -> None:
     st.session_state["authenticated"] = False
     st.session_state["auth_user_id"] = ""
     st.session_state["auth_username"] = ""
+    st.session_state["auth_is_admin"] = False
     st.session_state["user_id"] = ""
     st.session_state["user_name"] = ""
     st.session_state["initialized"] = False

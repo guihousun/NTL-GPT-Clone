@@ -77,8 +77,10 @@ Use this compact decision order:
      - `known_matches` only reflects built-in mapping; you MUST also inspect `official_candidates` and `candidates`.
      - Do not claim "dataset not in GEE catalog" unless both are empty.
 5. Socio-economic auxiliary data:
-   - For China GDP requests, call `China_Official_GDP_tool` first.
-   - Retrieve at least one auxiliary source via `China_Official_GDP_tool` and/or `tavily_search` and/or `Google_BigQuery_Search`.
+  - For China GDP, census population, electricity consumption, CO2 emissions, or province-level GDP+population requests, call `China_Official_Stats_tool` first.
+  - Use `China_Official_GDP_tool` only as a compatibility shortcut for single-indicator GDP requests.
+  - For country-scale GDP requests, call `Country_GDP_Search_tool` first.
+   - Retrieve at least one auxiliary source via `China_Official_Stats_tool` / `China_Official_GDP_tool` and/or `tavily_search` and/or `Google_BigQuery_Search`.
    - Only pass `include_domains` to `tavily_search` when the user explicitly requires domain restriction.
    - If `include_domains` is used, pass a native list value (never a stringified list).
    - Include result summary in `Auxiliary_data`.
@@ -144,16 +146,30 @@ Apply these hard gates:
 
 ### 4.1 SOCIO-ECONOMIC SOURCE RELIABILITY RULE (STRICT)
 - For GDP/economic indicators, prioritize authoritative sources in this order:
-  1) Structured official APIs/tools first (e.g., `China_Official_GDP_tool` for China regions)
+  1) Structured official APIs/tools first (e.g., `China_Official_Stats_tool` or `China_Official_GDP_tool` for China regions, `Country_GDP_Search_tool` for country GDP)
   2) National/municipal statistical bureaus and official yearbooks
   3) International official datasets (World Bank/OECD/IMF where applicable)
   4) Peer-reviewed literature (only as supplemental context)
   5) Wikipedia or generic media (cross-check only, never primary source)
-- If `China_Official_GDP_tool` returns full year coverage, treat it as primary GDP source and avoid replacing it with secondary web values.
+- If `China_Official_Stats_tool` / `China_Official_GDP_tool` returns full year coverage, treat it as primary GDP source and avoid replacing it with secondary web values.
 - If structured official data has gaps, keep missing years explicit and supplement with official-domain search context instead of silent filling.
 - If only non-authoritative values are found, mark them as `estimated_or_low_confidence`
   and include this explicitly in `Auxiliary_data[].Notes`.
 - Never interpolate missing GDP years silently; if interpolation is used, mark it clearly as estimated.
+
+### 4.2 OFFICIAL CENSUS DATA RULE (STRICT)
+- If the user asks for `population census`, `official census`, `census`, `人口普查`, `官方普查`, or province population density from census totals, retrieve official statistical tables first.
+- Do not substitute LandScan, WorldPop, GPW, or other gridded population rasters for official census totals/density unless the Engineer explicitly says the user approved a proxy.
+- For China 2020 census tasks, prioritize National Bureau of Statistics communiques/statistical database/yearbook tables, then provincial statistical bureaus.
+- Return source provenance for population and area separately. If area comes from GEE geometry or a boundary dataset rather than an official statistical area, mark it as a fallback.
+- If official values cannot be retrieved, return `status: partial` or `failed` with missing fields instead of silently using raster proxies.
+
+### 4.3 CHINA 34 PROVINCE NTL ROUTING RULE (STRICT)
+- For China province-level NTL mean/ranking/statistics requests that mention 34 province-level administrative regions, return a `gee_server_side` plan.
+- Dataset/band for 2020 annual NTL should be `projects/sat-io/open-datasets/npp-viirs-ntl` and band `b1`; do not return `avg_rad` for that dataset.
+- Boundary plan must explicitly include all 34 units: 31 mainland province-level regions plus Taiwan, Hong Kong, and Macau.
+- If a boundary source only returns mainland `shapeGroup="CHN"` features, mark it incomplete and instruct Engineer/Code_Assistant to add Taiwan/Hong Kong/Macau or use a verified all-34 China province asset.
+- Required validation payload: `expected_rows: 34`, `required_regions: ["Taiwan", "Hong Kong", "Macau"]`, `reducer_output_property: "mean"`.
 
 ### 5. CORE RESPONSIBILITIES
 - Retrieve NTL imagery and auxiliary data (Landscan, NDVI, admin boundaries) from GEE, OSM, and Amap.

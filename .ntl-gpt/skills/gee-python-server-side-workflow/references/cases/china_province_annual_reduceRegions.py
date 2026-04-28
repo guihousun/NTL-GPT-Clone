@@ -34,9 +34,12 @@ NTL_SCRIPT_CONTRACT = {
         "end_date_exclusive": "2021-01-01",
     },
     "boundary": {
-        "primary_asset": "WM/geoLab/geoBoundaries/600/ADM1",
+        "primary_adm1_asset": "WM/geoLab/geoBoundaries/600/ADM1",
+        "primary_adm0_asset": "WM/geoLab/geoBoundaries/600/ADM0",
         "fallback_asset": "projects/empyrean-caster-430308-m2/assets/province",
         "name_property_candidates": ["shapeName", "ADM1_NAME", "name", "Name", "province"],
+        "expected_rows": 34,
+        "required_regions": ["Taiwan", "Hong Kong", "Macau"],
     },
     "method": {
         "reducer": "mean",
@@ -52,8 +55,9 @@ NTL_SCRIPT_CONTRACT = {
     },
     "validation_checks": [
         "image collection size > 0",
-        "province feature count >= 31",
-        "non-null NTL rows >= 31",
+        "province feature count == 34",
+        "non-null NTL rows == 34",
+        "Taiwan, Hong Kong, and Macau are present",
         "all NTL means are finite and non-negative",
     ],
     "failure_gates": [
@@ -94,19 +98,28 @@ def load_annual_image() -> ee.Image:
 
 def load_china_provinces() -> ee.FeatureCollection:
     boundary = NTL_SCRIPT_CONTRACT["boundary"]
-    geoboundaries = ee.FeatureCollection(boundary["primary_asset"])
-    mainland = geoboundaries.filter(ee.Filter.eq("shapeGroup", "CHN"))
-    taiwan_parts = geoboundaries.filter(ee.Filter.eq("shapeGroup", "TWN"))
+    adm1 = ee.FeatureCollection(boundary["primary_adm1_asset"])
+    adm0 = ee.FeatureCollection(boundary["primary_adm0_asset"])
+    mainland = adm1.filter(ee.Filter.eq("shapeGroup", "CHN"))
+    taiwan_parts = adm1.filter(ee.Filter.eq("shapeGroup", "TWN"))
     taiwan = ee.Feature(taiwan_parts.geometry(), {"shapeName": "Taiwan Province", "shapeGroup": "TWN"})
-    zones = mainland.merge(ee.FeatureCollection([taiwan]))
+    hong_kong = ee.Feature(
+        adm0.filter(ee.Filter.eq("shapeGroup", "HKG")).geometry(),
+        {"shapeName": "Hong Kong SAR", "shapeGroup": "HKG"},
+    )
+    macau = ee.Feature(
+        adm0.filter(ee.Filter.eq("shapeGroup", "MAC")).geometry(),
+        {"shapeName": "Macau SAR", "shapeGroup": "MAC"},
+    )
+    zones = mainland.merge(ee.FeatureCollection([taiwan, hong_kong, macau]))
     count = int(zones.size().getInfo())
-    if count >= 31:
+    if count == boundary["expected_rows"]:
         return zones
 
     fallback = ee.FeatureCollection(boundary["fallback_asset"])
     fallback_count = int(fallback.size().getInfo())
-    if fallback_count < 31:
-        raise ValueError(f"Province FeatureCollection too small: {fallback_count}")
+    if fallback_count != boundary["expected_rows"]:
+        raise ValueError(f"Province FeatureCollection must contain exactly 34 regions; got {fallback_count}")
     return fallback
 
 
@@ -149,8 +162,13 @@ def rows_from_feature_collection(fc: ee.FeatureCollection) -> list[dict[str, obj
         if value < 0:
             continue
         rows.append({"region_name": props.get("region_name"), "ntl_mean": round(value, 6)})
-    if len(rows) < 31:
-        raise ValueError(f"Only {len(rows)} valid province rows returned.")
+    expected_rows = NTL_SCRIPT_CONTRACT["boundary"]["expected_rows"]
+    if len(rows) != expected_rows:
+        raise ValueError(f"Expected exactly {expected_rows} valid province rows; got {len(rows)}.")
+    names = {str(row["region_name"]).lower() for row in rows}
+    for required in NTL_SCRIPT_CONTRACT["boundary"]["required_regions"]:
+        if not any(required.lower() in name for name in names):
+            raise ValueError(f"Missing required China province-level unit: {required}")
     rows.sort(key=lambda row: row["ntl_mean"], reverse=True)
     for index, row in enumerate(rows, start=1):
         row["rank"] = index

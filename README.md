@@ -39,6 +39,7 @@ Optional:
 
 - `MINIMAX_API_KEY`
 - `MINIMAX_Coding_URL`
+- `OPENAI_API_KEY`
 - `GEE_DEFAULT_PROJECT_ID`
 - `GOOGLE_OAUTH_CLIENT_ID`
 - `GOOGLE_OAUTH_CLIENT_SECRET`
@@ -52,10 +53,19 @@ Optional:
 - `NTL_CONTEXTILY_TMP`
 - `NTL_MAX_ACTIVE_RUNS`
 - `NTL_MAX_ACTIVE_RUNS_PER_USER`
+- `NTL_THREAD_WORKSPACE_QUOTA_MB`
+- `NTL_USER_WORKSPACE_QUOTA_MB`
+- `NTL_LOCAL_ADMIN_HOST`
+- `NTL_LOCAL_ADMIN_PORT`
+- `NTL_LOCAL_ADMIN_ACTOR`
+- `NTL_FORCE_NATIVE_CHAT_INPUT`
+- `NTL_STREAMING_MAIN_REFRESH_SECONDS`
+- `NTL_STREAMING_GRAPH_REFRESH_SECONDS`
 - `NTL_LANGGRAPH_POSTGRES_URL`
 - `NTL_LANGGRAPH_POSTGRES_AUTO_SETUP`
 - `NTL_DEEPAGENTS_MEMORY_BACKEND`
 - `NTL_MEMORY_NAMESPACE_SCOPE`
+- `NTL_ADMIN_USERNAMES`
 
 ## Main Capabilities
 
@@ -85,6 +95,19 @@ Generate a Fernet encryption key for OAuth token storage:
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
+Admin console:
+
+- Set `NTL_ADMIN_USERNAMES` to a comma-separated list of usernames that should become admins when registered, for example `NTL_ADMIN_USERNAMES=owner,operator`.
+- Run `python admin_local.py` to start the local admin page on `http://127.0.0.1:8502` by default.
+- `NTL_LOCAL_ADMIN_HOST` and `NTL_LOCAL_ADMIN_PORT` control the local bind address.
+- The local admin page can list users, see account/GEE status, inspect workspace usage, clear thread `inputs/outputs/memory`, disable or enable users, reset a user's GEE pipeline, and delete threads.
+- Admin actions are written to `admin_audit_logs`; OAuth refresh tokens are never displayed.
+
+Streaming and input fallback controls:
+
+- `NTL_FORCE_NATIVE_CHAT_INPUT=1` forces Streamlit's native chat input when the multimodal input component has deployment-specific rendering issues.
+- `NTL_STREAMING_MAIN_REFRESH_SECONDS` and `NTL_STREAMING_GRAPH_REFRESH_SECONDS` tune live response refresh intervals. Lower values feel more immediate but increase WebSocket traffic.
+
 ## Runtime Execution Model
 
 NTL-Claw intentionally does not enable remote DeepAgents sandbox providers by default. Google Earth Engine authentication, local credential caches, GDAL/PROJ/Rasterio/GeoPandas native libraries, local RAG assets, `base_data`, and per-thread workspaces are expected to be available on the host machine.
@@ -105,6 +128,7 @@ The local Streamlit runtime isolates work by `thread_id`:
 - one run at a time is allowed per thread
 - different threads can run concurrently in background Python threads
 - global and per-user active-run limits are controlled by `NTL_MAX_ACTIVE_RUNS` and `NTL_MAX_ACTIVE_RUNS_PER_USER`
+- per-thread and per-user workspace storage quotas are controlled by `NTL_THREAD_WORKSPACE_QUOTA_MB` and `NTL_USER_WORKSPACE_QUOTA_MB`
 
 Development mode uses in-process LangGraph state:
 
