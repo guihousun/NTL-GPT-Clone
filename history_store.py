@@ -1380,6 +1380,43 @@ def set_user_disabled(
     return _db_get_user_by_user_id(uid) or {}
 
 
+def reset_user_password(
+    user_id: str,
+    new_password: str,
+    *,
+    admin_user_id: str = "",
+    reason: str = "",
+) -> Dict[str, Any]:
+    _db_auth_required()
+    uid = str(user_id or "").strip()
+    if not _db_get_user_by_user_id(uid):
+        raise ValueError("Unknown user_id.")
+    password_value = _validate_password_or_raise(new_password)
+    ts = _now_ts()
+    _db_execute(
+        """
+        UPDATE users
+        SET password_hash = ?, updated_at = ?
+        WHERE user_id = ?
+        """,
+        """
+        UPDATE users
+        SET password_hash = %s, updated_at = %s
+        WHERE user_id = %s
+        """,
+        (_hash_password(password_value), ts, uid),
+    )
+    if admin_user_id:
+        _append_admin_audit(
+            admin_user_id=admin_user_id,
+            target_user_id=uid,
+            action="reset_user_password",
+            reason=reason,
+            payload={"password_changed": True},
+        )
+    return _db_get_user_by_user_id(uid) or {}
+
+
 def list_admin_users(limit: int = 100) -> List[Dict[str, Any]]:
     _db_auth_required()
     rows = _db_fetchall(

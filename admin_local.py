@@ -87,7 +87,7 @@ BASE_TEMPLATE = """
     .pill.bad { border-color: rgba(255,127,127,0.35); color: #ffd1d1; background: rgba(76, 22, 22, 0.55); }
     .pill.good { border-color: rgba(125,211,166,0.35); color: #ddffe9; background: rgba(24, 62, 41, 0.55); }
     .row-actions, .inline-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-    input[type=text] {
+    input[type=text], input[type=password] {
       width: 100%; background: rgba(10, 17, 34, 0.9); color: var(--text);
       border: 1px solid rgba(128,160,220,0.22); border-radius: 10px; padding: 9px 10px;
     }
@@ -225,6 +225,12 @@ def user_detail(user_id: str):
           <input type="text" name="reason" placeholder="填写启用/禁用原因">
           <button class="{'danger' if not disabled else ''}" type="submit">{'启用用户' if disabled else '禁用用户'}</button>
         </form>
+        <form class="inline-form" method="post" action="{url_for('reset_user_password', user_id=user['user_id'])}">
+          <input type="password" name="new_password" placeholder="输入新密码，至少 8 位" autocomplete="new-password">
+          <input type="password" name="confirm_password" placeholder="再次输入新密码" autocomplete="new-password">
+          <input type="text" name="reason" placeholder="填写重置密码原因">
+          <button type="submit">重置密码</button>
+        </form>
         <form class="inline-form" method="post" action="{url_for('reset_user_gee', user_id=user['user_id'])}">
           <input type="text" name="reason" placeholder="填写重置 GEE 原因">
           <button type="submit">重置 GEE</button>
@@ -311,6 +317,24 @@ def reset_user_gee(user_id: str):
         reason=reason,
     )
     flash("用户 GEE pipeline 已重置为默认配置。", "success")
+    return redirect(url_for("user_detail", user_id=user_id))
+
+
+@app.post("/users/<user_id>/reset-password")
+def reset_user_password(user_id: str):
+    new_password = str(request.form.get("new_password", "") or "")
+    confirm_password = str(request.form.get("confirm_password", "") or "")
+    reason = str(request.form.get("reason", "") or "").strip()
+    if new_password != confirm_password:
+        flash("两次输入的新密码不一致。", "error")
+        return redirect(url_for("user_detail", user_id=user_id))
+    admin_service.reset_user_password_as_admin(
+        user_id,
+        new_password,
+        admin_user_id=admin_service.LOCAL_ADMIN_ACTOR,
+        reason=reason,
+    )
+    flash("用户密码已重置。", "success")
     return redirect(url_for("user_detail", user_id=user_id))
 
 

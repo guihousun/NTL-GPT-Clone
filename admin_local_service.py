@@ -245,3 +245,21 @@ def delete_thread_as_admin(
         payload={"thread_id": tid, **result},
     )
     return result
+
+
+def reset_user_password_as_admin(
+    user_id: str,
+    new_password: str,
+    *,
+    admin_user_id: str = LOCAL_ADMIN_ACTOR,
+    reason: str = "",
+) -> dict[str, Any]:
+    uid = str(user_id or "").strip()
+    if not uid:
+        raise ValueError("User ID is required.")
+    return history_store.reset_user_password(
+        uid,
+        str(new_password or ""),
+        admin_user_id=admin_user_id,
+        reason=reason,
+    )
