@@ -1,4 +1,4 @@
-# NTL-Claw-Clone
+# NTL-Claw(NTL-GPT)
 
 NTL-Claw is an open-source Streamlit application for nighttime light analysis. It combines multi-agent orchestration, geospatial tooling, Google Earth Engine workflows, and official VIIRS data processing in a single local workspace.
 
