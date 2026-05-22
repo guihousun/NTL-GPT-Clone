@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import ast
 import contextlib
@@ -22,12 +22,42 @@ from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 from dotenv import dotenv_values
 
-from storage_manager import current_thread_id, storage_manager
+from storage_manager import (
+    current_gee_encrypted_refresh_token,
+    current_gee_project_id,
+    current_gee_token_scopes,
+    current_thread_id,
+    storage_manager,
+)
 
 DEFAULT_GEE_PROJECT = "empyrean-caster-430308-m2"
 
 
+def _live_storage_context_value(name: str, imported_context_var: Any) -> str:
+    """Read contextvars robustly even if tests reload storage_manager after import."""
+    try:
+        value = imported_context_var.get()
+    except Exception:
+        value = ""
+    if str(value or "").strip():
+        return str(value or "").strip()
+    try:
+        live_module = __import__("storage_manager")
+        live_context_var = getattr(live_module, name, None)
+        if live_context_var is not None and live_context_var is not imported_context_var:
+            value = live_context_var.get()
+    except Exception:
+        value = ""
+    return str(value or "").strip()
+
+
 def _gee_project_id() -> str:
+    context_project_id = _live_storage_context_value("current_gee_project_id", current_gee_project_id)
+    if context_project_id:
+        return context_project_id
+    active_project_id = str(os.getenv("NTL_ACTIVE_GEE_PROJECT_ID", "") or "").strip()
+    if active_project_id:
+        return active_project_id
     dotenv_path = Path(__file__).resolve().parents[1] / ".env"
     project_id = ""
     if dotenv_path.exists():
@@ -35,6 +65,45 @@ def _gee_project_id() -> str:
     if not project_id:
         project_id = str(os.getenv("GEE_DEFAULT_PROJECT_ID") or "").strip()
     return project_id or DEFAULT_GEE_PROJECT
+
+
+def _active_gee_credentials():
+    encrypted = (
+        _live_storage_context_value("current_gee_encrypted_refresh_token", current_gee_encrypted_refresh_token)
+        or str(os.getenv("NTL_ACTIVE_GEE_ENCRYPTED_REFRESH_TOKEN", "") or "").strip()
+    )
+    if not encrypted:
+        return None
+    import gee_auth
+
+    refresh_token = gee_auth.decrypt_refresh_token(encrypted)
+    scopes_text = (
+        _live_storage_context_value("current_gee_token_scopes", current_gee_token_scopes)
+        or str(os.getenv("NTL_ACTIVE_GEE_TOKEN_SCOPES", "") or "").strip()
+    )
+    scopes = scopes_text.split() if scopes_text else None
+    return gee_auth.credentials_from_refresh_token(refresh_token, scopes=scopes)
+
+
+def _patch_ee_initialize_for_active_credentials(code_block: str) -> str:
+    encrypted = (
+        _live_storage_context_value("current_gee_encrypted_refresh_token", current_gee_encrypted_refresh_token)
+        or str(os.getenv("NTL_ACTIVE_GEE_ENCRYPTED_REFRESH_TOKEN", "") or "").strip()
+    )
+    if not encrypted:
+        return code_block
+    code = str(code_block or "")
+    code = re.sub(
+        r"ee\.Initialize\(\s*project\s*=",
+        "ee.Initialize(credentials=ntl_ee_credentials, project=",
+        code,
+    )
+    code = re.sub(
+        r"ee\.Initialize\(\s*\)",
+        "ee.Initialize(credentials=ntl_ee_credentials, project=project_id)",
+        code,
+    )
+    return code
 
 GLOBAL_EXEC_CONTEXTS: Dict[str, Dict[str, Any]] = {}
 
@@ -355,6 +424,33 @@ def _build_artifact_audit(stdout: str, thread_id: Optional[str] = None) -> Dict[
         "auto_migration_success": False,
         "migrated_paths": [],
         "migration_failures": [],
+    }
+
+
+def _build_stdout_quality_audit(stdout: str) -> Dict[str, Any]:
+    """Detect successful exits that actually report empty geospatial results."""
+    text = str(stdout or "")
+    warnings: List[str] = []
+    patterns = [
+        (r"\b0\s+regions?\b", "0 regions"),
+        (r"\b0\s+features?\b", "0 features"),
+        (r"\b0\s+records?\b", "0 records"),
+        (r"\brows?\s*[:=]\s*0\b", "rows=0"),
+        (r"\brow_count\s*[:=]\s*0\b", "row_count=0"),
+        (r"\bfeatures?\s*[:=]\s*0\b", "features=0"),
+        (r"\bregions?\s*[:=]\s*0\b", "regions=0"),
+    ]
+    for pattern, label in patterns:
+        if re.search(pattern, text, flags=re.IGNORECASE):
+            warnings.append(
+                f"Execution log reports {label}; empty geospatial/statistical outputs must be treated as failure."
+            )
+    warnings = _dedupe_ordered(warnings)
+    return {
+        "pass": not warnings,
+        "warnings": warnings,
+        "error_type": "EmptyResultError" if warnings else None,
+        "error_message": warnings[0] if warnings else None,
     }
 
 
@@ -926,6 +1022,11 @@ def _derive_fix_suggestions(error_type: Optional[str], error_message: Optional[s
             fixes.append("Use sandbox-relative paths from workspace root, e.g. inputs/xxx and outputs/yyy.")
             fixes.append("If portability is needed, switch to storage_manager.resolve_input_path/resolve_output_path.")
 
+    if "emptyresulterror" in et or "0 regions" in msg or "rows=0" in msg:
+        fixes.append("Treat empty geospatial results as failed validation, not success.")
+        fixes.append("For reduceRegions outputs, verify boundary feature count and read reducer output property `mean`.")
+        fixes.append("For China 34 province-level tasks, validate exactly 34 rows including Taiwan, Hong Kong, and Macau.")
+
     if "user_project_denied" in msg or "serviceusage.serviceusageconsumer" in msg:
         fixes.append(
             "GEE project authorization failed. Use an authorized GEE_DEFAULT_PROJECT_ID or grant the active account "
@@ -1081,14 +1182,17 @@ def _execute_code(code_block: str) -> Tuple[bool, str, Optional[str], Optional[s
         return _execute_code_in_subprocess_sandbox(code_block)
 
     user_globals = _get_thread_context()
+    user_globals["_active_gee_credentials"] = _active_gee_credentials
     bootstrap = (
         "import ee\n"
         f"project_id = {_gee_project_id()!r}\n"
+        "ntl_ee_credentials = _active_gee_credentials()\n"
         "try:\n"
-        "    ee.Initialize(project=project_id)\n"
+        "    ee.Initialize(credentials=ntl_ee_credentials, project=project_id) if ntl_ee_credentials else ee.Initialize(project=project_id)\n"
         "except Exception:\n"
         "    pass\n"
     )
+    code_block = _patch_ee_initialize_for_active_credentials(code_block)
 
     buf = io.StringIO()
     try:
@@ -1153,6 +1257,15 @@ def _build_sandbox_env(thread_id: str, code_path: Path) -> Dict[str, str]:
     env["PYTHONUTF8"] = "1"
     env["NTL_THREAD_ID"] = str(thread_id)
     env["NTL_CODE_PATH"] = str(code_path)
+    active_project_id = str(current_gee_project_id.get() or "").strip()
+    if active_project_id:
+        env["NTL_ACTIVE_GEE_PROJECT_ID"] = active_project_id
+    encrypted_refresh_token = str(current_gee_encrypted_refresh_token.get() or "").strip()
+    if encrypted_refresh_token:
+        env["NTL_ACTIVE_GEE_ENCRYPTED_REFRESH_TOKEN"] = encrypted_refresh_token
+    token_scopes = str(current_gee_token_scopes.get() or "").strip()
+    if token_scopes:
+        env["NTL_ACTIVE_GEE_TOKEN_SCOPES"] = token_scopes
     return env
 
 
@@ -1186,12 +1299,21 @@ def _execute_code_in_subprocess_sandbox(
 
     bootstrap = (
         "import ee\n"
+        "import os\n"
         f"project_id = {_gee_project_id()!r}\n"
+        "ntl_ee_credentials = None\n"
+        "encrypted = os.environ.get('NTL_ACTIVE_GEE_ENCRYPTED_REFRESH_TOKEN', '').strip()\n"
+        "if encrypted:\n"
+        "    import gee_auth\n"
+        "    refresh_token = gee_auth.decrypt_refresh_token(encrypted)\n"
+        "    scopes = os.environ.get('NTL_ACTIVE_GEE_TOKEN_SCOPES', '').split() or None\n"
+        "    ntl_ee_credentials = gee_auth.credentials_from_refresh_token(refresh_token, scopes=scopes)\n"
         "try:\n"
-        "    ee.Initialize(project=project_id)\n"
+        "    ee.Initialize(credentials=ntl_ee_credentials, project=project_id) if ntl_ee_credentials else ee.Initialize(project=project_id)\n"
         "except Exception:\n"
         "    pass\n"
     )
+    code_block = _patch_ee_initialize_for_active_credentials(code_block)
     runner = (
         "import os\n"
         "import traceback\n"
@@ -1331,6 +1453,12 @@ def GEE_GeoCode_COT_Validation(
             return json.dumps(report, indent=2, ensure_ascii=False)
         runtime_code, runtime_path_rewrite = _rewrite_virtual_paths_for_runtime(code_block, thread_id=thread_id)
         ok, logs, etype, emsg, tb = _execute_code(runtime_code)
+        stdout_quality_audit = _build_stdout_quality_audit(logs)
+        if ok and not stdout_quality_audit.get("pass", True):
+            ok = False
+            etype = str(stdout_quality_audit.get("error_type") or "EmptyResultError")
+            emsg = str(stdout_quality_audit.get("error_message") or "Execution produced an empty result.")
+            tb = None
         fix_suggestions = _derive_fix_suggestions(etype, emsg) + preflight["recommendations"]
         report = {
             "status": "pass" if ok else "fail",
@@ -1352,6 +1480,7 @@ def GEE_GeoCode_COT_Validation(
             ),
             "execution_skipped": False,
             "runtime_path_rewrite": runtime_path_rewrite,
+            "stdout_quality_audit": stdout_quality_audit,
         }
         _append_run_history(
             {
@@ -1674,6 +1803,12 @@ def execute_geospatial_script(
         runtime_code, runtime_path_rewrite = _rewrite_virtual_paths_for_runtime(script_content, thread_id=thread_id)
         ok, logs, etype, emsg, tb = _execute_code(runtime_code)
         artifact_audit = _build_artifact_audit(logs, thread_id=thread_id)
+        stdout_quality_audit = _build_stdout_quality_audit(logs)
+        if ok and not stdout_quality_audit.get("pass", True):
+            ok = False
+            etype = str(stdout_quality_audit.get("error_type") or "EmptyResultError")
+            emsg = str(stdout_quality_audit.get("error_message") or "Execution produced an empty result.")
+            tb = None
         if ok:
             warning_messages: List[str] = []
             warning_policy: Optional[Dict[str, Any]] = None
@@ -1744,6 +1879,7 @@ def execute_geospatial_script(
                 ),
                 "artifact_audit": artifact_audit,
                 "runtime_path_rewrite": runtime_path_rewrite,
+                "stdout_quality_audit": stdout_quality_audit,
             }
             if warning_messages:
                 result["warnings"] = warning_messages
@@ -1813,6 +1949,7 @@ def execute_geospatial_script(
             "execution_skipped": False,
             "artifact_audit": artifact_audit,
             "runtime_path_rewrite": runtime_path_rewrite,
+            "stdout_quality_audit": stdout_quality_audit,
         }
         _append_run_history(
             {

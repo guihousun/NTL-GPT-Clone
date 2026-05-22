@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Q24 reference implementation (ArcGIS-style cartography):
 Generate daily NTL animation for Fuding City (2020-01-01 to 2020-01-07).

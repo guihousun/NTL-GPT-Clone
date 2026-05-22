@@ -6,10 +6,8 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain.schema import Document
 
-env_vars = {
-    "OPENAI_API_KEY": "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",
-}
-os.environ.update({k: os.environ.get(k) or v for k, v in env_vars.items()})
+if not os.getenv("OPENAI_API_KEY"):
+    raise RuntimeError("OPENAI_API_KEY is required to build FAISS knowledge embeddings.")
 
 class RAGDatabase:
     def __init__(self, persistent_directory, collection_name="knowledge-faiss"):

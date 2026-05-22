@@ -33,6 +33,7 @@ REQUIRED_GEE_PROJECT = _configured_gee_project_id()
 EE_CATALOG_PAGE = "https://developers.google.com/earth-engine/datasets/catalog"
 _CATALOG_CACHE: Dict[str, object] = {"items": [], "fetched_at": 0.0}
 _DATASET_ID_CACHE: Dict[str, str] = {}
+_CURATED_DATASET_REGISTRY_CACHE: Dict[str, object] = {"items": [], "loaded": False}
 _COMMON_QUERY_STOPWORDS = {
     "a",
     "an",
@@ -187,6 +188,50 @@ def _resolve_dataset(
     return DATASET_BY_NAME[default_name.lower()]
 
 
+def _load_curated_dataset_registry() -> List[Dict]:
+    if _CURATED_DATASET_REGISTRY_CACHE.get("loaded"):
+        return list(_CURATED_DATASET_REGISTRY_CACHE.get("items", []) or [])
+
+    registry_path = (
+        Path(__file__).resolve().parents[1]
+        / ".ntl-gpt"
+        / "skills"
+        / "gee-dataset-selection"
+        / "references"
+        / "gee-dataset-registry.json"
+    )
+    items: List[Dict] = []
+    try:
+        payload = json.loads(registry_path.read_text(encoding="utf-8"))
+        raw_items = payload.get("datasets", [])
+        if isinstance(raw_items, list):
+            items = [item for item in raw_items if isinstance(item, dict)]
+    except Exception:
+        items = []
+    _CURATED_DATASET_REGISTRY_CACHE["items"] = items
+    _CURATED_DATASET_REGISTRY_CACHE["loaded"] = True
+    return items
+
+
+def _find_curated_dataset_entry(dataset_id: str) -> Optional[Dict]:
+    for item in _load_curated_dataset_registry():
+        if item.get("dataset_id") == dataset_id:
+            return item
+        ids = item.get("dataset_ids")
+        if isinstance(ids, list) and dataset_id in ids:
+            return item
+    return None
+
+
+def _curated_band_names(entry: Optional[Dict]) -> List[str]:
+    if not entry:
+        return []
+    bands = entry.get("primary_bands", [])
+    if not isinstance(bands, list):
+        return []
+    return [str(b.get("band")) for b in bands if isinstance(b, dict) and b.get("band")]
+
+
 def _estimate_image_count(temporal_resolution: str, start_dt: date, end_dt: date) -> int:
     if temporal_resolution == "daily":
         return (end_dt - start_dt).days + 1
@@ -208,6 +253,12 @@ def _query_requires_server_side(query: str) -> bool:
     )
     analysis_markers = (
         "compute antl",
+        "compute mean",
+        "mean nighttime light",
+        "average nighttime light",
+        "zonal statistics",
+        "zonal stats",
+        "reduceregions",
         "daily antl",
         "impact assessment",
         "damage assessment",
@@ -216,11 +267,34 @@ def _query_requires_server_side(query: str) -> bool:
         "first night",
         "time series",
         "统计",
+        "分区统计",
+        "计算",
+        "均值",
+        "平均",
+        "排序",
+        "排名",
         "评估",
         "震后",
         "震前",
     )
-    return any(m in q for m in api_markers) or any(m in q for m in analysis_markers)
+    scale_markers = (
+        "country",
+        "national",
+        "province-level",
+        "provincial",
+        "multi-province",
+        "all provinces",
+        "china",
+        "中国",
+        "全国",
+        "省级",
+        "各省",
+        "34个省",
+        "34 个省",
+    )
+    analysis_hit = any(m in q for m in analysis_markers)
+    scale_hit = any(m in q for m in scale_markers)
+    return any(m in q for m in api_markers) or analysis_hit or (analysis_hit and scale_hit)
 
 
 def _execution_mode(
@@ -233,8 +307,9 @@ def _execution_mode(
     image_count = _estimate_image_count(temporal_resolution, start_dt, end_dt)
     intent = (analysis_intent or "").strip().lower()
     heavy_intents = {"long_series", "composite_export", "time_series"}
+    server_side_intents = {"zonal_stats", "single_stat"}
 
-    if intent in heavy_intents or _query_requires_server_side(query):
+    if intent in heavy_intents or intent in server_side_intents or _query_requires_server_side(query):
         return "gee_server_side"
 
     if temporal_resolution == "daily":
@@ -378,6 +453,13 @@ class GEEScriptBlueprintInput(BaseModel):
         default="ee.Geometry.Rectangle([120.9, 30.9, 122.1, 31.9])",
         description="Python/JS expression used as region placeholder.",
     )
+    zones_template: str = Field(
+        default='ee.FeatureCollection("FAO/GAUL/2015/level1").filterBounds(region)',
+        description=(
+            "Python/JS expression for zonal-statistics zones. For China province-level stats, use "
+            "ee.FeatureCollection('projects/empyrean-caster-430308-m2/assets/province')."
+        ),
+    )
 
 
 def _python_blueprint(
@@ -390,6 +472,7 @@ def _python_blueprint(
     output_format: str,
     output_filename: str,
     region_template: str,
+    zones_template: str,
 ) -> str:
     reducer_expr = f"ee.Reducer.{reducer}()"
 
@@ -430,10 +513,8 @@ from storage_manager import storage_manager
 PROJECT_ID = "{REQUIRED_GEE_PROJECT}"
 ee.Initialize(project=PROJECT_ID)
 
-# Replace with your district/administrative feature collection.
-zones = ee.FeatureCollection("FAO/GAUL/2015/level1")
 region = {region_template}
-zones = zones.filterBounds(region)
+zones = {zones_template}
 
 image = (
     ee.ImageCollection("{dataset_id}")
@@ -532,6 +613,7 @@ def _javascript_blueprint(
     output_format: str,
     output_filename: str,
     region_template: str,
+    zones_template: str,
 ) -> str:
     if output_format == "tif":
         return f"""var region = {region_template};
@@ -556,7 +638,7 @@ Export.image.toDrive({{
 
     if analysis_mode == "zonal_stats":
         return f"""var region = {region_template};
-var zones = ee.FeatureCollection("FAO/GAUL/2015/level1").filterBounds(region);
+var zones = {zones_template};
 var image = ee.ImageCollection("{dataset_id}")
   .filterDate("{start_date}", "{end_date}")
   .select("{band}")
@@ -617,6 +699,7 @@ def gee_script_blueprint(
     output_format: str = "csv",
     output_filename: str = "gee_result.csv",
     region_template: str = "ee.Geometry.Rectangle([120.9, 30.9, 122.1, 31.9])",
+    zones_template: str = 'ee.FeatureCollection("FAO/GAUL/2015/level1").filterBounds(region)',
 ) -> str:
     if language == "python":
         script = _python_blueprint(
@@ -629,6 +712,7 @@ def gee_script_blueprint(
             output_format=output_format,
             output_filename=output_filename,
             region_template=region_template,
+            zones_template=zones_template,
         )
     else:
         script = _javascript_blueprint(
@@ -641,6 +725,7 @@ def gee_script_blueprint(
             output_format=output_format,
             output_filename=output_filename,
             region_template=region_template,
+            zones_template=zones_template,
         )
 
     payload = {
@@ -650,6 +735,7 @@ def gee_script_blueprint(
         "analysis_mode": analysis_mode,
         "output_format": output_format,
         "output_filename": output_filename,
+        "zones_template": zones_template if analysis_mode == "zonal_stats" else None,
         "script": script,
         "notes": [
             "For Python execution in this project, keep storage_manager path resolution.",
@@ -674,6 +760,29 @@ class GEEDatasetMetadataInput(BaseModel):
     check_temporal: bool = Field(
         default=True,
         description="If true, try to infer temporal coverage for image collections.",
+    )
+
+
+class DatasetLatestAvailabilityInput(BaseModel):
+    gee_dataset_ids: Optional[List[str]] = Field(
+        default=None,
+        description="Optional Earth Engine dataset ids to check for latest available date.",
+    )
+    laads_short_names: Optional[List[str]] = Field(
+        default=None,
+        description="Optional NASA LAADS/CMR short_name values to check for latest granule day, e.g. VNP46A2 or VJ102DNB.",
+    )
+    requested_end_date: Optional[str] = Field(
+        default=None,
+        description="Optional requested final observation date in YYYY-MM-DD, YYYY-MM, or YYYY format.",
+    )
+    bbox: Optional[str] = Field(
+        default=None,
+        description="Optional bbox for LAADS/CMR queries as minx,miny,maxx,maxy.",
+    )
+    lookback_days: int = Field(
+        default=30,
+        description="How many days back to search when checking LAADS/CMR latest availability.",
     )
 
 
@@ -995,17 +1104,64 @@ def _millis_to_iso(ms: Optional[int]) -> Optional[str]:
         return None
 
 
+def _temporal_resolution_for_dataset(known: Optional[DatasetSpec], curated: Optional[Dict]) -> Optional[str]:
+    if known:
+        return known.temporal_resolution
+    if curated and curated.get("temporal_resolution"):
+        return str(curated.get("temporal_resolution"))
+    return None
+
+
+def _latest_period_from_anchor(anchor_date: Optional[str], temporal_resolution: Optional[str]) -> Optional[str]:
+    if not anchor_date:
+        return None
+    if temporal_resolution == "annual":
+        return anchor_date[:4]
+    if temporal_resolution == "monthly":
+        return anchor_date[:7]
+    return anchor_date
+
+
+def _latest_date_semantics(temporal_resolution: Optional[str]) -> str:
+    if temporal_resolution == "annual":
+        return "period_start_anchor_for_annual_composite"
+    if temporal_resolution == "monthly":
+        return "period_start_anchor_for_monthly_composite"
+    return "observation_date"
+
+
 def gee_dataset_metadata(dataset_id: str, check_temporal: bool = True) -> str:
     known = DATASET_BY_ID.get(dataset_id)
+    curated = _find_curated_dataset_entry(dataset_id)
+    temporal_resolution = _temporal_resolution_for_dataset(known, curated)
     base_result = {
         "dataset_id": dataset_id,
         "status": "ok",
         "asset_type": None,
+        "temporal_resolution": temporal_resolution,
         "band_names": [],
         "collection_size": None,
         "temporal_coverage": {"start": None, "end": None},
+        "latest_available_date": None,
+        "latest_available_period": None,
+        "latest_date_semantics": _latest_date_semantics(temporal_resolution),
         "source": "earthengine-api",
     }
+    if curated:
+        base_result.update(
+            {
+                "asset_type": curated.get("asset_type"),
+                "band_names": _curated_band_names(curated),
+                "curated_dataset_key": curated.get("key"),
+                "curated_category": curated.get("category"),
+                "curated_use_when": curated.get("use_when", []),
+                "curated_avoid_when": curated.get("avoid_when", []),
+                "curated_scale_m": curated.get("scale_m"),
+                "curated_primary_bands": curated.get("primary_bands", []),
+                "curated_expected_temporal_coverage": curated.get("expected_temporal_coverage"),
+                "source": "curated_registry+earthengine-api",
+            }
+        )
     if known:
         base_result.update(
             {
@@ -1015,9 +1171,14 @@ def gee_dataset_metadata(dataset_id: str, check_temporal: bool = True) -> str:
                     "start": known.start_date.isoformat(),
                     "end": known.end_date.isoformat(),
                 },
+                "latest_available_date": known.end_date.isoformat(),
                 "known_dataset_note": known.note,
                 "source": "built_in_catalog+earthengine-api",
             }
+        )
+        base_result["latest_available_period"] = _latest_period_from_anchor(
+            known.end_date.isoformat(),
+            temporal_resolution,
         )
 
     try:
@@ -1026,6 +1187,11 @@ def gee_dataset_metadata(dataset_id: str, check_temporal: bool = True) -> str:
         if known:
             base_result["status"] = "partial"
             base_result["source"] = "built_in_catalog"
+            base_result["warning"] = f"earthengine-api import failed: {exc}"
+            return json.dumps(base_result, indent=2, ensure_ascii=False)
+        if curated:
+            base_result["status"] = "partial"
+            base_result["source"] = "curated_registry"
             base_result["warning"] = f"earthengine-api import failed: {exc}"
             return json.dumps(base_result, indent=2, ensure_ascii=False)
         return json.dumps(
@@ -1040,6 +1206,11 @@ def gee_dataset_metadata(dataset_id: str, check_temporal: bool = True) -> str:
         if known:
             base_result["status"] = "partial"
             base_result["source"] = "built_in_catalog"
+            base_result["warning"] = f"ee.Initialize failed: {exc}"
+            return json.dumps(base_result, indent=2, ensure_ascii=False)
+        if curated:
+            base_result["status"] = "partial"
+            base_result["source"] = "curated_registry"
             base_result["warning"] = f"ee.Initialize failed: {exc}"
             return json.dumps(base_result, indent=2, ensure_ascii=False)
 
@@ -1060,6 +1231,11 @@ def gee_dataset_metadata(dataset_id: str, check_temporal: bool = True) -> str:
                 "start": _millis_to_iso(start_ms),
                 "end": _millis_to_iso(end_ms),
             }
+            result["latest_available_date"] = result["temporal_coverage"]["end"]
+            result["latest_available_period"] = _latest_period_from_anchor(
+                result["latest_available_date"],
+                result.get("temporal_resolution"),
+            )
         return json.dumps(result, indent=2, ensure_ascii=False)
     except Exception:
         pass
@@ -1069,6 +1245,13 @@ def gee_dataset_metadata(dataset_id: str, check_temporal: bool = True) -> str:
         img = ee.Image(dataset_id)
         result["asset_type"] = "Image"
         result["band_names"] = img.bandNames().getInfo()
+        time_start = img.get("system:time_start").getInfo()
+        if time_start is not None:
+            result["latest_available_date"] = _millis_to_iso(time_start)
+            result["latest_available_period"] = _latest_period_from_anchor(
+                result["latest_available_date"],
+                result.get("temporal_resolution"),
+            )
         return json.dumps(result, indent=2, ensure_ascii=False)
     except Exception:
         pass
@@ -1092,6 +1275,131 @@ def gee_dataset_metadata(dataset_id: str, check_temporal: bool = True) -> str:
             indent=2,
             ensure_ascii=False,
         )
+
+
+def _parse_bbox_text(raw: Optional[str]) -> Optional[Tuple[float, float, float, float]]:
+    if not raw:
+        return None
+    parts = [p.strip() for p in str(raw).split(",")]
+    if len(parts) != 4:
+        raise ValueError("bbox must be minx,miny,maxx,maxy")
+    minx, miny, maxx, maxy = (float(x) for x in parts)
+    if maxx <= minx or maxy <= miny:
+        raise ValueError("Invalid bbox: maxx>minx and maxy>miny required.")
+    return minx, miny, maxx, maxy
+
+
+def _compare_requested_end_date(
+    latest_value: Optional[str],
+    requested_end_date: Optional[str],
+    temporal_resolution: Optional[str] = None,
+) -> str:
+    if not requested_end_date:
+        return "not_requested"
+    if not latest_value:
+        return "unknown"
+    try:
+        latest = datetime.strptime(latest_value, "%Y-%m-%d").date()
+    except Exception:
+        return "unknown"
+    try:
+        raw = str(requested_end_date).strip()
+        if temporal_resolution == "annual":
+            requested_year = _parse_date(raw, "end").year
+            return "available" if requested_year <= latest.year else "not_yet_available"
+        if temporal_resolution == "monthly":
+            requested_month = _parse_date(raw, "end")
+            return (
+                "available"
+                if (requested_month.year, requested_month.month) <= (latest.year, latest.month)
+                else "not_yet_available"
+            )
+        requested = _parse_date(raw, "end")
+        return "available" if requested <= latest else "not_yet_available"
+    except Exception:
+        return "unknown"
+
+
+def dataset_latest_availability(
+    gee_dataset_ids: Optional[List[str]] = None,
+    laads_short_names: Optional[List[str]] = None,
+    requested_end_date: Optional[str] = None,
+    bbox: Optional[str] = None,
+    lookback_days: int = 30,
+) -> str:
+    checks: List[Dict[str, object]] = []
+
+    for dataset_id in gee_dataset_ids or []:
+        payload = json.loads(gee_dataset_metadata(dataset_id, check_temporal=True))
+        payload["source"] = "gee"
+        payload["coverage_status"] = _compare_requested_end_date(
+            payload.get("latest_available_date"),
+            requested_end_date,
+            payload.get("temporal_resolution"),
+        )
+        checks.append(payload)
+
+    if laads_short_names:
+        from experiments.official_daily_ntl_fastpath.cmr_client import search_granules, select_latest_day_entries
+
+        bbox_value = _parse_bbox_text(bbox)
+        search_end = _today()
+        search_start = search_end - timedelta(days=max(1, int(lookback_days)))
+        for short_name in laads_short_names:
+            granules = search_granules(
+                short_name=str(short_name).strip(),
+                start_date=search_start.isoformat(),
+                end_date=search_end.isoformat(),
+                bbox=bbox_value,
+                page_size=200,
+            )
+            latest_day, entries = select_latest_day_entries(granules, night_only=False)
+            checks.append(
+                {
+                    "source": "laads_cmr",
+                    "short_name": short_name,
+                    "status": "ok" if latest_day else "empty",
+                    "temporal_resolution": "daily",
+                    "search_window": {"start": search_start.isoformat(), "end": search_end.isoformat()},
+                    "granule_count": len(granules),
+                    "latest_available_date": latest_day,
+                    "latest_available_period": latest_day,
+                    "latest_date_semantics": "observation_date",
+                    "latest_granule_ids": [g.producer_granule_id for g in entries[:5]],
+                    "coverage_status": _compare_requested_end_date(latest_day, requested_end_date, "daily"),
+                }
+            )
+
+    if not checks:
+        return json.dumps(
+            {
+                "status": "error",
+                "error": "Provide at least one gee_dataset_id or laads_short_name.",
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
+
+    statuses = [str(item.get("coverage_status")) for item in checks]
+    if requested_end_date:
+        if statuses and all(status == "available" for status in statuses):
+            overall_status = "available"
+        elif any(status == "available" for status in statuses):
+            overall_status = "mixed"
+        elif all(status == "not_yet_available" for status in statuses):
+            overall_status = "not_yet_available"
+        else:
+            overall_status = "unknown"
+    else:
+        overall_status = "checked"
+
+    payload = {
+        "status": "ok",
+        "requested_end_date": requested_end_date,
+        "overall_status": overall_status,
+        "checks": checks,
+    }
+    return json.dumps(payload, indent=2, ensure_ascii=False)
 
 
 GEE_dataset_router_tool = StructuredTool.from_function(
@@ -1135,4 +1443,15 @@ GEE_dataset_metadata_tool = StructuredTool.from_function(
         "including band names and temporal coverage when available."
     ),
     args_schema=GEEDatasetMetadataInput,
+)
+
+
+dataset_latest_availability_tool = StructuredTool.from_function(
+    func=dataset_latest_availability,
+    name="dataset_latest_availability_tool",
+    description=(
+        "Check latest data availability for one or more GEE datasets and/or NASA LAADS/CMR short_name products. "
+        "Use before recent daily/event analysis to verify whether the requested end date is already available."
+    ),
+    args_schema=DatasetLatestAvailabilityInput,
 )

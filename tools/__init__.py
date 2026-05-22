@@ -37,7 +37,9 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "LandScan_download_tool": (".Other_image_download", "LandScan_download_tool"),
     "google_bigquery_search": (".Google_Bigquery", "google_bigquery_search"),
     "Tavily_search": (".TavilySearch", "Tavily_search"),
+    "China_Official_Stats_tool": (".China_official_stats", "China_Official_Stats_tool"),
     "China_Official_GDP_tool": (".China_official_stats", "China_Official_GDP_tool"),
+    "Country_GDP_Search_tool": (".country_gdp_tool", "Country_GDP_Search_tool"),
     "geodata_inspector_tool": (".geodata_inspector_tool", "geodata_inspector_tool"),
     "geodata_quick_check_tool": (".geodata_inspector_tool", "geodata_quick_check_tool"),
     "GeoCode_COT_Validation_tool": (".NTL_Code_generation", "GeoCode_COT_Validation_tool"),
@@ -47,6 +49,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "GEE_script_blueprint_tool": (".GEE_specialist_toolkit", "GEE_script_blueprint_tool"),
     "GEE_catalog_discovery_tool": (".GEE_specialist_toolkit", "GEE_catalog_discovery_tool"),
     "GEE_dataset_metadata_tool": (".GEE_specialist_toolkit", "GEE_dataset_metadata_tool"),
+    "dataset_latest_availability_tool": (".GEE_specialist_toolkit", "dataset_latest_availability_tool"),
     "NTL_estimate_indicator_provincial_tool": (
         ".NTL_estimate_indicator",
         "NTL_estimate_indicator_provincial_tool",
@@ -58,10 +61,13 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         ".official_vj_dnb_preprocess_tool",
         "convert_vj102_vj103_precise_to_tif_tool",
     ),
+    "NTL_preview_tool": (".ntl_preview_tool", "NTL_preview_tool"),
     "official_vj_dnb_gif_tool": (".official_vj_dnb_gif_tool", "official_vj_dnb_gif_tool"),
     "official_ntl_ais_fusion_tool": (".official_ntl_ais_fusion_tool", "official_ntl_ais_fusion_tool"),
     "uploaded_pdf_understanding_tool": (".uploaded_file_understanding_tool", "uploaded_pdf_understanding_tool"),
     "wrap_tool_json_safe": (".tool_json_safety", "wrap_tool_json_safe"),
+    "conflict_ntl_agent_system_tool": (".conflict_ntl", "conflict_ntl_agent_system_tool"),
+    "conflict_ntl_fetch_isw_events_tool": (".conflict_ntl", "conflict_ntl_fetch_isw_events_tool"),
 }
 
 _GROUPS: dict[str, list[str]] = {
@@ -77,15 +83,21 @@ _GROUPS: dict[str, list[str]] = {
         "official_vj_dnb_fullchain_tool",
         "official_vj_dnb_preprocess_tool",
         "convert_vj102_vj103_precise_to_tif_tool",
+        "NTL_preview_tool",
         "official_vj_dnb_gif_tool",
         "official_ntl_ais_fusion_tool",
+        "China_Official_Stats_tool",
         "China_Official_GDP_tool",
+        "Country_GDP_Search_tool",
         "Tavily_search",
         "google_bigquery_search",
         "GEE_dataset_router_tool",
         "GEE_script_blueprint_tool",
         "GEE_catalog_discovery_tool",
         "GEE_dataset_metadata_tool",
+        "dataset_latest_availability_tool",
+        "conflict_ntl_agent_system_tool",
+        "conflict_ntl_fetch_isw_events_tool",
     ],
     "Code_tools": [
         "GeoCode_Knowledge_Recipes_tool",
@@ -111,11 +123,36 @@ _GROUPS: dict[str, list[str]] = {
         "official_vj_dnb_fullchain_tool",
         "official_vj_dnb_preprocess_tool",
         "convert_vj102_vj103_precise_to_tif_tool",
+        "NTL_preview_tool",
         "official_vj_dnb_gif_tool",
         "official_ntl_ais_fusion_tool",
         "SDGSAT1_index_tool",
         "vnci_index_tool",
         "uploaded_pdf_understanding_tool",
+    ],
+    "specialized_tool_catalog": [
+        "SDGSAT1_strip_removal_tool",
+        "SDGSAT1_radiometric_calibration_tool",
+        "VNP46A2_angular_correction_tool",
+        "dmsp_evi_preprocess_tool",
+        "urban_extraction_by_thresholding_tool",
+        "svm_urban_extraction_tool",
+        "electrified_detection_tool",
+        "otsu_road_extraction_tool",
+        "detect_urban_centres_tool",
+        "NTL_composite_local_tool",
+        "NTL_estimate_indicator_provincial_tool",
+        "DEI_estimate_city_tool",
+        "official_vj_dnb_fullchain_tool",
+        "official_vj_dnb_preprocess_tool",
+        "convert_vj102_vj103_precise_to_tif_tool",
+        "NTL_preview_tool",
+        "official_vj_dnb_gif_tool",
+        "official_ntl_ais_fusion_tool",
+        "SDGSAT1_index_tool",
+        "vnci_index_tool",
+        "conflict_ntl_agent_system_tool",
+        "conflict_ntl_fetch_isw_events_tool",
     ],
 }
 
@@ -172,6 +209,7 @@ class LazyToolCollection(Sequence[Any]):
 data_searcher_tools = LazyToolCollection(_GROUPS["data_searcher_tools"])
 Code_tools = LazyToolCollection(_GROUPS["Code_tools"])
 Engineer_tools = LazyToolCollection(_GROUPS["Engineer_tools"])
+specialized_tool_catalog = LazyToolCollection(_GROUPS["specialized_tool_catalog"])
 
 
 __all__ = sorted(list(_EXPORTS.keys()) + list(_GROUPS.keys()))

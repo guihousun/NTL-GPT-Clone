@@ -16,17 +16,11 @@ from experiments.official_daily_ntl_fastpath.cmr_client import extract_download_
 
 
 SUPPORTED_SOURCES = {
-    # Swath (L1/L2-like) products.
-    "VJ102DNB",
-    "VJ103DNB",
-    # Gridded (L3-like) daily products.
-    "VJ146A1",
-    "VJ146A2",
+    # Official VIIRS nighttime-light products currently monitored.
     "VNP46A1",
     "VNP46A2",
-    # Optional NRT variants (if available in CMR by short_name).
-    "VJ102DNB_NRT",
-    "VJ146A1_NRT",
+    "VNP46A3",
+    "VNP46A4",
 }
 
 
@@ -52,7 +46,7 @@ def _parse_sources(raw: str) -> list[str]:
         if s not in out:
             out.append(s)
     if not out:
-        out = ["VJ102DNB", "VJ103DNB"]
+        out = ["VNP46A1", "VNP46A2", "VNP46A3", "VNP46A4"]
     return out
 
 
@@ -103,10 +97,10 @@ def main() -> None:
     parser.add_argument("--bbox", required=True, help="minx,miny,maxx,maxy")
     parser.add_argument(
         "--sources",
-        default="VJ102DNB,VJ103DNB",
+        default="VNP46A1,VNP46A2,VNP46A3,VNP46A4",
         help=(
             "Comma list of short_names. "
-            "Examples: VJ102DNB,VJ103DNB or VJ146A1 or VJ146A1,VJ146A2"
+            "Examples: VNP46A1,VNP46A2 or VNP46A1,VNP46A2,VNP46A3,VNP46A4"
         ),
     )
     parser.add_argument(

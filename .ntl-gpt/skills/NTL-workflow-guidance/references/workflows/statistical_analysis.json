@@ -200,5 +200,33 @@
       }
     ],
     "output": "outputs/Shanghai_District_Landscape_Metrics.csv"
+  },
+  {
+    "task_id": "Q30",
+    "task_name": "Compute and rank province-level mean NTL for China (server-side GEE)",
+    "category": "NTL statistics",
+    "description": "Compute mean nighttime light for all Chinese province-level administrative units using a cloud-hosted annual NTL image and cloud-hosted province boundaries. This workflow is mandatory for country-scale or all-province statistics because downloading a country-scale GeoTIFF can exceed GEE request-size limits.",
+    "scale_policy": {
+      "spatial_scope": "country_or_multi_province",
+      "required_execution_mode": "gee_server_side",
+      "prohibited_steps": [
+        "country_scale_NTL_download_tool",
+        "bulk_provincial_shapefile_download",
+        "local_zonal_statistics_as_primary_path"
+      ],
+      "required_method": "ee.Image.reduceRegions over a GEE-hosted province FeatureCollection"
+    },
+    "steps": [
+      {
+        "type": "gee_server_side_code",
+        "language": "Python",
+        "description": "Initialize GEE with the configured project, load the requested annual NPP-VIIRS-Like image from `projects/sat-io/open-datasets/npp-viirs-ntl`, load China province-level boundaries from a GEE-hosted FeatureCollection such as `WM/geoLab/geoBoundaries/600/ADM1` (merge CHN ADM1 with Taiwan as one feature, or use the project province asset only if its name fields are clean), compute province-level mean NTL with `ee.Image.reduceRegions(reducer=ee.Reducer.mean(), scale=500, maxPixelsPerRegion=1e13)`, convert the returned feature properties to a pandas DataFrame, sort descending by the mean field, and save `outputs/china_province_ntl_mean_2020.csv`.",
+        "name": "gee_reduceRegions_step_1"
+      }
+    ],
+    "code_examples": [
+      "/skills/gee-python-server-side-workflow/references/cases/china_province_annual_reduceRegions.py"
+    ],
+    "output": "outputs/china_province_ntl_mean_2020.csv"
   }
 ]

@@ -47,10 +47,10 @@ TOOLS = [NTL_Literature_Knowledge, NTL_Solution_Knowledge, NTL_Code_Knowledge]
 
 @lru_cache(maxsize=1)
 def _tool_registry_snapshot() -> dict[str, str]:
-    from tools import Code_tools, Engineer_tools, data_searcher_tools
+    from tools import Code_tools, Engineer_tools, data_searcher_tools, specialized_tool_catalog
 
     snapshot: dict[str, str] = {}
-    for tool in Engineer_tools + data_searcher_tools + Code_tools:
+    for tool in Engineer_tools + data_searcher_tools + Code_tools + specialized_tool_catalog:
         name = getattr(tool, "name", "")
         if not name or name == "NTL_Knowledge_Base":
             continue
@@ -474,8 +474,10 @@ def _build_force_json_fallback_payload(
                         "and compute period statistics for pre-event baseline, first post-event overpass night, "
                         "and post-event recovery windows. For daily VNP46A2, determine first-night using event "
                         "time at epicenter local timezone: if event occurs after the local nightly overpass "
-                        "(typically ~01:30 local), first-night must shift to local day D+1 (not D). "
-                        "Record the rule and chosen first-night date in outputs. "
+                        "(often within a candidate range such as ~00:30-02:30 local), first-night must shift to local day D+1 (not D). "
+                        "For UTC-indexed daily products/files, convert that local first-night acquisition time "
+                        "back to UTC before choosing the image/file date; record both the local first-night "
+                        "date and UTC file date in outputs. If the UTC date boundary is ambiguous, require pixel-level UTC_Time only when the relevant source covers the target date; otherwise use LAADS/CMR granule timing or official metadata. "
                         "Save daily/period metrics to "
                         "'outputs/event_daily_antl_metrics.csv'."
                     ),
@@ -1024,6 +1026,7 @@ Rules:
 - Valid step types: "builtin_tool" (for actual tool calls), "instruction" (for guidance only)
 - Handle Code_RAG empty status by reporting "code corpus unavailable".
 - Treat "first night after event" as the first post-event nighttime overpass at epicenter local time.
+- If the target daily product/file is UTC-indexed, convert that local acquisition time to UTC before selecting the image/file date.
 
 Language: {locale}
 Citations Required: {need_citations}

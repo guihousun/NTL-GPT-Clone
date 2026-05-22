@@ -52,6 +52,8 @@ utils/sessions/
 # Local backups and experiments byproducts
 backups/
 scripts/
+!.ntl-gpt/skills/**/scripts/
+!.ntl-gpt/skills/**/scripts/*.py
 ntl_paper_retrieval_app.py
 experiments/**/workspace_validation/**/outputs/
 experiments/official_daily_ntl_fastpath/workspace/
