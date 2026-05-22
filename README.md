@@ -42,7 +42,16 @@ Optional:
 - `GEE_DEFAULT_PROJECT_ID`
 - `EARTHDATA_TOKEN`
 - `NTL_TOOL_PROFILE`
+- `NTL_USER_DATA_DIR`
+- `NTL_SHARED_DATA_DIR`
 - `NTL_CONTEXTILY_TMP`
+- `NTL_HISTORY_DB_URL`
+- `NTL_LANGGRAPH_POSTGRES_URL`
+- `NTL_MAX_ACTIVE_RUNS`
+- `NTL_MAX_ACTIVE_RUNS_PER_USER`
+- `NTL_THREAD_WORKSPACE_QUOTA_MB`
+- `NTL_USER_WORKSPACE_QUOTA_MB`
+- `NTL_FORCE_NATIVE_CHAT_INPUT`
 
 ## Main Capabilities
 
@@ -51,6 +60,9 @@ Available after basic setup:
 - chat-based task handling
 - local tool orchestration
 - knowledge-guided geospatial code generation
+- account/password login
+- per-thread workspace isolation
+- configurable run concurrency and workspace quotas
 
 Additional setup for Google Earth Engine:
 
@@ -67,6 +79,63 @@ Generated geospatial code is executed through the project-local subprocess works
 - `tools/NTL_Code_generation.py` runs generated code in a subprocess with the current thread workspace as the working directory.
 - Relative `inputs/...` and `outputs/...` paths resolve under `user_data/<thread_id>/`.
 - This is not a vendor-hosted secure sandbox; safety relies on preflight checks, path protocol enforcement, subprocess timeouts, and workspace scoping.
+- `/shared/...` maps to `base_data/...` and is treated as shared read-only source data.
+
+## Multi-User Runtime Model
+
+The Streamlit runtime isolates work by thread:
+
+- each thread uses its own `user_data/<thread_id>/inputs`, `outputs`, `memory`, and history records
+- one run at a time is allowed per thread
+- different threads can run concurrently in background Python threads
+- global and per-user active-run limits are controlled by `NTL_MAX_ACTIVE_RUNS` and `NTL_MAX_ACTIVE_RUNS_PER_USER`
+- per-thread and per-user workspace storage quotas are controlled by `NTL_THREAD_WORKSPACE_QUOTA_MB` and `NTL_USER_WORKSPACE_QUOTA_MB`
+
+Set a limit to `0` to disable it.
+
+## PostgreSQL Persistence
+
+For production or multi-user use, configure PostgreSQL in `.env`:
+
+```env
+NTL_HISTORY_DB_URL=postgresql://ntl_gpt:your_password@127.0.0.1:5432/ntl_gpt
+NTL_LANGGRAPH_POSTGRES_URL=postgresql://ntl_gpt:your_password@127.0.0.1:5432/ntl_gpt
+```
+
+`NTL_HISTORY_DB_URL` stores users, password hashes, chat history, threads, profiles, and related app state. If it is empty, history storage falls back to `NTL_LANGGRAPH_POSTGRES_URL`.
+
+`NTL_LANGGRAPH_POSTGRES_URL` is reserved for LangGraph/Postgres-backed runtime memory and checkpoint storage where supported by the installed LangGraph packages.
+
+Local PostgreSQL and Docker PostgreSQL use the same URL format. Only the host name changes:
+
+- PostgreSQL installed directly on the same machine: `127.0.0.1:5432`
+- Docker PostgreSQL exposed with `-p 5432:5432`, while Streamlit runs in local conda: `127.0.0.1:5432`
+- Docker Compose where Streamlit and PostgreSQL run on the same Docker network: use the service name, for example `postgres:5432`
+
+Example local database bootstrap:
+
+```sql
+CREATE USER ntl_gpt WITH PASSWORD 'your_password';
+CREATE DATABASE ntl_gpt OWNER ntl_gpt;
+GRANT ALL PRIVILEGES ON DATABASE ntl_gpt TO ntl_gpt;
+```
+
+Example Docker PostgreSQL:
+
+```bash
+docker run --name ntl-gpt-postgres \
+  -e POSTGRES_USER=ntl_gpt \
+  -e POSTGRES_PASSWORD=your_password \
+  -e POSTGRES_DB=ntl_gpt \
+  -p 5432:5432 \
+  -d postgres:16
+```
+
+After editing `.env`, run:
+
+```bash
+python check_env.py
+```
 
 Additional setup for official VIIRS downloads:
 
