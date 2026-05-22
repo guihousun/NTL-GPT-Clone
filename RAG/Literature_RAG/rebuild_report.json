@@ -1,0 +1,27 @@
+{
+  "collection_name": "Literature_RAG",
+  "persistent_directory": "RAG/Literature_RAG",
+  "embedding_model": "text-embedding-3-small",
+  "profile": "literature",
+  "reset": true,
+  "deleted_before_rebuild": 500,
+  "records_seen": 683,
+  "records_ingested": 508,
+  "records_skipped": 175,
+  "dedupe_removed_count": 73,
+  "errors": [],
+  "non_json_docs_loaded": 0,
+  "chunks_written": 508,
+  "final_collection_count": 508,
+  "doc_type_counts": {
+    "literature_paper": 508
+  },
+  "source_bucket_counts": {
+    "literature_pdf": 500,
+    "literature_text": 8
+  },
+  "language_counts": {
+    "en": 486,
+    "zh": 22
+  }
+}

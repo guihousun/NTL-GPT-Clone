@@ -1,0 +1,96 @@
+﻿Unnamed: 0,Category,Label,Case
+1.0,data retrieval and preprocessing,NPP VIIRS annual,Retrieve NPP VIIRS annual NTL data for Shanghai from 2015 to 2020.
+2.0,data retrieval and preprocessing,DMSP-OLS annual,Retrieve DMSP–OLS annual NTL data for Shanghai from 2005 to 2010.
+4.0,data retrieval and preprocessing,NPP-VIIRS-like annual,Retrieve NPP-VIIRS-like annual NTL data for Shanghai from 2010 to 2020.
+5.0,data retrieval and preprocessing,NPP VIIRS monthly,Retrieve NPP VIIRS monthly NTL data for Shanghai from January to December 2020.
+6.0,data retrieval and preprocessing,VNP46A1,"Retrieve NPP VIIRS VNP46A1 daily NTL data for Shanghai from December 1 to December 7, 2020."
+7.0,data retrieval and preprocessing,VNP46A2,"Retrieve NPP VIIRS VNP46A2 daily NTL data for Shanghai, from January 1 to January 7, 2020."
+9.0,data retrieval and preprocessing,Monthly composite,"Retrieve NPP VIIRS VNP46A2 daily NTL data for Shanghai, from Jan 1 to Jan 31, 2020,and composite them into a monthly NTL imagery"
+11.0,data retrieval and preprocessing,NPP VIIRS daily,Retrieve VNP46A2 daily NTL imagery of Beijing during the 2022 Winter Olympics.
+15.0,data retrieval and preprocessing,Event news,Retrieve event information about 2025 Myanmar earthquake from USGS and ReliefWeb.
+16.0,data retrieval and preprocessing,Administrative boundary,Retrieve Shanghai's administrative boundary from Amap.
+17.0,data retrieval and preprocessing,POI,Retrieve POI data within 200 meters of the Oriental Pearl Tower from Amap.
+18.0,data retrieval and preprocessing,Coordinates,Retrieve coordinates for the Oriental Pearl Tower in Shanghai.
+22.0,data retrieval and preprocessing,SDGSAT-1 stripe noise removal,Perform stripe noise removal on SDGSAT-1 GLI image at inputs/.
+23.0,data retrieval and preprocessing,SDGSAT-1 radiometric calibration,Perform radiometric calibration on SDGSAT-1 GLI image at inputs/.
+24.0,data retrieval and preprocessing,SDGSAT-1 grayscale brightness,Create grayscale brightness image using SDGSAT-1 GLI image at inputs/.
+25.0,data retrieval and preprocessing,NOAA20 preprocess,Preprocess NOAA-20 VIIRS data saved in inputs/NOAA20.
+27.0,data retrieval and preprocessing,SDGSAT-1 NDIGR,Calculate NDIGR using the SDGSAT-1 GLI image at inputs/.
+29.0,data retrieval and preprocessing,SDGSAT-1 RRLI,Calculate RRLI using the SDGSAT-1 GLI image at inputs/.
+31.0,NTL spatial statistic and querying,Zonal statistics,Identify the district in Shanghai with the highest ANTL in a 2022 NPP-VIIRS-like image.
+32.0,NTL spatial statistic and querying,Point statistics,"Identify the WGS84 coordinate of the brightest pixel of NPP-VIIRS NTL imagery in Shanghai, 2022."
+34.0,NTL spatial statistic and querying,Point statistics,"Identify the WGS84 coordinate of the darkest pixel of NPP-VIIRS NTL imagery in Shanghai, June, 2022."
+33.0,NTL spatial statistic and querying,Point statistics,Report the NTL intensity of NPP-VIIRS imagery at the location of the Oriental Pearl Tower in 2020.
+35.0,NTL spatial statistic and querying,Maximum NTL intensity [MaxNTL(P)],"Calculate maximum NTL intensity of  NPP-VIIRS-like annual NTL image for each district in Shanghai, 2020."
+39.0,NTL spatial statistic and querying,Total NTL intensity [TNTL],"Calculate total NTL intensity of  NPP-VIIRS-like annual NTL image for each district in Shanghai, 2020."
+44.0,NTL spatial statistic and querying,ANTL [ANTL],"Calculate ANTL of  NPP-VIIRS-like annual NTL image for each district in Shanghai, 2020."
+47.0,NTL spatial statistic and querying,Threshold processing,"Within Shanghai’s 2020 administrative boundary, calculate the proportion of NPP-VIIRS NTL pixels with values greater than 50."
+49.0,NTL spatial statistic and querying,Numerical statistics,Calculate the compound annual growth rate of Total NTL intensity for Shanghai from 2015 to 2020.
+50.0,NTL spatial statistic and querying,Numerical statistics,Calculate the annual growth rate of total NTL intensity in Shanghai for each year between 2015 and 2020
+51.0,NTL spatial statistic and querying,Numerical statistics,Identify the district with the highest NTL growth rate in Shanghai from 2019 to 2020.
+52.0,NTL spatial statistic and querying,Anomaly detection,Detect anomalous pixels in Shanghai from 2015 to 2020.
+53.0,NTL spatial statistic and querying,GEE statistics,"Calculate VNP46A2 average nighttime light intensity (ANTL) in Shanghai each day, from January 1, 2022, to January 31, 2022, using GEE Python Code,and save it as a csv."
+54.0,NTL spatial statistic and querying,GEE statistics,"Calculate NPP-VIIRS average nighttime light intensity (ANTL) in Shanghai each year, from 2015 to 2022, using GEE Python Code,and save it as a csv."
+55.0,NTL spatial statistic and querying,Change,"Download VNP46A2 daily NTL data, and detect the brightness value in the Oriental Pearl Tower, Shanghai before and after the 2024 National Day of China."
+56.0,NTL spatial statistic and querying,Thresholded pixel extraction,Extract the built-up area in Shanghai for 2018 using a threshold of 10.
+57.0,NTL spatial statistic and querying,Different,Calculate and visualize the NTL intensity difference between 2020 and 2021 in Shanghai.
+58.0,NTL spatial statistic and querying,Visualization,"Download NPP-VIIRS-like imagery of Shanghai in 2020, set noise values less than 1 to NaN, and visualize using a 'viridis' color map."
+59.0,NTL spatial statistic and querying,Compare,Compare ANTL in Shanghai and Beijing in 2022 and tell me which is brighter.
+60.0,NTL spatial statistic and querying,Trend analysis,Conduct a slope trend analysis on annual NPP-VIIRS-like NTL data for Shanghai (2000–2020).
+61.0,NTL application and modeling,COVID19,"Calculate the ANTL for Wuhan during the official lockdown period (January 23 – April 8, 2020), and compare it with the corresponding dates in 2019."
+62.0,NTL application and modeling,Earthquake,"Assess the impact of the 2025 Myanmar earthquake using daily NPP-VIIRS VNP46A2 imagery. Retrieve earthquake details from official sources (USGS, ReliefWeb) to identify the epicenter. Compute ANTL during pre-event and post-event periods,
+ and the first night after the earthquake using the GEE Python API, and summarize results for damage assessment."
+64.0,NTL application and modeling,GDP,"Please retrieve Shanghai’s GDP data and the NPP-VIIRS NTL imagery from 2013 to 2022, analyze the relationship between ANTL and GDP using multiple regression models, and select the best-fitting model."
+66.0,NTL application and modeling,Built-Up Areas Extraction,"Download the 2020 NTL imagery for Shanghai. Then, extract the built-up area using the SVM method. Finally, calculate the proportion of built-up area within each district of Shanghai."
+67.0,NTL application and modeling,Urban main roads extraction,"Extract urban main roads based on the SDGSAT-1 GLI NTL imagery located at inputs\SDG_rgb.tif, and convert the result to a shapefile (.shp)."
+69.0,NTL application and modeling,Streetlight classification,"Compute the Ratio Red Light Index (RRLI) and Ratio Blue Light Index (RBLI) based on the RGB NTL image located at inputs\SDG_rgb.tif. Then, classify the pixels into different types according to Jia et al. (2024)."
+101.0,data retrieval and preprocessing,Cross-year annual stack,"Retrieve NPP-VIIRS-Like annual NTL data for Shanghai from 2005 to 2024, and export one GeoTIFF per year with consistent naming."
+102.0,data retrieval and preprocessing,Two-city monthly retrieval,"Retrieve monthly VIIRS NTL (VCMSLCFG) for Shanghai and Wuhan from 2019-01 to 2020-12, then store all monthly rasters and a manifest CSV."
+103.0,data retrieval and preprocessing,Daily long series server-side,Compute daily ANTL time series for Shanghai for the full year 2020 using VNP46A2. Do not download all daily rasters; perform aggregation server-side in GEE and export only CSV.
+104.0,data retrieval and preprocessing,Mixed annual-monthly-daily sanity,"Retrieve annual NTL for 2020, monthly NTL for 2020-01, and daily NTL for 2020-01-15 over Shanghai. Verify temporal consistency and save a metadata report."
+105.0,data retrieval and preprocessing,Boundary source consistency,Retrieve Shanghai administrative boundaries from both Amap/OSM pathways and compare geometry area difference ratio in a CSV report.
+106.0,data retrieval and preprocessing,NDVI + NTL paired retrieval,"Retrieve MODIS NDVI and VIIRS monthly NTL for Kunming in 2022 (monthly aligned), export paired files and a join key table by month."
+107.0,data retrieval and preprocessing,LandScan + NTL alignment prep,"Retrieve 2020 LandScan population and annual NTL for Wuhan, reproject/align to a common grid, and save aligned rasters for downstream modeling."
+108.0,data retrieval and preprocessing,Event-driven data package,"Retrieve authoritative event briefs for the 2025 Myanmar earthquake (USGS/ReliefWeb/OCHA), and collect corresponding monthly NTL before/after event for affected provinces."
+109.0,data retrieval and preprocessing,DMSP preprocessing workflow,Retrieve DMSP-OLS annual data for 2008-2012 over Beijing and run a standard preprocessing workflow (normalization/inter-calibration) to produce cleaned annual rasters.
+110.0,data retrieval and preprocessing,VNP46A2 angular correction prep,Retrieve a 14-day daily VNP46A2 series for Shanghai and prepare angular-correction-ready stack with metadata checks and valid pixel counts.
+111.0,data retrieval and preprocessing,China vs non-China admin collections,"Retrieve provincial boundaries for China and level-1 boundaries for Turkey, documenting which GEE collection and property fields were used."
+112.0,data retrieval and preprocessing,POI + boundary package,"Retrieve POIs related to hospitals and shelters within Wuhan boundary, and export a cleaned POI dataset with category mapping and coordinate QC."
+113.0,data retrieval and preprocessing,Daily-to-monthly composite protocol,"From VNP46A2 daily images in March 2020 over Wuhan, build monthly composite using robust median and export quality summary."
+114.0,data retrieval and preprocessing,Out-of-range request handling,Request NPP-VIIRS annual NTL for year 1995 and return a constrained fallback plan with valid dataset/time alternatives and no hallucinated retrieval.
+115.0,data retrieval and preprocessing,Multi-source metadata inspector,"Given retrieved rasters and vectors in inputs, run geodata inspection and output a metadata audit table (CRS, bounds overlap, nodata, resolution)."
+116.0,NTL spatial statistic and querying,District ANTL ranking,Calculate district-level ANTL for Shanghai 2022 and output sorted CSV plus a bar chart of top-to-bottom ranking.
+117.0,NTL spatial statistic and querying,Yearly TNTL trend,Compute city-level TNTL for Shanghai from 2015 to 2024 and output trend CSV with a line plot and CAGR value.
+118.0,NTL spatial statistic and querying,Min/Max/Std metrics,"For a given NTL raster and district boundary, compute MinNTL, MaxNTL, SDNTL, and ANTL per district."
+119.0,NTL spatial statistic and querying,Histogram-based distribution,Generate pixel-value histogram statistics (quantiles + bins) for Wuhan 2020 NTL and save histogram plot + summary CSV.
+120.0,NTL spatial statistic and querying,Lit area at thresholds,"For thresholds [5, 10, 20], compute lit area (LArea) for Shanghai and compare sensitivity in one summary chart."
+121.0,NTL spatial statistic and querying,Inter-annual change map,"Create 2022 minus 2019 NTL change raster for Wuhan, then summarize positive/negative change area and ANTL delta."
+122.0,NTL spatial statistic and querying,Mann-Kendall slope,"Use annual NTL series (2005-2024) to estimate per-pixel trend slope and p-value over Shanghai, exporting slope/p-value rasters and visualization."
+123.0,NTL spatial statistic and querying,District panel stats,Build a district-year panel (2016-2024) of ANTL and TNTL for Shanghai and output long-format CSV suitable for econometric analysis.
+124.0,NTL spatial statistic and querying,Road buffer brightness,"Using road vectors and annual NTL, compute ANTL within 200m/500m/1000m road buffers and compare results."
+125.0,NTL spatial statistic and querying,Center-periphery gradient,Construct ring buffers from city center and quantify NTL decay gradient by distance bands.
+126.0,NTL spatial statistic and querying,Weekend vs weekday daily ANTL,"For one month of daily NTL, compute weekday vs weekend ANTL and test whether weekend lights are significantly different."
+127.0,NTL spatial statistic and querying,Cloud contamination robustness,Compare ANTL derived from mean composite vs median composite for a noisy daily month and report robustness difference.
+128.0,NTL spatial statistic and querying,Cross-city comparability,"Compare normalized ANTL of Shanghai, Wuhan, and Kunming in 2022 with consistent boundary and projection handling."
+129.0,NTL spatial statistic and querying,Subregion hotspot extraction,Extract top 5% brightest pixels within each district and summarize hotspot area share per district.
+130.0,NTL spatial statistic and querying,Thresholded urban mask stats,Use threshold-based urban extraction on annual NTL and report urban mask area + mean brightness for each district.
+131.0,NTL spatial statistic and querying,Spatial overlap QC,"Given one raster and one vector with CRS mismatch, reproject correctly and quantify how much area overlaps before and after fix."
+132.0,NTL spatial statistic and querying,Multi-index CSV,"For each district compute TNTL, ANTL, LArea, SDNTL in one pass and export a clean schema with Region as key."
+133.0,NTL spatial statistic and querying,Daily anomaly index,Build z-score anomaly index for daily ANTL over Wuhan in 2020 Q1 using 2019 Q1 as baseline.
+134.0,NTL spatial statistic and querying,Province-level rollup,Aggregate province-level TNTL for all China provinces for 2024 and output ranked table with top/bottom 10 highlights.
+135.0,NTL spatial statistic and querying,3D landscape metrics pack,"Implement 3DPL, 3DED, and 3DLPI on annual NTL raster and provide metric definitions and computed outputs."
+136.0,NTL application and modeling,GDP regression baseline,"Using provided provincial GDP and annual TNTL panel, fit baseline regressions and report out-of-sample R2 and MAE by province."
+137.0,NTL application and modeling,Population estimation,"Train a model to estimate provincial population from TNTL/ANTL features, and compare linear vs tree-based methods with cross-validation."
+138.0,NTL application and modeling,Electricity consumption proxy,Estimate provincial electricity consumption from NTL features with year fixed effects and output prediction diagnostics.
+139.0,NTL application and modeling,CO2 proxy modeling,Fit CO2 emission estimation models from NTL panel features and evaluate robustness across train/test year splits.
+140.0,NTL application and modeling,DEI forecasting,"Build a DEI estimation workflow combining city-level NTL and provided DEI labels, then produce 2024 prediction with uncertainty interval."
+141.0,NTL application and modeling,SDG 7.1.1 enhanced,"Estimate electrification access (SDG 7.1.1 proxy) by combining NTL and population rasters, reporting both national and province-level results."
+142.0,NTL application and modeling,Urban center detection robust,"Implement localized contour-tree urban center detection for Shanghai 2020, output centers and quality checks against district structure."
+143.0,NTL application and modeling,Disaster impact quantification,"For a disaster-affected city, quantify pre/post event NTL drop using matched baseline windows and provide confidence intervals."
+144.0,NTL application and modeling,Lockdown recovery curve,Model Wuhan lockdown and recovery trajectory from monthly/daily NTL using segmented regression and identify recovery turning point.
+145.0,NTL application and modeling,Built-up extraction comparison,Compare threshold-based and SVM-based urban extraction using the same annual raster and evaluate area/IoU agreement.
+146.0,NTL application and modeling,Cross-city transfer,"Train a built-up/indicator model on Shanghai data and test transfer to Wuhan/Kunming, reporting transfer degradation and adaptation strategy."
+147.0,NTL application and modeling,Feature ablation,"Run ablation experiments for TNTL-only, ANTL-only, and full feature set on GDP/population tasks and summarize performance delta."
+148.0,NTL application and modeling,Temporal generalization,"Train on 2013-2020 and test on 2021-2024 for one socio-economic indicator, reporting drift and retraining recommendations."
+149.0,NTL application and modeling,Explainable modeling,Fit an interpretable model for provincial GDP from NTL features and output feature importance + partial dependence plots.
+150.0,NTL application and modeling,End-to-end policy brief,"Produce an end-to-end analysis brief for one city: retrieval, preprocessing, zonal stats, modeling insight, and final policy-oriented conclusions with output evidence files."

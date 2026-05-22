@@ -1,0 +1,26 @@
+{
+  "collection_name": "Solution_RAG",
+  "persistent_directory": "RAG/Solution_RAG",
+  "embedding_model": "text-embedding-3-small",
+  "profile": "solution",
+  "reset": true,
+  "deleted_before_rebuild": 57,
+  "records_seen": 57,
+  "records_ingested": 57,
+  "records_skipped": 0,
+  "dedupe_removed_count": 0,
+  "errors": [],
+  "non_json_docs_loaded": 0,
+  "chunks_written": 57,
+  "final_collection_count": 57,
+  "doc_type_counts": {
+    "workflow_task": 30,
+    "tool_spec": 27
+  },
+  "source_bucket_counts": {
+    "guidence_json": 57
+  },
+  "language_counts": {
+    "json": 57
+  }
+}
