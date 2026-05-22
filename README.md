@@ -51,6 +51,11 @@ Optional:
 - `NTL_MAX_ACTIVE_RUNS_PER_USER`
 - `NTL_THREAD_WORKSPACE_QUOTA_MB`
 - `NTL_USER_WORKSPACE_QUOTA_MB`
+- `NTL_EMBEDDING_PROVIDER`
+- `NTL_EMBEDDING_MODEL`
+- `NTL_EMBEDDING_BASE_URL`
+- `NTL_EMBEDDING_DIMENSIONS`
+- `NTL_EMBEDDING_API_KEY`
 - `NTL_FORCE_NATIVE_CHAT_INPUT`
 
 ## Main Capabilities
@@ -145,6 +150,21 @@ DashScope channel mapping:
 
 - `DASHSCOPE_API_KEY` is used with `DASHSCOPE_Coding_URL`
 - `DASHSCOPE_Qwen_plus_KEY` is used with `DASHSCOPE_Qwen_plus_URL`
+
+## RAG Embeddings
+
+The local NTL knowledge-base tools use DashScope embeddings by default through the OpenAI-compatible API:
+
+```env
+NTL_EMBEDDING_PROVIDER=dashscope
+NTL_EMBEDDING_MODEL=text-embedding-v4
+NTL_EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+NTL_EMBEDDING_DIMENSIONS=1024
+```
+
+If `NTL_EMBEDDING_API_KEY` is empty, the embedding client uses `DASHSCOPE_Qwen_plus_KEY`. `OPENAI_API_KEY` is only needed if you explicitly set `NTL_EMBEDDING_PROVIDER=openai`.
+
+If an existing `RAG/*_RAG` Chroma store was built with OpenAI embeddings, rebuild it after switching to DashScope so stored document vectors and query vectors come from the same embedding model.
 
 Model channel mapping:
 

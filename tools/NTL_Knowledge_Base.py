@@ -5,12 +5,12 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Callable
+from typing import Any
 
 from dotenv import load_dotenv
 from langchain_chroma import Chroma
 from langchain_core.tools import StructuredTool, create_retriever_tool
-from langchain_openai import OpenAIEmbeddings
+from utils.ntl_embeddings import create_text_embeddings
 
 
 load_dotenv()
@@ -30,14 +30,6 @@ def _resolve_rag_persist_dir(store_name: str) -> str:
     else:
         root = Path(__file__).resolve().parents[1] / "RAG"
     return str((root / store_name).resolve())
-
-
-def _ensure_openai_api_key() -> None:
-    if not os.getenv("OPENAI_API_KEY"):
-        raise RuntimeError(
-            "OPENAI_API_KEY is required for NTL Knowledge Base retrieval. "
-            "Set it in environment variables or .env."
-        )
 
 
 def _make_empty_store_tool(tool_name: str, description: str, store_name: str) -> StructuredTool:
@@ -65,7 +57,7 @@ def _build_retriever_tool(
     persist_directory: str,
     tool_name: str,
     description: str,
-    embeddings: OpenAIEmbeddings,
+    embeddings: Any,
     k: int,
     score_threshold: float,
 ) -> StructuredTool:
@@ -85,8 +77,7 @@ def _build_retriever_tool(
     return create_retriever_tool(retriever, name=tool_name, description=description)
 
 
-_ensure_openai_api_key()
-_EMBEDDINGS = OpenAIEmbeddings(model="text-embedding-3-small")
+_EMBEDDINGS = create_text_embeddings()
 
 
 NTL_Literature_Knowledge = _build_retriever_tool(

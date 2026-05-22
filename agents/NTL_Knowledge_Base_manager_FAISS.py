@@ -2,28 +2,28 @@ import os
 import json
 from langchain_community.document_loaders import PyPDFLoader, WebBaseLoader, TextLoader, PythonLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain.schema import Document
-
-if not os.getenv("OPENAI_API_KEY"):
-    raise RuntimeError("OPENAI_API_KEY is required to build FAISS knowledge embeddings.")
+from utils.ntl_embeddings import build_embedding_config, create_text_embeddings
 
 class RAGDatabase:
-    def __init__(self, persistent_directory, collection_name="knowledge-faiss"):
+    def __init__(self, persistent_directory, collection_name="knowledge-faiss", embedding_model=None):
         """
         使用 FAISS 初始化 RAG 数据库
         :param persistent_directory: 持久化存储目录（FAISS 保存为本地文件）
         :param collection_name: 仅用于区分用途的命名，不影响 FAISS
         """
+        embedding_config = build_embedding_config(model=embedding_model)
         self.persistent_directory = persistent_directory
         self.collection_name = collection_name
+        self.embedding_provider = embedding_config.provider
+        self.embedding_model = embedding_config.model
         os.makedirs(persistent_directory, exist_ok=True)
 
         self.text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
             chunk_size=2048, chunk_overlap=512
         )
-        self.embeddings = OpenAIEmbeddings()
+        self.embeddings = create_text_embeddings(model=embedding_model)
 
         # 如果本地已有 FAISS 索引，尝试加载
         self.vector_store = None

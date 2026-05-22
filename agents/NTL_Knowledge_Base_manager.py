@@ -21,7 +21,6 @@ from langchain_community.document_loaders import (
     WebBaseLoader,
 )
 from langchain_core.documents import Document
-from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -29,6 +28,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from utils.ntl_kb_aliases import flatten_records, normalize_tool_name, normalize_workflow_task
+from utils.ntl_embeddings import build_embedding_config, create_text_embeddings
 
 
 load_dotenv()
@@ -66,14 +66,6 @@ TOOL_TEMPLATE_TARGETS: dict[str, list[str]] = {
     "NTL_anomaly_detection_tool.py": ["detect_ntl_anomaly"],
     "NPP_viirs_index_tool.py": ["compute_vnci_index"],
 }
-
-
-def _ensure_openai_api_key() -> None:
-    if not os.getenv("OPENAI_API_KEY"):
-        raise RuntimeError(
-            "OPENAI_API_KEY is required to build Chroma embeddings. "
-            "Set it in environment variables or .env."
-        )
 
 
 def _safe_read_text_loader(file_path: str) -> list[Document]:
@@ -243,19 +235,20 @@ class RAGDatabase:
         self,
         persistent_directory: str,
         collection_name: str = "knowledge-chroma",
-        embedding_model: str = "text-embedding-3-small",
+        embedding_model: str | None = None,
     ):
-        _ensure_openai_api_key()
+        embedding_config = build_embedding_config(model=embedding_model)
         self.persistent_directory = persistent_directory
         self.collection_name = collection_name
-        self.embedding_model = embedding_model
+        self.embedding_provider = embedding_config.provider
+        self.embedding_model = embedding_config.model
         os.makedirs(persistent_directory, exist_ok=True)
 
         self.text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
             chunk_size=2048,
             chunk_overlap=512,
         )
-        self.embeddings = OpenAIEmbeddings(model=self.embedding_model)
+        self.embeddings = create_text_embeddings(model=embedding_model)
         self.vector_store = Chroma(
             collection_name=self.collection_name,
             persist_directory=self.persistent_directory,
@@ -286,6 +279,7 @@ class RAGDatabase:
         return {
             "collection_name": "",
             "persistent_directory": "",
+            "embedding_provider": "",
             "embedding_model": "",
             "profile": profile,
             "reset": reset,
@@ -939,6 +933,7 @@ class RAGDatabase:
         report = self._init_report(profile=profile, reset=reset)
         report["collection_name"] = self.collection_name
         report["persistent_directory"] = self.persistent_directory
+        report["embedding_provider"] = self.embedding_provider
         report["embedding_model"] = self.embedding_model
 
         if reset:
@@ -1063,12 +1058,14 @@ class ChromaManager:
         self,
         persistent_directory: str,
         collection_name: str = "knowledge-chroma",
-        embedding_model: str = "text-embedding-3-small",
+        embedding_model: str | None = None,
     ):
-        _ensure_openai_api_key()
+        embedding_config = build_embedding_config(model=embedding_model)
         self.persistent_directory = persistent_directory
         self.collection_name = collection_name
-        self.embeddings = OpenAIEmbeddings(model=embedding_model)
+        self.embedding_provider = embedding_config.provider
+        self.embedding_model = embedding_config.model
+        self.embeddings = create_text_embeddings(model=embedding_model)
         os.makedirs(persistent_directory, exist_ok=True)
         self.vector_store = Chroma(
             collection_name=collection_name,

@@ -11,12 +11,13 @@ from typing import Any
 from dotenv import load_dotenv
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
-from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
+
+from utils.ntl_embeddings import create_text_embeddings
 
 
 load_dotenv()
@@ -25,15 +26,6 @@ load_dotenv()
 DEFAULT_LITERATURE_PERSIST_DIR = ROOT_DIR / "RAG" / "Literature_RAG"
 DEFAULT_LITERATURE_COLLECTION_NAME = "Literature_RAG"
 DEFAULT_LITERATURE_REPORT_PATH = ROOT_DIR / "RAG" / "Literature_RAG" / "rebuild_report.json"
-
-
-def _ensure_openai_api_key() -> None:
-    import os
-    if not os.getenv("OPENAI_API_KEY"):
-        raise RuntimeError(
-            "OPENAI_API_KEY is required to build Chroma embeddings. "
-            "Set it in environment variables or .env."
-        )
 
 
 def _load_processed_papers(processed_dir: Path) -> list[dict]:
@@ -133,8 +125,6 @@ def ingest_papers_to_kb(
     collection_name: str | None = None,
     reset: bool = False,
 ) -> dict[str, Any]:
-    _ensure_openai_api_key()
-
     processed_path = Path(processed_dir)
     metadata_dir = processed_path.parent / "metadata"
 
@@ -156,10 +146,7 @@ def ingest_papers_to_kb(
     persist_path = Path(persist_dir) if persist_dir else DEFAULT_LITERATURE_PERSIST_DIR
     collection = collection_name or DEFAULT_LITERATURE_COLLECTION_NAME
 
-    embeddings = OpenAIEmbeddings(
-        model="text-embedding-3-small",
-        api_key=None,
-    )
+    embeddings = create_text_embeddings()
 
     if reset:
         import shutil
