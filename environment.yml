@@ -45,6 +45,7 @@ dependencies:
       - google-api-python-client==2.178.0
       - google-cloud-bigquery==3.40.0
       - db-dtypes==1.5.0
+      - beautifulsoup4>=4.12,<5
       - langchain==1.2.10
       - langchain-core==1.2.16
       - langchain-community==0.4.1
@@ -59,6 +60,7 @@ dependencies:
       - langgraph-checkpoint==3.0.1
       - langgraph-sdk==0.3.3
       - langgraph-supervisor==0.0.31
+      - psycopg[binary]>=3.2,<4
       - opencv-python==4.13.0.92
       - pmdarima==2.0.4
       - pymannkendall==1.4.3
