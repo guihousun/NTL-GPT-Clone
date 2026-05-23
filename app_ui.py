@@ -109,7 +109,11 @@ elif ("127.0.0.1" in MONITOR_UI_URL) or ("localhost" in MONITOR_UI_URL):
 else:
     MONITOR_API_URL = f"{MONITOR_UI_URL}api/latest"
 _NTL_AVAIL_SNAPSHOT_KEY = "ntl_data_availability_snapshot_v1"
-_NTL_SCAN_SCRIPT_PATH = _project_path("experiments", "official_daily_ntl_fastpath", "scan_ntl_availability.py")
+_NTL_SCAN_SCRIPT_CANDIDATES = [
+    _project_path("experiments", "official_daily_ntl_fastpath", "scan_ntl_availability.py"),
+    _project_path("experiments", "official_daily_ntl_fastpath", "scan_official_ntl_availability.py"),
+]
+_NTL_SCAN_SCRIPT_PATH = next((p for p in _NTL_SCAN_SCRIPT_CANDIDATES if p.exists()), _NTL_SCAN_SCRIPT_CANDIDATES[0])
 _NTL_SCAN_OUTPUT_DIR = _project_path("experiments", "official_daily_ntl_fastpath", "workspace_monitor", "outputs")
 _NTL_SCAN_TIMEOUT_SECONDS = 160
 _NTL_SCAN_REFRESH_SECONDS = 3600
