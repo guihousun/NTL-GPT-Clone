@@ -88,6 +88,18 @@ def _project_path(*parts: str) -> Path:
     return APP_ROOT.joinpath(*parts)
 
 
+def _html_data_uri(html_content: str) -> str:
+    encoded = base64.b64encode(str(html_content or "").encode("utf-8")).decode("ascii")
+    return f"data:text/html;charset=utf-8;base64,{encoded}"
+
+
+def _render_html_iframe(html_content: str, *, height: int, scrolling: bool = False) -> None:
+    iframe = getattr(st, "iframe", None)
+    if iframe is None:
+        iframe = components.iframe
+    iframe(_html_data_uri(html_content), height=height, scrolling=scrolling)
+
+
 def _normalize_monitor_base_url(raw: Optional[str], default: str) -> str:
     value = (raw or "").strip() or default
     if not re.match(r"^https?://", value, re.IGNORECASE):
@@ -1419,7 +1431,7 @@ def scroll_to_bottom():
         setTimeout(alignChatInput, 900);
     </script>
     """
-    components.html(js, height=0)
+    _render_html_iframe(js, height=0)
 
 # ==============================================================================
 # SECTION C: UI Rendering Helpers (Reusable)
@@ -3786,7 +3798,7 @@ def render_reasoning_map(events, interactive: bool = True, show_sub_steps: bool 
     }})();
     </script>
     """
-    components.html(html, height=graph_height + 8, scrolling=False)
+    _render_html_iframe(html, height=graph_height + 8, scrolling=False)
 
 
 def _render_code_assistant_message(raw_content: str) -> None:
@@ -4683,3 +4695,4 @@ def render_content_layout():
 
             _streaming_live_fragment_main()
             _streaming_live_fragment_graph()
+
