@@ -669,24 +669,39 @@ def inject_css():
     [data-testid="stChatInput"] > div {
         width: 100% !important;
         max-width: 100% !important;
-        background-color: rgba(15, 24, 48, 0.86) !important;
+        background: rgba(15, 24, 48, 0.90) !important;
         border: 1.2px solid rgba(149, 176, 255, 0.40) !important;
         border-radius: 999px !important;
         box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06) !important;
         min-height: 56px !important;
+        padding: 0 0.55rem !important;
+    }
+    [data-testid="stChatInput"] > div > div,
+    [data-testid="stChatInput"] [data-baseweb],
+    [data-testid="stChatInput"] [data-baseweb="base-input"],
+    [data-testid="stChatInput"] [data-baseweb="textarea"] {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        outline: none !important;
     }
     [data-testid="stChatInput"] textarea,
     [data-testid="stChatInput"] input {
         color: #e8edf8 !important;
+        -webkit-text-fill-color: #e8edf8 !important;
         background: transparent !important;
+        caret-color: #dbeafe !important;
     }
     [data-testid="stChatInput"] textarea::placeholder,
     [data-testid="stChatInput"] input::placeholder {
         color: rgba(226, 236, 255, 0.58) !important;
+        -webkit-text-fill-color: rgba(226, 236, 255, 0.58) !important;
     }
     [data-testid="stChatInput"] button {
         color: #b7cbff !important;
         background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
     }
     iframe[title*="st_chat_input_multimodal"] {
         border: none !important;
@@ -724,6 +739,10 @@ def inject_css():
         border: none !important;
         box-shadow: none !important;
         padding: 0 !important;
+    }
+    [data-testid="stBottomBlockContainer"] [data-testid="stChatInput"],
+    [data-testid="stBottomBlockContainer"] [data-testid="stChatInput"] * {
+        border-color: rgba(149, 176, 255, 0.40) !important;
     }
     div[data-testid="stElementContainer"]:has(iframe[title*="st_chat_input_multimodal"]) {
         background: transparent !important;
@@ -1814,8 +1833,14 @@ def get_user_input(*, disabled: bool = False):
         "Query",
         "Query",
     )
-    force_native = str(os.getenv("NTL_FORCE_NATIVE_CHAT_INPUT", "0")).strip().lower() in {"1", "true", "yes", "on"}
-    if _MULTIMODAL_CHAT_INPUT_IMPORT_ERROR is not None and not st.session_state.get("_ntl_mm_input_error_shown"):
+    use_custom_mm = str(os.getenv("NTL_USE_CUSTOM_MULTIMODAL_CHAT_INPUT", "0")).strip().lower() in {"1", "true", "yes", "on"}
+    force_native = str(os.getenv("NTL_FORCE_NATIVE_CHAT_INPUT", "1")).strip().lower() in {"1", "true", "yes", "on"}
+    if (
+        use_custom_mm
+        and not force_native
+        and _MULTIMODAL_CHAT_INPUT_IMPORT_ERROR is not None
+        and not st.session_state.get("_ntl_mm_input_error_shown")
+    ):
         st.session_state["_ntl_mm_input_error_shown"] = True
         st.sidebar.warning(
             _tr(
@@ -1823,7 +1848,7 @@ def get_user_input(*, disabled: bool = False):
                 "Multimodal input component failed to load; using native input temporarily. Install st-chat-input-multimodal in the active conda environment.",
             )
         )
-    if multimodal_chat_input is not None and not force_native and not disabled:
+    if use_custom_mm and multimodal_chat_input is not None and not force_native and not disabled:
         return multimodal_chat_input(
             placeholder=placeholder,
             accepted_file_types=_CHAT_INPUT_FILE_TYPES,

@@ -34,11 +34,12 @@ OPTIONAL_ENV = [
     "NTL_EMBEDDING_BASE_URL",
     "NTL_EMBEDDING_DIMENSIONS",
     "NTL_EMBEDDING_API_KEY",
+    "NTL_FORCE_NATIVE_CHAT_INPUT",
+    "NTL_USE_CUSTOM_MULTIMODAL_CHAT_INPUT",
 ]
 
 CORE_IMPORTS = {
     "streamlit": "streamlit",
-    "st-chat-input-multimodal": "st_chat_input_multimodal",
     "deepagents": "deepagents",
     "geopandas": "geopandas",
     "rasterio": "rasterio",
@@ -94,9 +95,7 @@ def _check_imports() -> tuple[list[str], list[str]]:
     failed = []
     for label, module_name in CORE_IMPORTS.items():
         try:
-            module = importlib.import_module(module_name)
-            if module_name == "st_chat_input_multimodal" and not hasattr(module, "multimodal_chat_input"):
-                raise ImportError("module does not export multimodal_chat_input")
+            importlib.import_module(module_name)
             ok.append(label)
         except Exception as exc:  # noqa: BLE001
             failed.append(f"{label}: {exc}")
