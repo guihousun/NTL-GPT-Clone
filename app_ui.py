@@ -59,6 +59,9 @@ try:
     from st_chat_input_multimodal import multimodal_chat_input
 except Exception:  # noqa: BLE001
     multimodal_chat_input = None
+    _MULTIMODAL_CHAT_INPUT_IMPORT_ERROR = sys.exc_info()[1]
+else:
+    _MULTIMODAL_CHAT_INPUT_IMPORT_ERROR = None
 
 
 def _is_en() -> bool:
@@ -1409,6 +1412,10 @@ def scroll_to_bottom():
 
             var input = nativeInput || mmHost;
             if (!input) return;
+            var inputShell = input;
+            if (nativeInput) {{
+                inputShell = nativeInput.closest('[data-testid="stBottomBlockContainer"]') || nativeInput.parentElement || nativeInput;
+            }}
             var panels = styleMainPanels(doc);
             if (!panels.length) return;
             var chatPanel = panels[0];
@@ -1427,18 +1434,25 @@ def scroll_to_bottom():
             var left = Math.max(minLeft, Math.round(chatRect.left + 10));
             var width = Math.round(chatRect.width - 20);
             width = Math.max(280, Math.min(width, viewportW - left - 12));
-            input.style.setProperty('position', 'fixed', 'important');
-            input.style.setProperty('left', left + 'px', 'important');
-            input.style.setProperty('width', width + 'px', 'important');
-            input.style.setProperty('max-width', width + 'px', 'important');
-            input.style.setProperty('top', 'auto', 'important');
-            input.style.setProperty('bottom', '12px', 'important');
-            input.style.setProperty('right', 'auto', 'important');
-            input.style.setProperty('height', 'auto', 'important');
-            input.style.setProperty('min-height', '0px', 'important');
-            input.style.setProperty('transform', 'none', 'important');
-            input.style.setProperty('z-index', '900', 'important');
-            input.style.setProperty('opacity', '1', 'important');
+            [inputShell, input].forEach(function(el) {{
+                if (!el) return;
+                el.style.setProperty('position', 'fixed', 'important');
+                el.style.setProperty('left', left + 'px', 'important');
+                el.style.setProperty('width', width + 'px', 'important');
+                el.style.setProperty('max-width', width + 'px', 'important');
+                el.style.setProperty('top', 'auto', 'important');
+                el.style.setProperty('bottom', '12px', 'important');
+                el.style.setProperty('right', 'auto', 'important');
+                el.style.setProperty('height', 'auto', 'important');
+                el.style.setProperty('min-height', '0px', 'important');
+                el.style.setProperty('transform', 'none', 'important');
+                el.style.setProperty('z-index', '900', 'important');
+                el.style.setProperty('opacity', '1', 'important');
+                el.style.setProperty('background', 'transparent', 'important');
+                el.style.setProperty('border', 'none', 'important');
+                el.style.setProperty('box-shadow', 'none', 'important');
+                el.style.setProperty('padding', '0px', 'important');
+            }});
             if (mmFrame) {{
                 input.style.setProperty('background', 'transparent', 'important');
                 input.style.setProperty('border', 'none', 'important');
@@ -1801,6 +1815,14 @@ def get_user_input(*, disabled: bool = False):
         "Query",
     )
     force_native = str(os.getenv("NTL_FORCE_NATIVE_CHAT_INPUT", "0")).strip().lower() in {"1", "true", "yes", "on"}
+    if _MULTIMODAL_CHAT_INPUT_IMPORT_ERROR is not None and not st.session_state.get("_ntl_mm_input_error_shown"):
+        st.session_state["_ntl_mm_input_error_shown"] = True
+        st.sidebar.warning(
+            _tr(
+                "多模态输入组件未加载，已临时使用原生输入框。请在当前 conda 环境安装 st-chat-input-multimodal。",
+                "Multimodal input component failed to load; using native input temporarily. Install st-chat-input-multimodal in the active conda environment.",
+            )
+        )
     if multimodal_chat_input is not None and not force_native and not disabled:
         return multimodal_chat_input(
             placeholder=placeholder,

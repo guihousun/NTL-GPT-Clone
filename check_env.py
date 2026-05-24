@@ -94,7 +94,9 @@ def _check_imports() -> tuple[list[str], list[str]]:
     failed = []
     for label, module_name in CORE_IMPORTS.items():
         try:
-            importlib.import_module(module_name)
+            module = importlib.import_module(module_name)
+            if module_name == "st_chat_input_multimodal" and not hasattr(module, "multimodal_chat_input"):
+                raise ImportError("module does not export multimodal_chat_input")
             ok.append(label)
         except Exception as exc:  # noqa: BLE001
             failed.append(f"{label}: {exc}")
