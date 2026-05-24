@@ -97,7 +97,7 @@ def _render_html_iframe(html_content: str, *, height: int, scrolling: bool = Fal
     iframe = getattr(st, "iframe", None)
     uri = _html_data_uri(html_content)
     if iframe is not None:
-        iframe(uri, height=height)
+        iframe(uri, height=max(1, height))
         return
     components.iframe(uri, height=height, scrolling=scrolling)
 
