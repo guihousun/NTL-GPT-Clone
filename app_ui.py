@@ -52,6 +52,9 @@ import model_config
 from storage_manager import storage_manager
 from map_view_policy import build_layer_signature, advance_map_view_state
 
+if hasattr(st, "bottom"):
+    st._bottom = st.bottom
+
 try:
     from st_chat_input_multimodal import multimodal_chat_input
 except Exception:  # noqa: BLE001
@@ -706,9 +709,18 @@ def inject_css():
     [data-testid="stBottom"],
     [data-testid="stBottomBlockContainer"] {
         background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
     }
+    [data-testid="stBottom"] > div,
+    [data-testid="stBottomBlockContainer"] > div,
+    [data-testid="stBottomBlockContainer"] [data-testid="stElementContainer"],
     div:has(> [data-testid="stBottomBlockContainer"]) {
         background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
     }
     div[data-testid="stElementContainer"]:has(iframe[title*="st_chat_input_multimodal"]) {
         background: transparent !important;
@@ -1208,6 +1220,12 @@ def inject_css():
     [data-testid="stSidebar"] [data-baseweb="select"] input {
         color: #e7f1ff !important;
         -webkit-text-fill-color: #e7f1ff !important;
+    }
+    [data-testid="stSidebar"] [data-baseweb="select"] div[role="combobox"] {
+        align-items: center !important;
+    }
+    [data-testid="stSidebar"] [data-baseweb="select"] input {
+        caret-color: transparent !important;
     }
     [data-testid="stSidebar"] [data-testid="stExpander"] details,
     [data-testid="stSidebar"] [data-testid="stExpander"] details * {
