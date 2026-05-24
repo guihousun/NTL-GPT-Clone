@@ -188,7 +188,7 @@ The checker verifies:
 
 ## Cloud Demo
 
-A temporary public demo is available at:
+The public HTTPS endpoint is available at:
 
 [https://ntl-gpt.gischaser.cn/](https://ntl-gpt.gischaser.cn/)
 

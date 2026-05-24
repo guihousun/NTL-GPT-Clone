@@ -95,9 +95,11 @@ def _html_data_uri(html_content: str) -> str:
 
 def _render_html_iframe(html_content: str, *, height: int, scrolling: bool = False) -> None:
     iframe = getattr(st, "iframe", None)
-    if iframe is None:
-        iframe = components.iframe
-    iframe(_html_data_uri(html_content), height=height, scrolling=scrolling)
+    uri = _html_data_uri(html_content)
+    if iframe is not None:
+        iframe(uri, height=height)
+        return
+    components.iframe(uri, height=height, scrolling=scrolling)
 
 
 def _normalize_monitor_base_url(raw: Optional[str], default: str) -> str:
