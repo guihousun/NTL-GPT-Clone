@@ -679,6 +679,8 @@ def inject_css():
         box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06) !important;
         min-height: 56px !important;
         padding: 0 0.55rem !important;
+        display: flex !important;
+        align-items: center !important;
     }
     [data-testid="stChatInput"] > div > div,
     [data-testid="stChatInput"] [data-baseweb],
@@ -688,6 +690,9 @@ def inject_css():
         border: none !important;
         box-shadow: none !important;
         outline: none !important;
+        min-height: 42px !important;
+        display: flex !important;
+        align-items: center !important;
     }
     [data-testid="stChatInput"] textarea,
     [data-testid="stChatInput"] input {
@@ -695,6 +700,12 @@ def inject_css():
         -webkit-text-fill-color: #e8edf8 !important;
         background: transparent !important;
         caret-color: #dbeafe !important;
+        min-height: 42px !important;
+        line-height: 42px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        display: flex !important;
+        align-items: center !important;
     }
     [data-testid="stChatInput"] textarea::placeholder,
     [data-testid="stChatInput"] input::placeholder {
@@ -706,6 +717,11 @@ def inject_css():
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
+        min-height: 42px !important;
+        height: 42px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
     iframe[title*="st_chat_input_multimodal"] {
         border: none !important;
