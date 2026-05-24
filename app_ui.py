@@ -108,6 +108,10 @@ def _render_html_iframe(html_content: str, *, height: int, scrolling: bool = Fal
     components.iframe(uri, height=height, scrolling=scrolling)
 
 
+def _render_dom_script(html_content: str, *, height: int = 0) -> None:
+    components.html(html_content, height=height)
+
+
 def _normalize_monitor_base_url(raw: Optional[str], default: str) -> str:
     value = (raw or "").strip() or default
     if not re.match(r"^https?://", value, re.IGNORECASE):
@@ -1431,13 +1435,16 @@ def scroll_to_bottom():
 
             var input = nativeInput || mmHost;
             if (!input) return;
-            var inputShell = input;
-            if (nativeInput) {{
-                inputShell = nativeInput.closest('[data-testid="stBottomBlockContainer"]') || nativeInput.parentElement || nativeInput;
-            }}
             var panels = styleMainPanels(doc);
             if (!panels.length) return;
-            var chatPanel = panels[0];
+            var chatPanel = panels.reduce(function(best, panel) {{
+                if (!best) return panel;
+                var rb = best.getBoundingClientRect();
+                var rp = panel.getBoundingClientRect();
+                if (rp.width > rb.width + 8) return panel;
+                if (Math.abs(rp.width - rb.width) <= 8 && rp.left < rb.left) return panel;
+                return best;
+            }}, null);
             var chatRect = chatPanel.getBoundingClientRect();
             if (!chatRect || chatRect.width < 220 || chatRect.height < 120) return;
 
@@ -1453,25 +1460,18 @@ def scroll_to_bottom():
             var left = Math.max(minLeft, Math.round(chatRect.left + 10));
             var width = Math.round(chatRect.width - 20);
             width = Math.max(280, Math.min(width, viewportW - left - 12));
-            [inputShell, input].forEach(function(el) {{
-                if (!el) return;
-                el.style.setProperty('position', 'fixed', 'important');
-                el.style.setProperty('left', left + 'px', 'important');
-                el.style.setProperty('width', width + 'px', 'important');
-                el.style.setProperty('max-width', width + 'px', 'important');
-                el.style.setProperty('top', 'auto', 'important');
-                el.style.setProperty('bottom', '12px', 'important');
-                el.style.setProperty('right', 'auto', 'important');
-                el.style.setProperty('height', 'auto', 'important');
-                el.style.setProperty('min-height', '0px', 'important');
-                el.style.setProperty('transform', 'none', 'important');
-                el.style.setProperty('z-index', '900', 'important');
-                el.style.setProperty('opacity', '1', 'important');
-                el.style.setProperty('background', 'transparent', 'important');
-                el.style.setProperty('border', 'none', 'important');
-                el.style.setProperty('box-shadow', 'none', 'important');
-                el.style.setProperty('padding', '0px', 'important');
-            }});
+            input.style.setProperty('position', 'fixed', 'important');
+            input.style.setProperty('left', left + 'px', 'important');
+            input.style.setProperty('width', width + 'px', 'important');
+            input.style.setProperty('max-width', width + 'px', 'important');
+            input.style.setProperty('top', 'auto', 'important');
+            input.style.setProperty('bottom', '12px', 'important');
+            input.style.setProperty('right', 'auto', 'important');
+            input.style.setProperty('height', 'auto', 'important');
+            input.style.setProperty('min-height', '0px', 'important');
+            input.style.setProperty('transform', 'none', 'important');
+            input.style.setProperty('z-index', '900', 'important');
+            input.style.setProperty('opacity', '1', 'important');
             if (mmFrame) {{
                 input.style.setProperty('background', 'transparent', 'important');
                 input.style.setProperty('border', 'none', 'important');
@@ -1496,7 +1496,7 @@ def scroll_to_bottom():
         setTimeout(alignChatInput, 900);
     </script>
     """
-    _render_html_iframe(js, height=0)
+    _render_dom_script(js, height=0)
 
 # ==============================================================================
 # SECTION C: UI Rendering Helpers (Reusable)
