@@ -38,6 +38,7 @@ OPTIONAL_ENV = [
 
 CORE_IMPORTS = {
     "streamlit": "streamlit",
+    "st-chat-input-multimodal": "st_chat_input_multimodal",
     "deepagents": "deepagents",
     "geopandas": "geopandas",
     "rasterio": "rasterio",

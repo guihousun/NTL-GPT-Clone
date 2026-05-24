@@ -658,10 +658,29 @@ def inject_css():
         z-index: 900 !important;
         opacity: 1;
         height: auto !important;
+        background: transparent !important;
     }
     [data-testid="stChatInput"] > div {
         width: 100% !important;
         max-width: 100% !important;
+        background-color: rgba(15, 24, 48, 0.86) !important;
+        border: 1.2px solid rgba(149, 176, 255, 0.40) !important;
+        border-radius: 999px !important;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06) !important;
+        min-height: 56px !important;
+    }
+    [data-testid="stChatInput"] textarea,
+    [data-testid="stChatInput"] input {
+        color: #e8edf8 !important;
+        background: transparent !important;
+    }
+    [data-testid="stChatInput"] textarea::placeholder,
+    [data-testid="stChatInput"] input::placeholder {
+        color: rgba(226, 236, 255, 0.58) !important;
+    }
+    [data-testid="stChatInput"] button {
+        color: #b7cbff !important;
+        background: transparent !important;
     }
     iframe[title*="st_chat_input_multimodal"] {
         border: none !important;
@@ -1374,14 +1393,7 @@ def scroll_to_bottom():
             if (!input) return;
             var panels = styleMainPanels(doc);
             if (!panels.length) return;
-            var chatPanel = panels.reduce(function(best, panel) {{
-                if (!best) return panel;
-                var rb = best.getBoundingClientRect();
-                var rp = panel.getBoundingClientRect();
-                if (rp.width > rb.width + 8) return panel;
-                if (Math.abs(rp.width - rb.width) <= 8 && rp.left < rb.left) return panel;
-                return best;
-            }}, null);
+            var chatPanel = panels[0];
             var chatRect = chatPanel.getBoundingClientRect();
             if (!chatRect || chatRect.width < 220 || chatRect.height < 120) return;
 
