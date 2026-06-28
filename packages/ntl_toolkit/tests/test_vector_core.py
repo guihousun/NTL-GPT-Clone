@@ -38,6 +38,7 @@ def test_inspect_vector_returns_metadata_for_polygons(
 
     assert result.status == "succeeded"
     assert result.metrics == {
+        "path": str(admin_polygons_path.resolve(strict=False)),
         "feature_count": 2,
         "crs": "EPSG:4326",
         "geometry_types": ["Polygon"],

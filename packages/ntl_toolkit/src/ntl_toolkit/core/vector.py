@@ -175,7 +175,8 @@ def inspect_vector(path: str | Path) -> ToolResult:
     """Return metadata for a vector dataset."""
     tool = _VECTOR_TOOL_NAME["inspect"]
     try:
-        gdf = _read_vector(path)
+        input_path = _resolve_input_path(path)
+        gdf = _read_vector(input_path)
     except FileNotFoundError as exc:
         return _tool_failure(
             tool,
@@ -189,6 +190,7 @@ def inspect_vector(path: str | Path) -> ToolResult:
         return _tool_failure(tool, exc.error)
 
     metrics = {
+        "path": str(input_path),
         "feature_count": int(len(gdf)),
         "crs": str(gdf.crs),
         "geometry_types": sorted(str(value) for value in gdf.geometry.geom_type.dropna().unique()),
