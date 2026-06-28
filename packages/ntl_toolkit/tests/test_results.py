@@ -1,5 +1,12 @@
+import importlib
+import warnings
 from datetime import datetime, timezone
 
+import pytest
+from pydantic import ValidationError
+
+import ntl_toolkit.schemas.jobs as jobs_module
+import ntl_toolkit.schemas.results as results_module
 from ntl_toolkit.schemas import JobRecord, OutputArtifact, ToolError, ToolResult
 
 
@@ -167,3 +174,85 @@ def test_succeeded_builder_defensively_copies_mutable_inputs() -> None:
     ]
     assert payload["metrics"] == {"width": 128}
     assert payload["warnings"] == ["initial"]
+
+
+def test_schema_modules_reload_without_schema_shadow_warnings() -> None:
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        importlib.reload(results_module)
+        importlib.reload(jobs_module)
+
+    shadow_warnings = [
+        str(warning.message)
+        for warning in caught
+        if 'Field name "schema"' in str(warning.message)
+    ]
+
+    assert shadow_warnings == []
+
+
+def test_tool_result_schema_alias_population_dump_and_literal_enforcement() -> None:
+    via_alias = ToolResult(
+        schema="ntl.tool.result.v1",
+        status="succeeded",
+        tool="render_map",
+        summary="done",
+    )
+    via_name = ToolResult(
+        schema_="ntl.tool.result.v1",
+        status="succeeded",
+        tool="render_map",
+        summary="done",
+    )
+
+    assert via_alias.schema_ == "ntl.tool.result.v1"
+    assert via_name.schema_ == "ntl.tool.result.v1"
+    assert via_alias.model_dump()["schema"] == "ntl.tool.result.v1"
+    assert via_alias.model_dump(mode="json")["schema"] == "ntl.tool.result.v1"
+    assert "schema_" not in via_alias.model_dump()
+
+    with pytest.raises(ValidationError):
+        ToolResult(
+            schema="wrong",
+            status="succeeded",
+            tool="render_map",
+            summary="done",
+        )
+
+
+def test_job_record_schema_alias_population_dump_and_literal_enforcement() -> None:
+    created_at = datetime(2026, 6, 28, 10, 30, tzinfo=timezone.utc)
+    updated_at = datetime(2026, 6, 28, 10, 45, tzinfo=timezone.utc)
+
+    via_alias = JobRecord(
+        schema="ntl.job.v1",
+        job_id="job-123",
+        tool="render_map",
+        status="queued",
+        created_at=created_at,
+        updated_at=updated_at,
+    )
+    via_name = JobRecord(
+        schema_="ntl.job.v1",
+        job_id="job-124",
+        tool="render_map",
+        status="queued",
+        created_at=created_at,
+        updated_at=updated_at,
+    )
+
+    assert via_alias.schema_ == "ntl.job.v1"
+    assert via_name.schema_ == "ntl.job.v1"
+    assert via_alias.model_dump()["schema"] == "ntl.job.v1"
+    assert via_alias.model_dump(mode="json")["schema"] == "ntl.job.v1"
+    assert "schema_" not in via_alias.model_dump()
+
+    with pytest.raises(ValidationError):
+        JobRecord(
+            schema_="wrong",
+            job_id="job-125",
+            tool="render_map",
+            status="queued",
+            created_at=created_at,
+            updated_at=updated_at,
+        )

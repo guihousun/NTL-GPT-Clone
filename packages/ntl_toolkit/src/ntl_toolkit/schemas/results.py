@@ -3,7 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .errors import ToolError
 
@@ -15,7 +15,12 @@ class OutputArtifact(BaseModel):
 
 
 class ToolResult(BaseModel):
-    schema: Literal["ntl.tool.result.v1"] = "ntl.tool.result.v1"
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+    schema_: Literal["ntl.tool.result.v1"] = Field(
+        default="ntl.tool.result.v1",
+        alias="schema",
+    )
     status: Literal["succeeded", "failed", "cancelled"]
     tool: str
     summary: str

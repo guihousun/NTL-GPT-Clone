@@ -3,11 +3,16 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class JobRecord(BaseModel):
-    schema: Literal["ntl.job.v1"] = "ntl.job.v1"
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+    schema_: Literal["ntl.job.v1"] = Field(
+        default="ntl.job.v1",
+        alias="schema",
+    )
     job_id: str
     tool: str
     status: Literal["queued", "running", "succeeded", "failed", "cancelled"]
