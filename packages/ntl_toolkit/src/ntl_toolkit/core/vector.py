@@ -80,6 +80,25 @@ def _require_columns(frame: pd.DataFrame, columns: list[str]) -> None:
             )
 
 
+def _parse_radius_km(raw_value: Any) -> float:
+    try:
+        radius_km = float(raw_value)
+    except (TypeError, ValueError):
+        _fail(
+            "INVALID_PARAMETER",
+            "radius_km must be a numeric value in kilometers.",
+            details={"parameter": "radius_km", "value": raw_value},
+        )
+
+    if radius_km <= 0:
+        _fail(
+            "INVALID_PARAMETER",
+            "radius_km must be greater than zero.",
+            details={"parameter": "radius_km", "value": radius_km},
+        )
+    return radius_km
+
+
 def _validate_crs(gdf: gpd.GeoDataFrame, path: Path) -> None:
     if gdf.crs is None:
         _fail(
@@ -122,10 +141,10 @@ def _read_points(path: str | Path, lon_col: str, lat_col: str) -> gpd.GeoDataFra
     if input_path.suffix.lower() in _POINT_VECTOR_SUFFIXES:
         points = _read_vector(input_path)
         geometry_types = set(points.geometry.geom_type.unique())
-        if not geometry_types.issubset({"Point", "MultiPoint"}):
+        if geometry_types != {"Point"}:
             _fail(
                 "INVALID_GEOMETRY",
-                f"Point dataset '{input_path}' must contain only point geometries.",
+                f"Point dataset '{input_path}' must contain only Point geometries.",
                 details={"path": str(input_path), "geometry_types": sorted(geometry_types)},
             )
         return points
@@ -328,13 +347,7 @@ def buffer_points_aeqd(
     """Create AEQD point buffers."""
     tool = _VECTOR_TOOL_NAME["buffer"]
     try:
-        radius_km = float(radius_km)
-        if radius_km <= 0:
-            _fail(
-                "INVALID_PARAMETER",
-                "radius_km must be greater than zero.",
-                details={"parameter": "radius_km", "value": radius_km},
-            )
+        radius_km = _parse_radius_km(radius_km)
         points = _read_points(points_path, lon_col, lat_col).to_crs("EPSG:4326")
         center_lon = float(points.geometry.x.mean())
         center_lat = float(points.geometry.y.mean())
@@ -357,7 +370,14 @@ def buffer_points_aeqd(
             ),
         )
     except _KnownVectorFailure as exc:
-        return _tool_failure(tool, exc.error)
+        error = exc.error
+        if error.code == "INVALID_PARAMETER" and error.suggestion is None:
+            error = error.model_copy(
+                update={
+                    "suggestion": "Provide a numeric radius in kilometers greater than zero.",
+                }
+            )
+        return _tool_failure(tool, error)
 
     return ToolResult.succeeded(
         tool=tool,

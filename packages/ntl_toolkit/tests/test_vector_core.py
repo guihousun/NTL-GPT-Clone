@@ -5,7 +5,7 @@ from pathlib import Path
 
 import geopandas as gpd
 import pytest
-from shapely.geometry import Polygon, box
+from shapely.geometry import MultiPoint, Polygon, box
 
 from ntl_toolkit.core.vector import (
     buffer_points_aeqd,
@@ -154,6 +154,32 @@ def test_dissolve_intersections_clusters_overlapping_buffers(
     assert dissolved["member_count"].sort_values().tolist() == [1, 2]
 
 
+def test_dissolve_intersections_merges_transitive_chain_into_one_cluster(
+    runtime_workspace: Path,
+) -> None:
+    path = runtime_workspace / "inputs" / "transitive_chain.geojson"
+    gpd.GeoDataFrame(
+        {"name": ["a", "b", "c"]},
+        geometry=[
+            box(0.0, 0.0, 1.0, 1.0),
+            box(0.8, 0.0, 1.8, 1.0),
+            box(1.6, 0.0, 2.6, 1.0),
+        ],
+        crs="EPSG:4326",
+    ).to_file(path, driver="GeoJSON")
+
+    result = dissolve_intersections(
+        path,
+        Path("outputs") / "transitive_dissolved.geojson",
+    )
+
+    assert result.status == "succeeded"
+    assert result.metrics["cluster_count"] == 1
+    dissolved = gpd.read_file(Path(result.outputs[0].path))
+    assert dissolved["cluster_id"].tolist() == [0]
+    assert dissolved["member_count"].tolist() == [3]
+
+
 def test_filter_points_by_polygon_accepts_csv_longitude_latitude_inputs(
     point_features_csv_path: Path,
     admin_polygons_path: Path,
@@ -292,4 +318,49 @@ def test_invalid_radius_returns_invalid_parameter_and_no_partial_output(
     assert result.error is not None
     assert result.error.code == "INVALID_PARAMETER"
     assert result.error.details == {"parameter": "radius_km", "value": 0.0}
+    assert not requested.exists()
+
+
+@pytest.mark.parametrize("radius_value", ["abc", None])
+def test_invalid_radius_coercion_returns_structured_failure_without_output(
+    point_features_geojson_path: Path,
+    runtime_workspace: Path,
+    radius_value: object,
+) -> None:
+    requested = runtime_workspace / "outputs" / f"bad_buffer_{radius_value}.geojson"
+
+    result = buffer_points_aeqd(
+        point_features_geojson_path,
+        requested,
+        radius_km=radius_value,  # type: ignore[arg-type]
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "INVALID_PARAMETER"
+    assert result.error.details == {"parameter": "radius_km", "value": radius_value}
+    assert result.error.suggestion is not None
+    assert not requested.exists()
+
+
+def test_buffer_points_aeqd_rejects_multipoint_inputs_without_creating_output(
+    runtime_workspace: Path,
+) -> None:
+    points_path = runtime_workspace / "inputs" / "multipoint.geojson"
+    requested = runtime_workspace / "outputs" / "multipoint_buffers.geojson"
+    gpd.GeoDataFrame(
+        {"id": [1]},
+        geometry=[MultiPoint([(0.5, 0.5), (0.6, 0.6)])],
+        crs="EPSG:4326",
+    ).to_file(points_path, driver="GeoJSON")
+
+    result = buffer_points_aeqd(
+        points_path,
+        requested,
+        radius_km=10,
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "INVALID_GEOMETRY"
     assert not requested.exists()
