@@ -12,6 +12,10 @@ def _runtime_function(name: str):
     return getattr(runtime, name)
 
 
+def _runtime_module():
+    return importlib.import_module("ntl_toolkit.runtime.paths")
+
+
 def test_resolve_local_path_joins_relative_unicode_path_to_unicode_workdir(
     tmp_path: Path,
 ) -> None:
@@ -34,6 +38,40 @@ def test_resolve_local_path_keeps_absolute_paths_absolute_and_resolved(
     )
 
     assert result == (tmp_path / "absolute" / "result.tif").resolve(strict=False)
+
+
+def test_resolve_local_path_rejects_rooted_relative_windows_path(
+    tmp_path: Path,
+) -> None:
+    resolve_local_path = _runtime_function("resolve_local_path")
+    raw_path = r"\temp\a.txt"
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "^"
+            + re.escape(raw_path)
+            + r".*fully absolute path or ordinary relative path is required"
+        ),
+    ):
+        resolve_local_path(raw_path, tmp_path)
+
+
+def test_resolve_local_path_rejects_drive_relative_windows_path(
+    tmp_path: Path,
+) -> None:
+    resolve_local_path = _runtime_function("resolve_local_path")
+    raw_path = r"C:foo\bar.txt"
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "^"
+            + re.escape(raw_path)
+            + r".*fully absolute path or ordinary relative path is required"
+        ),
+    ):
+        resolve_local_path(raw_path, tmp_path)
 
 
 def test_require_input_path_returns_existing_file_and_raises_with_resolved_missing_path(
@@ -104,6 +142,30 @@ def test_reserve_output_path_creates_parent_directory_without_creating_output_fi
     assert result == requested.resolve(strict=False)
     assert result.parent.exists()
     assert not result.exists()
+
+
+def test_reserve_output_path_exhaustion_raises_actionable_runtime_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reserve_output_path = _runtime_function("reserve_output_path")
+    runtime_paths = _runtime_module()
+    requested = (tmp_path / "render.tif").resolve(strict=False)
+
+    def fake_exists(path: Path) -> bool:
+        if path == requested:
+            return True
+        return path.parent == requested.parent and path.name.startswith("render_")
+
+    monkeypatch.setattr(runtime_paths.Path, "exists", fake_exists)
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            r"unable to reserve after 9999 attempts.*"
+            + re.escape(str(requested))
+        ),
+    ):
+        reserve_output_path(requested)
 
 
 def test_load_runtime_environment_adds_missing_keys_without_overwriting_existing_env(
