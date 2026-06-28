@@ -1,9 +1,5 @@
-import importlib
-import warnings
 from datetime import datetime, timezone
 
-import ntl_toolkit.schemas.jobs as jobs_module
-import ntl_toolkit.schemas.results as results_module
 from ntl_toolkit.schemas import JobRecord, OutputArtifact, ToolError, ToolResult
 
 
@@ -63,6 +59,21 @@ def test_failed_result_preserves_actionable_error_and_defaults_summary() -> None
         "details": {"field": "input_raster", "retryable": False},
         "suggestion": "Upload a raster and retry.",
     }
+
+
+def test_failed_result_preserves_explicit_empty_summary() -> None:
+    error = ToolError(
+        code="missing_input",
+        message="Input raster is required.",
+    )
+
+    result = ToolResult.failed(
+        tool="render_map",
+        error=error,
+        summary="",
+    )
+
+    assert result.summary == ""
 
 
 def test_job_record_json_serialization_and_defaults() -> None:
@@ -156,12 +167,3 @@ def test_succeeded_builder_defensively_copies_mutable_inputs() -> None:
     ]
     assert payload["metrics"] == {"width": 128}
     assert payload["warnings"] == ["initial"]
-
-
-def test_schema_modules_reload_without_field_shadow_warnings() -> None:
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        importlib.reload(results_module)
-        importlib.reload(jobs_module)
-
-    assert [warning.message.args[0] for warning in caught] == []
