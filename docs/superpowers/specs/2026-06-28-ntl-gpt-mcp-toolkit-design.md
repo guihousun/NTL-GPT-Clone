@@ -108,7 +108,7 @@ detect_ntl_anomaly
 validate_geodata
 ```
 
-现有 `conflictntl-gis-tools` 是 `core/vector` 的原型。其 `_read_points`、`_write_vector` 和六个执行能力迁入共享 Core。新服务通过行为一致性测试后，旧服务进入 deprecated 状态。
+现有 `conflictntl-gis-tools` 是 `core/vector` 的原型。其 `_read_points`、`_write_vector` 和五个本地 GIS 执行能力迁入共享 Core。网络工具 `download_geoboundary` 保留在兼容服务，第二阶段迁入数据访问服务。只有全部能力完成替代后，旧服务才进入 deprecated 状态。
 
 ### 5.2 `ntl-gee-tools`
 
@@ -116,6 +116,7 @@ validate_geodata
 
 ```text
 validate_environment
+download_geoboundary
 discover_datasets
 get_dataset_metadata
 check_dataset_availability
