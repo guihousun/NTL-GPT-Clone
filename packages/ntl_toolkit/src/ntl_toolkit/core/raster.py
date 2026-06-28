@@ -7,7 +7,10 @@ from typing import Any, Iterable
 import geopandas as gpd
 import numpy as np
 import rasterio
+from affine import Affine
+from rasterio.crs import CRS
 from rasterio.errors import RasterioError
+from rasterio.warp import transform_bounds
 
 from ntl_toolkit.runtime import require_input_path, runtime_workdir
 from ntl_toolkit.schemas import ToolError, ToolResult
@@ -17,6 +20,7 @@ _RASTER_TOOL_NAME = {
     "validate": "validate_geodata",
 }
 _VALID_MODES = {"basic", "full"}
+_GRID_TOLERANCE = 1e-15
 
 
 class _KnownRasterFailure(Exception):
@@ -104,6 +108,16 @@ def _empty_stats() -> dict[str, Any]:
         "mean": None,
         "std": None,
     }
+
+
+def _finite_bounds(bounds: Iterable[Any] | None) -> list[float] | None:
+    if bounds is None:
+        return None
+
+    values = [float(value) for value in bounds]
+    if len(values) != 4 or not np.all(np.isfinite(values)):
+        return None
+    return values
 
 
 def _sample_band(band: np.ndarray, sample_pixels: int) -> np.ndarray:
@@ -295,7 +309,11 @@ def _vector_validation_report(path: str | Path) -> tuple[dict[str, Any], gpd.Geo
         if invalid_geometry:
             warning_codes.append("INVALID_GEOMETRY")
 
-    bounds = None if empty_dataset else [float(value) for value in gdf.total_bounds]
+    raw_bounds = None if empty_dataset else _finite_bounds(gdf.total_bounds)
+    if raw_bounds is None and not empty_dataset and "INVALID_GEOMETRY" not in warning_codes:
+        warning_codes.append("INVALID_GEOMETRY")
+        invalid_geometry = True
+
     report = {
         "requested_path": requested_path,
         "path": str(resolved.resolve(strict=False)),
@@ -304,7 +322,7 @@ def _vector_validation_report(path: str | Path) -> tuple[dict[str, Any], gpd.Geo
         "crs": str(gdf.crs) if gdf.crs else None,
         "feature_count": int(len(gdf)),
         "geometry_types": sorted(str(value) for value in gdf.geometry.geom_type.dropna().unique()),
-        "bounds": bounds,
+        "bounds": raw_bounds,
         "empty_dataset": empty_dataset,
         "invalid_geometry": invalid_geometry,
         "warning_codes": warning_codes,
@@ -321,13 +339,67 @@ def _warning_union(*code_groups: list[str]) -> list[str]:
     return ordered
 
 
+def _crs_object(raw_crs: Any) -> CRS | None:
+    if raw_crs in {None, ""}:
+        return None
+    try:
+        return CRS.from_user_input(raw_crs)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _crs_equal(left: Any, right: Any) -> bool:
+    left_crs = _crs_object(left)
+    right_crs = _crs_object(right)
+    if left_crs is None or right_crs is None:
+        return False
+    return left_crs == right_crs
+
+
+def _transform_object(raw_transform: Any) -> Affine | None:
+    if raw_transform is None:
+        return None
+    try:
+        values = tuple(float(value) for value in raw_transform)
+    except (TypeError, ValueError):
+        return None
+    if len(values) != 9 or not np.all(np.isfinite(values)):
+        return None
+    return Affine(*values[:6])
+
+
+def _float_lists_close(left: Any, right: Any) -> bool:
+    if left is None or right is None:
+        return False
+    try:
+        left_values = np.asarray(left, dtype=float)
+        right_values = np.asarray(right, dtype=float)
+    except (TypeError, ValueError):
+        return False
+    return bool(
+        left_values.shape == right_values.shape
+        and np.all(np.isfinite(left_values))
+        and np.all(np.isfinite(right_values))
+        and np.allclose(
+            left_values,
+            right_values,
+            rtol=_GRID_TOLERANCE,
+            atol=_GRID_TOLERANCE,
+        )
+    )
+
+
 def _grid_compatible(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    left_transform = _transform_object(left.get("transform"))
+    right_transform = _transform_object(right.get("transform"))
     return (
-        left.get("crs") == right.get("crs")
+        _crs_equal(left.get("crs"), right.get("crs"))
         and left.get("width") == right.get("width")
         and left.get("height") == right.get("height")
-        and left.get("resolution") == right.get("resolution")
-        and left.get("transform") == right.get("transform")
+        and _float_lists_close(left.get("resolution"), right.get("resolution"))
+        and left_transform is not None
+        and right_transform is not None
+        and left_transform.almost_equals(right_transform, precision=_GRID_TOLERANCE)
     )
 
 
@@ -340,6 +412,28 @@ def _bbox_intersects(raster_bounds: list[float], vector_bounds: list[float]) -> 
         or top <= miny
         or bottom >= maxy
     )
+
+
+def _transform_bounds_safe(
+    source_crs: Any,
+    target_crs: Any,
+    bounds: Iterable[Any] | None,
+) -> list[float] | None:
+    normalized_bounds = _finite_bounds(bounds)
+    source = _crs_object(source_crs)
+    target = _crs_object(target_crs)
+    if normalized_bounds is None or source is None or target is None:
+        return None
+    try:
+        transformed = transform_bounds(
+            source,
+            target,
+            *normalized_bounds,
+            densify_pts=21,
+        )
+    except Exception:  # noqa: BLE001
+        return None
+    return _finite_bounds(transformed)
 
 
 def inspect_raster(
@@ -436,30 +530,24 @@ def validate_geodata(
         raster_crs = raster_report.get("crs")
         raster_bounds = raster_report.get("bounds")
         for vector_report, vector_gdf in readable_vector_results:
-            vector_bounds = vector_report.get("bounds")
-            if raster_bounds is None or vector_bounds is None:
-                continue
-
             warning_codes: list[str] = []
-            crs_match = raster_crs is not None and raster_crs == vector_report.get("crs")
-            comparison_bounds = vector_bounds
+            warning_codes = _warning_union(
+                warning_codes,
+                [code for code in vector_report["warning_codes"] if code in {"INVALID_GEOMETRY", "EMPTY_DATASET"}],
+            )
+            crs_match = _crs_equal(raster_crs, vector_report.get("crs"))
+            comparison_bounds = _finite_bounds(vector_report.get("bounds"))
             if not crs_match:
                 warning_codes.append("CRS_MISMATCH")
-                if raster_crs and vector_gdf.crs:
-                    try:
-                        projected = vector_gdf.to_crs(raster_crs)
-                        if not projected.empty:
-                            comparison_bounds = [
-                                float(value) for value in projected.total_bounds
-                            ]
-                    except Exception:  # noqa: BLE001
-                        comparison_bounds = None
-                else:
-                    comparison_bounds = None
+                comparison_bounds = _transform_bounds_safe(
+                    vector_report.get("crs"),
+                    raster_crs,
+                    comparison_bounds,
+                )
 
             bbox_intersects = (
                 _bbox_intersects(raster_bounds, comparison_bounds)
-                if comparison_bounds is not None
+                if raster_bounds is not None and comparison_bounds is not None
                 else None
             )
             if bbox_intersects is False:

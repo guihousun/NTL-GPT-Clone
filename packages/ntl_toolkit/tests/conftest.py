@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import rasterio
+from rasterio.crs import CRS
 from rasterio.transform import from_origin
 from shapely.geometry import Point, box
 
@@ -117,6 +118,23 @@ def shifted_raster_path(runtime_workspace: Path) -> Path:
         runtime_workspace / "inputs" / "shifted.tif",
         values,
         transform=shifted_transform,
+    )
+
+
+@pytest.fixture
+def noisy_transform_raster_path(runtime_workspace: Path) -> Path:
+    values = np.array([[5.0, 6.0], [7.0, 8.0]], dtype=np.float32)
+    noisy_transform = from_origin(
+        0.0,
+        np.nextafter(2.0, 3.0),
+        np.nextafter(1.0, 2.0),
+        np.nextafter(1.0, 2.0),
+    )
+    return _write_raster(
+        runtime_workspace / "inputs" / "noisy_transform.tif",
+        values,
+        transform=noisy_transform,
+        crs=CRS.from_epsg(4326),
     )
 
 

@@ -148,6 +148,19 @@ def test_validate_geodata_does_not_flag_grid_mismatch_for_matching_rasters(
     assert result.metrics["raster_pair_reports"][0]["grid_compatible"] is True
 
 
+def test_validate_geodata_tolerates_harmless_transform_noise(
+    sample_raster_path: Path,
+    noisy_transform_raster_path: Path,
+) -> None:
+    result = _raster_module().validate_geodata(
+        raster_paths=[sample_raster_path, noisy_transform_raster_path]
+    )
+
+    assert result.status == "succeeded"
+    assert "GRID_MISMATCH" not in result.warnings
+    assert result.metrics["raster_pair_reports"][0]["grid_compatible"] is True
+
+
 def test_validate_geodata_reports_vector_crs_mismatch_and_no_overlap(
     sample_raster_path: Path,
     mercator_overlap_vector_path: Path,
@@ -178,6 +191,27 @@ def test_validate_geodata_reports_vector_crs_mismatch_and_no_overlap(
     assert far_report["crs_match"] is True
     assert far_report["bbox_intersects"] is False
     assert "NO_BBOX_INTERSECTION" in far_report["warning_codes"]
+
+
+def test_validate_geodata_propagates_invalid_geometry_without_claiming_bbox_overlap(
+    sample_raster_path: Path,
+    invalid_vector_path: Path,
+) -> None:
+    result = _raster_module().validate_geodata(
+        raster_paths=[sample_raster_path],
+        vector_paths=[invalid_vector_path],
+    )
+
+    assert result.status == "succeeded"
+    assert "INVALID_GEOMETRY" in result.warnings
+    vector_report = result.metrics["vector_reports"][0]
+    pair_report = result.metrics["raster_vector_reports"][0]
+    assert vector_report["invalid_geometry"] is True
+    assert vector_report["bounds"] is None
+    assert "INVALID_GEOMETRY" in vector_report["warning_codes"]
+    assert pair_report["bbox_intersects"] is None
+    assert "INVALID_GEOMETRY" in pair_report["warning_codes"]
+    assert "NO_BBOX_INTERSECTION" not in pair_report["warning_codes"]
 
 
 def test_validate_geodata_reports_empty_invalid_and_unreadable_inputs(
