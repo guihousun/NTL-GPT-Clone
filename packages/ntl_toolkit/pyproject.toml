@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ntl-toolkit"
 version = "0.1.0"
-description = "Shared domain core for NTL-GPT geospatial workflows."
+description = "Shared GIS and nighttime-light execution core for NTL-GPT and MCP clients"
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 dependencies = [
@@ -32,4 +32,3 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-
