@@ -32,6 +32,7 @@ tmp/
 temp/
 .cache/
 .codegraph/
+.worktrees/
 .playwright-mcp/
 .runlogs/
 tmp_*.log
