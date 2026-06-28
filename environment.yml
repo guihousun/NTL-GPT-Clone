@@ -39,6 +39,9 @@ dependencies:
   - bcrypt
   - typing_extensions
   - pip:
+      - mcp>=1.9,<2
+      - pytest>=8,<9
+      - -e ./packages/ntl_toolkit
       - deepagents==0.4.3
       - earthengine-api==1.6.3
       - geemap==0.36.1
