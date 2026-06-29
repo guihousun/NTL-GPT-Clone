@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import warnings
 from collections.abc import Sequence
+from numbers import Integral
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import rasterio
+from affine import TransformNotInvertibleError
 from rasterio.errors import RasterioError
 from rasterio.mask import raster_geometry_mask
 from scipy import ndimage
@@ -129,14 +131,10 @@ def _normalize_pixel_area(pixel_area: Any) -> float:
 
 
 def _normalize_band(band: Any) -> int:
-    if isinstance(band, bool):
+    if isinstance(band, bool) or not isinstance(band, Integral):
         raise ValueError("band must be an integer between 1 and the raster band count.")
 
-    try:
-        value = int(band)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("band must be an integer between 1 and the raster band count.") from exc
-
+    value = int(band)
     if value < 1:
         raise ValueError("band must be an integer between 1 and the raster band count.")
     return value
@@ -168,6 +166,40 @@ def _pixel_area_for(dataset: rasterio.io.DatasetReader) -> float:
     return abs(float(transform.a * transform.e - transform.b * transform.d))
 
 
+def _validate_raster_transform(
+    dataset: rasterio.io.DatasetReader,
+    *,
+    path: Path,
+) -> None:
+    transform = dataset.transform
+    determinant = float(transform.a * transform.e - transform.b * transform.d)
+    details = {
+        "path": str(path),
+        "transform": repr(transform),
+        "determinant": determinant,
+    }
+    suggestion = "Check the raster geotransform and regenerate the file with a finite, non-degenerate affine transform."
+
+    if not np.isfinite(determinant) or determinant == 0.0:
+        _fail(
+            "INVALID_RASTER_TRANSFORM",
+            f"Raster dataset '{path}' has a non-invertible affine transform.",
+            details=details,
+            suggestion=suggestion,
+        )
+
+    try:
+        ~transform
+    except TransformNotInvertibleError as exc:
+        details["reason"] = str(exc)
+        _fail(
+            "INVALID_RASTER_TRANSFORM",
+            f"Raster dataset '{path}' has a non-invertible affine transform.",
+            details=details,
+            suggestion=suggestion,
+        )
+
+
 def _read_raster_band(
     path: Path,
     *,
@@ -184,6 +216,7 @@ def _read_raster_band(
 
     warnings: list[str] = []
     try:
+        _validate_raster_transform(dataset, path=path)
         if dataset.crs is None:
             _fail(
                 "CRS_MISSING",
@@ -368,6 +401,21 @@ def calculate_ntl_metrics_for_raster(
 ) -> ToolResult:
     try:
         normalized_band = _normalize_band(band)
+    except ValueError as exc:
+        return _tool_failure(
+            _RASTER_TOOL,
+            ToolError(
+                code="INVALID_PARAMETER",
+                message=str(exc),
+                details={
+                    "parameter": "band",
+                    "value": band,
+                    "received_type": type(band).__name__,
+                },
+            ),
+        )
+
+    try:
         ordered_metrics = _normalize_selected(selected)
         input_path = _resolve_tool_input_path(raster_path, parameter="raster_path")
     except FileNotFoundError as exc:
@@ -385,7 +433,7 @@ def calculate_ntl_metrics_for_raster(
             ToolError(
                 code="INVALID_PARAMETER",
                 message=str(exc),
-                details={"parameter": "band" if "band" in str(exc) else "selected"},
+                details={"parameter": "selected"},
             ),
         )
     except _KnownNTLFailure as exc:

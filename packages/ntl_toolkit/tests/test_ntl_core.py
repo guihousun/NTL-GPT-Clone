@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import rasterio
+from affine import Affine
 from rasterio.crs import CRS
 from rasterio.transform import from_origin
 from shapely.geometry import box
@@ -234,6 +235,49 @@ def test_calculate_ntl_metrics_for_raster_uses_projected_pixel_area(
 
 
 @pytest.mark.parametrize(
+    ("band", "expected_tntl"),
+    [
+        (1, 10.0),
+        (np.int64(2), 100.0),
+        (np.uint8(1), 10.0),
+    ],
+)
+def test_calculate_ntl_metrics_for_raster_accepts_integral_band_types(
+    multiband_raster_path: Path,
+    band: int,
+    expected_tntl: float,
+) -> None:
+    result = _ntl_module().calculate_ntl_metrics_for_raster(
+        multiband_raster_path,
+        band=band,
+        selected=["TNTL"],
+    )
+
+    assert result.status == "succeeded"
+    assert result.metrics["band"] == int(band)
+    assert result.metrics["TNTL"] == expected_tntl
+
+
+@pytest.mark.parametrize("band", [True, False, 1.0, 1.5, "1", None])
+def test_calculate_ntl_metrics_for_raster_rejects_non_integral_band_types(
+    sample_raster_path: Path,
+    band: object,
+) -> None:
+    result = _ntl_module().calculate_ntl_metrics_for_raster(
+        sample_raster_path,
+        band=band,
+        selected=["TNTL"],
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "INVALID_PARAMETER"
+    assert result.error.details["parameter"] == "band"
+    assert result.error.details["value"] == band
+    assert result.error.details["received_type"] == type(band).__name__
+
+
+@pytest.mark.parametrize(
     ("path_factory", "band", "selected", "error_code"),
     [
         (lambda request: Path("inputs") / "missing.tif", 1, None, "INPUT_NOT_FOUND"),
@@ -404,6 +448,53 @@ def test_calculate_zonal_statistics_reports_vector_failures(
     assert result.error.code == expected_code
 
 
+def test_calculate_ntl_metrics_for_raster_reports_invalid_raster_transform(
+    runtime_workspace: Path,
+) -> None:
+    raster_path = _write_raster(
+        runtime_workspace / "inputs" / "zero_det_metrics.tif",
+        np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32),
+        transform=Affine(1.0, 2.0, 0.0, 2.0, 4.0, 0.0),
+        crs="EPSG:3857",
+    )
+
+    result = _ntl_module().calculate_ntl_metrics_for_raster(
+        raster_path,
+        selected=["TNTL", "LArea"],
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "INVALID_RASTER_TRANSFORM"
+    assert result.error.details["path"] == str(raster_path)
+    assert result.error.details["determinant"] == pytest.approx(0.0)
+    assert "Affine" in result.error.details["transform"]
+    assert "parameter" not in result.error.details
+    assert result.error.suggestion is not None
+
+
+def test_calculate_ntl_metrics_for_raster_accepts_tiny_nonzero_determinant(
+    runtime_workspace: Path,
+) -> None:
+    raster_path = _write_raster(
+        runtime_workspace / "inputs" / "tiny_det_metrics.tif",
+        np.array([[0.0, 5.0], [7.0, 0.0]], dtype=np.float32),
+        transform=Affine(1.0, 1.0, 0.0, 1.0, 1.000000001, 0.0),
+        crs="EPSG:3857",
+    )
+
+    result = _ntl_module().calculate_ntl_metrics_for_raster(
+        raster_path,
+        selected=["LArea", "TNTL"],
+    )
+
+    assert result.status == "succeeded"
+    assert result.warnings == []
+    assert result.metrics["TNTL"] == 12.0
+    assert result.metrics["LArea"] == pytest.approx(2e-9)
+    assert result.metrics["pixel_area"] == pytest.approx(1e-9)
+
+
 def test_calculate_zonal_statistics_reserves_output_collision_without_mutating_inputs(
     admin_polygons_path: Path,
     matching_raster_path: Path,
@@ -457,3 +548,32 @@ def test_calculate_zonal_statistics_cleans_up_partial_output_on_write_failure(
     assert result.error is not None
     assert result.error.code == "OUTPUT_WRITE_FAILED"
     assert not reserved.exists()
+
+
+def test_calculate_zonal_statistics_reports_invalid_raster_transform_without_writing_csv(
+    admin_polygons_path: Path,
+    runtime_workspace: Path,
+) -> None:
+    raster_path = _write_raster(
+        runtime_workspace / "inputs" / "zero_det_zonal.tif",
+        np.array([[10.0, 20.0], [30.0, 40.0]], dtype=np.float32),
+        transform=Affine(1.0, 2.0, 0.0, 2.0, 4.0, 0.0),
+        crs="EPSG:3857",
+    )
+    output_path = Path("outputs") / "zero_det_zonal.csv"
+
+    result = _ntl_module().calculate_zonal_statistics(
+        raster_paths=[raster_path],
+        vector_path=admin_polygons_path,
+        output_path=output_path,
+        selected_indices=["TNTL"],
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "INVALID_RASTER_TRANSFORM"
+    assert result.error.details["path"] == str(raster_path)
+    assert result.error.details["determinant"] == pytest.approx(0.0)
+    assert "Affine" in result.error.details["transform"]
+    assert result.error.suggestion is not None
+    assert not (runtime_workspace / output_path).exists()
