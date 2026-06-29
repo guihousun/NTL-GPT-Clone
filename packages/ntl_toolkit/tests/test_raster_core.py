@@ -165,6 +165,35 @@ def test_clip_raster_requires_vector_crs(
     assert result.error.code == "CRS_MISSING"
 
 
+def test_clip_raster_preserves_mask_semantics_without_source_nodata(
+    nodata_less_uint8_raster_path: Path,
+    triangular_clip_polygon_path: Path,
+    runtime_workspace: Path,
+) -> None:
+    output_path = Path("outputs") / "clip_triangle_masked.tif"
+
+    result = _raster_module().clip_raster(
+        nodata_less_uint8_raster_path,
+        triangular_clip_polygon_path,
+        output_path,
+    )
+
+    assert result.status == "succeeded"
+
+    import rasterio
+
+    with rasterio.open(runtime_workspace / output_path) as dataset:
+        assert dataset.nodata is None
+        masked = dataset.read(1, masked=True)
+        assert masked.shape == (2, 2)
+        assert masked[0, 0] == 0
+        assert bool(masked.mask[0, 0]) is False
+        assert bool(masked.mask[0, 1]) is True
+        assert bool(masked.mask[1, 0]) is True
+        assert bool(masked.mask[1, 1]) is True
+        assert dataset.dataset_mask().tolist() == [[255, 0], [0, 0]]
+
+
 def test_clip_raster_reserves_collision_suffix_without_overwriting(
     sample_raster_path: Path,
     clip_polygon_path: Path,
@@ -307,6 +336,100 @@ def test_reproject_raster_requires_source_crs(
     assert result.error.code == "CRS_MISSING"
 
 
+@pytest.mark.parametrize(
+    ("tool_name", "kwargs"),
+    [
+        (
+            "clip_raster",
+            {
+                "raster_path": "C:bad-input.tif",
+                "vector_path": Path("inputs") / "clip.geojson",
+                "output_path": Path("outputs") / "clip_invalid_input.tif",
+            },
+        ),
+        (
+            "reproject_raster",
+            {
+                "raster_path": "C:bad-input.tif",
+                "output_path": Path("outputs") / "reproject_invalid_input.tif",
+                "dst_crs": "EPSG:3857",
+            },
+        ),
+        (
+            "mosaic_rasters",
+            {
+                "raster_paths": ["C:bad-input.tif"],
+                "output_path": Path("outputs") / "mosaic_invalid_input.tif",
+            },
+        ),
+    ],
+)
+def test_raster_transforms_reject_partially_qualified_input_paths(
+    tool_name: str,
+    kwargs: dict[str, object],
+    sample_raster_path: Path,
+    clip_polygon_path: Path,
+    runtime_workspace: Path,
+) -> None:
+    del sample_raster_path, clip_polygon_path
+    tool = getattr(_raster_module(), tool_name)
+
+    result = tool(**kwargs)
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "INVALID_PARAMETER"
+    assert "path" in result.error.details
+    assert list((runtime_workspace / "outputs").glob("*.tif")) == []
+
+
+@pytest.mark.parametrize(
+    ("tool_name", "kwargs"),
+    [
+        (
+            "clip_raster",
+            {
+                "raster_path": Path("inputs") / "sample.tif",
+                "vector_path": Path("inputs") / "clip.geojson",
+                "output_path": "C:bad-output.tif",
+            },
+        ),
+        (
+            "reproject_raster",
+            {
+                "raster_path": Path("inputs") / "sample.tif",
+                "output_path": "C:bad-output.tif",
+                "dst_crs": "EPSG:3857",
+            },
+        ),
+        (
+            "mosaic_rasters",
+            {
+                "raster_paths": [Path("inputs") / "sample.tif"],
+                "output_path": "C:bad-output.tif",
+            },
+        ),
+    ],
+)
+def test_raster_transforms_reject_partially_qualified_output_paths(
+    tool_name: str,
+    kwargs: dict[str, object],
+    sample_raster_path: Path,
+    clip_polygon_path: Path,
+    runtime_workspace: Path,
+) -> None:
+    del sample_raster_path, clip_polygon_path
+    tool = getattr(_raster_module(), tool_name)
+
+    result = tool(**kwargs)
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "INVALID_PARAMETER"
+    assert "path" in result.error.details
+    assert list((runtime_workspace / "outputs").glob("*.tif")) == []
+
+
 def test_mosaic_rasters_preserves_adjacent_union_extent(
     adjacent_left_raster_path: Path,
     adjacent_right_raster_path: Path,
@@ -336,6 +459,24 @@ def test_mosaic_rasters_preserves_adjacent_union_extent(
         assert dataset.width == 4
         assert dataset.height == 2
         assert dataset.read(1).tolist() == [[1.0, 2.0, 5.0, 6.0], [3.0, 4.0, 7.0, 8.0]]
+
+
+def test_mosaic_rasters_rejects_half_pixel_grid_offset(
+    sample_raster_path: Path,
+    half_pixel_offset_raster_path: Path,
+    runtime_workspace: Path,
+) -> None:
+    output_path = Path("outputs") / "mosaic_half_pixel.tif"
+
+    result = _raster_module().mosaic_rasters(
+        [sample_raster_path, half_pixel_offset_raster_path],
+        output_path,
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "GRID_MISMATCH"
+    assert not (runtime_workspace / output_path).exists()
 
 
 @pytest.mark.parametrize(
@@ -417,6 +558,28 @@ def test_mosaic_rasters_mean_handles_overlap_and_nodata_exactly(
             [10.0, 510.0, 2000.0],
             [30.0, 3000.0, -9999.0],
         ]
+
+
+def test_mosaic_rasters_mean_promotes_integer_inputs_to_float_for_fractional_averages(
+    uint8_mean_left_raster_path: Path,
+    uint8_mean_right_raster_path: Path,
+    runtime_workspace: Path,
+) -> None:
+    output_path = Path("outputs") / "mosaic_uint8_mean.tif"
+
+    result = _raster_module().mosaic_rasters(
+        [uint8_mean_left_raster_path, uint8_mean_right_raster_path],
+        output_path,
+        method="mean",
+    )
+
+    assert result.status == "succeeded"
+
+    import rasterio
+
+    with rasterio.open(runtime_workspace / output_path) as dataset:
+        assert dataset.dtypes == ("float32",)
+        assert dataset.read(1).tolist() == [[1.5]]
 
 
 def test_mosaic_rasters_reserves_collision_suffix_without_mutating_inputs(

@@ -37,6 +37,7 @@ _RASTER_TOOL_NAME = {
 }
 _VALID_MODES = {"basic", "full"}
 _GRID_TOLERANCE = 1e-15
+_GRID_INDEX_TOLERANCE = 1e-9
 _RESAMPLING_METHODS = {
     "nearest": Resampling.nearest,
     "bilinear": Resampling.bilinear,
@@ -80,6 +81,30 @@ def _resolve_input_path(path: str | Path) -> Path:
 def _resolve_output_path(path: str | Path) -> Path:
     requested = resolve_local_path(path, runtime_workdir())
     return reserve_output_path(requested)
+
+
+def _resolve_tool_input_path(path: str | Path, *, parameter: str) -> Path:
+    try:
+        return _resolve_input_path(path)
+    except ValueError as exc:
+        _fail(
+            "INVALID_PARAMETER",
+            f"Invalid path for '{parameter}'.",
+            details={"parameter": parameter, "path": str(path), "reason": str(exc)},
+            suggestion="Use an ordinary relative path or a fully qualified absolute Windows path.",
+        )
+
+
+def _resolve_tool_output_path(path: str | Path, *, parameter: str) -> Path:
+    try:
+        return _resolve_output_path(path)
+    except ValueError as exc:
+        _fail(
+            "INVALID_PARAMETER",
+            f"Invalid path for '{parameter}'.",
+            details={"parameter": parameter, "path": str(path), "reason": str(exc)},
+            suggestion="Use an ordinary relative path or a fully qualified absolute Windows path.",
+        )
 
 
 def _artifact_for(path: Path) -> OutputArtifact:
@@ -490,8 +515,13 @@ def _read_vector_dataset(path: Path) -> gpd.GeoDataFrame:
 
 
 def _cleanup_partial_output(path: Path | None) -> None:
-    if path is not None and path.exists():
+    if path is None:
+        return
+    if path.exists():
         path.unlink()
+    mask_sidecar = path.with_name(f"{path.name}.msk")
+    if mask_sidecar.exists():
+        mask_sidecar.unlink()
 
 
 def _dataset_resolution(dataset: rasterio.io.DatasetReader) -> tuple[float, float]:
@@ -504,6 +534,39 @@ def _dataset_orientation(dataset: rasterio.io.DatasetReader) -> tuple[float, flo
         float(dataset.transform.d),
         int(np.sign(dataset.transform.a)),
         int(np.sign(dataset.transform.e)),
+    )
+
+
+def _grid_basis_compatible(
+    reference_transform: Affine,
+    other_transform: Affine,
+) -> bool:
+    return bool(
+        np.allclose(
+            [reference_transform.a, reference_transform.b, reference_transform.d, reference_transform.e],
+            [other_transform.a, other_transform.b, other_transform.d, other_transform.e],
+            atol=_GRID_INDEX_TOLERANCE,
+            rtol=_GRID_INDEX_TOLERANCE,
+        )
+    )
+
+
+def _origin_is_integer_grid_offset(
+    reference_transform: Affine,
+    other_transform: Affine,
+) -> bool:
+    try:
+        col_offset, row_offset = (~reference_transform) * (other_transform.c, other_transform.f)
+    except Exception:  # noqa: BLE001
+        return False
+    nearest = np.rint([col_offset, row_offset])
+    return bool(
+        np.allclose(
+            [col_offset, row_offset],
+            nearest,
+            atol=_GRID_INDEX_TOLERANCE,
+            rtol=0.0,
+        )
     )
 
 
@@ -537,6 +600,7 @@ def _validate_raster_sources_for_mosaic(
     reference_dtype = reference.dtypes[0] if reference.dtypes else None
     reference_resolution = _dataset_resolution(reference)
     reference_orientation = _dataset_orientation(reference)
+    reference_transform = reference.transform
 
     for dataset, path in zip(datasets[1:], paths[1:]):
         current_crs = _validate_raster_crs(dataset.crs, path)
@@ -580,10 +644,12 @@ def _validate_raster_sources_for_mosaic(
         if (
             not np.allclose(_dataset_resolution(dataset), reference_resolution, atol=_GRID_TOLERANCE, rtol=_GRID_TOLERANCE)
             or not np.allclose(_dataset_orientation(dataset), reference_orientation, atol=_GRID_TOLERANCE, rtol=_GRID_TOLERANCE)
+            or not _grid_basis_compatible(reference_transform, dataset.transform)
+            or not _origin_is_integer_grid_offset(reference_transform, dataset.transform)
         ):
             _fail(
                 "GRID_MISMATCH",
-                f"Raster dataset '{path}' does not match the reference grid resolution/orientation.",
+                f"Raster dataset '{path}' does not align to the reference grid.",
                 details={
                     "reference_path": str(reference_path),
                     "path": str(path),
@@ -749,8 +815,8 @@ def clip_raster(
     reserved_output: Path | None = None
     try:
         all_touched = _validate_bool_parameter(all_touched, parameter="all_touched")
-        input_raster = _resolve_input_path(raster_path)
-        input_vector = _resolve_input_path(vector_path)
+        input_raster = _resolve_tool_input_path(raster_path, parameter="raster_path")
+        input_vector = _resolve_tool_input_path(vector_path, parameter="vector_path")
         with rasterio.open(input_raster) as dataset:
             raster_crs = _validate_raster_crs(dataset.crs, input_raster)
             vectors = _read_vector_dataset(input_vector)
@@ -769,7 +835,9 @@ def clip_raster(
                 projected.geometry,
                 crop=True,
                 all_touched=all_touched,
+                filled=False,
             )
+            clipped_mask = np.ma.getmaskarray(clipped)
             profile = dataset.profile.copy()
             profile.update(
                 transform=clipped_transform,
@@ -778,9 +846,18 @@ def clip_raster(
                 count=int(clipped.shape[0]),
                 nodata=dataset.nodata,
             )
-            reserved_output = _resolve_output_path(output_path)
-            with rasterio.open(reserved_output, "w", **profile) as output_dataset:
-                output_dataset.write(clipped)
+            fill_value = (
+                dataset.nodata
+                if dataset.nodata is not None
+                else np.zeros((), dtype=clipped.dtype).item()
+            )
+            clipped_data = np.ma.filled(clipped, fill_value=fill_value)
+            valid_mask = np.where(np.all(clipped_mask, axis=0), 0, 255).astype(np.uint8)
+            reserved_output = _resolve_tool_output_path(output_path, parameter="output_path")
+            with rasterio.Env(GDAL_TIFF_INTERNAL_MASK=True):
+                with rasterio.open(reserved_output, "w", **profile) as output_dataset:
+                    output_dataset.write(clipped_data)
+                    output_dataset.write_mask(valid_mask)
     except FileNotFoundError as exc:
         _cleanup_partial_output(reserved_output)
         return _tool_failure(
@@ -849,7 +926,7 @@ def reproject_raster(
     try:
         dst_crs_object = _normalize_dst_crs(dst_crs)
         resampling_name, resampling_method = _normalize_resampling(resampling)
-        input_raster = _resolve_input_path(raster_path)
+        input_raster = _resolve_tool_input_path(raster_path, parameter="raster_path")
         with rasterio.open(input_raster) as dataset:
             source_crs = _validate_raster_crs(dataset.crs, input_raster)
             transform, width, height = calculate_default_transform(
@@ -868,7 +945,7 @@ def reproject_raster(
                 count=int(dataset.count),
                 nodata=dataset.nodata,
             )
-            reserved_output = _resolve_output_path(output_path)
+            reserved_output = _resolve_tool_output_path(output_path, parameter="output_path")
             with rasterio.open(reserved_output, "w", **profile) as destination:
                 for band_index in range(1, dataset.count + 1):
                     reproject(
@@ -935,7 +1012,7 @@ def mosaic_rasters(
     try:
         method = _normalize_mosaic_method(method)
         for raster_path in raster_items:
-            resolved_paths.append(_resolve_input_path(raster_path))
+            resolved_paths.append(_resolve_tool_input_path(raster_path, parameter="raster_paths"))
 
         with ExitStack() as stack:
             datasets = [stack.enter_context(rasterio.open(path)) for path in resolved_paths]
@@ -944,31 +1021,32 @@ def mosaic_rasters(
             first_dataset = datasets[0]
             nodata = first_dataset.nodata
             profile = first_dataset.profile.copy()
+            source_dtype = np.dtype(profile["dtype"])
 
             if method == "first":
                 mosaic_array, transform = merge(datasets, method="first", nodata=nodata)
                 output_dtype = profile["dtype"]
+                output_nodata = nodata
             else:
                 sum_array, transform = merge(datasets, method="sum", nodata=nodata, dtype="float64")
                 count_array, _ = merge(datasets, method="count", nodata=nodata, dtype="float64")
-                output_dtype = profile["dtype"]
-                mean_array = np.full(sum_array.shape, nodata, dtype=np.float64)
+                promoted_dtype = np.result_type(source_dtype, np.float32)
+                output_dtype = np.dtype(promoted_dtype).name
+                output_nodata = np.nan if nodata is None else promoted_dtype.type(nodata)
+                mean_array = np.full(sum_array.shape, output_nodata, dtype=promoted_dtype)
                 np.divide(sum_array, count_array, out=mean_array, where=count_array > 0)
-                if nodata is None:
-                    mosaic_array = mean_array.astype(output_dtype)
-                else:
-                    mean_array[count_array <= 0] = nodata
-                    mosaic_array = mean_array.astype(output_dtype)
+                mean_array[count_array <= 0] = output_nodata
+                mosaic_array = mean_array.astype(promoted_dtype, copy=False)
 
             profile.update(
                 transform=transform,
                 width=int(mosaic_array.shape[2]),
                 height=int(mosaic_array.shape[1]),
                 count=int(mosaic_array.shape[0]),
-                nodata=nodata,
+                nodata=output_nodata,
                 dtype=output_dtype,
             )
-            reserved_output = _resolve_output_path(output_path)
+            reserved_output = _resolve_tool_output_path(output_path, parameter="output_path")
             with rasterio.open(reserved_output, "w", **profile) as destination:
                 destination.write(mosaic_array)
     except FileNotFoundError as exc:

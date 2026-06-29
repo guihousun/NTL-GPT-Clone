@@ -9,7 +9,7 @@ import pytest
 import rasterio
 from rasterio.crs import CRS
 from rasterio.transform import from_origin
-from shapely.geometry import Point, box
+from shapely.geometry import Point, Polygon, box
 
 
 @pytest.fixture
@@ -137,6 +137,16 @@ def raster_without_crs_path(runtime_workspace: Path) -> Path:
 
 
 @pytest.fixture
+def nodata_less_uint8_raster_path(runtime_workspace: Path) -> Path:
+    values = np.array([[0, 5], [7, 9]], dtype=np.uint8)
+    return _write_raster(
+        runtime_workspace / "inputs" / "nodata_less_uint8.tif",
+        values,
+        nodata=None,
+    )
+
+
+@pytest.fixture
 def clip_polygon_path(runtime_workspace: Path) -> Path:
     gdf = gpd.GeoDataFrame(
         {"name": ["clip"]},
@@ -144,6 +154,16 @@ def clip_polygon_path(runtime_workspace: Path) -> Path:
         crs="EPSG:4326",
     )
     return _write_geojson(runtime_workspace / "inputs" / "clip.geojson", gdf)
+
+
+@pytest.fixture
+def triangular_clip_polygon_path(runtime_workspace: Path) -> Path:
+    gdf = gpd.GeoDataFrame(
+        {"name": ["triangle"]},
+        geometry=[Polygon([(0.0, 2.0), (1.2, 2.0), (0.0, 0.0)])],
+        crs="EPSG:4326",
+    )
+    return _write_geojson(runtime_workspace / "inputs" / "triangle_clip.geojson", gdf)
 
 
 @pytest.fixture
@@ -165,6 +185,16 @@ def adjacent_right_raster_path(runtime_workspace: Path) -> Path:
         runtime_workspace / "inputs" / "adjacent_right.tif",
         values,
         transform=from_origin(2.0, 2.0, 1.0, 1.0),
+    )
+
+
+@pytest.fixture
+def half_pixel_offset_raster_path(runtime_workspace: Path) -> Path:
+    values = np.array([[9.0, 10.0], [11.0, 12.0]], dtype=np.float32)
+    return _write_raster(
+        runtime_workspace / "inputs" / "half_pixel_offset.tif",
+        values,
+        transform=from_origin(0.5, 2.0, 1.0, 1.0),
     )
 
 
@@ -196,6 +226,26 @@ def overlapping_mean_right_raster_path(runtime_workspace: Path) -> Path:
         runtime_workspace / "inputs" / "overlap_right.tif",
         values,
         transform=from_origin(1.0, 2.0, 1.0, 1.0),
+    )
+
+
+@pytest.fixture
+def uint8_mean_left_raster_path(runtime_workspace: Path) -> Path:
+    values = np.array([[1]], dtype=np.uint8)
+    return _write_raster(
+        runtime_workspace / "inputs" / "uint8_mean_left.tif",
+        values,
+        nodata=255,
+    )
+
+
+@pytest.fixture
+def uint8_mean_right_raster_path(runtime_workspace: Path) -> Path:
+    values = np.array([[2]], dtype=np.uint8)
+    return _write_raster(
+        runtime_workspace / "inputs" / "uint8_mean_right.tif",
+        values,
+        nodata=255,
     )
 
 
