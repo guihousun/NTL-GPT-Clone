@@ -44,7 +44,8 @@ _ZONAL_TOOL = "calculate_zonal_statistics"
 _COMPOSITE_TOOL = "composite_ntl_rasters"
 _TREND_TOOL = "analyze_ntl_trend"
 _ANOMALY_TOOL = "detect_ntl_anomaly"
-_GRID_TOLERANCE = 1e-15
+_GRID_RELATIVE_TOLERANCE = 1e-9
+_GRID_ABSOLUTE_FLOOR = 1e-12
 
 
 class _KnownNTLFailure(Exception):
@@ -797,8 +798,27 @@ def _crs_equal(left: Any, right: Any) -> bool:
     return bool(left == right)
 
 
+def _pixel_scale(transform: Any) -> float:
+    x_scale = float(np.hypot(transform.a, transform.d))
+    y_scale = float(np.hypot(transform.b, transform.e))
+    return max(x_scale, y_scale, 0.0)
+
+
+def _transform_tolerance(left: Any, right: Any) -> float:
+    scale = max(_pixel_scale(left), _pixel_scale(right))
+    return max(scale * _GRID_RELATIVE_TOLERANCE, _GRID_ABSOLUTE_FLOOR)
+
+
 def _transforms_equal(left: Any, right: Any) -> bool:
-    return left.almost_equals(right, precision=_GRID_TOLERANCE)
+    tolerance = _transform_tolerance(left, right)
+    return bool(
+        np.allclose(
+            tuple(left)[:6],
+            tuple(right)[:6],
+            rtol=0.0,
+            atol=tolerance,
+        )
+    )
 
 
 def _validate_aligned_raster_datasets(

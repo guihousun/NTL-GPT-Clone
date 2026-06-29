@@ -637,6 +637,34 @@ def test_composite_ntl_rasters_returns_fractional_mean_without_mutating_inputs(
         assert dataset.nodata == pytest.approx(255.0)
 
 
+def test_composite_ntl_rasters_accepts_noisy_transform_alignment(
+    sample_raster_path: Path,
+    noisy_transform_raster_path: Path,
+    runtime_workspace: Path,
+) -> None:
+    result = _ntl_module().composite_ntl_rasters(
+        [sample_raster_path, noisy_transform_raster_path],
+        Path("outputs") / "composite_noisy_transform.tif",
+    )
+
+    assert result.status == "succeeded"
+    assert result.metrics["input_count"] == 2
+    assert result.metrics["valid_pixel_count"] == 4
+
+    with rasterio.open(runtime_workspace / "outputs" / "composite_noisy_transform.tif") as dataset:
+        assert dataset.read(1).tolist() == [[3.0, 4.0], [5.0, 8.0]]
+
+
+def test_task8_transform_comparator_uses_pixel_scale_tolerance_for_large_origins() -> None:
+    module = _ntl_module()
+    left = Affine(1.0, 0.0, 1_000_000.0, 0.0, -1.0, 2_000_000.0)
+    right = Affine(1.0 + 5e-10, 0.0, 1_000_000.0 + 5e-10, 0.0, -1.0 - 5e-10, 2_000_000.0 + 5e-10)
+    shifted = Affine(1.0, 0.0, 1_000_000.5, 0.0, -1.0, 2_000_000.0)
+
+    assert module._transforms_equal(left, right) is True
+    assert module._transforms_equal(left, shifted) is False
+
+
 @pytest.mark.parametrize(
     ("raster_paths", "output_path", "method", "expected_code"),
     [
@@ -759,7 +787,7 @@ def test_analyze_ntl_trend_writes_slope_and_pvalue_rasters_for_union_roi(
     with rasterio.open(pvalue_path) as pvalue_dataset:
         masked = pvalue_dataset.read(1, masked=True)
         assert masked.shape == (1, 2)
-        assert 0.0 <= float(masked[0, 0]) <= 1.0
+        assert float(masked[0, 0]) == pytest.approx(1.0 / 3.0)
         assert bool(masked.mask[0, 0]) is False
         assert bool(masked.mask[0, 1]) is True
 
@@ -784,6 +812,30 @@ def test_analyze_ntl_trend_accepts_two_step_series_when_pixel_has_two_observatio
         assert masked.shape == (1, 2)
         assert masked[0, 0] == pytest.approx(3.0)
         assert bool(masked.mask[0, 1]) is True
+
+
+def test_analyze_ntl_trend_reprojects_mercator_roi_and_preserves_expected_slopes(
+    trend_series_raster_paths: list[Path],
+    mercator_overlap_vector_path: Path,
+    runtime_workspace: Path,
+) -> None:
+    result = _ntl_module().analyze_ntl_trend(
+        trend_series_raster_paths,
+        mercator_overlap_vector_path,
+        Path("outputs") / "trend_mercator",
+    )
+
+    assert result.status == "succeeded"
+    assert result.metrics["raster_count"] == 3
+    assert result.metrics["analyzed_pixel_count"] == 3
+
+    with rasterio.open(runtime_workspace / "outputs" / "trend_mercator_slope_trend.tif") as dataset:
+        masked = dataset.read(1, masked=True)
+        assert masked.shape == (2, 2)
+        assert masked[0, 0] == pytest.approx(10.0)
+        assert masked[0, 1] == pytest.approx(20.0)
+        assert masked[1, 0] == pytest.approx(10.0)
+        assert bool(masked.mask[1, 1]) is True
 
 
 @pytest.mark.parametrize(
@@ -950,6 +1002,30 @@ def test_detect_ntl_anomaly_masks_pixels_without_three_baseline_observations(
     with rasterio.open(runtime_workspace / "outputs" / "anomaly_sparse.tif") as dataset:
         assert dataset.read(1).tolist() == [[1, 0], [0, 0]]
         assert dataset.dataset_mask().tolist() == [[255, 0], [255, 0]]
+
+
+def test_detect_ntl_anomaly_keeps_negative_change_as_valid_non_anomaly(
+    runtime_workspace: Path,
+) -> None:
+    raster_paths = [
+        _write_raster(runtime_workspace / "inputs" / "anomaly_negative_01.tif", np.array([[5.0]], dtype=np.float32)),
+        _write_raster(runtime_workspace / "inputs" / "anomaly_negative_02.tif", np.array([[5.0]], dtype=np.float32)),
+        _write_raster(runtime_workspace / "inputs" / "anomaly_negative_03.tif", np.array([[5.0]], dtype=np.float32)),
+        _write_raster(runtime_workspace / "inputs" / "anomaly_negative_04.tif", np.array([[0.0]], dtype=np.float32)),
+    ]
+
+    result = _ntl_module().detect_ntl_anomaly(
+        raster_paths,
+        Path("outputs") / "anomaly_negative.tif",
+    )
+
+    assert result.status == "succeeded"
+    assert result.metrics["anomaly_pixel_count"] == 0
+    assert result.metrics["valid_pixel_count"] == 1
+
+    with rasterio.open(runtime_workspace / "outputs" / "anomaly_negative.tif") as dataset:
+        assert dataset.read(1).tolist() == [[0]]
+        assert dataset.dataset_mask().tolist() == [[255]]
 
 
 @pytest.mark.parametrize(
