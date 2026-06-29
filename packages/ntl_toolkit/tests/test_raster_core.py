@@ -16,8 +16,370 @@ def _raster_module():
 def test_raster_module_exports_required_public_callables() -> None:
     module = _raster_module()
 
-    for name in ["inspect_raster", "validate_geodata"]:
+    for name in [
+        "inspect_raster",
+        "validate_geodata",
+        "clip_raster",
+        "reproject_raster",
+        "mosaic_rasters",
+    ]:
         assert hasattr(module, name), f"ntl_toolkit.core.raster missing {name}"
+
+
+def test_clip_raster_writes_reopenable_single_pixel_clip(
+    sample_raster_path: Path,
+    clip_polygon_path: Path,
+    runtime_workspace: Path,
+) -> None:
+    output_path = Path("outputs") / "clip.tif"
+
+    result = _raster_module().clip_raster(
+        sample_raster_path,
+        clip_polygon_path,
+        output_path,
+    )
+
+    assert result.status == "succeeded"
+    assert result.tool == "clip_raster"
+    assert len(result.outputs) == 1
+    assert result.outputs[0].path == str((runtime_workspace / output_path).resolve(strict=False))
+    assert result.outputs[0].media_type == "image/tiff"
+    assert result.metrics["width"] == 1
+    assert result.metrics["height"] == 1
+    assert result.metrics["band_count"] == 1
+    assert result.metrics["crs"] == "EPSG:4326"
+
+    import rasterio
+
+    with rasterio.open(runtime_workspace / output_path) as dataset:
+        assert dataset.width == 1
+        assert dataset.height == 1
+        assert dataset.count == 1
+        assert dataset.crs == rasterio.CRS.from_epsg(4326)
+        assert dataset.read(1).tolist() == [[1.0]]
+
+
+def test_clip_raster_reprojects_vector_geometries_before_masking(
+    sample_raster_path: Path,
+    mercator_overlap_vector_path: Path,
+    runtime_workspace: Path,
+) -> None:
+    output_path = Path("outputs") / "clip_mercator.tif"
+
+    result = _raster_module().clip_raster(
+        sample_raster_path,
+        mercator_overlap_vector_path,
+        output_path,
+    )
+
+    assert result.status == "succeeded"
+    with __import__("rasterio").open(runtime_workspace / output_path) as dataset:
+        assert dataset.width == 2
+        assert dataset.height == 2
+        assert dataset.read(1).tolist() == [[1.0, 2.0], [3.0, -9999.0]]
+
+
+@pytest.mark.parametrize(
+    ("vector_fixture", "all_touched", "error_code"),
+    [
+        ("far_vector_path", False, "NO_SPATIAL_OVERLAP"),
+        ("invalid_vector_path", False, "INVALID_GEOMETRY"),
+        ("clip_polygon_path", "yes", "INVALID_PARAMETER"),
+    ],
+)
+def test_clip_raster_reports_validation_failures(
+    sample_raster_path: Path,
+    vector_fixture: str,
+    all_touched: object,
+    error_code: str,
+    request: pytest.FixtureRequest,
+) -> None:
+    vector_path = request.getfixturevalue(vector_fixture)
+
+    result = _raster_module().clip_raster(
+        sample_raster_path,
+        vector_path,
+        Path("outputs") / "clip_failure.tif",
+        all_touched=all_touched,
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == error_code
+
+
+def test_clip_raster_reserves_collision_suffix_without_overwriting(
+    sample_raster_path: Path,
+    clip_polygon_path: Path,
+    runtime_workspace: Path,
+) -> None:
+    requested_path = runtime_workspace / "outputs" / "clip_existing.tif"
+    requested_path.write_bytes(b"sentinel")
+
+    result = _raster_module().clip_raster(
+        sample_raster_path,
+        clip_polygon_path,
+        Path("outputs") / "clip_existing.tif",
+    )
+
+    assert result.status == "succeeded"
+    assert requested_path.read_bytes() == b"sentinel"
+    assert result.outputs[0].path.endswith("clip_existing_001.tif")
+    assert Path(result.outputs[0].path).exists()
+
+
+def test_reproject_raster_writes_epsg3857_output_for_each_band(
+    multiband_raster_path: Path,
+    runtime_workspace: Path,
+) -> None:
+    output_path = Path("outputs") / "reprojected.tif"
+
+    result = _raster_module().reproject_raster(
+        multiband_raster_path,
+        output_path,
+        dst_crs="EPSG:3857",
+    )
+
+    assert result.status == "succeeded"
+    assert result.tool == "reproject_raster"
+    assert len(result.outputs) == 1
+    assert result.outputs[0].path == str((runtime_workspace / output_path).resolve(strict=False))
+    assert result.outputs[0].media_type == "image/tiff"
+    assert result.metrics["band_count"] == 2
+    assert result.metrics["crs"] == "EPSG:3857"
+    assert result.metrics["resampling"] == "bilinear"
+
+    import rasterio
+
+    with rasterio.open(runtime_workspace / output_path) as dataset:
+        assert dataset.count == 2
+        assert dataset.crs == rasterio.CRS.from_epsg(3857)
+        assert dataset.width > 0
+        assert dataset.height > 0
+        assert dataset.read(1).shape == (dataset.height, dataset.width)
+        assert dataset.read(2).shape == (dataset.height, dataset.width)
+
+
+def test_reproject_raster_supports_same_crs_and_collision_suffix(
+    sample_raster_path: Path,
+    runtime_workspace: Path,
+) -> None:
+    requested_path = runtime_workspace / "outputs" / "reproject_same.tif"
+    requested_path.write_bytes(b"sentinel")
+
+    result = _raster_module().reproject_raster(
+        sample_raster_path,
+        Path("outputs") / "reproject_same.tif",
+        dst_crs="EPSG:4326",
+        resampling="nearest",
+    )
+
+    assert result.status == "succeeded"
+    assert requested_path.read_bytes() == b"sentinel"
+    assert result.outputs[0].path.endswith("reproject_same_001.tif")
+
+    import rasterio
+
+    with rasterio.open(Path(result.outputs[0].path)) as dataset:
+        assert dataset.crs == rasterio.CRS.from_epsg(4326)
+        assert dataset.read(1).tolist() == [[1.0, 2.0], [3.0, -9999.0]]
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "error_code"),
+    [
+        ({"dst_crs": "EPSG:3857", "resampling": "lanczos"}, "UNSUPPORTED_RESAMPLING"),
+        ({"dst_crs": "not-a-crs"}, "INVALID_PARAMETER"),
+    ],
+)
+def test_reproject_raster_rejects_invalid_parameters(
+    sample_raster_path: Path,
+    kwargs: dict[str, object],
+    error_code: str,
+) -> None:
+    result = _raster_module().reproject_raster(
+        sample_raster_path,
+        Path("outputs") / "reproject_invalid.tif",
+        **kwargs,
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == error_code
+
+
+def test_reproject_raster_requires_source_crs(
+    raster_without_crs_path: Path,
+) -> None:
+    result = _raster_module().reproject_raster(
+        raster_without_crs_path,
+        Path("outputs") / "reproject_missing_crs.tif",
+        dst_crs="EPSG:3857",
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "CRS_MISSING"
+
+
+def test_mosaic_rasters_preserves_adjacent_union_extent(
+    adjacent_left_raster_path: Path,
+    adjacent_right_raster_path: Path,
+    runtime_workspace: Path,
+) -> None:
+    output_path = Path("outputs") / "mosaic_adjacent.tif"
+
+    result = _raster_module().mosaic_rasters(
+        [adjacent_left_raster_path, adjacent_right_raster_path],
+        output_path,
+    )
+
+    assert result.status == "succeeded"
+    assert result.tool == "mosaic_rasters"
+    assert len(result.outputs) == 1
+    assert result.outputs[0].path == str((runtime_workspace / output_path).resolve(strict=False))
+    assert result.outputs[0].media_type == "image/tiff"
+    assert result.metrics["width"] == 4
+    assert result.metrics["height"] == 2
+    assert result.metrics["band_count"] == 1
+    assert result.metrics["crs"] == "EPSG:4326"
+    assert result.metrics["method"] == "first"
+
+    import rasterio
+
+    with rasterio.open(runtime_workspace / output_path) as dataset:
+        assert dataset.width == 4
+        assert dataset.height == 2
+        assert dataset.read(1).tolist() == [[1.0, 2.0, 5.0, 6.0], [3.0, 4.0, 7.0, 8.0]]
+
+
+@pytest.mark.parametrize(
+    ("paths_factory", "method", "error_code"),
+    [
+        (lambda request: [], "first", "INVALID_PARAMETER"),
+        (
+            lambda request: [
+                request.getfixturevalue("sample_raster_path"),
+                request.getfixturevalue("band_mismatch_raster_path"),
+            ],
+            "first",
+            "BAND_COUNT_MISMATCH",
+        ),
+        (
+            lambda request: [
+                request.getfixturevalue("sample_raster_path"),
+                request.getfixturevalue("crs_mismatch_raster_path"),
+            ],
+            "first",
+            "CRS_MISMATCH",
+        ),
+        (
+            lambda request: [request.getfixturevalue("sample_raster_path")],
+            "meanish",
+            "UNSUPPORTED_METHOD",
+        ),
+    ],
+)
+def test_mosaic_rasters_rejects_invalid_inputs(
+    method: str,
+    error_code: str,
+    paths_factory,
+    request: pytest.FixtureRequest,
+) -> None:
+    raster_paths = paths_factory(request)
+    original_paths = list(raster_paths)
+
+    result = _raster_module().mosaic_rasters(
+        raster_paths,
+        Path("outputs") / "mosaic_invalid.tif",
+        method=method,
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == error_code
+    assert raster_paths == original_paths
+
+
+def test_mosaic_rasters_mean_handles_overlap_and_nodata_exactly(
+    overlapping_mean_left_raster_path: Path,
+    overlapping_mean_right_raster_path: Path,
+    runtime_workspace: Path,
+) -> None:
+    output_path = Path("outputs") / "mosaic_mean.tif"
+
+    result = _raster_module().mosaic_rasters(
+        [overlapping_mean_left_raster_path, overlapping_mean_right_raster_path],
+        output_path,
+        method="mean",
+    )
+
+    assert result.status == "succeeded"
+    assert result.metrics["width"] == 3
+    assert result.metrics["height"] == 2
+    assert result.metrics["band_count"] == 2
+    assert result.metrics["method"] == "mean"
+
+    import rasterio
+
+    with rasterio.open(runtime_workspace / output_path) as dataset:
+        assert dataset.count == 2
+        assert dataset.read(1).tolist() == [
+            [1.0, 51.0, 200.0],
+            [3.0, 300.0, -9999.0],
+        ]
+        assert dataset.read(2).tolist() == [
+            [10.0, 510.0, 2000.0],
+            [30.0, 3000.0, -9999.0],
+        ]
+
+
+def test_mosaic_rasters_reserves_collision_suffix_without_mutating_inputs(
+    adjacent_left_raster_path: Path,
+    adjacent_right_raster_path: Path,
+    runtime_workspace: Path,
+) -> None:
+    requested_path = runtime_workspace / "outputs" / "mosaic_existing.tif"
+    requested_path.write_bytes(b"sentinel")
+    raster_paths = [adjacent_left_raster_path, adjacent_right_raster_path]
+
+    result = _raster_module().mosaic_rasters(
+        raster_paths,
+        Path("outputs") / "mosaic_existing.tif",
+    )
+
+    assert result.status == "succeeded"
+    assert requested_path.read_bytes() == b"sentinel"
+    assert raster_paths == [adjacent_left_raster_path, adjacent_right_raster_path]
+    assert result.outputs[0].path.endswith("mosaic_existing_001.tif")
+
+
+def test_reproject_raster_cleans_partial_output_on_write_failure(
+    sample_raster_path: Path,
+    runtime_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _raster_module()
+    real_open = module.rasterio.open
+
+    def failing_open(path, mode="r", *args, **kwargs):
+        if mode == "w":
+            Path(path).touch()
+            raise module.RasterioError("simulated write failure")
+        return real_open(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(module.rasterio, "open", failing_open)
+
+    result = module.reproject_raster(
+        sample_raster_path,
+        Path("outputs") / "reproject_partial.tif",
+        dst_crs="EPSG:3857",
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "RASTER_READ_FAILED"
+    assert not (runtime_workspace / "outputs" / "reproject_partial.tif").exists()
 
 
 def test_inspect_raster_full_mode_reports_masked_stats_for_fixture(

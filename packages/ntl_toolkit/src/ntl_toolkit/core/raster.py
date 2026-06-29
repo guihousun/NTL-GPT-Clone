@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import ExitStack
 from numbers import Integral
 from pathlib import Path
 from typing import Any, Iterable
@@ -9,18 +10,40 @@ import numpy as np
 import rasterio
 from affine import Affine
 from rasterio.crs import CRS
-from rasterio.errors import RasterioError
-from rasterio.warp import transform_bounds
+from rasterio.errors import MergeError, RasterioError
+from rasterio.mask import mask
+from rasterio.merge import merge
+from rasterio.warp import (
+    Resampling,
+    calculate_default_transform,
+    reproject,
+    transform_bounds,
+)
 
-from ntl_toolkit.runtime import require_input_path, runtime_workdir
-from ntl_toolkit.schemas import ToolError, ToolResult
+from ntl_toolkit.runtime import (
+    require_input_path,
+    reserve_output_path,
+    resolve_local_path,
+    runtime_workdir,
+)
+from ntl_toolkit.schemas import OutputArtifact, ToolError, ToolResult
 
 _RASTER_TOOL_NAME = {
     "inspect": "inspect_raster",
     "validate": "validate_geodata",
+    "clip": "clip_raster",
+    "reproject": "reproject_raster",
+    "mosaic": "mosaic_rasters",
 }
 _VALID_MODES = {"basic", "full"}
 _GRID_TOLERANCE = 1e-15
+_RESAMPLING_METHODS = {
+    "nearest": Resampling.nearest,
+    "bilinear": Resampling.bilinear,
+    "cubic": Resampling.cubic,
+    "average": Resampling.average,
+}
+_MOSAIC_METHODS = {"first", "mean"}
 
 
 class _KnownRasterFailure(Exception):
@@ -29,12 +52,19 @@ class _KnownRasterFailure(Exception):
         self.error = error
 
 
-def _fail(code: str, message: str, *, details: dict[str, Any] | None = None) -> None:
+def _fail(
+    code: str,
+    message: str,
+    *,
+    details: dict[str, Any] | None = None,
+    suggestion: str | None = None,
+) -> None:
     raise _KnownRasterFailure(
         ToolError(
             code=code,
             message=message,
             details=details or {},
+            suggestion=suggestion,
         )
     )
 
@@ -45,6 +75,30 @@ def _tool_failure(tool: str, error: ToolError) -> ToolResult:
 
 def _resolve_input_path(path: str | Path) -> Path:
     return require_input_path(path, runtime_workdir())
+
+
+def _resolve_output_path(path: str | Path) -> Path:
+    requested = resolve_local_path(path, runtime_workdir())
+    return reserve_output_path(requested)
+
+
+def _artifact_for(path: Path) -> OutputArtifact:
+    return OutputArtifact(path=str(path), media_type="image/tiff")
+
+
+def _raster_processing_error(
+    code: str,
+    message: str,
+    *,
+    details: dict[str, Any] | None = None,
+    suggestion: str | None = None,
+) -> ToolError:
+    return ToolError(
+        code=code,
+        message=message,
+        details=details or {},
+        suggestion=suggestion,
+    )
 
 
 def _normalize_mode(mode: str) -> str:
@@ -339,6 +393,207 @@ def _warning_union(*code_groups: list[str]) -> list[str]:
     return ordered
 
 
+def _validate_bool_parameter(value: Any, *, parameter: str) -> bool:
+    if not isinstance(value, bool):
+        _fail(
+            "INVALID_PARAMETER",
+            f"{parameter} must be a boolean value.",
+            details={"parameter": parameter, "value": value},
+            suggestion=f"Provide True or False for '{parameter}'.",
+        )
+    return value
+
+
+def _validate_raster_crs(crs: Any, path: Path) -> CRS:
+    crs_object = _crs_object(crs)
+    if crs_object is None:
+        _fail(
+            "CRS_MISSING",
+            f"Raster dataset '{path}' does not define a CRS.",
+            details={"path": str(path)},
+            suggestion="Assign a source CRS before running this raster operation.",
+        )
+    return crs_object
+
+
+def _normalize_dst_crs(value: Any) -> CRS:
+    try:
+        crs = CRS.from_user_input(value)
+    except Exception:  # noqa: BLE001
+        crs = None
+    if crs is None:
+        _fail(
+            "INVALID_PARAMETER",
+            "dst_crs must be a valid CRS definition.",
+            details={"parameter": "dst_crs", "value": value},
+            suggestion="Provide a valid CRS such as 'EPSG:3857'.",
+        )
+    return crs
+
+
+def _normalize_resampling(value: str) -> tuple[str, Resampling]:
+    method = _RESAMPLING_METHODS.get(value)
+    if method is None:
+        _fail(
+            "UNSUPPORTED_RESAMPLING",
+            f"Resampling method '{value}' is not supported.",
+            details={"resampling": value},
+            suggestion="Use one of: nearest, bilinear, cubic, average.",
+        )
+    return value, method
+
+
+def _validate_vector_geometries(gdf: gpd.GeoDataFrame, path: Path) -> None:
+    if gdf.crs is None:
+        _fail(
+            "CRS_MISSING",
+            f"Vector dataset '{path}' does not define a CRS.",
+            details={"path": str(path)},
+            suggestion="Assign a CRS to the vector dataset before clipping.",
+        )
+    if gdf.empty:
+        _fail(
+            "INVALID_GEOMETRY",
+            f"Vector dataset '{path}' contains no features.",
+            details={"path": str(path), "reason": "empty_dataset"},
+            suggestion="Provide a vector dataset with at least one valid feature.",
+        )
+    for index, geometry in enumerate(gdf.geometry):
+        problem = _geometry_problem(geometry)
+        if problem is not None:
+            _fail(
+                "INVALID_GEOMETRY",
+                f"Vector dataset '{path}' contains {problem} geometry.",
+                details={"path": str(path), "feature_index": index, "reason": problem},
+                suggestion="Repair or remove invalid geometries before clipping.",
+            )
+    bounds = _finite_bounds(gdf.total_bounds)
+    if bounds is None:
+        _fail(
+            "INVALID_GEOMETRY",
+            f"Vector dataset '{path}' has invalid bounds.",
+            details={"path": str(path), "reason": "invalid_bounds"},
+            suggestion="Repair the vector dataset and ensure its bounds are finite.",
+        )
+
+
+def _read_vector_dataset(path: Path) -> gpd.GeoDataFrame:
+    try:
+        return gpd.read_file(path)
+    except Exception as exc:  # noqa: BLE001
+        _fail(
+            "VECTOR_READ_FAILED",
+            f"Failed to read vector dataset '{path}'.",
+            details={"path": str(path), "reason": str(exc)},
+            suggestion="Confirm the vector file exists and can be opened by GeoPandas.",
+        )
+
+
+def _cleanup_partial_output(path: Path | None) -> None:
+    if path is not None and path.exists():
+        path.unlink()
+
+
+def _dataset_resolution(dataset: rasterio.io.DatasetReader) -> tuple[float, float]:
+    return abs(float(dataset.transform.a)), abs(float(dataset.transform.e))
+
+
+def _dataset_orientation(dataset: rasterio.io.DatasetReader) -> tuple[float, float, int, int]:
+    return (
+        float(dataset.transform.b),
+        float(dataset.transform.d),
+        int(np.sign(dataset.transform.a)),
+        int(np.sign(dataset.transform.e)),
+    )
+
+
+def _normalize_mosaic_method(value: str) -> str:
+    if value not in _MOSAIC_METHODS:
+        _fail(
+            "UNSUPPORTED_METHOD",
+            f"Mosaic method '{value}' is not supported.",
+            details={"method": value},
+            suggestion="Use 'first' or 'mean'.",
+        )
+    return value
+
+
+def _validate_raster_sources_for_mosaic(
+    datasets: list[rasterio.io.DatasetReader],
+    paths: list[Path],
+) -> None:
+    if not datasets:
+        _fail(
+            "INVALID_PARAMETER",
+            "raster_paths must contain at least one raster path.",
+            details={"parameter": "raster_paths", "value": []},
+            suggestion="Provide at least one readable raster path to mosaic.",
+        )
+
+    reference = datasets[0]
+    reference_path = paths[0]
+    reference_crs = _validate_raster_crs(reference.crs, reference_path)
+    reference_count = int(reference.count)
+    reference_dtype = reference.dtypes[0] if reference.dtypes else None
+    reference_resolution = _dataset_resolution(reference)
+    reference_orientation = _dataset_orientation(reference)
+
+    for dataset, path in zip(datasets[1:], paths[1:]):
+        current_crs = _validate_raster_crs(dataset.crs, path)
+        if current_crs != reference_crs:
+            _fail(
+                "CRS_MISMATCH",
+                f"Raster dataset '{path}' does not match CRS '{reference_crs}'.",
+                details={
+                    "reference_path": str(reference_path),
+                    "path": str(path),
+                    "reference_crs": str(reference_crs),
+                    "crs": str(current_crs),
+                },
+                suggestion="Reproject the input rasters to a common CRS before mosaicking.",
+            )
+        if int(dataset.count) != reference_count:
+            _fail(
+                "BAND_COUNT_MISMATCH",
+                f"Raster dataset '{path}' does not match the expected band count.",
+                details={
+                    "reference_path": str(reference_path),
+                    "path": str(path),
+                    "reference_band_count": reference_count,
+                    "band_count": int(dataset.count),
+                },
+                suggestion="Use rasters with the same number of bands.",
+            )
+        current_dtype = dataset.dtypes[0] if dataset.dtypes else None
+        if current_dtype != reference_dtype:
+            _fail(
+                "DTYPE_MISMATCH",
+                f"Raster dataset '{path}' does not match dtype '{reference_dtype}'.",
+                details={
+                    "reference_path": str(reference_path),
+                    "path": str(path),
+                    "reference_dtype": reference_dtype,
+                    "dtype": current_dtype,
+                },
+                suggestion="Convert the rasters to a shared dtype before mosaicking.",
+            )
+        if (
+            not np.allclose(_dataset_resolution(dataset), reference_resolution, atol=_GRID_TOLERANCE, rtol=_GRID_TOLERANCE)
+            or not np.allclose(_dataset_orientation(dataset), reference_orientation, atol=_GRID_TOLERANCE, rtol=_GRID_TOLERANCE)
+        ):
+            _fail(
+                "GRID_MISMATCH",
+                f"Raster dataset '{path}' does not match the reference grid resolution/orientation.",
+                details={
+                    "reference_path": str(reference_path),
+                    "path": str(path),
+                    "reference_resolution": list(reference_resolution),
+                    "resolution": list(_dataset_resolution(dataset)),
+                },
+                suggestion="Resample the rasters to a shared resolution and orientation before mosaicking.",
+            )
+
+
 def _crs_object(raw_crs: Any) -> CRS | None:
     if raw_crs in {None, ""}:
         return None
@@ -480,6 +735,279 @@ def inspect_raster(
         tool=tool,
         summary=summary,
         metrics=metrics,
+    )
+
+
+def clip_raster(
+    raster_path: str | Path,
+    vector_path: str | Path,
+    output_path: str | Path,
+    *,
+    all_touched: bool = False,
+) -> ToolResult:
+    tool = _RASTER_TOOL_NAME["clip"]
+    reserved_output: Path | None = None
+    try:
+        all_touched = _validate_bool_parameter(all_touched, parameter="all_touched")
+        input_raster = _resolve_input_path(raster_path)
+        input_vector = _resolve_input_path(vector_path)
+        with rasterio.open(input_raster) as dataset:
+            raster_crs = _validate_raster_crs(dataset.crs, input_raster)
+            vectors = _read_vector_dataset(input_vector)
+            _validate_vector_geometries(vectors, input_vector)
+            projected = vectors.to_crs(raster_crs)
+            bounds = _finite_bounds(projected.total_bounds)
+            if bounds is None or not _bbox_intersects(_bounds_to_list(dataset.bounds), bounds):
+                _fail(
+                    "NO_SPATIAL_OVERLAP",
+                    "Vector geometries do not overlap the raster extent.",
+                    details={"raster_path": str(input_raster), "vector_path": str(input_vector)},
+                    suggestion="Provide clip geometries that intersect the raster extent.",
+                )
+            clipped, clipped_transform = mask(
+                dataset,
+                projected.geometry,
+                crop=True,
+                all_touched=all_touched,
+            )
+            profile = dataset.profile.copy()
+            profile.update(
+                transform=clipped_transform,
+                width=int(clipped.shape[2]),
+                height=int(clipped.shape[1]),
+                count=int(clipped.shape[0]),
+                nodata=dataset.nodata,
+            )
+            reserved_output = _resolve_output_path(output_path)
+            with rasterio.open(reserved_output, "w", **profile) as output_dataset:
+                output_dataset.write(clipped)
+    except FileNotFoundError as exc:
+        _cleanup_partial_output(reserved_output)
+        return _tool_failure(
+            tool,
+            ToolError(
+                code="INPUT_NOT_FOUND",
+                message=f"Input dataset was not found: {exc}.",
+                details={"path": str(exc)},
+                suggestion="Confirm both raster and vector input paths exist inside the workspace.",
+            ),
+        )
+    except _KnownRasterFailure as exc:
+        _cleanup_partial_output(reserved_output)
+        return _tool_failure(tool, exc.error)
+    except ValueError as exc:
+        _cleanup_partial_output(reserved_output)
+        if "do not overlap" in str(exc).lower():
+            return _tool_failure(
+                tool,
+                ToolError(
+                    code="NO_SPATIAL_OVERLAP",
+                    message="Vector geometries do not overlap the raster extent.",
+                    details={"raster_path": str(raster_path), "vector_path": str(vector_path)},
+                    suggestion="Provide clip geometries that intersect the raster extent.",
+                ),
+            )
+        raise
+    except (RasterioError, OSError) as exc:
+        _cleanup_partial_output(reserved_output)
+        return _tool_failure(
+            tool,
+            _raster_processing_error(
+                "RASTER_READ_FAILED",
+                f"Failed to process raster '{raster_path}'.",
+                details={
+                    "path": str(raster_path),
+                    "reason": str(exc),
+                },
+                suggestion="Confirm the raster can be opened and the output path is writable.",
+            ),
+        )
+
+    return ToolResult.succeeded(
+        tool=tool,
+        summary=f"Clipped raster to {clipped.shape[2]}x{clipped.shape[1]}.",
+        outputs=[_artifact_for(reserved_output)],
+        metrics={
+            "width": int(clipped.shape[2]),
+            "height": int(clipped.shape[1]),
+            "band_count": int(clipped.shape[0]),
+            "crs": str(raster_crs),
+            "all_touched": all_touched,
+        },
+    )
+
+
+def reproject_raster(
+    raster_path: str | Path,
+    output_path: str | Path,
+    *,
+    dst_crs: Any,
+    resampling: str = "bilinear",
+) -> ToolResult:
+    tool = _RASTER_TOOL_NAME["reproject"]
+    reserved_output: Path | None = None
+    try:
+        dst_crs_object = _normalize_dst_crs(dst_crs)
+        resampling_name, resampling_method = _normalize_resampling(resampling)
+        input_raster = _resolve_input_path(raster_path)
+        with rasterio.open(input_raster) as dataset:
+            source_crs = _validate_raster_crs(dataset.crs, input_raster)
+            transform, width, height = calculate_default_transform(
+                source_crs,
+                dst_crs_object,
+                dataset.width,
+                dataset.height,
+                *dataset.bounds,
+            )
+            profile = dataset.profile.copy()
+            profile.update(
+                crs=dst_crs_object,
+                transform=transform,
+                width=int(width),
+                height=int(height),
+                count=int(dataset.count),
+                nodata=dataset.nodata,
+            )
+            reserved_output = _resolve_output_path(output_path)
+            with rasterio.open(reserved_output, "w", **profile) as destination:
+                for band_index in range(1, dataset.count + 1):
+                    reproject(
+                        source=rasterio.band(dataset, band_index),
+                        destination=rasterio.band(destination, band_index),
+                        src_transform=dataset.transform,
+                        src_crs=source_crs,
+                        dst_transform=transform,
+                        dst_crs=dst_crs_object,
+                        src_nodata=dataset.nodata,
+                        dst_nodata=dataset.nodata,
+                        resampling=resampling_method,
+                    )
+    except FileNotFoundError as exc:
+        _cleanup_partial_output(reserved_output)
+        return _tool_failure(
+            tool,
+            ToolError(
+                code="INPUT_NOT_FOUND",
+                message=f"Input raster was not found: {exc}.",
+                details={"path": str(exc)},
+                suggestion="Confirm the input raster path exists inside the workspace.",
+            ),
+        )
+    except _KnownRasterFailure as exc:
+        _cleanup_partial_output(reserved_output)
+        return _tool_failure(tool, exc.error)
+    except (RasterioError, OSError) as exc:
+        _cleanup_partial_output(reserved_output)
+        return _tool_failure(
+            tool,
+            _raster_processing_error(
+                "RASTER_READ_FAILED",
+                f"Failed to process raster '{raster_path}'.",
+                details={"path": str(raster_path), "reason": str(exc)},
+                suggestion="Confirm the raster can be opened and the output path is writable.",
+            ),
+        )
+
+    return ToolResult.succeeded(
+        tool=tool,
+        summary=f"Reprojected raster to {dst_crs_object}.",
+        outputs=[_artifact_for(reserved_output)],
+        metrics={
+            "width": int(width),
+            "height": int(height),
+            "band_count": int(profile["count"]),
+            "crs": str(dst_crs_object),
+            "resampling": resampling_name,
+        },
+    )
+
+
+def mosaic_rasters(
+    raster_paths: Iterable[str | Path],
+    output_path: str | Path,
+    *,
+    method: str = "first",
+) -> ToolResult:
+    tool = _RASTER_TOOL_NAME["mosaic"]
+    reserved_output: Path | None = None
+    raster_items = list(raster_paths)
+    resolved_paths: list[Path] = []
+    try:
+        method = _normalize_mosaic_method(method)
+        for raster_path in raster_items:
+            resolved_paths.append(_resolve_input_path(raster_path))
+
+        with ExitStack() as stack:
+            datasets = [stack.enter_context(rasterio.open(path)) for path in resolved_paths]
+            _validate_raster_sources_for_mosaic(datasets, resolved_paths)
+
+            first_dataset = datasets[0]
+            nodata = first_dataset.nodata
+            profile = first_dataset.profile.copy()
+
+            if method == "first":
+                mosaic_array, transform = merge(datasets, method="first", nodata=nodata)
+                output_dtype = profile["dtype"]
+            else:
+                sum_array, transform = merge(datasets, method="sum", nodata=nodata, dtype="float64")
+                count_array, _ = merge(datasets, method="count", nodata=nodata, dtype="float64")
+                output_dtype = profile["dtype"]
+                mean_array = np.full(sum_array.shape, nodata, dtype=np.float64)
+                np.divide(sum_array, count_array, out=mean_array, where=count_array > 0)
+                if nodata is None:
+                    mosaic_array = mean_array.astype(output_dtype)
+                else:
+                    mean_array[count_array <= 0] = nodata
+                    mosaic_array = mean_array.astype(output_dtype)
+
+            profile.update(
+                transform=transform,
+                width=int(mosaic_array.shape[2]),
+                height=int(mosaic_array.shape[1]),
+                count=int(mosaic_array.shape[0]),
+                nodata=nodata,
+                dtype=output_dtype,
+            )
+            reserved_output = _resolve_output_path(output_path)
+            with rasterio.open(reserved_output, "w", **profile) as destination:
+                destination.write(mosaic_array)
+    except FileNotFoundError as exc:
+        _cleanup_partial_output(reserved_output)
+        return _tool_failure(
+            tool,
+            ToolError(
+                code="INPUT_NOT_FOUND",
+                message=f"Input raster was not found: {exc}.",
+                details={"path": str(exc)},
+                suggestion="Confirm every raster path exists inside the workspace.",
+            ),
+        )
+    except _KnownRasterFailure as exc:
+        _cleanup_partial_output(reserved_output)
+        return _tool_failure(tool, exc.error)
+    except (MergeError, RasterioError, OSError) as exc:
+        _cleanup_partial_output(reserved_output)
+        return _tool_failure(
+            tool,
+            ToolError(
+                code="RASTER_READ_FAILED",
+                message="Failed to process raster inputs for mosaicking.",
+                details={"reason": str(exc)},
+                suggestion="Confirm the rasters are readable and the output path is writable.",
+            ),
+        )
+
+    return ToolResult.succeeded(
+        tool=tool,
+        summary=f"Mosaicked {len(raster_items)} raster(s).",
+        outputs=[_artifact_for(reserved_output)],
+        metrics={
+            "width": int(mosaic_array.shape[2]),
+            "height": int(mosaic_array.shape[1]),
+            "band_count": int(mosaic_array.shape[0]),
+            "crs": str(first_dataset.crs),
+            "method": method,
+        },
     )
 
 

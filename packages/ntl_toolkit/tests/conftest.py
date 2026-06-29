@@ -31,23 +31,33 @@ def _write_raster(
     values: np.ndarray,
     *,
     transform=None,
-    crs: str = "EPSG:4326",
+    crs: str | CRS | None = "EPSG:4326",
     nodata: float = -9999.0,
 ) -> Path:
     raster_transform = transform or from_origin(0.0, 2.0, 1.0, 1.0)
+    array = np.asarray(values)
+    if array.ndim == 2:
+        band_count = 1
+        height, width = array.shape
+        writer = lambda dataset: dataset.write(array, 1)
+    elif array.ndim == 3:
+        band_count, height, width = array.shape
+        writer = lambda dataset: dataset.write(array)
+    else:
+        raise ValueError("values must be a 2D or 3D array")
     with rasterio.open(
         path,
         "w",
         driver="GTiff",
-        height=int(values.shape[0]),
-        width=int(values.shape[1]),
-        count=1,
-        dtype=str(values.dtype),
+        height=int(height),
+        width=int(width),
+        count=int(band_count),
+        dtype=str(array.dtype),
         crs=crs,
         transform=raster_transform,
         nodata=nodata,
     ) as dataset:
-        dataset.write(values, 1)
+        writer(dataset)
     return path
 
 
@@ -105,9 +115,88 @@ def sample_raster_path(runtime_workspace: Path) -> Path:
 
 
 @pytest.fixture
+def multiband_raster_path(runtime_workspace: Path) -> Path:
+    values = np.array(
+        [
+            [[1.0, 2.0], [3.0, 4.0]],
+            [[10.0, 20.0], [30.0, 40.0]],
+        ],
+        dtype=np.float32,
+    )
+    return _write_raster(runtime_workspace / "inputs" / "multiband.tif", values)
+
+
+@pytest.fixture
+def raster_without_crs_path(runtime_workspace: Path) -> Path:
+    values = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+    return _write_raster(
+        runtime_workspace / "inputs" / "no_crs.tif",
+        values,
+        crs=None,
+    )
+
+
+@pytest.fixture
+def clip_polygon_path(runtime_workspace: Path) -> Path:
+    gdf = gpd.GeoDataFrame(
+        {"name": ["clip"]},
+        geometry=[box(0.0, 1.0, 1.0, 2.0)],
+        crs="EPSG:4326",
+    )
+    return _write_geojson(runtime_workspace / "inputs" / "clip.geojson", gdf)
+
+
+@pytest.fixture
 def matching_raster_path(runtime_workspace: Path) -> Path:
     values = np.array([[10.0, 20.0], [30.0, 40.0]], dtype=np.float32)
     return _write_raster(runtime_workspace / "inputs" / "matching.tif", values)
+
+
+@pytest.fixture
+def adjacent_left_raster_path(runtime_workspace: Path) -> Path:
+    values = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+    return _write_raster(runtime_workspace / "inputs" / "adjacent_left.tif", values)
+
+
+@pytest.fixture
+def adjacent_right_raster_path(runtime_workspace: Path) -> Path:
+    values = np.array([[5.0, 6.0], [7.0, 8.0]], dtype=np.float32)
+    return _write_raster(
+        runtime_workspace / "inputs" / "adjacent_right.tif",
+        values,
+        transform=from_origin(2.0, 2.0, 1.0, 1.0),
+    )
+
+
+@pytest.fixture
+def overlapping_mean_left_raster_path(runtime_workspace: Path) -> Path:
+    values = np.array(
+        [
+            [[1.0, 2.0], [3.0, -9999.0]],
+            [[10.0, 20.0], [30.0, -9999.0]],
+        ],
+        dtype=np.float32,
+    )
+    return _write_raster(
+        runtime_workspace / "inputs" / "overlap_left.tif",
+        values,
+    )
+
+
+@pytest.fixture
+def overlapping_mean_right_raster_path(runtime_workspace: Path) -> Path:
+    values = np.array(
+        [
+            [[100.0, 200.0], [300.0, -9999.0]],
+            [[1000.0, 2000.0], [3000.0, -9999.0]],
+        ],
+        dtype=np.float32,
+    )
+    return _write_raster(
+        runtime_workspace / "inputs" / "overlap_right.tif",
+        values,
+        transform=from_origin(1.0, 2.0, 1.0, 1.0),
+    )
 
 
 @pytest.fixture
@@ -143,6 +232,28 @@ def corrupt_raster_path(runtime_workspace: Path) -> Path:
     path = runtime_workspace / "inputs" / "corrupt.tif"
     path.write_text("not-a-raster", encoding="utf-8")
     return path
+
+
+@pytest.fixture
+def band_mismatch_raster_path(runtime_workspace: Path) -> Path:
+    values = np.array(
+        [
+            [[1.0, 2.0], [3.0, 4.0]],
+            [[5.0, 6.0], [7.0, 8.0]],
+        ],
+        dtype=np.float32,
+    )
+    return _write_raster(runtime_workspace / "inputs" / "band_mismatch.tif", values)
+
+
+@pytest.fixture
+def crs_mismatch_raster_path(runtime_workspace: Path) -> Path:
+    values = np.array([[9.0, 10.0], [11.0, 12.0]], dtype=np.float32)
+    return _write_raster(
+        runtime_workspace / "inputs" / "crs_mismatch.tif",
+        values,
+        crs="EPSG:3857",
+    )
 
 
 @pytest.fixture
