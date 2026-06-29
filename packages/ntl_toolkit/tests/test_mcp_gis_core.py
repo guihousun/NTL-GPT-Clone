@@ -5,6 +5,9 @@ import importlib.util
 import io
 import json
 import os
+import subprocess
+import sys
+import zipfile
 from contextlib import redirect_stdout
 from pathlib import Path
 
@@ -105,8 +108,8 @@ READ_ONLY_TOOLS = {
 }
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 SERVER_FILE = REPO_ROOT / "mcp_servers" / "gis_core_server.py"
-CONDA_EXE = Path(r"C:\Users\27334\miniconda3\Scripts\conda.exe")
 
 
 def _load_server_module():
@@ -138,11 +141,12 @@ def _tool_payloads(server: object) -> list[dict[str, object]]:
 
 def _call_tool(server: object, name: str, arguments: dict[str, object]) -> dict[str, object]:
     result = asyncio.run(server.call_tool(name, arguments))
-    if isinstance(result, tuple):
-        _, structured = result
-        result = structured
-    assert isinstance(result, dict)
-    return result
+    assert isinstance(result, tuple)
+    assert len(result) == 2
+    content, structured = result
+    assert isinstance(content, list)
+    assert isinstance(structured, dict)
+    return structured
 
 
 def test_tool_catalog_annotations_and_input_schemas() -> None:
@@ -237,6 +241,31 @@ def test_validate_environment_reports_missing_dependencies(monkeypatch) -> None:
     assert result["error"]["suggestion"]
 
 
+def test_validate_environment_reports_import_and_os_errors(monkeypatch) -> None:
+    from ntl_toolkit.adapters.mcp import gis_core
+
+    original_import_module = gis_core.importlib.import_module
+
+    def fake_import_module(name: str):
+        if name == "scipy":
+            raise ImportError("scipy ABI mismatch")
+        if name == "rasterio":
+            raise OSError("gdal_data missing")
+        return original_import_module(name)
+
+    monkeypatch.setattr(gis_core.importlib, "import_module", fake_import_module)
+
+    result = gis_core.validate_environment()
+
+    assert result["status"] == "failed"
+    assert result["error"]["code"] == "DEPENDENCY_MISSING"
+    assert result["error"]["details"]["missing"] == ["rasterio", "scipy"]
+    assert result["error"]["details"]["errors"] == {
+        "rasterio": {"type": "OSError", "message": "gdal_data missing"},
+        "scipy": {"type": "ImportError", "message": "scipy ABI mismatch"},
+    }
+
+
 def test_manager_level_inspect_raster_returns_schema_result_and_uses_captured_workdir(
     runtime_workspace: Path,
     monkeypatch,
@@ -316,39 +345,75 @@ def test_server_entrypoint_import_is_quiet_and_main_runs_stdio(monkeypatch) -> N
     module = _load_server_module()
     calls: list[str] = []
 
-    class FakeServer:
-        def run(self, *, transport: str) -> None:
-            calls.append(transport)
+    def fake_main() -> None:
+        calls.append("delegated")
 
-    monkeypatch.setattr(module, "build_gis_core_mcp", lambda: FakeServer())
+    monkeypatch.setattr(module, "package_main", fake_main)
 
     stdout = io.StringIO()
     with redirect_stdout(stdout):
         module.main()
 
     assert stdout.getvalue() == ""
-    assert calls == ["stdio"]
+    assert calls == ["delegated"]
 
 
-def test_stdio_initialize_list_tools_and_list_resources_smoke(
+def test_wheel_contains_capabilities_json_and_console_entrypoint(tmp_path: Path) -> None:
+    wheel_dir = tmp_path / "wheelhouse"
+    wheel_dir.mkdir()
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "wheel",
+            "--no-deps",
+            "--wheel-dir",
+            str(wheel_dir),
+            str(PACKAGE_ROOT),
+        ],
+        cwd=str(PACKAGE_ROOT),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+
+    wheel_paths = sorted(wheel_dir.glob("ntl_toolkit-*.whl"))
+    assert len(wheel_paths) == 1
+
+    with zipfile.ZipFile(wheel_paths[0]) as archive:
+        names = set(archive.namelist())
+        assert "ntl_toolkit/adapters/mcp/gis_capabilities.json" in names
+        entry_points_name = next(
+            name for name in names if name.endswith(".dist-info/entry_points.txt")
+        )
+        entry_points = archive.read(entry_points_name).decode("utf-8")
+
+    assert "[console_scripts]" in entry_points
+    assert "ntl-gis-core = ntl_toolkit.adapters.mcp.gis_core:main" in entry_points
+
+
+def test_stdio_initialize_list_resources_and_call_tools_smoke(
     runtime_workspace: Path,
+    sample_raster_path: Path,
 ) -> None:
-    async def exercise_stdio() -> tuple[dict[str, object], list[str], list[str]]:
+    async def exercise_stdio() -> tuple[
+        dict[str, object],
+        list[str],
+        list[str],
+        dict[str, object],
+        dict[str, object],
+    ]:
         parameters = StdioServerParameters(
-            command=str(CONDA_EXE),
-            args=[
-                "run",
-                "--no-capture-output",
-                "-n",
-                "NTL-GPT-Stable",
-                "python",
-                str(SERVER_FILE),
-            ],
+            command=sys.executable,
+            args=["-m", "ntl_toolkit.adapters.mcp.gis_core"],
             cwd=str(REPO_ROOT),
             env={
                 **os.environ,
                 "NTL_MCP_WORKDIR": str(runtime_workspace),
-                "PYTHONPATH": str(REPO_ROOT / "packages" / "ntl_toolkit" / "src"),
             },
         )
         async with stdio_client(parameters) as (read_stream, write_stream):
@@ -356,13 +421,23 @@ def test_stdio_initialize_list_tools_and_list_resources_smoke(
                 initialized = await session.initialize()
                 tools = await session.list_tools()
                 resources = await session.list_resources()
+                inspect_result = await session.call_tool(
+                    "inspect_raster",
+                    {"path": "inputs/sample.tif"},
+                )
+                invalid_result = await session.call_tool(
+                    "inspect_raster",
+                    {"path": "inputs/sample.tif", "unexpected": True},
+                )
                 return (
                     initialized.model_dump(mode="json"),
                     [tool.name for tool in tools.tools],
                     [str(resource.uri) for resource in resources.resources],
+                    inspect_result.model_dump(mode="json"),
+                    invalid_result.model_dump(mode="json"),
                 )
 
-    initialized, tools, resources = asyncio.run(
+    initialized, tools, resources, inspect_result, invalid_result = asyncio.run(
         asyncio.wait_for(exercise_stdio(), timeout=20)
     )
 
@@ -372,3 +447,15 @@ def test_stdio_initialize_list_tools_and_list_resources_smoke(
         "ntl://gis/capabilities",
         "ntl://schemas/result-v1",
     ]
+    assert inspect_result["isError"] is False
+    assert inspect_result["structuredContent"]["status"] == "succeeded"
+    assert inspect_result["structuredContent"]["metrics"]["path"] == str(
+        sample_raster_path.resolve()
+    )
+    assert invalid_result["isError"] is False
+    assert invalid_result["structuredContent"]["status"] == "failed"
+    assert invalid_result["structuredContent"]["error"]["code"] == "INVALID_PARAMETER"
+    assert invalid_result["structuredContent"]["error"]["details"] == {
+        "unexpected_fields": ["unexpected"],
+        "allowed_fields": ["path", "mode", "sample_pixels"],
+    }

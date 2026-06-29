@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import inspect
 import importlib
 import json
 from pathlib import Path
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
-from mcp.types import ToolAnnotations
+from mcp.types import TextContent, Tool, ToolAnnotations
 
 from ntl_toolkit.core import ntl as ntl_core
 from ntl_toolkit.core import raster as raster_core
@@ -43,6 +44,71 @@ _WRITE_NEW = ToolAnnotations(
 )
 
 
+class StrictFastMCP(FastMCP):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._allowed_fields_by_tool: dict[str, list[str]] = {}
+
+    def add_tool(
+        self,
+        fn: Any,
+        name: str | None = None,
+        title: str | None = None,
+        description: str | None = None,
+        annotations: ToolAnnotations | None = None,
+        icons: list[Any] | None = None,
+        meta: dict[str, Any] | None = None,
+        structured_output: bool | None = None,
+    ) -> None:
+        tool_name = name or fn.__name__
+        parameters = inspect.signature(fn).parameters
+        self._allowed_fields_by_tool[tool_name] = [parameter.name for parameter in parameters.values()]
+        super().add_tool(
+            fn,
+            name=name,
+            title=title,
+            description=description,
+            annotations=annotations,
+            icons=icons,
+            meta=meta,
+            structured_output=structured_output,
+        )
+
+    async def list_tools(self) -> list[Tool]:
+        tools = await super().list_tools()
+        sealed_tools: list[Tool] = []
+        for tool in tools:
+            input_schema = dict(tool.inputSchema)
+            input_schema["additionalProperties"] = False
+            sealed_tools.append(
+                Tool.model_validate(
+                    {
+                        **tool.model_dump(mode="python"),
+                        "inputSchema": input_schema,
+                    }
+                )
+            )
+        return sealed_tools
+
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
+        allowed_fields = self._allowed_fields_by_tool.get(name)
+        if allowed_fields is not None:
+            unexpected_fields = sorted(
+                field for field in arguments if field not in allowed_fields
+            )
+            if unexpected_fields:
+                payload = _invalid_fields_payload(
+                    tool=name,
+                    unexpected_fields=unexpected_fields,
+                    allowed_fields=allowed_fields,
+                )
+                return (
+                    [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))],
+                    payload,
+                )
+        return await super().call_tool(name, arguments)
+
+
 def _payload(result: ToolResult) -> dict[str, Any]:
     return result.model_dump(mode="json")
 
@@ -67,6 +133,28 @@ def _invalid_parameter(
                 suggestion=(
                     "Use an ordinary relative path or a fully qualified absolute Windows path."
                 ),
+            ),
+        )
+    )
+
+
+def _invalid_fields_payload(
+    *,
+    tool: str,
+    unexpected_fields: list[str],
+    allowed_fields: list[str],
+) -> dict[str, Any]:
+    return _payload(
+        ToolResult.failed(
+            tool=tool,
+            error=ToolError(
+                code="INVALID_PARAMETER",
+                message="Unexpected tool arguments were provided.",
+                details={
+                    "unexpected_fields": unexpected_fields,
+                    "allowed_fields": allowed_fields,
+                },
+                suggestion="Remove unsupported fields and retry with only the documented tool parameters.",
             ),
         )
     )
@@ -108,12 +196,17 @@ def validate_environment() -> dict[str, Any]:
     """Report whether the required local GIS dependencies are importable."""
     versions: dict[str, str] = {}
     missing: list[str] = []
+    errors: dict[str, dict[str, str]] = {}
 
     for module_name in _DEPENDENCIES:
         try:
             module = importlib.import_module(module_name)
-        except ModuleNotFoundError:
+        except (ImportError, OSError) as exc:
             missing.append(module_name)
+            errors[module_name] = {
+                "type": type(exc).__name__,
+                "message": str(exc),
+            }
             continue
         versions[module_name] = str(getattr(module, "__version__", "unknown"))
 
@@ -127,6 +220,7 @@ def validate_environment() -> dict[str, Any]:
                     details={
                         "missing": missing,
                         "available_versions": versions,
+                        "errors": errors,
                     },
                     suggestion=(
                         "Install the missing packages in the active runtime environment "
@@ -145,16 +239,11 @@ def validate_environment() -> dict[str, Any]:
     )
 
 
-def _forbid_extra_parameters(mcp: FastMCP, tool_name: str) -> None:
-    tool = mcp._tool_manager._tools[tool_name]
-    tool.parameters["additionalProperties"] = False
-
-
 def build_gis_core_mcp() -> FastMCP:
     """Build the local GIS MCP server with fixed tools and resources."""
     load_runtime_environment()
     captured_workdir = runtime_workdir()
-    mcp = FastMCP("ntl-gis-core", instructions=_SERVER_INSTRUCTIONS)
+    mcp = StrictFastMCP("ntl-gis-core", instructions=_SERVER_INSTRUCTIONS)
 
     @mcp.resource(
         "ntl://gis/capabilities",
@@ -739,23 +828,6 @@ def build_gis_core_mcp() -> FastMCP:
             )
         )
 
-    _forbid_extra_parameters(mcp, "validate_environment")
-    _forbid_extra_parameters(mcp, "inspect_vector")
-    _forbid_extra_parameters(mcp, "inspect_raster")
-    _forbid_extra_parameters(mcp, "filter_points_by_polygon")
-    _forbid_extra_parameters(mcp, "spatial_join_points_to_admin")
-    _forbid_extra_parameters(mcp, "buffer_points_aeqd")
-    _forbid_extra_parameters(mcp, "dissolve_intersections")
-    _forbid_extra_parameters(mcp, "clip_raster")
-    _forbid_extra_parameters(mcp, "reproject_raster")
-    _forbid_extra_parameters(mcp, "mosaic_rasters")
-    _forbid_extra_parameters(mcp, "calculate_zonal_statistics")
-    _forbid_extra_parameters(mcp, "calculate_ntl_metrics")
-    _forbid_extra_parameters(mcp, "composite_ntl_rasters")
-    _forbid_extra_parameters(mcp, "analyze_ntl_trend")
-    _forbid_extra_parameters(mcp, "detect_ntl_anomaly")
-    _forbid_extra_parameters(mcp, "validate_geodata")
-
     return mcp
 
 
@@ -763,3 +835,11 @@ class _ResolvedPathError(Exception):
     def __init__(self, payload: dict[str, Any]) -> None:
         super().__init__("invalid path")
         self.payload = payload
+
+
+def main() -> None:
+    build_gis_core_mcp().run(transport="stdio")
+
+
+if __name__ == "__main__":
+    main()
