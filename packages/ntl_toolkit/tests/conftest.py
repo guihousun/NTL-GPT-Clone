@@ -278,6 +278,100 @@ def noisy_transform_raster_path(runtime_workspace: Path) -> Path:
 
 
 @pytest.fixture
+def composite_series_raster_paths(runtime_workspace: Path) -> list[Path]:
+    first = _write_raster(
+        runtime_workspace / "inputs" / "composite_01.tif",
+        np.array([[1.0, -9999.0], [3.0, -9999.0]], dtype=np.float32),
+    )
+    second = _write_raster(
+        runtime_workspace / "inputs" / "composite_02.tif",
+        np.array([[3.0, 5.0], [-9999.0, -9999.0]], dtype=np.float32),
+    )
+    return [first, second]
+
+
+@pytest.fixture
+def trend_series_raster_paths(runtime_workspace: Path) -> list[Path]:
+    rasters: list[Path] = []
+    for index, values in enumerate(
+        [
+            np.array([[100.0, 200.0], [10.0, 5.0]], dtype=np.float32),
+            np.array([[110.0, 220.0], [20.0, 5.0]], dtype=np.float32),
+            np.array([[120.0, 240.0], [30.0, 5.0]], dtype=np.float32),
+        ],
+        start=1,
+    ):
+        rasters.append(
+            _write_raster(
+                runtime_workspace / "inputs" / f"trend_{index:02d}.tif",
+                values,
+            )
+        )
+    return rasters
+
+
+@pytest.fixture
+def trend_two_step_raster_paths(runtime_workspace: Path) -> list[Path]:
+    rasters: list[Path] = []
+    for index, values in enumerate(
+        [
+            np.array([[50.0, 60.0], [2.0, 7.0]], dtype=np.float32),
+            np.array([[55.0, 65.0], [5.0, 7.0]], dtype=np.float32),
+        ],
+        start=1,
+    ):
+        rasters.append(
+            _write_raster(
+                runtime_workspace / "inputs" / f"trend_two_step_{index:02d}.tif",
+                values,
+            )
+        )
+    return rasters
+
+
+@pytest.fixture
+def anomaly_latest_spike_raster_paths(runtime_workspace: Path) -> list[Path]:
+    rasters: list[Path] = []
+    for index, values in enumerate(
+        [
+            np.array([[1.0, 1.0], [1.0, -9999.0]], dtype=np.float32),
+            np.array([[1.0, 1.0], [1.0, -9999.0]], dtype=np.float32),
+            np.array([[1.0, 1.0], [1.0, -9999.0]], dtype=np.float32),
+            np.array([[10.0, 1.0], [0.0, -9999.0]], dtype=np.float32),
+        ],
+        start=1,
+    ):
+        rasters.append(
+            _write_raster(
+                runtime_workspace / "inputs" / f"anomaly_latest_{index:02d}.tif",
+                values,
+            )
+        )
+    return rasters
+
+
+@pytest.fixture
+def anomaly_sparse_baseline_raster_paths(runtime_workspace: Path) -> list[Path]:
+    rasters: list[Path] = []
+    for index, values in enumerate(
+        [
+            np.array([[1.0, -9999.0], [1.0, -9999.0]], dtype=np.float32),
+            np.array([[1.0, 1.0], [1.0, -9999.0]], dtype=np.float32),
+            np.array([[1.0, 1.0], [1.0, -9999.0]], dtype=np.float32),
+            np.array([[5.0, 5.0], [1.0, -9999.0]], dtype=np.float32),
+        ],
+        start=1,
+    ):
+        rasters.append(
+            _write_raster(
+                runtime_workspace / "inputs" / f"anomaly_sparse_{index:02d}.tif",
+                values,
+            )
+        )
+    return rasters
+
+
+@pytest.fixture
 def corrupt_raster_path(runtime_workspace: Path) -> Path:
     path = runtime_workspace / "inputs" / "corrupt.tif"
     path.write_text("not-a-raster", encoding="utf-8")

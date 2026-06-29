@@ -70,6 +70,9 @@ def test_ntl_module_exports_required_public_callables() -> None:
         "calculate_ntl_metrics",
         "calculate_ntl_metrics_for_raster",
         "calculate_zonal_statistics",
+        "composite_ntl_rasters",
+        "analyze_ntl_trend",
+        "detect_ntl_anomaly",
     ]:
         assert hasattr(module, name), f"ntl_toolkit.core.ntl missing {name}"
 
@@ -577,3 +580,463 @@ def test_calculate_zonal_statistics_reports_invalid_raster_transform_without_wri
     assert "Affine" in result.error.details["transform"]
     assert result.error.suggestion is not None
     assert not (runtime_workspace / output_path).exists()
+
+
+def test_composite_ntl_rasters_writes_mean_composite_with_mask_and_metrics(
+    composite_series_raster_paths: list[Path],
+    runtime_workspace: Path,
+) -> None:
+    output_path = Path("outputs") / "composite_mean.tif"
+
+    result = _ntl_module().composite_ntl_rasters(
+        composite_series_raster_paths,
+        output_path,
+    )
+
+    assert result.status == "succeeded"
+    assert result.tool == "composite_ntl_rasters"
+    assert len(result.outputs) == 1
+    assert result.outputs[0].path == str((runtime_workspace / output_path).resolve(strict=False))
+    assert result.outputs[0].media_type == "image/tiff"
+    assert result.outputs[0].role == "composite"
+    assert result.metrics == {
+        "input_count": 2,
+        "valid_pixel_count": 3,
+        "coverage": pytest.approx(0.75),
+        "method": "mean",
+    }
+
+    with rasterio.open(runtime_workspace / output_path) as dataset:
+        assert dataset.dtypes == ("float32",)
+        assert dataset.nodata == pytest.approx(-9999.0)
+        assert dataset.read(1).tolist() == [[2.0, 5.0], [3.0, -9999.0]]
+        masked = dataset.read(1, masked=True)
+        assert masked.mask.tolist() == [[False, False], [False, True]]
+        assert dataset.dataset_mask().tolist() == [[255, 255], [255, 0]]
+
+
+def test_composite_ntl_rasters_returns_fractional_mean_without_mutating_inputs(
+    uint8_mean_left_raster_path: Path,
+    uint8_mean_right_raster_path: Path,
+    runtime_workspace: Path,
+) -> None:
+    raster_paths = [uint8_mean_left_raster_path, uint8_mean_right_raster_path]
+    original_paths = list(raster_paths)
+    output_path = Path("outputs") / "composite_fractional.tif"
+
+    result = _ntl_module().composite_ntl_rasters(
+        raster_paths,
+        output_path,
+    )
+
+    assert result.status == "succeeded"
+    assert raster_paths == original_paths
+
+    with rasterio.open(runtime_workspace / output_path) as dataset:
+        assert dataset.read(1).tolist() == [[1.5]]
+        assert dataset.nodata == pytest.approx(255.0)
+
+
+@pytest.mark.parametrize(
+    ("raster_paths", "output_path", "method", "expected_code"),
+    [
+        ([], Path("outputs") / "empty.tif", "mean", "INVALID_PARAMETER"),
+        (["C:partial\\input.tif"], Path("outputs") / "partial_input.tif", "mean", "INVALID_PARAMETER"),
+        ([Path("inputs") / "missing.tif"], Path("outputs") / "missing.tif", "mean", "INPUT_NOT_FOUND"),
+        (["sample_raster_path", "shifted_raster_path"], Path("outputs") / "grid.tif", "mean", "GRID_MISMATCH"),
+        (["sample_raster_path"], "C:partial\\output.tif", "mean", "INVALID_PARAMETER"),
+        (["sample_raster_path"], Path("outputs") / "unsupported.tif", "median", "UNSUPPORTED_METHOD"),
+    ],
+)
+def test_composite_ntl_rasters_reports_stable_failures(
+    request: pytest.FixtureRequest,
+    raster_paths: list[object],
+    output_path: object,
+    method: str,
+    expected_code: str,
+) -> None:
+    resolved_paths = [
+        request.getfixturevalue(path) if isinstance(path, str) and path.endswith(("_path", "_paths")) else path
+        for path in raster_paths
+    ]
+
+    result = _ntl_module().composite_ntl_rasters(
+        resolved_paths,
+        output_path,
+        method=method,
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == expected_code
+
+
+def test_composite_ntl_rasters_reserves_output_collision_without_overwriting(
+    composite_series_raster_paths: list[Path],
+    runtime_workspace: Path,
+) -> None:
+    requested = runtime_workspace / "outputs" / "composite_existing.tif"
+    requested.write_bytes(b"sentinel")
+
+    result = _ntl_module().composite_ntl_rasters(
+        composite_series_raster_paths,
+        Path("outputs") / "composite_existing.tif",
+    )
+
+    assert result.status == "succeeded"
+    assert requested.read_bytes() == b"sentinel"
+    assert result.outputs[0].path.endswith("composite_existing_001.tif")
+
+
+def test_composite_ntl_rasters_cleans_up_partial_output_on_write_failure(
+    composite_series_raster_paths: list[Path],
+    runtime_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _ntl_module()
+    reserved = (runtime_workspace / "outputs" / "composite_partial.tif").resolve(strict=False)
+    real_open = module.rasterio.open
+
+    def failing_open(path, *args, **kwargs):  # noqa: ANN001
+        mode = args[0] if args else kwargs.get("mode", "r")
+        if mode == "w":
+            Path(path).write_bytes(b"partial")
+            raise OSError("disk full")
+        return real_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(module.rasterio, "open", failing_open)
+
+    result = module.composite_ntl_rasters(
+        composite_series_raster_paths,
+        Path("outputs") / "composite_partial.tif",
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "OUTPUT_WRITE_FAILED"
+    assert not reserved.exists()
+    assert not Path(f"{reserved}.aux.xml").exists()
+
+
+def test_analyze_ntl_trend_writes_slope_and_pvalue_rasters_for_union_roi(
+    trend_series_raster_paths: list[Path],
+    admin_polygons_path: Path,
+    runtime_workspace: Path,
+) -> None:
+    output_prefix = Path("outputs") / "trend_roi"
+
+    result = _ntl_module().analyze_ntl_trend(
+        trend_series_raster_paths,
+        admin_polygons_path,
+        output_prefix,
+    )
+
+    slope_path = runtime_workspace / "outputs" / "trend_roi_slope_trend.tif"
+    pvalue_path = runtime_workspace / "outputs" / "trend_roi_pvalue_map.tif"
+
+    assert result.status == "succeeded"
+    assert result.tool == "analyze_ntl_trend"
+    assert [artifact.role for artifact in result.outputs] == ["slope", "pvalue"]
+    assert [artifact.path for artifact in result.outputs] == [
+        str(slope_path.resolve(strict=False)),
+        str(pvalue_path.resolve(strict=False)),
+    ]
+    assert result.metrics["raster_count"] == 3
+    assert result.metrics["analyzed_pixel_count"] == 1
+    assert result.metrics["minimum_observations"] == 2
+
+    with rasterio.open(slope_path) as slope_dataset:
+        masked = slope_dataset.read(1, masked=True)
+        assert slope_dataset.height == 1
+        assert slope_dataset.width == 2
+        assert str(slope_dataset.crs) == "EPSG:4326"
+        assert np.isnan(slope_dataset.nodata)
+        assert masked.shape == (1, 2)
+        assert masked[0, 0] == pytest.approx(10.0)
+        assert bool(masked.mask[0, 0]) is False
+        assert bool(masked.mask[0, 1]) is True
+
+    with rasterio.open(pvalue_path) as pvalue_dataset:
+        masked = pvalue_dataset.read(1, masked=True)
+        assert masked.shape == (1, 2)
+        assert 0.0 <= float(masked[0, 0]) <= 1.0
+        assert bool(masked.mask[0, 0]) is False
+        assert bool(masked.mask[0, 1]) is True
+
+
+def test_analyze_ntl_trend_accepts_two_step_series_when_pixel_has_two_observations(
+    trend_two_step_raster_paths: list[Path],
+    admin_polygons_path: Path,
+    runtime_workspace: Path,
+) -> None:
+    result = _ntl_module().analyze_ntl_trend(
+        trend_two_step_raster_paths,
+        admin_polygons_path,
+        Path("outputs") / "trend_two_step",
+    )
+
+    assert result.status == "succeeded"
+    assert result.metrics["raster_count"] == 2
+    assert result.metrics["analyzed_pixel_count"] == 1
+
+    with rasterio.open(runtime_workspace / "outputs" / "trend_two_step_slope_trend.tif") as dataset:
+        masked = dataset.read(1, masked=True)
+        assert masked.shape == (1, 2)
+        assert masked[0, 0] == pytest.approx(3.0)
+        assert bool(masked.mask[0, 1]) is True
+
+
+@pytest.mark.parametrize(
+    ("raster_paths", "vector_path", "output_prefix", "expected_code"),
+    [
+        ([], "admin_polygons_path", Path("outputs") / "trend_empty", "INVALID_PARAMETER"),
+        (["sample_raster_path"], "admin_polygons_path", Path("outputs") / "trend_short", "INVALID_PARAMETER"),
+        (["trend_series_raster_paths"], "far_vector_path", Path("outputs") / "trend_far", "NO_SPATIAL_OVERLAP"),
+        (["trend_series_raster_paths"], "invalid_vector_path", Path("outputs") / "trend_invalid", "INVALID_GEOMETRY"),
+        (["matching_raster_path", "crs_mismatch_raster_path"], "admin_polygons_path", Path("outputs") / "trend_grid", "GRID_MISMATCH"),
+        (["trend_series_raster_paths"], "admin_polygons_path", "C:partial\\trend", "INVALID_PARAMETER"),
+    ],
+)
+def test_analyze_ntl_trend_reports_stable_failures(
+    request: pytest.FixtureRequest,
+    raster_paths: list[object],
+    vector_path: str,
+    output_prefix: object,
+    expected_code: str,
+) -> None:
+    resolved_paths: list[object] = []
+    for item in raster_paths:
+        value = request.getfixturevalue(item) if isinstance(item, str) and item.endswith(("_path", "_paths")) else item
+        if isinstance(value, list):
+            resolved_paths.extend(value)
+        else:
+            resolved_paths.append(value)
+
+    result = _ntl_module().analyze_ntl_trend(
+        resolved_paths,
+        request.getfixturevalue(vector_path),
+        output_prefix,
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == expected_code
+
+
+def test_analyze_ntl_trend_reserves_collisions_independently(
+    trend_series_raster_paths: list[Path],
+    admin_polygons_path: Path,
+    runtime_workspace: Path,
+) -> None:
+    requested_slope = runtime_workspace / "outputs" / "trend_existing_slope_trend.tif"
+    requested_slope.write_bytes(b"sentinel")
+
+    result = _ntl_module().analyze_ntl_trend(
+        trend_series_raster_paths,
+        admin_polygons_path,
+        Path("outputs") / "trend_existing",
+    )
+
+    assert result.status == "succeeded"
+    assert requested_slope.read_bytes() == b"sentinel"
+    assert result.outputs[0].path.endswith("trend_existing_slope_trend_001.tif")
+    assert result.outputs[1].path.endswith("trend_existing_pvalue_map.tif")
+
+
+def test_analyze_ntl_trend_cleans_up_all_new_outputs_on_partial_write_failure(
+    trend_series_raster_paths: list[Path],
+    admin_polygons_path: Path,
+    runtime_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _ntl_module()
+    slope_path = (runtime_workspace / "outputs" / "trend_partial_slope_trend.tif").resolve(strict=False)
+    pvalue_path = (runtime_workspace / "outputs" / "trend_partial_pvalue_map.tif").resolve(strict=False)
+    real_open = module.rasterio.open
+    write_calls = 0
+
+    def failing_open(path, *args, **kwargs):  # noqa: ANN001
+        nonlocal write_calls
+        mode = args[0] if args else kwargs.get("mode", "r")
+        if mode == "w":
+            write_calls += 1
+            if write_calls == 2:
+                Path(path).write_bytes(b"partial")
+                raise OSError("disk full")
+        return real_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(module.rasterio, "open", failing_open)
+
+    result = module.analyze_ntl_trend(
+        trend_series_raster_paths,
+        admin_polygons_path,
+        Path("outputs") / "trend_partial",
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "OUTPUT_WRITE_FAILED"
+    assert not slope_path.exists()
+    assert not pvalue_path.exists()
+
+
+def test_detect_ntl_anomaly_marks_only_positive_latest_spike_and_writes_valid_mask(
+    anomaly_latest_spike_raster_paths: list[Path],
+    runtime_workspace: Path,
+) -> None:
+    output_path = Path("outputs") / "anomaly_latest.tif"
+
+    result = _ntl_module().detect_ntl_anomaly(
+        anomaly_latest_spike_raster_paths,
+        output_path,
+    )
+
+    assert result.status == "succeeded"
+    assert result.tool == "detect_ntl_anomaly"
+    assert len(result.outputs) == 1
+    assert result.outputs[0].role == "anomaly"
+    assert result.metrics == {
+        "target_index": 3,
+        "k_sigma": 3.0,
+        "raster_count": 4,
+        "baseline_count": 3,
+        "anomaly_pixel_count": 1,
+        "valid_pixel_count": 3,
+    }
+
+    with rasterio.open(runtime_workspace / output_path) as dataset:
+        assert dataset.dtypes == ("uint8",)
+        assert dataset.nodata is None
+        assert dataset.read(1).tolist() == [[1, 0], [0, 0]]
+        assert dataset.dataset_mask().tolist() == [[255, 255], [255, 0]]
+
+
+def test_detect_ntl_anomaly_supports_explicit_target_index(
+    runtime_workspace: Path,
+) -> None:
+    raster_paths = [
+        _write_raster(runtime_workspace / "inputs" / "anomaly_explicit_01.tif", np.array([[1.0, 1.0]], dtype=np.float32)),
+        _write_raster(runtime_workspace / "inputs" / "anomaly_explicit_02.tif", np.array([[1.0, 1.0]], dtype=np.float32)),
+        _write_raster(runtime_workspace / "inputs" / "anomaly_explicit_03.tif", np.array([[8.0, 1.0]], dtype=np.float32)),
+        _write_raster(runtime_workspace / "inputs" / "anomaly_explicit_04.tif", np.array([[1.0, 1.0]], dtype=np.float32)),
+    ]
+
+    result = _ntl_module().detect_ntl_anomaly(
+        raster_paths,
+        Path("outputs") / "anomaly_explicit.tif",
+        target_index=2,
+    )
+
+    assert result.status == "succeeded"
+    assert result.metrics["target_index"] == 2
+
+    with rasterio.open(runtime_workspace / "outputs" / "anomaly_explicit.tif") as dataset:
+        assert dataset.read(1).tolist() == [[1, 0]]
+
+
+def test_detect_ntl_anomaly_masks_pixels_without_three_baseline_observations(
+    anomaly_sparse_baseline_raster_paths: list[Path],
+    runtime_workspace: Path,
+) -> None:
+    result = _ntl_module().detect_ntl_anomaly(
+        anomaly_sparse_baseline_raster_paths,
+        Path("outputs") / "anomaly_sparse.tif",
+    )
+
+    assert result.status == "succeeded"
+    assert result.metrics["valid_pixel_count"] == 2
+    assert result.metrics["anomaly_pixel_count"] == 1
+
+    with rasterio.open(runtime_workspace / "outputs" / "anomaly_sparse.tif") as dataset:
+        assert dataset.read(1).tolist() == [[1, 0], [0, 0]]
+        assert dataset.dataset_mask().tolist() == [[255, 0], [255, 0]]
+
+
+@pytest.mark.parametrize(
+    ("raster_paths", "output_path", "target_index", "k_sigma", "expected_code"),
+    [
+        (["sample_raster_path", "matching_raster_path", "shifted_raster_path"], Path("outputs") / "anomaly_short.tif", None, 3.0, "INVALID_PARAMETER"),
+        (["anomaly_latest_spike_raster_paths"], Path("outputs") / "anomaly_bool.tif", True, 3.0, "INVALID_PARAMETER"),
+        (["anomaly_latest_spike_raster_paths"], Path("outputs") / "anomaly_range.tif", 4, 3.0, "INVALID_PARAMETER"),
+        (["anomaly_latest_spike_raster_paths"], Path("outputs") / "anomaly_sigma.tif", None, 0.0, "INVALID_PARAMETER"),
+        (["anomaly_latest_spike_raster_paths"], Path("outputs") / "anomaly_grid.tif", None, 3.0, "GRID_MISMATCH"),
+        (["anomaly_latest_spike_raster_paths"], "C:partial\\anomaly.tif", None, 3.0, "INVALID_PARAMETER"),
+    ],
+)
+def test_detect_ntl_anomaly_reports_stable_failures(
+    request: pytest.FixtureRequest,
+    raster_paths: list[object],
+    output_path: object,
+    target_index: object,
+    k_sigma: float,
+    expected_code: str,
+) -> None:
+    resolved_paths: list[object] = []
+    for item in raster_paths:
+        value = request.getfixturevalue(item) if isinstance(item, str) and item.endswith(("_path", "_paths")) else item
+        if isinstance(value, list):
+            resolved_paths.extend(value)
+        else:
+            resolved_paths.append(value)
+    if expected_code == "GRID_MISMATCH":
+        resolved_paths[-1] = request.getfixturevalue("shifted_raster_path")
+
+    result = _ntl_module().detect_ntl_anomaly(
+        resolved_paths,
+        output_path,
+        target_index=target_index,
+        k_sigma=k_sigma,
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == expected_code
+
+
+def test_detect_ntl_anomaly_reserves_output_collision_without_overwriting(
+    anomaly_latest_spike_raster_paths: list[Path],
+    runtime_workspace: Path,
+) -> None:
+    raster_paths = list(anomaly_latest_spike_raster_paths)
+    original_paths = list(raster_paths)
+    requested = runtime_workspace / "outputs" / "anomaly_existing.tif"
+    requested.write_bytes(b"sentinel")
+
+    result = _ntl_module().detect_ntl_anomaly(
+        raster_paths,
+        Path("outputs") / "anomaly_existing.tif",
+    )
+
+    assert result.status == "succeeded"
+    assert requested.read_bytes() == b"sentinel"
+    assert result.outputs[0].path.endswith("anomaly_existing_001.tif")
+    assert raster_paths == original_paths
+
+
+def test_detect_ntl_anomaly_cleans_up_partial_output_on_write_failure(
+    anomaly_latest_spike_raster_paths: list[Path],
+    runtime_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _ntl_module()
+    reserved = (runtime_workspace / "outputs" / "anomaly_partial.tif").resolve(strict=False)
+    real_open = module.rasterio.open
+
+    def failing_open(path, *args, **kwargs):  # noqa: ANN001
+        mode = args[0] if args else kwargs.get("mode", "r")
+        if mode == "w":
+            Path(path).write_bytes(b"partial")
+            raise OSError("disk full")
+        return real_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(module.rasterio, "open", failing_open)
+
+    result = module.detect_ntl_anomaly(
+        anomaly_latest_spike_raster_paths,
+        Path("outputs") / "anomaly_partial.tif",
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "OUTPUT_WRITE_FAILED"
+    assert not reserved.exists()

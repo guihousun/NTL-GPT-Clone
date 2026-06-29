@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import re
 import warnings
+from contextlib import ExitStack
 from collections.abc import Sequence
-from numbers import Integral
+from numbers import Integral, Real
 from pathlib import Path
 from typing import Any
 
@@ -13,8 +14,9 @@ import pandas as pd
 import rasterio
 from affine import TransformNotInvertibleError
 from rasterio.errors import RasterioError
-from rasterio.mask import raster_geometry_mask
+from rasterio.mask import mask, raster_geometry_mask
 from scipy import ndimage
+from scipy.stats import kendalltau, theilslopes
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
 
@@ -39,6 +41,10 @@ _METRIC_ORDER = (
 )
 _RASTER_TOOL = "calculate_ntl_metrics_for_raster"
 _ZONAL_TOOL = "calculate_zonal_statistics"
+_COMPOSITE_TOOL = "composite_ntl_rasters"
+_TREND_TOOL = "analyze_ntl_trend"
+_ANOMALY_TOOL = "detect_ntl_anomaly"
+_GRID_TOLERANCE = 1e-15
 
 
 class _KnownNTLFailure(Exception):
@@ -230,7 +236,7 @@ def _read_raster_band(
                 details={"parameter": "band", "value": band, "band_count": dataset.count},
             )
 
-        masked = dataset.read(band, masked=True)
+        masked = dataset.read(band, masked=True).astype(float)
         array = np.asarray(masked.filled(np.nan), dtype=float)
         array[~np.isfinite(array)] = np.nan
         if dataset.crs.is_geographic:
@@ -631,4 +637,595 @@ def calculate_zonal_statistics(
             "only_global": only_global_value,
         },
         warnings=warnings,
+    )
+
+
+def _artifact_for_raster(path: Path, *, role: str) -> OutputArtifact:
+    return OutputArtifact(path=str(path), media_type="image/tiff", role=role)
+
+
+def _cleanup_output_path(path: Path | None) -> None:
+    if path is None:
+        return
+
+    related_paths = (
+        path,
+        Path(f"{path}.aux.xml"),
+        Path(f"{path}.msk"),
+        Path(f"{path}.ovr"),
+    )
+    for candidate in related_paths:
+        try:
+            if candidate.exists():
+                candidate.unlink()
+        except OSError:
+            continue
+
+
+def _cleanup_output_paths(paths: Sequence[Path | None]) -> None:
+    for path in paths:
+        _cleanup_output_path(path)
+
+
+def _resolve_tool_output_prefix(path: str | Path, *, parameter: str) -> Path:
+    try:
+        return resolve_local_path(path, runtime_workdir())
+    except ValueError as exc:
+        _fail(
+            "INVALID_PARAMETER",
+            f"Invalid path for '{parameter}'.",
+            details={"parameter": parameter, "path": str(path), "reason": str(exc)},
+            suggestion="Use an ordinary relative path or a fully qualified absolute Windows path.",
+        )
+
+
+def _normalize_raster_path_list(
+    raster_paths: Sequence[str | Path],
+    *,
+    minimum_count: int,
+) -> list[Path]:
+    if isinstance(raster_paths, (str, bytes)):
+        _fail(
+            "INVALID_PARAMETER",
+            "raster_paths must be a non-empty sequence.",
+            details={"parameter": "raster_paths"},
+        )
+
+    path_list = list(raster_paths)
+    if len(path_list) < minimum_count:
+        _fail(
+            "INVALID_PARAMETER",
+            f"raster_paths must contain at least {minimum_count} raster path(s).",
+            details={
+                "parameter": "raster_paths",
+                "minimum_count": minimum_count,
+                "count": len(path_list),
+            },
+        )
+
+    return [
+        _resolve_tool_input_path(path, parameter="raster_paths")
+        for path in path_list
+    ]
+
+
+def _normalize_composite_method(method: Any) -> str:
+    if method != "mean":
+        _fail(
+            "UNSUPPORTED_METHOD",
+            "method must be 'mean'.",
+            details={"parameter": "method", "value": method},
+        )
+    return "mean"
+
+
+def _normalize_target_index(value: Any, *, raster_count: int) -> int:
+    if value is None:
+        return raster_count - 1
+    if isinstance(value, bool) or not isinstance(value, Integral):
+        _fail(
+            "INVALID_PARAMETER",
+            "target_index must be an integer between 0 and the final raster index.",
+            details={"parameter": "target_index", "value": value},
+        )
+
+    normalized = int(value)
+    if normalized < 0 or normalized >= raster_count:
+        _fail(
+            "INVALID_PARAMETER",
+            "target_index must be an integer between 0 and the final raster index.",
+            details={
+                "parameter": "target_index",
+                "value": normalized,
+                "raster_count": raster_count,
+            },
+        )
+    return normalized
+
+
+def _normalize_k_sigma(value: Any) -> float:
+    if isinstance(value, bool) or not isinstance(value, Real):
+        _fail(
+            "INVALID_PARAMETER",
+            "k_sigma must be a finite number greater than zero.",
+            details={"parameter": "k_sigma", "value": value},
+        )
+
+    normalized = float(value)
+    if not np.isfinite(normalized) or normalized <= 0.0:
+        _fail(
+            "INVALID_PARAMETER",
+            "k_sigma must be a finite number greater than zero.",
+            details={"parameter": "k_sigma", "value": normalized},
+        )
+    return normalized
+
+
+def _open_validated_raster(path: Path) -> rasterio.io.DatasetReader:
+    try:
+        dataset = rasterio.open(path)
+    except RasterioError as exc:
+        _fail(
+            "RASTER_READ_FAILED",
+            f"Unable to read raster '{path}'.",
+            details={"path": str(path), "reason": str(exc)},
+        )
+
+    try:
+        _validate_raster_transform(dataset, path=path)
+        if dataset.crs is None:
+            _fail(
+                "CRS_MISSING",
+                f"Raster dataset '{path}' does not define a CRS.",
+                details={"path": str(path)},
+            )
+        if dataset.count < 1:
+            _fail(
+                "RASTER_READ_FAILED",
+                f"Raster dataset '{path}' does not contain band 1.",
+                details={"path": str(path), "band_count": int(dataset.count)},
+            )
+        return dataset
+    except Exception:
+        dataset.close()
+        raise
+
+
+def _crs_equal(left: Any, right: Any) -> bool:
+    if left is None or right is None:
+        return False
+    return bool(left == right)
+
+
+def _transforms_equal(left: Any, right: Any) -> bool:
+    return left.almost_equals(right, precision=_GRID_TOLERANCE)
+
+
+def _validate_aligned_raster_datasets(
+    datasets: Sequence[rasterio.io.DatasetReader],
+    paths: Sequence[Path],
+) -> None:
+    reference = datasets[0]
+    reference_path = paths[0]
+    for dataset, path in zip(datasets[1:], paths[1:]):
+        if (
+            not _crs_equal(reference.crs, dataset.crs)
+            or reference.width != dataset.width
+            or reference.height != dataset.height
+            or not _transforms_equal(reference.transform, dataset.transform)
+        ):
+            _fail(
+                "GRID_MISMATCH",
+                "Raster inputs must share the same CRS, dimensions, and affine grid.",
+                details={
+                    "reference_path": str(reference_path),
+                    "path": str(path),
+                    "reference_crs": str(reference.crs),
+                    "crs": str(dataset.crs),
+                    "reference_width": int(reference.width),
+                    "width": int(dataset.width),
+                    "reference_height": int(reference.height),
+                    "height": int(dataset.height),
+                    "reference_transform": repr(reference.transform),
+                    "transform": repr(dataset.transform),
+                },
+            )
+
+
+def _load_aligned_raster_arrays(
+    resolved_paths: Sequence[Path],
+) -> tuple[list[np.ndarray], dict[str, Any], float | None]:
+    arrays: list[np.ndarray] = []
+    datasets: list[rasterio.io.DatasetReader] = []
+    try:
+        for path in resolved_paths:
+            array, dataset, _ = _read_raster_band(path, band=1)
+            arrays.append(array)
+            datasets.append(dataset)
+        _validate_aligned_raster_datasets(datasets, resolved_paths)
+        return arrays, datasets[0].profile.copy(), datasets[0].nodata
+    finally:
+        for dataset in datasets:
+            dataset.close()
+
+
+def _float32_nodata_value(source_nodata: float | None) -> float:
+    if source_nodata is None:
+        return float("nan")
+
+    candidate = np.float32(source_nodata)
+    if not np.isfinite(candidate):
+        return float("nan")
+
+    if not np.isclose(float(candidate), float(source_nodata), rtol=0.0, atol=0.0):
+        return float("nan")
+    return float(candidate)
+
+
+def _write_single_band_raster(
+    output_path: Path,
+    data: np.ndarray,
+    *,
+    profile: dict[str, Any],
+    valid_mask: np.ndarray,
+) -> None:
+    with rasterio.Env(GDAL_TIFF_INTERNAL_MASK=True):
+        with rasterio.open(output_path, "w", **profile) as dataset:
+            dataset.write(data, 1)
+            dataset.write_mask(np.where(valid_mask, 255, 0).astype(np.uint8))
+
+
+def _bbox_intersects(raster_bounds: Any, vector_bounds: Sequence[float]) -> bool:
+    left, bottom, right, top = (
+        float(raster_bounds.left),
+        float(raster_bounds.bottom),
+        float(raster_bounds.right),
+        float(raster_bounds.top),
+    )
+    minx, miny, maxx, maxy = [float(value) for value in vector_bounds]
+    return not (
+        right <= minx
+        or left >= maxx
+        or top <= miny
+        or bottom >= maxy
+    )
+
+
+def composite_ntl_rasters(
+    raster_paths: Sequence[str | Path],
+    output_path: str | Path,
+    *,
+    method: str = "mean",
+) -> ToolResult:
+    reserved_output: Path | None = None
+    try:
+        normalized_method = _normalize_composite_method(method)
+        resolved_paths = _normalize_raster_path_list(raster_paths, minimum_count=1)
+        arrays, profile, source_nodata = _load_aligned_raster_arrays(resolved_paths)
+        reserved_output = _resolve_tool_output_path(output_path, parameter="output_path")
+    except FileNotFoundError as exc:
+        return _tool_failure(
+            _COMPOSITE_TOOL,
+            ToolError(
+                code="INPUT_NOT_FOUND",
+                message=f"Input raster was not found: {exc}.",
+                details={"path": str(exc)},
+            ),
+        )
+    except _KnownNTLFailure as exc:
+        return _tool_failure(_COMPOSITE_TOOL, exc.error)
+
+    stack = np.stack(arrays, axis=0)
+    valid_mask = np.isfinite(stack)
+    valid_counts = np.sum(valid_mask, axis=0)
+    output_valid_mask = valid_counts > 0
+    output_nodata = _float32_nodata_value(source_nodata)
+    output_data = np.full(valid_counts.shape, output_nodata, dtype=np.float32)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        np.divide(
+            np.nansum(stack, axis=0, dtype=np.float64),
+            valid_counts,
+            out=output_data,
+            where=output_valid_mask,
+        )
+
+    profile.update(count=1, dtype="float32", nodata=output_nodata)
+
+    try:
+        _write_single_band_raster(
+            reserved_output,
+            output_data.astype(np.float32, copy=False),
+            profile=profile,
+            valid_mask=output_valid_mask,
+        )
+    except (RasterioError, OSError) as exc:
+        _cleanup_output_path(reserved_output)
+        return _tool_failure(
+            _COMPOSITE_TOOL,
+            ToolError(
+                code="OUTPUT_WRITE_FAILED",
+                message=f"Unable to write composite raster '{reserved_output}'.",
+                details={"path": str(reserved_output), "reason": str(exc)},
+            ),
+        )
+
+    total_pixels = int(output_valid_mask.size)
+    valid_pixel_count = int(np.sum(output_valid_mask))
+    return ToolResult.succeeded(
+        tool=_COMPOSITE_TOOL,
+        summary=f"Created a mean composite from {len(resolved_paths)} raster(s).",
+        outputs=[_artifact_for_raster(reserved_output, role="composite")],
+        metrics={
+            "input_count": int(len(resolved_paths)),
+            "valid_pixel_count": valid_pixel_count,
+            "coverage": float(valid_pixel_count / total_pixels) if total_pixels else 0.0,
+            "method": normalized_method,
+        },
+    )
+
+
+def analyze_ntl_trend(
+    raster_paths: Sequence[str | Path],
+    vector_path: str | Path,
+    output_prefix: str | Path,
+) -> ToolResult:
+    slope_output: Path | None = None
+    pvalue_output: Path | None = None
+    try:
+        resolved_paths = _normalize_raster_path_list(raster_paths, minimum_count=2)
+        resolved_vector_path = _resolve_tool_input_path(vector_path, parameter="vector_path")
+        resolved_prefix = _resolve_tool_output_prefix(output_prefix, parameter="output_prefix")
+        source_vector = _read_vector(resolved_vector_path)
+
+        with ExitStack() as stack:
+            datasets = [stack.enter_context(_open_validated_raster(path)) for path in resolved_paths]
+            _validate_aligned_raster_datasets(datasets, resolved_paths)
+            reference = datasets[0]
+            try:
+                vector_for_raster = (
+                    source_vector.copy()
+                    if _crs_equal(source_vector.crs, reference.crs)
+                    else source_vector.to_crs(reference.crs)
+                )
+            except Exception as exc:
+                _fail(
+                    "VECTOR_READ_FAILED",
+                    f"Unable to reproject vector dataset '{resolved_vector_path}'.",
+                    details={"path": str(resolved_vector_path), "reason": str(exc)},
+                )
+
+            _validate_geometry(vector_for_raster, resolved_vector_path)
+            vector_bounds = vector_for_raster.total_bounds
+            if not np.all(np.isfinite(vector_bounds)) or not _bbox_intersects(reference.bounds, vector_bounds):
+                _fail(
+                    "NO_SPATIAL_OVERLAP",
+                    "Vector geometries do not overlap the raster extent.",
+                    details={"raster_path": str(resolved_paths[0]), "vector_path": str(resolved_vector_path)},
+                )
+
+            union_geometry = unary_union(vector_for_raster.geometry)
+            try:
+                first_crop, cropped_transform = mask(
+                    reference,
+                    [union_geometry],
+                    crop=True,
+                    nodata=np.nan,
+                    filled=False,
+                )
+            except ValueError as exc:
+                _fail(
+                    "NO_SPATIAL_OVERLAP",
+                    "Vector geometries do not overlap the raster extent.",
+                    details={
+                        "raster_path": str(resolved_paths[0]),
+                        "vector_path": str(resolved_vector_path),
+                        "reason": str(exc),
+                    },
+                )
+
+            stack_arrays = np.empty((len(datasets), first_crop.shape[1], first_crop.shape[2]), dtype=np.float32)
+            first_array = np.asarray(first_crop[0].filled(np.nan), dtype=np.float32)
+            first_array[~np.isfinite(first_array)] = np.nan
+            stack_arrays[0] = first_array
+
+            for index, dataset in enumerate(datasets[1:], start=1):
+                cropped, current_transform = mask(
+                    dataset,
+                    [union_geometry],
+                    crop=True,
+                    nodata=np.nan,
+                    filled=False,
+                )
+                if (
+                    cropped.shape[1:] != first_crop.shape[1:]
+                    or not _transforms_equal(cropped_transform, current_transform)
+                ):
+                    _fail(
+                        "GRID_MISMATCH",
+                        "Raster inputs must share the same CRS, dimensions, and affine grid.",
+                        details={"reference_path": str(resolved_paths[0]), "path": str(resolved_paths[index])},
+                    )
+                array = np.asarray(cropped[0].filled(np.nan), dtype=np.float32)
+                array[~np.isfinite(array)] = np.nan
+                stack_arrays[index] = array
+
+            slope_map = np.full(first_crop.shape[1:], np.nan, dtype=np.float32)
+            pvalue_map = np.full(first_crop.shape[1:], np.nan, dtype=np.float32)
+            analyzed_pixel_count = 0
+            time_index = np.arange(len(datasets), dtype=float)
+            for row in range(stack_arrays.shape[1]):
+                for col in range(stack_arrays.shape[2]):
+                    series = stack_arrays[:, row, col]
+                    valid = np.isfinite(series)
+                    if int(np.sum(valid)) < 2:
+                        continue
+                    values = series[valid]
+                    if np.ptp(values) <= 0.0:
+                        continue
+
+                    slope = theilslopes(values, time_index[valid]).slope
+                    pvalue = kendalltau(time_index[valid], values).pvalue
+                    if not np.isfinite(slope) or not np.isfinite(pvalue):
+                        continue
+
+                    slope_map[row, col] = np.float32(slope)
+                    pvalue_map[row, col] = np.float32(pvalue)
+                    analyzed_pixel_count += 1
+
+            profile = reference.profile.copy()
+            profile.update(
+                count=1,
+                dtype="float32",
+                height=int(first_crop.shape[1]),
+                width=int(first_crop.shape[2]),
+                transform=cropped_transform,
+                nodata=np.nan,
+            )
+
+        slope_output = reserve_output_path(
+            resolved_prefix.with_name(f"{resolved_prefix.name}_slope_trend.tif")
+        )
+        pvalue_output = reserve_output_path(
+            resolved_prefix.with_name(f"{resolved_prefix.name}_pvalue_map.tif")
+        )
+    except FileNotFoundError as exc:
+        _cleanup_output_paths([slope_output, pvalue_output])
+        return _tool_failure(
+            _TREND_TOOL,
+            ToolError(
+                code="INPUT_NOT_FOUND",
+                message=f"Input dataset was not found: {exc}.",
+                details={"path": str(exc)},
+            ),
+        )
+    except _KnownNTLFailure as exc:
+        _cleanup_output_paths([slope_output, pvalue_output])
+        return _tool_failure(_TREND_TOOL, exc.error)
+
+    valid_output_mask = np.isfinite(slope_map) & np.isfinite(pvalue_map)
+    try:
+        _write_single_band_raster(
+            slope_output,
+            slope_map,
+            profile=profile,
+            valid_mask=valid_output_mask,
+        )
+        _write_single_band_raster(
+            pvalue_output,
+            pvalue_map,
+            profile=profile,
+            valid_mask=valid_output_mask,
+        )
+    except (RasterioError, OSError) as exc:
+        _cleanup_output_paths([slope_output, pvalue_output])
+        return _tool_failure(
+            _TREND_TOOL,
+            ToolError(
+                code="OUTPUT_WRITE_FAILED",
+                message="Unable to write trend analysis rasters.",
+                details={"reason": str(exc)},
+            ),
+        )
+
+    return ToolResult.succeeded(
+        tool=_TREND_TOOL,
+        summary=f"Computed trend outputs for {len(resolved_paths)} raster(s).",
+        outputs=[
+            _artifact_for_raster(slope_output, role="slope"),
+            _artifact_for_raster(pvalue_output, role="pvalue"),
+        ],
+        metrics={
+            "raster_count": int(len(resolved_paths)),
+            "analyzed_pixel_count": int(analyzed_pixel_count),
+            "minimum_observations": 2,
+        },
+    )
+
+
+def detect_ntl_anomaly(
+    raster_paths: Sequence[str | Path],
+    output_path: str | Path,
+    *,
+    target_index: int | None = None,
+    k_sigma: float = 3.0,
+) -> ToolResult:
+    reserved_output: Path | None = None
+    try:
+        resolved_paths = _normalize_raster_path_list(raster_paths, minimum_count=4)
+        normalized_target_index = _normalize_target_index(target_index, raster_count=len(resolved_paths))
+        normalized_k_sigma = _normalize_k_sigma(k_sigma)
+        arrays, profile, _ = _load_aligned_raster_arrays(resolved_paths)
+        reserved_output = _resolve_tool_output_path(output_path, parameter="output_path")
+    except FileNotFoundError as exc:
+        return _tool_failure(
+            _ANOMALY_TOOL,
+            ToolError(
+                code="INPUT_NOT_FOUND",
+                message=f"Input raster was not found: {exc}.",
+                details={"path": str(exc)},
+            ),
+        )
+    except _KnownNTLFailure as exc:
+        return _tool_failure(_ANOMALY_TOOL, exc.error)
+
+    stack = np.stack(arrays, axis=0)
+    baseline = np.delete(stack, normalized_target_index, axis=0)
+    baseline_valid = np.isfinite(baseline)
+    baseline_observation_count = np.sum(baseline_valid, axis=0)
+    baseline_sum = np.nansum(np.where(baseline_valid, baseline, 0.0), axis=0, dtype=np.float64)
+    baseline_mean = np.full(stack.shape[1:], np.nan, dtype=np.float64)
+    np.divide(
+        baseline_sum,
+        baseline_observation_count,
+        out=baseline_mean,
+        where=baseline_observation_count > 0,
+    )
+
+    squared_distance = np.where(baseline_valid, (baseline - baseline_mean) ** 2, 0.0)
+    baseline_variance = np.full(stack.shape[1:], np.nan, dtype=np.float64)
+    np.divide(
+        np.sum(squared_distance, axis=0, dtype=np.float64),
+        baseline_observation_count,
+        out=baseline_variance,
+        where=baseline_observation_count > 0,
+    )
+    baseline_std = np.sqrt(baseline_variance)
+
+    target = stack[normalized_target_index]
+    valid_output_mask = np.isfinite(target) & (baseline_observation_count >= 3)
+    z_score = (target - baseline_mean) / (baseline_std + 1e-6)
+    anomaly_mask = np.where(valid_output_mask & (z_score > normalized_k_sigma), 1, 0).astype(np.uint8)
+
+    profile.update(count=1, dtype="uint8", nodata=None)
+
+    try:
+        _write_single_band_raster(
+            reserved_output,
+            anomaly_mask,
+            profile=profile,
+            valid_mask=valid_output_mask,
+        )
+    except (RasterioError, OSError) as exc:
+        _cleanup_output_path(reserved_output)
+        return _tool_failure(
+            _ANOMALY_TOOL,
+            ToolError(
+                code="OUTPUT_WRITE_FAILED",
+                message=f"Unable to write anomaly raster '{reserved_output}'.",
+                details={"path": str(reserved_output), "reason": str(exc)},
+            ),
+        )
+
+    return ToolResult.succeeded(
+        tool=_ANOMALY_TOOL,
+        summary=f"Computed anomaly mask for raster index {normalized_target_index}.",
+        outputs=[_artifact_for_raster(reserved_output, role="anomaly")],
+        metrics={
+            "target_index": int(normalized_target_index),
+            "k_sigma": float(normalized_k_sigma),
+            "raster_count": int(len(resolved_paths)),
+            "baseline_count": int(len(resolved_paths) - 1),
+            "anomaly_pixel_count": int(np.sum(anomaly_mask == 1)),
+            "valid_pixel_count": int(np.sum(valid_output_mask)),
+        },
     )
