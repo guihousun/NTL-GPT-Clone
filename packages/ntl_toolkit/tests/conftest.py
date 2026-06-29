@@ -279,6 +279,21 @@ def invalid_vector_path(runtime_workspace: Path) -> Path:
 
 
 @pytest.fixture
+def vector_without_crs_path(runtime_workspace: Path) -> Path:
+    path = runtime_workspace / "inputs" / "no_crs_vector.shp"
+    gdf = gpd.GeoDataFrame(
+        {"name": ["clip"]},
+        geometry=[box(0.0, 1.0, 1.0, 2.0)],
+        crs="EPSG:4326",
+    )
+    gdf.to_file(path, driver="ESRI Shapefile")
+    prj_path = path.with_suffix(".prj")
+    if prj_path.exists():
+        prj_path.unlink()
+    return path
+
+
+@pytest.fixture
 def mercator_overlap_vector_path(runtime_workspace: Path) -> Path:
     path = runtime_workspace / "inputs" / "overlap_mercator.geojson"
     gdf = gpd.GeoDataFrame(

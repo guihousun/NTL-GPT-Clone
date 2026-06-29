@@ -108,6 +108,63 @@ def test_clip_raster_reports_validation_failures(
     assert result.error.code == error_code
 
 
+@pytest.mark.parametrize(
+    ("raster_path", "vector_path"),
+    [
+        (Path("inputs") / "missing.tif", Path("inputs") / "clip.geojson"),
+        (Path("inputs") / "sample.tif", Path("inputs") / "missing.geojson"),
+    ],
+)
+def test_clip_raster_reports_missing_inputs_as_input_not_found(
+    raster_path: Path,
+    vector_path: Path,
+    sample_raster_path: Path,
+    clip_polygon_path: Path,
+) -> None:
+    del sample_raster_path, clip_polygon_path
+
+    result = _raster_module().clip_raster(
+        raster_path,
+        vector_path,
+        Path("outputs") / "clip_missing.tif",
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "INPUT_NOT_FOUND"
+
+
+def test_clip_raster_rejects_empty_vector_dataset(
+    sample_raster_path: Path,
+    empty_vector_path: Path,
+) -> None:
+    result = _raster_module().clip_raster(
+        sample_raster_path,
+        empty_vector_path,
+        Path("outputs") / "clip_empty.tif",
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "INVALID_GEOMETRY"
+    assert result.error.details["reason"] == "empty_dataset"
+
+
+def test_clip_raster_requires_vector_crs(
+    sample_raster_path: Path,
+    vector_without_crs_path: Path,
+) -> None:
+    result = _raster_module().clip_raster(
+        sample_raster_path,
+        vector_without_crs_path,
+        Path("outputs") / "clip_no_crs.tif",
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "CRS_MISSING"
+
+
 def test_clip_raster_reserves_collision_suffix_without_overwriting(
     sample_raster_path: Path,
     clip_polygon_path: Path,
@@ -128,7 +185,33 @@ def test_clip_raster_reserves_collision_suffix_without_overwriting(
     assert Path(result.outputs[0].path).exists()
 
 
-def test_reproject_raster_writes_epsg3857_output_for_each_band(
+@pytest.mark.parametrize("resampling", ["nearest", "bilinear", "cubic", "average"])
+def test_reproject_raster_supports_public_resampling_modes_and_preserves_profile(
+    sample_raster_path: Path,
+    runtime_workspace: Path,
+    resampling: str,
+) -> None:
+    output_path = Path("outputs") / f"reproject_{resampling}.tif"
+
+    result = _raster_module().reproject_raster(
+        sample_raster_path,
+        output_path,
+        dst_crs="EPSG:4326",
+        resampling=resampling,
+    )
+
+    assert result.status == "succeeded"
+    assert result.metrics["resampling"] == resampling
+
+    import rasterio
+
+    with rasterio.open(runtime_workspace / output_path) as dataset:
+        assert dataset.crs == rasterio.CRS.from_epsg(4326)
+        assert dataset.dtypes == ("float32",)
+        assert dataset.nodata == pytest.approx(-9999.0)
+
+
+def test_reproject_raster_writes_epsg3857_output_for_each_band_and_preserves_dtype_nodata(
     multiband_raster_path: Path,
     runtime_workspace: Path,
 ) -> None:
@@ -156,6 +239,8 @@ def test_reproject_raster_writes_epsg3857_output_for_each_band(
         assert dataset.crs == rasterio.CRS.from_epsg(3857)
         assert dataset.width > 0
         assert dataset.height > 0
+        assert dataset.dtypes == ("float32", "float32")
+        assert dataset.nodata == pytest.approx(-9999.0)
         assert dataset.read(1).shape == (dataset.height, dataset.width)
         assert dataset.read(2).shape == (dataset.height, dataset.width)
 
@@ -352,6 +437,34 @@ def test_mosaic_rasters_reserves_collision_suffix_without_mutating_inputs(
     assert requested_path.read_bytes() == b"sentinel"
     assert raster_paths == [adjacent_left_raster_path, adjacent_right_raster_path]
     assert result.outputs[0].path.endswith("mosaic_existing_001.tif")
+
+
+@pytest.mark.parametrize(
+    ("raster_paths", "error_code", "output_name"),
+    [
+        (["sample_raster_path", "corrupt_raster_path"], "RASTER_READ_FAILED", "mosaic_corrupt.tif"),
+        (["raster_without_crs_path", "sample_raster_path"], "CRS_MISSING", "mosaic_no_crs.tif"),
+    ],
+)
+def test_mosaic_rasters_reports_member_read_failures_without_leaving_output(
+    raster_paths: list[str],
+    error_code: str,
+    output_name: str,
+    runtime_workspace: Path,
+    request: pytest.FixtureRequest,
+) -> None:
+    resolved_paths = [request.getfixturevalue(name) for name in raster_paths]
+    output_path = Path("outputs") / output_name
+
+    result = _raster_module().mosaic_rasters(
+        resolved_paths,
+        output_path,
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == error_code
+    assert not (runtime_workspace / output_path).exists()
 
 
 def test_reproject_raster_cleans_partial_output_on_write_failure(
