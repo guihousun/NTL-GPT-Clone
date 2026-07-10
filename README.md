@@ -58,6 +58,9 @@ Optional:
 - `NTL_EMBEDDING_API_KEY`
 - `NTL_FORCE_NATIVE_CHAT_INPUT`
 - `NTL_USE_CUSTOM_MULTIMODAL_CHAT_INPUT`
+- `NTL_MCP_ENV_FILE`
+- `NTL_MCP_WORKDIR`
+- `NTL_MCP_STATE_DIR`
 
 ## Main Capabilities
 
@@ -74,6 +77,16 @@ Additional setup for Google Earth Engine:
 
 - set `GEE_DEFAULT_PROJECT_ID`
 - authenticate locally with Earth Engine if needed
+
+## Local `ntl-gis-core` MCP
+
+The repository also ships a local stdio MCP service for deterministic GIS and
+nighttime-light operations. Install the package in the `NTL-GPT-Stable`
+environment and use the client configuration and workspace rules in
+[`docs/mcp/ntl-gis-core.md`](docs/mcp/ntl-gis-core.md). The service reads local
+inputs, writes new outputs without overwriting existing files, and does not
+access the repository's RAG stores or user workspaces unless they are
+explicitly selected as the MCP working directory.
 
 ## Runtime Execution Model
 

@@ -27,8 +27,12 @@ Do not use this skill as the primary route for natural-disaster chains such as e
 1. Read `/skills/conflict-ntl-workflow/references/data_source_inventory.md`.
 2. Read `/skills/conflict-ntl-workflow/references/event_screening_criteria.md`.
 3. Read `/skills/conflict-ntl-workflow/references/output_contracts.json`.
-4. If the user has not supplied an event CSV/JSON, call `conflict_ntl_fetch_isw_events_tool` to pull ISW/CTP StoryMap points first.
-5. If tools are available, call `conflict_ntl_agent_system_tool` for end-to-end staging; use lower-level screening/AOI tools for partial or debugging runs.
+4. For generic local vector/raster inspection and processing, prefer the
+   `ntl-gis-core` stdio MCP service. It is the shared implementation target;
+   use the compatibility `conflictntl-gis-tools` service for existing calls
+   until its parity checks are complete.
+5. If the user has not supplied an event CSV/JSON, call `conflict_ntl_fetch_isw_events_tool` to pull ISW/CTP StoryMap points first.
+6. If tools are available, call `conflict_ntl_agent_system_tool` for end-to-end staging; use lower-level screening/AOI tools for partial or debugging runs.
 
 ## Agent System Chain
 
