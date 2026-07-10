@@ -8,6 +8,7 @@ from pathlib import Path
 
 # 导入你的存储管理器
 from storage_manager import storage_manager
+from ntl_toolkit.adapters.langchain import anomaly_detection
 
 # ===== Input Schema =====
 class SimpleAnomalyDetectionInput(BaseModel):
@@ -38,64 +39,15 @@ def detect_ntl_anomaly(
     """
     Core function for detecting anomalies in NTL time-series using standardized workspace paths.
     """
-    # 1. 获取动态工作空间路径
-    workspace = storage_manager.get_workspace()
-    input_dir = workspace / "inputs"
-    output_dir = workspace / "outputs"
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # 2. 补全输入文件路径
-    # 支持传入纯文件名或相对路径，统一指向 inputs/
-    full_raster_paths = []
-    for f in raster_files:
-        p = Path(f)
-        full_path = input_dir / p.name if not p.is_absolute() else p
-        if not full_path.exists():
-            return f"Error: File not found: {full_path.name} in inputs/ folder."
-        full_raster_paths.append(str(full_path))
-
-    # 3. 确定目标检测索引
-    target_index = target_index if target_index is not None else len(full_raster_paths) - 1
-    if target_index < 0 or target_index >= len(full_raster_paths):
-        return f"Error: target_index is out of range (0~{len(full_raster_paths)-1})"
-
-    # 4. 读取影像并执行 Z-Score 算法
-    try:
-        with rasterio.open(full_raster_paths[0]) as src:
-            profile = src.profile
-            height, width = src.height, src.width
-
-        stack = np.empty((len(full_raster_paths), height, width), dtype=np.float32)
-        for i, f in enumerate(full_raster_paths):
-            with rasterio.open(f) as src:
-                stack[i] = src.read(1)
-
-        # 统计基准计算 (排除目标期)
-        baseline = np.delete(stack, target_index, axis=0)
-        mean_img = np.nanmean(baseline, axis=0)
-        std_img = np.nanstd(baseline, axis=0)
-
-        # 异常检测
-        target_img = stack[target_index]
-        z_score = (target_img - mean_img) / (std_img + 1e-6)
-        anomaly_mask = (z_score > k_sigma).astype(np.uint8)
-
-        # 5. 保存结果到 outputs/
-        output_file_path = output_dir / save_filename
-        profile.update(dtype=rasterio.uint8, count=1, nodata=0)
-        
-        with rasterio.open(output_file_path, "w", **profile) as dst:
-            dst.write(anomaly_mask, 1)
-
-        return (
-            f"✅ Anomaly Detection Task Completed.\n"
-            f"- **Target Image**: {Path(full_raster_paths[target_index]).name}\n"
-            f"- **Method**: Pixel-wise Z-Score Analysis (Threshold: {k_sigma}σ)\n"
-            f"- **Result Saved**: `outputs/{save_filename}`"
-        )
-        
-    except Exception as e:
-        return f"Error during processing: {str(e)}"
+    save_filename = save_filename or "NTL_anomaly_mask.tif"
+    full_raster_paths = [storage_manager.resolve_input_path(path) for path in raster_files]
+    output_file_path = storage_manager.resolve_output_path(save_filename)
+    return anomaly_detection(
+        full_raster_paths,
+        output_file_path,
+        target_index=target_index,
+        k_sigma=k_sigma,
+    )
 
 # ===== Tool Registration =====
 detect_ntl_anomaly_tool = StructuredTool.from_function(

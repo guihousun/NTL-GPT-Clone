@@ -720,6 +720,25 @@ def _normalize_composite_method(method: Any) -> str:
     return "mean"
 
 
+def _normalize_fallback_nodata(value: Any) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, Real):
+        _fail(
+            "INVALID_PARAMETER",
+            "fallback_nodata must be a finite number when provided.",
+            details={"parameter": "fallback_nodata", "value": value},
+        )
+    normalized = float(value)
+    if not np.isfinite(normalized):
+        _fail(
+            "INVALID_PARAMETER",
+            "fallback_nodata must be a finite number when provided.",
+            details={"parameter": "fallback_nodata", "value": normalized},
+        )
+    return normalized
+
+
 def _normalize_target_index(value: Any, *, raster_count: int) -> int:
     if value is None:
         return raster_count - 1
@@ -758,6 +777,23 @@ def _normalize_k_sigma(value: Any) -> float:
             "INVALID_PARAMETER",
             "k_sigma must be a finite number greater than zero.",
             details={"parameter": "k_sigma", "value": normalized},
+        )
+    return normalized
+
+
+def _normalize_minimum_baseline_observations(value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, Integral):
+        _fail(
+            "INVALID_PARAMETER",
+            "minimum_baseline_observations must be a positive integer.",
+            details={"parameter": "minimum_baseline_observations", "value": value},
+        )
+    normalized = int(value)
+    if normalized < 1:
+        _fail(
+            "INVALID_PARAMETER",
+            "minimum_baseline_observations must be a positive integer.",
+            details={"parameter": "minimum_baseline_observations", "value": normalized},
         )
     return normalized
 
@@ -854,16 +890,23 @@ def _validate_aligned_raster_datasets(
 
 def _load_aligned_raster_arrays(
     resolved_paths: Sequence[Path],
+    *,
+    fallback_nodata: float | None = None,
 ) -> tuple[list[np.ndarray], dict[str, Any], float | None]:
     arrays: list[np.ndarray] = []
     datasets: list[rasterio.io.DatasetReader] = []
     try:
         for path in resolved_paths:
             array, dataset, _ = _read_raster_band(path, band=1)
+            if dataset.nodata is None and fallback_nodata is not None:
+                array[array == fallback_nodata] = np.nan
             arrays.append(array)
             datasets.append(dataset)
         _validate_aligned_raster_datasets(datasets, resolved_paths)
-        return arrays, datasets[0].profile.copy(), datasets[0].nodata
+        source_nodata = datasets[0].nodata
+        if source_nodata is None and fallback_nodata is not None:
+            source_nodata = fallback_nodata
+        return arrays, datasets[0].profile.copy(), source_nodata
     finally:
         for dataset in datasets:
             dataset.close()
@@ -916,12 +959,17 @@ def composite_ntl_rasters(
     output_path: str | Path,
     *,
     method: str = "mean",
+    fallback_nodata: float | None = None,
 ) -> ToolResult:
     reserved_output: Path | None = None
     try:
         normalized_method = _normalize_composite_method(method)
+        normalized_fallback_nodata = _normalize_fallback_nodata(fallback_nodata)
         resolved_paths = _normalize_raster_path_list(raster_paths, minimum_count=1)
-        arrays, profile, source_nodata = _load_aligned_raster_arrays(resolved_paths)
+        arrays, profile, source_nodata = _load_aligned_raster_arrays(
+            resolved_paths,
+            fallback_nodata=normalized_fallback_nodata,
+        )
         reserved_output = _resolve_tool_output_path(output_path, parameter="output_path")
     except FileNotFoundError as exc:
         return _tool_failure(
@@ -1168,10 +1216,17 @@ def detect_ntl_anomaly(
     *,
     target_index: int | None = None,
     k_sigma: float = 3.0,
+    minimum_baseline_observations: int = 3,
 ) -> ToolResult:
     reserved_output: Path | None = None
     try:
-        resolved_paths = _normalize_raster_path_list(raster_paths, minimum_count=4)
+        normalized_minimum_baseline = _normalize_minimum_baseline_observations(
+            minimum_baseline_observations
+        )
+        resolved_paths = _normalize_raster_path_list(
+            raster_paths,
+            minimum_count=normalized_minimum_baseline + 1,
+        )
         normalized_target_index = _normalize_target_index(target_index, raster_count=len(resolved_paths))
         normalized_k_sigma = _normalize_k_sigma(k_sigma)
         arrays, profile, _ = _load_aligned_raster_arrays(resolved_paths)
@@ -1212,7 +1267,7 @@ def detect_ntl_anomaly(
     baseline_std = np.sqrt(baseline_variance)
 
     target = stack[normalized_target_index]
-    valid_output_mask = np.isfinite(target) & (baseline_observation_count >= 3)
+    valid_output_mask = np.isfinite(target) & (baseline_observation_count >= normalized_minimum_baseline)
     z_score = (target - baseline_mean) / (baseline_std + 1e-6)
     anomaly_mask = np.where(valid_output_mask & (z_score > normalized_k_sigma), 1, 0).astype(np.uint8)
 

@@ -24,6 +24,8 @@ except Exception:  # noqa: BLE001
     Window = None
 
 import storage_manager as sm_module
+from ntl_toolkit.adapters.langchain import raster_report as _core_raster_report
+from ntl_toolkit.adapters.langchain import vector_report as _core_vector_report
 
 sm = sm_module.storage_manager
 DEFAULT_GEE_PROJECT = "empyrean-caster-430308-m2"
@@ -213,118 +215,11 @@ def _raster_basic_stats(arr: np.ndarray) -> Dict[str, Any]:
 
 
 def _raster_report(path: str, sample_pixels: int = 0, mode: Literal["basic", "full"] = "full") -> Dict[str, Any]:
-    if rasterio is None:
-        raise RuntimeError("rasterio is not installed; raster inspection is unavailable.")
-
-    report: Dict[str, Any] = {"path": path, "exists": True, "readable": True}
-    if not os.path.isabs(path):
-        report["warning"] = "Path is not absolute."
-
-    with rasterio.open(path) as ds:
-        report.update(
-            {
-                "driver": ds.driver,
-                "crs": str(ds.crs) if ds.crs else None,
-                "width": ds.width,
-                "height": ds.height,
-                "count_bands": ds.count,
-                "dtype": ds.dtypes[0] if ds.count > 0 else None,
-                "resolution": (abs(ds.transform.a), abs(ds.transform.e)),
-                "nodata": ds.nodata,
-                "bounds": {
-                    "left": ds.bounds.left,
-                    "bottom": ds.bounds.bottom,
-                    "right": ds.bounds.right,
-                    "top": ds.bounds.top,
-                },
-            }
-        )
-
-        if mode == "basic" or ds.count < 1:
-            return report
-
-        if sample_pixels and sample_pixels > 0:
-            step_x = max(1, int(np.sqrt((ds.width * ds.height) / sample_pixels)))
-            window = Window(col_off=0, row_off=0, width=ds.width, height=ds.height)
-            band = ds.read(1, window=window)[::step_x, ::step_x]
-        else:
-            band = ds.read(1)
-
-        nd = ds.nodata
-        if nd is None:
-            mask = np.isfinite(band)
-        else:
-            mask = (band != nd) & np.isfinite(band)
-
-        marr = np.ma.array(band, mask=~mask)
-        report["band1_stats"] = _raster_basic_stats(marr)
-
-        hints: List[str] = []
-        if "mean" in report["band1_stats"] and report["band1_stats"]["mean"] is not None:
-            mn = report["band1_stats"]["min"]
-            mx = report["band1_stats"]["max"]
-            if mn is not None and mn < -1e-6:
-                hints.append("Contains negative values; verify nodata and sensor units.")
-            if mx is not None and mx > 1e6:
-                hints.append("Very large max; check radiance units or scale.")
-        report["hints"] = hints
-    return report
+    return _core_raster_report(path, mode=mode, sample_pixels=sample_pixels)
 
 
 def _vector_report(path: str, mode: Literal["basic", "full"] = "full") -> Dict[str, Any]:
-    if gpd is None and mode == "full":
-        raise RuntimeError("geopandas is not installed; full vector inspection is unavailable.")
-
-    report: Dict[str, Any] = {"path": path, "exists": True, "readable": True}
-    if not os.path.isabs(path):
-        report["warning"] = "Path is not absolute."
-
-    # Basic mode: prefer lightweight file-level metadata.
-    if mode == "basic":
-        try:
-            import fiona
-
-            with fiona.open(path) as src:
-                schema = src.schema or {}
-                fields = schema.get("properties", {}) if isinstance(schema, dict) else {}
-                geometry_name = schema.get("geometry") if isinstance(schema, dict) else None
-                b = src.bounds
-                report.update(
-                    {
-                        "crs": src.crs_wkt or (str(src.crs) if src.crs else None),
-                        "feature_count": int(len(src)),
-                        "geometry_types": [geometry_name] if geometry_name else [],
-                        "bounds": {"minx": float(b[0]), "miny": float(b[1]), "maxx": float(b[2]), "maxy": float(b[3])},
-                        "fields": {str(k): str(v) for k, v in fields.items()},
-                    }
-                )
-                return report
-        except Exception:
-            # Fallback to GeoPandas if Fiona metadata path fails.
-            pass
-
-    if gpd is None:
-        raise RuntimeError("geopandas is not installed and Fiona fallback failed.")
-
-    gdf = gpd.read_file(path)
-    geom_types = sorted(list(gdf.geom_type.unique()))
-    report.update(
-        {
-            "crs": str(gdf.crs) if gdf.crs else None,
-            "feature_count": int(len(gdf)),
-            "geometry_types": geom_types,
-            "bounds": {
-                "minx": float(gdf.total_bounds[0]),
-                "miny": float(gdf.total_bounds[1]),
-                "maxx": float(gdf.total_bounds[2]),
-                "maxy": float(gdf.total_bounds[3]),
-            },
-            "fields": {c: str(gdf[c].dtype) for c in gdf.columns if c != gdf.geometry.name},
-        }
-    )
-    if mode == "full":
-        report["sample_records"] = gdf.drop(columns=gdf.geometry.name).head(1).to_dict(orient="records")
-    return report
+    return _core_vector_report(path, mode=mode)
 
 
 def _bbox_intersect(a: Dict[str, float], b: Dict[str, float]) -> bool:

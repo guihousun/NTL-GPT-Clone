@@ -117,9 +117,10 @@ not a machine-specific absolute path.
 
 ## Current rollout status
 
-The MCP catalog and adapter contract are covered by
-`packages/ntl_toolkit/tests/test_mcp_gis_core.py`. The legacy LangChain parity
-adapter/test module from Task 10 is not present on this branch, so the
-migration manifest intentionally leaves legacy mappings in `planned` or
-`parity_testing` status. This document does not claim a completed legacy
-cutover.
+The MCP catalog and transport contract are covered by
+`packages/ntl_toolkit/tests/test_mcp_gis_core.py`. The local legacy LangChain
+adapters are covered by `packages/ntl_toolkit/tests/test_langchain_parity.py`:
+the existing public tool names, input schemas, thread-workspace resolution and
+chat-oriented outputs are retained while local numerical work delegates to the
+shared core. GEE and network-download tools are deliberately outside this
+local GIS MCP cutover.

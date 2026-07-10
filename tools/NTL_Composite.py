@@ -5,6 +5,7 @@ import rasterio
 from pydantic.v1 import BaseModel, Field
 from langchain_core.tools import StructuredTool
 from storage_manager import storage_manager
+from ntl_toolkit.adapters.langchain import composite_local
 
 class LocalNTLCompositeInput(BaseModel):
     file_paths: List[str] = Field(
@@ -15,7 +16,7 @@ class LocalNTLCompositeInput(BaseModel):
         ...,
         description="The target filename for the mean composite to be saved in 'outputs/' (e.g., 'Monthly_Mean_Jan.tif')."
     )
-    enforce_same_grid: bool = Field(True, description="Ensure all input rasters share the same CRS and resolution.")
+    enforce_same_grid: bool = Field(True, description="Retained for compatibility. The shared core always requires aligned CRS, dimensions, and affine grids.")
     fallback_nodata: Optional[float] = Field(None, description="The value to use if NoData is not defined in metadata.")
 
 def build_ntl_mean_composite_local(
@@ -30,66 +31,13 @@ def build_ntl_mean_composite_local(
     """
     if not file_paths:
         return "❌ Error: file_paths list is empty."
-
-    # Resolve absolute paths securely via storage_manager
-    abs_file_paths = [storage_manager.resolve_input_path(fp) for fp in file_paths]
+    abs_file_paths = [storage_manager.resolve_input_path(path) for path in file_paths]
     abs_out_tif = storage_manager.resolve_output_path(out_tif)
-
-    # Ensure output directory exists
-    os.makedirs(os.path.dirname(abs_out_tif), exist_ok=True)
-
-    try:
-        # Read reference metadata from the first file
-        with rasterio.open(abs_file_paths[0]) as src0:
-            profile = src0.profile.copy()
-            height, width = src0.height, src0.width
-            transform = src0.transform
-            crs = src0.crs
-            nodata0 = src0.nodata
-
-        if nodata0 is None:
-            nodata0 = -1.0 if fallback_nodata is None else fallback_nodata
-
-        stack_sum = np.zeros((height, width), dtype=np.float64)
-        stack_cnt = np.zeros((height, width), dtype=np.uint32)
-
-        for fp, abs_fp in zip(file_paths, abs_file_paths):
-            if not os.path.exists(abs_fp):
-                return f"❌ Input file not found in 'inputs/': {fp}"
-            
-            with rasterio.open(abs_fp) as ds:
-                if enforce_same_grid:
-                    if ds.height != height or ds.width != width or ds.transform != transform or ds.crs != crs:
-                        return f"❌ Grid/CRS mismatch in {fp}. All daily inputs must be spatially aligned."
-                
-                arr = ds.read(1).astype(np.float64)
-                nd = ds.nodata if ds.nodata is not None else nodata0
-                valid = (arr != nd) & np.isfinite(arr)
-                stack_sum[valid] += arr[valid]
-                stack_cnt[valid] += 1
-
-        # Calculate mean safely
-        with np.errstate(divide='ignore', invalid='ignore'):
-            mean_arr = np.where(stack_cnt > 0, stack_sum / stack_cnt, np.nan)
-
-        # Prepare output profile
-        out_profile = profile.copy()
-        out_profile.update(count=1, dtype=rasterio.float32, nodata=nodata0, compress='lzw')
-
-        # Handle NoData values in final array
-        out_data = mean_arr.copy()
-        out_data[~np.isfinite(out_data)] = nodata0
-
-        with rasterio.open(abs_out_tif, "w", **out_profile) as dst:
-            dst.write(out_data.astype(np.float32), 1)
-
-        valid_ratio = float(np.mean(stack_cnt > 0))
-        return (f"✅ Success! Mean composite saved to 'outputs/{out_tif}'.\n"
-                f"- Input files processed: {len(file_paths)}\n"
-                f"- Effective pixel coverage: {valid_ratio:.2%}")
-
-    except Exception as e:
-        return f"❌ Error during compositing: {str(e)}"
+    return composite_local(
+        abs_file_paths,
+        abs_out_tif,
+        fallback_nodata=fallback_nodata,
+    )
 
 # Registering the Tool
 NTL_composite_local_tool = StructuredTool.from_function(

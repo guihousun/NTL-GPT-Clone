@@ -3,7 +3,7 @@
   "manifest": "ntl.tool.migration.v1",
   "service": "ntl-gis-core",
   "scope": "Local GIS and nighttime-light capabilities only; network download and GEE tools remain outside this rollout.",
-  "parity_note": "The current branch contains MCP contract tests but no Task 10 LangChain adapter/parity test module. No entry is marked migrated until those comparisons pass.",
+  "parity_note": "Task 10 routes the listed local LangChain operations through ntl_toolkit.core while retaining their public StructuredTool names and input schemas. The focused parity suite is packages/ntl_toolkit/tests/test_langchain_parity.py; GEE and network-download branches remain outside this local MCP rollout.",
   "entries": [
     {
       "legacy_capability": "Environment and dependency readiness check",
@@ -18,7 +18,7 @@
       "legacy_source": "tools/geodata_inspector_tool.py::inspect_geospatial_assets",
       "mcp_tool": "inspect_vector",
       "core_function": "vector.inspect_vector",
-      "status": "parity_testing",
+      "status": "migrated",
       "parity_tests": ["feature_count", "crs", "geometry_types", "bounds"]
     },
     {
@@ -26,7 +26,7 @@
       "legacy_source": "tools/geodata_inspector_tool.py::inspect_geospatial_assets",
       "mcp_tool": "inspect_raster",
       "core_function": "raster.inspect_raster",
-      "status": "parity_testing",
+      "status": "migrated",
       "parity_tests": ["grid_metadata", "nodata_masking", "band_statistics"]
     },
     {
@@ -90,7 +90,7 @@
       "legacy_source": "tools/NTL_raster_stats.py::NTL_raster_statistics",
       "mcp_tool": "calculate_zonal_statistics",
       "core_function": "ntl.calculate_zonal_statistics",
-      "status": "parity_testing",
+      "status": "migrated",
       "parity_tests": ["global_summary", "per_feature_rows", "selected_indices", "csv_reopen"]
     },
     {
@@ -106,7 +106,7 @@
       "legacy_source": "tools/NTL_Composite.py::build_ntl_mean_composite_local",
       "mcp_tool": "composite_ntl_rasters",
       "core_function": "ntl.composite_ntl_rasters",
-      "status": "parity_testing",
+      "status": "migrated",
       "parity_tests": ["mean_values", "nodata_exclusion", "duplicate_output_naming"]
     },
     {
@@ -114,7 +114,7 @@
       "legacy_source": "tools/NTL_trend_detection_tool.py::analyze_ntl_trend_masked_logic",
       "mcp_tool": "analyze_ntl_trend",
       "core_function": "ntl.analyze_ntl_trend",
-      "status": "parity_testing",
+      "status": "migrated",
       "parity_tests": ["chronological_series", "slope_output", "p_value_output"]
     },
     {
@@ -122,7 +122,7 @@
       "legacy_source": "tools/NTL_anomaly_detection_tool.py::detect_ntl_anomaly",
       "mcp_tool": "detect_ntl_anomaly",
       "core_function": "ntl.detect_ntl_anomaly",
-      "status": "parity_testing",
+      "status": "migrated",
       "parity_tests": ["latest_target", "baseline_exclusion", "anomaly_pixel_count"]
     },
     {

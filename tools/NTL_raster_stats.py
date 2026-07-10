@@ -17,6 +17,7 @@ from shapely.ops import unary_union
 from tqdm import tqdm
 
 from storage_manager import storage_manager, current_thread_id
+from ntl_toolkit.adapters.langchain import zonal_statistics
 
 
 class NTL_raster_statistics_input(BaseModel):
@@ -264,61 +265,16 @@ def NTL_raster_statistics(
     abs_out_path = storage_manager.resolve_output_path(output_csv_path, thread_id=thread_id)
     output_ref = _normalized_output_reference(output_csv_path)
 
-    if not os.path.exists(abs_shp_path):
-        return f"Error: Shapefile not found at {abs_shp_path}"
-
-    all_results: List[dict] = []
-    global_summaries: List[Tuple[str, Dict[str, float]]] = []
-
-    for tif_name in ntl_inputs:
-        abs_ntl_path = storage_manager.resolve_input_path(tif_name, thread_id=thread_id)
-        if not os.path.exists(abs_ntl_path):
-            return f"Error: Raster file not found at {abs_ntl_path}"
-
-        try:
-            rows, global_indices = _compute_for_single_raster(
-                abs_ntl_path=abs_ntl_path,
-                ntl_label=tif_name,
-                abs_shp_path=abs_shp_path,
-                selected_indices=selected_indices,
-                only_global=only_global,
-            )
-            all_results.extend(rows)
-            global_summaries.append((tif_name, global_indices))
-        except RasterioIOError as e:
-            return f"Error: Failed to open raster '{tif_name}'. Details: {str(e)}"
-        except Exception as e:
-            return f"Error: Failed during NTL raster statistics calculation for '{tif_name}'. Details: {str(e)}"
-
-    df = pd.DataFrame(all_results)
-    df.to_csv(abs_out_path, index=False, encoding="utf-8", float_format="%.4f")
-
-    total_feature_rows = len([r for r in all_results if r.get("Region") != "Global_Summary"])
-    summary_blocks = []
-    for tif_name, global_indices in global_summaries:
-        lines = [f"- {k}: {v:.4f}" for k, v in global_indices.items()]
-        summary_blocks.append(f"[{tif_name}]\n" + "\n".join(lines))
-    summary_str = "\n\n".join(summary_blocks)
-
-    if len(ntl_inputs) == 1:
-        if total_feature_rows <= 0:
-            return (
-                f"Results saved to: {output_ref}\n\n"
-                f"**Global Summary (Total ROI):**\n{summary_str}\n"
-                "Note: Detailed statistics for each sub-region are available in the generated CSV file."
-            )
-        return (
-            f"Success: Analysis completed for {total_feature_rows} region rows.\n"
-            f"Results saved to: {output_ref}\n\n"
-            f"**Global Summary (Total ROI):**\n{summary_str}\n"
-            "Note: Detailed statistics for each sub-region are available in the generated CSV file."
-        )
-
-    return (
-        f"Success: Batch analysis completed for {len(ntl_inputs)} rasters.\n"
-        f"Feature rows: {total_feature_rows}\n"
-        f"Results saved to: {output_ref}\n\n"
-        f"**Global Summary (Per Raster):**\n{summary_str}"
+    abs_ntl_paths = [
+        storage_manager.resolve_input_path(tif_name, thread_id=thread_id)
+        for tif_name in ntl_inputs
+    ]
+    return zonal_statistics(
+        raster_paths=abs_ntl_paths,
+        vector_path=abs_shp_path,
+        output_path=abs_out_path,
+        selected_indices=selected_indices,
+        only_global=only_global,
     )
 
 
