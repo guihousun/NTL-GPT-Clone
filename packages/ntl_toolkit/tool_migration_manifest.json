@@ -106,7 +106,7 @@
       "legacy_source": "tools/NTL_Composite.py::build_ntl_mean_composite_local",
       "mcp_tool": "composite_ntl_rasters",
       "core_function": "ntl.composite_ntl_rasters",
-      "status": "migrated",
+      "status": "migrated_with_safety_contract",
       "parity_tests": ["mean_values", "nodata_exclusion", "duplicate_output_naming"]
     },
     {
@@ -122,7 +122,7 @@
       "legacy_source": "tools/NTL_anomaly_detection_tool.py::detect_ntl_anomaly",
       "mcp_tool": "detect_ntl_anomaly",
       "core_function": "ntl.detect_ntl_anomaly",
-      "status": "migrated",
+      "status": "migrated_with_safety_contract",
       "parity_tests": ["latest_target", "baseline_exclusion", "anomaly_pixel_count"]
     },
     {

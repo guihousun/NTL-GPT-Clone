@@ -14,7 +14,7 @@ from ntl_toolkit.adapters.langchain import anomaly_detection
 class SimpleAnomalyDetectionInput(BaseModel):
     raster_files: List[str] = Field(
         ...,
-        description="Time-series NTL raster file names (e.g., ['NTL_2022.tif', 'NTL_2023.tif']). Files should be located in the workspace 'inputs/' folder."
+        description="Time-series NTL raster file names (at least two images, e.g., ['NTL_2022.tif', 'NTL_2023.tif']). Files should be located in the workspace 'inputs/' folder."
     )
     target_index: Optional[int] = Field(
         None,

@@ -18,7 +18,13 @@ if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
 
-def _write_raster(path: Path, values: np.ndarray, *, nodata: float | None = -9999.0) -> Path:
+def _write_raster(
+    path: Path,
+    values: np.ndarray,
+    *,
+    nodata: float | None = -9999.0,
+    transform=None,
+) -> Path:
     with rasterio.open(
         path,
         "w",
@@ -28,7 +34,7 @@ def _write_raster(path: Path, values: np.ndarray, *, nodata: float | None = -999
         count=1,
         dtype="float32",
         crs="EPSG:4326",
-        transform=from_origin(0.0, 2.0, 1.0, 1.0),
+        transform=transform or from_origin(0.0, 2.0, 1.0, 1.0),
         nodata=nodata,
     ) as dataset:
         dataset.write(values.astype(np.float32), 1)
@@ -63,6 +69,17 @@ def test_local_composite_uses_shared_core_and_preserves_chat_response(tmp_path: 
         assert "outputs/mean_001.tif" in repeated
         assert (workspace / "outputs" / "mean_001.tif").exists()
         assert "Success!" in module.build_ntl_mean_composite_local(["first.tif"], "bad.tif", enforce_same_grid=False)
+        _write_raster(
+            workspace / "inputs" / "shifted.tif",
+            np.array([[1.0, 2.0], [3.0, 4.0]]),
+            transform=from_origin(0.5, 2.0, 1.0, 1.0),
+        )
+        unsafe_response = module.build_ntl_mean_composite_local(
+            ["first.tif", "shifted.tif"],
+            "unsafe.tif",
+            enforce_same_grid=False,
+        )
+        assert "must share the same CRS, dimensions, and affine grid" in unsafe_response
 
         _write_raster(workspace / "inputs" / "fallback_a.tif", np.array([[-1.0, 2.0], [-1.0, -1.0]]), nodata=None)
         _write_raster(workspace / "inputs" / "fallback_b.tif", np.array([[-1.0, 4.0], [-1.0, -1.0]]), nodata=None)
@@ -179,3 +196,14 @@ def test_legacy_function_signatures_and_structured_tool_names_remain_stable() ->
     assert statistics.NTL_raster_statistics_tool.name == "NTL_raster_statistics"
     assert trend.NTL_Trend_Analysis.name == "Analyze_NTL_trend"
     assert anomaly.detect_ntl_anomaly_tool.name == "Detect_NTL_anomaly"
+    def field_names(model) -> set[str]:
+        return set(getattr(model, "model_fields", None) or model.__fields__)
+
+    assert field_names(composite.LocalNTLCompositeInput) == {
+        "file_paths", "out_tif", "enforce_same_grid", "fallback_nodata"
+    }
+    assert field_names(statistics.NTL_raster_statistics_input) == {
+        "ntl_tif_path", "ntl_tif_paths", "shapefile_path", "output_csv_path", "selected_indices", "only_global"
+    }
+    assert field_names(trend.MaskedTrendAnalysisInput) == {"raster_files", "vector_file", "out_prefix"}
+    assert field_names(anomaly.SimpleAnomalyDetectionInput) == {"raster_files", "target_index", "k_sigma", "save_filename"}

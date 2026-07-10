@@ -259,6 +259,23 @@ def vector_report(path: str | Path, *, mode: str) -> dict[str, Any]:
     metrics = result.metrics
     bounds = metrics["bounds"]
     attributes = gpd.read_file(path)
+    field_types = {
+        column: str(attributes[column].dtype)
+        for column in attributes.columns
+        if column != attributes.geometry.name
+    }
+    try:
+        import fiona
+
+        with fiona.open(path) as source:
+            properties = source.schema.get("properties", {}) if source.schema else {}
+            if properties:
+                field_types = {
+                    str(name): str(field_type)
+                    for name, field_type in dict(properties).items()
+                }
+    except Exception:
+        pass
     report: dict[str, Any] = {
         "path": str(path),
         "exists": True,
@@ -267,11 +284,7 @@ def vector_report(path: str | Path, *, mode: str) -> dict[str, Any]:
         "feature_count": metrics["feature_count"],
         "geometry_types": metrics["geometry_types"],
         "bounds": {"minx": bounds[0], "miny": bounds[1], "maxx": bounds[2], "maxy": bounds[3]},
-        "fields": {
-            column: str(attributes[column].dtype)
-            for column in attributes.columns
-            if column != attributes.geometry.name
-        },
+        "fields": field_types,
     }
     if mode == "full":
         report["sample_records"] = attributes.drop(columns=attributes.geometry.name).head(1).to_dict(orient="records")

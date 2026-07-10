@@ -122,5 +122,8 @@ The MCP catalog and transport contract are covered by
 adapters are covered by `packages/ntl_toolkit/tests/test_langchain_parity.py`:
 the existing public tool names, input schemas, thread-workspace resolution and
 chat-oriented outputs are retained while local numerical work delegates to the
-shared core. GEE and network-download tools are deliberately outside this
-local GIS MCP cutover.
+shared core. Two intentional safety contracts differ from the historical local
+implementation: local composites always require aligned CRS/dimensions/affine
+grids, and anomaly detection requires at least two images (one baseline plus a
+target). GEE and network-download tools are deliberately outside this local
+GIS MCP cutover.
