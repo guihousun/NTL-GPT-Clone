@@ -76,6 +76,21 @@ Use this compact decision order:
      - Call `GEE_catalog_discovery_tool`, then `GEE_dataset_metadata_tool`.
      - `known_matches` only reflects built-in mapping; you MUST also inspect `official_candidates` and `candidates`.
      - Do not claim "dataset not in GEE catalog" unless both are empty.
+   - Path D (explicit country-scale daily raster retrieval):
+     - Use `official_vnp46a2_h5_country_mosaic_tool` only when the user
+       explicitly requests country-scale daily non-gap-filled VNP46A2 raster
+       files, official HDF5/Earthdata provenance, or an audited country-day
+       package.
+     - Call it first with `execution_mode="plan"`. Run only after the AOI,
+       date range, country list, Earthdata-token readiness, output volume, and
+       audit expectations are explicit.
+     - This is an exception for raw-raster retrieval, not for country-scale
+       statistics. For statistics/ranking/comparison, keep `gee_server_side`
+       and return a table rather than bulk country rasters.
+     - Require the final audit: `downloaded_without_mosaic=0`; interpret
+       `no_granules` as product availability rather than transport failure;
+       accept `mosaic_all_nodata` only after valid HDF5, a successful mosaic,
+       and a valid-pixel scan.
 5. Socio-economic auxiliary data:
   - For China GDP, census population, electricity consumption, CO2 emissions, or province-level GDP+population requests, call `China_Official_Stats_tool` first.
   - Use `China_Official_GDP_tool` only as a compatibility shortcut for single-indicator GDP requests.

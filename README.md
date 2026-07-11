@@ -159,6 +159,10 @@ python check_env.py
 Additional setup for official VIIRS downloads:
 
 - set `EARTHDATA_TOKEN`
+- For explicit country-scale daily VNP46A2 raster retrieval, use
+  `official_vnp46a2_h5_country_mosaic_tool`. It follows the official CMR/Earthdata
+  HDF5 route for non-gap-filled `DNB_BRDF_Corrected_NTL`, writes only inside the
+  current thread workspace, and requires a country-day audit after mosaicking.
 
 DashScope channel mapping:
 
