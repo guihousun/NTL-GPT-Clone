@@ -19,7 +19,12 @@ from ntl_toolkit.core.vnp46a2_download import (
     inspect_vnp46a2_run,
     run_vnp46a2_download,
 )
-from ntl_toolkit.runtime import load_runtime_environment, resolve_local_path, runtime_workdir
+from ntl_toolkit.runtime import (
+    load_runtime_environment,
+    resolve_local_path,
+    runtime_workdir,
+    sanitize_download_text,
+)
 from ntl_toolkit.schemas import ToolError, ToolResult
 
 _CAPABILITIES_PATH = Path(__file__).with_name("download_capabilities.json")
@@ -40,7 +45,7 @@ _WRITE_NEW = ToolAnnotations(
     idempotentHint=False,
     openWorldHint=True,
 )
-_DEPENDENCIES = ("h5py", "rasterio", "geopandas", "osmnx")
+_DEPENDENCIES = ("ee", "geemap", "h5py", "rasterio", "geopandas", "osmnx")
 
 
 class StrictFastMCP(FastMCP):
@@ -136,7 +141,7 @@ def validate_download_environment(
             metrics["gee_initialized"] = True
         except Exception as exc:  # noqa: BLE001
             metrics["gee_initialized"] = False
-            metrics["gee_error"] = str(exc)
+            metrics["gee_error"] = sanitize_download_text(str(exc))
             return _failed_payload(
                 tool="validate_download_environment",
                 code="GEE_NOT_INITIALIZED",

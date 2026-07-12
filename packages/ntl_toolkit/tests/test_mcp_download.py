@@ -104,6 +104,25 @@ def test_environment_readiness_only_reports_token_presence(monkeypatch) -> None:
     assert "do-not-print" not in json.dumps(result)
 
 
+def test_environment_readiness_redacts_gee_initialization_errors(monkeypatch) -> None:
+    from ntl_toolkit.adapters.mcp import download
+    from ntl_toolkit.core import gee_download
+
+    monkeypatch.setattr(download, "_dependency_versions", lambda: ({"h5py": "x"}, {}))
+    monkeypatch.setattr(
+        gee_download,
+        "_initialize_ee",
+        lambda _project: (_ for _ in ()).throw(RuntimeError("Bearer do-not-print")),
+    )
+
+    result = download.validate_download_environment(initialize_gee=True)
+
+    assert result["status"] == "failed"
+    assert result["error"]["code"] == "GEE_NOT_INITIALIZED"
+    assert "do-not-print" not in json.dumps(result)
+    assert "<REDACTED>" in result["error"]["details"]["gee_error"]
+
+
 def test_launcher_import_is_quiet_and_stdio_smoke(runtime_workspace: Path) -> None:
     _load_server_module()
 
