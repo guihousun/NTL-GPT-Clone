@@ -280,8 +280,13 @@ def build_download_mcp() -> FastMCP:
     mcp = StrictFastMCP("ntl-download", instructions=_SERVER_INSTRUCTIONS)
 
     @mcp.tool(name="download_vnp46a2_official_h5_country", annotations=_WRITE_NEW, structured_output=True)
-    def download_vnp46a2_official_h5_country(ctx: Context, **kwargs: Any) -> dict[str, Any]:
-        request = _resolve_vnp_request(kwargs, workdir)
+    def download_vnp46a2_official_h5_country(
+        ctx: Context, start_date: str, end_date: str, countries: list[str], output_root: str,
+        phase: str = "full", execution_mode: str = "plan", targets: list[str] | None = None,
+        workers: int = 4, download_timeout: int = 600, token_env: str = "EARTHDATA_TOKEN",
+        no_gee_latest: bool = False, force: bool = False, skip_pixel_scan: bool = False,
+    ) -> dict[str, Any]:
+        request = _resolve_vnp_request(locals(), workdir)
         result = run_vnp46a2_download(
             request, progress=lambda done, total, message: ctx.report_progress(done, total, message),
         )
@@ -391,4 +396,3 @@ Expected: checks pass. The global project skill is outside the repository; repor
 - [ ] Run the direct stdio initialize/list/call smoke test and confirm no launcher output reaches stdout.
 - [ ] Run `git diff c7d9a96..HEAD --stat` and `git diff --check c7d9a96..HEAD`.
 - [ ] Confirm the standalone global VNP46A2 skill still exists and remains unchanged.
-
