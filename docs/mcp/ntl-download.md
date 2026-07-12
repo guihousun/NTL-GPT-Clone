@@ -1,0 +1,87 @@
+# `ntl-download` MCP
+
+`ntl-download` is a local, single-user stdio MCP service for synchronous Google
+Earth Engine raster exports and official NASA Earthdata VNP46A2 country mosaics.
+It is intentionally separate from `ntl-gis-core`: the latter remains a
+network-independent local GIS and nighttime-light analysis service.
+
+Long downloads keep the MCP call open. They emit progress notifications and
+write sanitized manifests under the selected output directory. There is no web
+service, database, task queue, or remote account system.
+
+## Install and configure
+
+Install the package once in `NTL-GPT-Stable`:
+
+```powershell
+C:\Users\27334\miniconda3\Scripts\conda.exe run -n NTL-GPT-Stable python -m pip install -e D:\NTL-GPT-main\packages\ntl_toolkit
+```
+
+Codex configuration:
+
+```toml
+[mcp_servers.ntl-download]
+command = "C:/Users/27334/miniconda3/Scripts/conda.exe"
+args = ["run", "-n", "NTL-GPT-Stable", "python", "D:/NTL-GPT-main/mcp_servers/download_server.py"]
+env = { NTL_MCP_WORKDIR = "D:/NTL-GPT-data", NTL_MCP_ENV_FILE = "D:/NTL-GPT-main/.env" }
+```
+
+For another checkout or Conda installation, replace the two paths. Keep
+credentials in the local dotenv file or process environment, never in the MCP
+configuration or tool arguments.
+
+## Tools
+
+| Tool | What it does |
+| --- | --- |
+| `validate_download_environment` | Checks local download dependencies, Earthdata token presence, and optional non-interactive GEE initialization. |
+| `download_gee_raster` | Exports one explicit GEE image or collection reduction from a dataset, band, UTC dates, WGS84 bounding box, scale, CRS, and output path. |
+| `download_vnp46a2_official_h5_country` | Plans or runs the official VNP46A2 non-gap-filled HDF5 country workflow: boundaries, CMR, download, validation, mosaic, audit, and optional package. |
+| `inspect_download_run` | Reads the VNP46A2 audit and returns actual status counts, retry targets, and pending mosaic targets. |
+
+The service also publishes `ntl://download/capabilities` and the shared
+`ntl://schemas/result-v1` resource.
+
+## Credential and path rules
+
+- GEE uses credentials already authorized in the local Earth Engine runtime.
+  `ntl-download` never runs OAuth. Use EasyGEE's environment/auth tools if
+  `validate_download_environment(initialize_gee=true)` reports a setup error.
+- The official HDF5 route reads `EARTHDATA_TOKEN` by default. It reports only
+  whether that variable is configured; token values are redacted from manifests
+  and tool results.
+- Relative paths resolve below `NTL_MCP_WORKDIR`; absolute Windows paths are
+  accepted. Partially-qualified paths such as `D:output.tif` are rejected.
+- GEE output names are reserved with a numeric suffix instead of overwriting an
+  existing GeoTIFF. VNP46A2 runs retain their manifests to support retry.
+
+## Progress, recovery, and audit
+
+The GEE tool reports initialization, imagery selection, export, validation, and
+completion. The official VNP46A2 route reports each pipeline phase plus
+sanitized script output. If Codex disconnects, do not restart a country run by
+default: call `inspect_download_run` on the same run directory.
+
+For VNP46A2, `retry_download` and `not_processed` entries are returned as exact
+`ISO3:YYYY-MM-DD` retry targets. `downloaded_without_mosaic` entries are
+returned separately for a mosaic-only retry. `no_granules` is an availability
+state, not a transport error. Do not declare a run complete while the audit
+contains `downloaded_without_mosaic`, `retry_download`, `not_processed`, or
+`other_manifest_status`.
+
+Use this official HDF5 route only for explicit raw country-scale daily
+non-gap-filled `DNB_BRDF_Corrected_NTL` rasters. For country statistics,
+long-series summaries, and many-feature comparisons, use GEE server-side
+reductions instead of downloading country rasters.
+
+## Troubleshooting
+
+- `GEE_NOT_INITIALIZED`: run EasyGEE environment/auth planning, complete the
+  browser authorization locally if needed, then retry the MCP tool.
+- `EARTHDATA_TOKEN_MISSING`: set or refresh the token in the dotenv file named
+  by `NTL_MCP_ENV_FILE`, then restart the MCP client.
+- `VNP46A2_AUDIT_INCOMPLETE`: call `inspect_download_run`, use its exact retry
+  targets, run the required phase, then audit again.
+- No server response or malformed protocol: start only through the stdio launcher;
+  ordinary diagnostic output must not be written to stdout before MCP starts.
+

@@ -10,9 +10,15 @@ From the repository root in the `NTL-GPT-Stable` environment:
 python -m pip install -e packages/ntl_toolkit
 ```
 
-The package exposes the `ntl-gis-core` stdio entry point. The checked-in
-launcher at `mcp_servers/gis_core_server.py` is equivalent and is the form
-used by the client examples in [`docs/mcp/ntl-gis-core.md`](../../docs/mcp/ntl-gis-core.md).
+The package exposes two local stdio entry points:
+
+- `ntl-gis-core` for deterministic local GIS and nighttime-light analysis;
+  [`mcp_servers/gis_core_server.py`](../../mcp_servers/gis_core_server.py) is
+  its checked-in launcher.
+- `ntl-download` for synchronous explicit GEE export and audited official
+  VNP46A2 Earthdata HDF5 country mosaics;
+  [`mcp_servers/download_server.py`](../../mcp_servers/download_server.py) is
+  its checked-in launcher. See [`docs/mcp/ntl-download.md`](../../docs/mcp/ntl-download.md).
 
 ## Runtime contract
 
@@ -24,6 +30,8 @@ used by the client examples in [`docs/mcp/ntl-gis-core.md`](../../docs/mcp/ntl-g
   NTL metric calculation, and geodata validation are read-only.
 - Credentials are loaded from the process environment or
   `NTL_MCP_ENV_FILE`; they are not tool arguments or result fields.
+- `ntl-download` emits MCP progress and writes sanitized run manifests. It
+  does not create a background job queue or a database.
 
 See [`tool_migration_manifest.json`](tool_migration_manifest.json) for legacy
 capability mappings and parity status.

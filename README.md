@@ -88,6 +88,17 @@ inputs, writes new outputs without overwriting existing files, and does not
 access the repository's RAG stores or user workspaces unless they are
 explicitly selected as the MCP working directory.
 
+## Local `ntl-download` MCP
+
+`ntl-download` is the companion local stdio MCP for explicit GEE raster export
+and audited official VNP46A2 Earthdata HDF5 country mosaics. It runs
+synchronously, reports progress to the client, and keeps sanitized manifests
+so interrupted clients can inspect and retry only unfinished country-days. It
+does not require the Job Runtime, PostgreSQL, or a web service. Setup,
+credential handling, recovery, and Codex configuration are in
+[`docs/mcp/ntl-download.md`](docs/mcp/ntl-download.md). Use EasyGEE for GEE
+authentication planning, catalog search, quotas, and map preview.
+
 ## Runtime Execution Model
 
 NTL-GPT intentionally does not enable remote DeepAgents sandbox providers by default. Google Earth Engine authentication, local credential caches, GDAL/PROJ/Rasterio/GeoPandas native libraries, local RAG assets, `base_data`, and per-thread workspaces are expected to be available on the host machine.
