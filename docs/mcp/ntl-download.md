@@ -84,4 +84,3 @@ reductions instead of downloading country rasters.
   targets, run the required phase, then audit again.
 - No server response or malformed protocol: start only through the stdio launcher;
   ordinary diagnostic output must not be written to stdout before MCP starts.
-
