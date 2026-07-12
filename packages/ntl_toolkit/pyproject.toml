@@ -26,12 +26,13 @@ test = ["pytest>=8,<9"]
 
 [project.scripts]
 ntl-gis-core = "ntl_toolkit.adapters.mcp.gis_core:main"
+ntl-download = "ntl_toolkit.adapters.mcp.download:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 
 [tool.setuptools.package-data]
-"ntl_toolkit.adapters.mcp" = ["gis_capabilities.json"]
+"ntl_toolkit.adapters.mcp" = ["gis_capabilities.json", "download_capabilities.json"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

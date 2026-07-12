@@ -1,0 +1,26 @@
+[
+  {
+    "name": "validate_download_environment",
+    "purpose": "Inspect local GEE/Earthdata download readiness without exposing credentials.",
+    "side_effects": "none",
+    "common_error_codes": ["DEPENDENCY_MISSING", "GEE_NOT_INITIALIZED"]
+  },
+  {
+    "name": "download_gee_raster",
+    "purpose": "Export one explicit Earth Engine image or collection reduction as GeoTIFF.",
+    "side_effects": "creates a new GeoTIFF and a suffixed name when necessary",
+    "common_error_codes": ["INVALID_PARAMETER", "GEE_NOT_INITIALIZED", "GEE_DOWNLOAD_FAILED"]
+  },
+  {
+    "name": "download_vnp46a2_official_h5_country",
+    "purpose": "Run official NASA Earthdata VNP46A2 HDF5 country mosaics and audit output coverage.",
+    "side_effects": "creates run manifests, HDF5 files, mosaics, and audit files under output_root",
+    "common_error_codes": ["EARTHDATA_TOKEN_MISSING", "VNP46A2_PHASE_FAILED", "VNP46A2_AUDIT_INCOMPLETE"]
+  },
+  {
+    "name": "inspect_download_run",
+    "purpose": "Read an existing VNP46A2 country-day audit and return exact retry/mosaic targets.",
+    "side_effects": "none",
+    "common_error_codes": ["VNP46A2_AUDIT_NOT_FOUND", "VNP46A2_AUDIT_INCOMPLETE"]
+  }
+]
