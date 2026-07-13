@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import os
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
@@ -10,10 +12,12 @@ import h5py
 import numpy as np
 import rasterio
 from rasterio.mask import mask
+from rasterio.merge import merge
 from rasterio.transform import from_origin
 from shapely.geometry import mapping
 
-from ntl_toolkit.schemas import ToolError, ToolResult
+from ntl_toolkit.runtime.downloads import DownloadProgress, sanitize_download_text, write_download_manifest
+from ntl_toolkit.schemas import OutputArtifact, ToolError, ToolResult
 
 NODATA = -9999.0
 _DATE_FORMAT = "%Y-%m-%d"
@@ -146,17 +150,8 @@ def h5_to_target_tifs(
     return output, utc_output
 
 
-def run_vnp46a1_download(request: Vnp46a1DownloadRequest) -> ToolResult:
-    """Plan the official VNP46A1 country or BBox pipeline before execution."""
-    if request.execution_mode != "plan":
-        return ToolResult.failed(
-            tool="download_vnp46a1_official_h5",
-            error=ToolError(
-                code="VNP46A1_RUN_NOT_IMPLEMENTED",
-                message="VNP46A1 run phases are not available yet.",
-                suggestion="Use execution_mode='plan' while the local pipeline is being installed.",
-            ),
-        )
+def run_vnp46a1_download(request: Vnp46a1DownloadRequest, *, progress: DownloadProgress | None = None) -> ToolResult:
+    """Plan or run official VNP46A1 Earthdata retrieval and clipped mosaics."""
     return ToolResult.succeeded(
         tool="download_vnp46a1_official_h5",
         summary="Prepared VNP46A1 execution plan.",
@@ -169,7 +164,175 @@ def run_vnp46a1_download(request: Vnp46a1DownloadRequest) -> ToolResult:
             "phases": request.phase_list,
             "run_root": str(request.run_root),
         },
-    )
+    ) if request.execution_mode == "plan" else _run_request(request, progress)
+
+
+def inspect_vnp46a1_run(run_root: str | Path) -> ToolResult:
+    root = Path(run_root).expanduser().resolve(strict=False)
+    audit_path = root / "vnp46a1_audit.json"
+    if not audit_path.exists():
+        return _failed("VNP46A1_AUDIT_NOT_FOUND", "No VNP46A1 audit was found.", "Run the audit phase first.", {"run_root": str(root)})
+    payload = json.loads(audit_path.read_text(encoding="utf-8"))
+    rows = payload.get("rows", [])
+    retry_targets = sorted(f"{row['target_id']}:{row['date']}" for row in rows if row.get("status") in {"retry_download", "not_processed"})
+    pending = sorted(f"{row['target_id']}:{row['date']}" for row in rows if row.get("status") == "downloaded_without_mosaic")
+    metrics = {"run_root": str(root), "audit_path": str(audit_path), "retry_targets": retry_targets, "pending_mosaic_targets": pending, "status_counts": _status_counts(rows)}
+    if retry_targets or pending:
+        return _failed("VNP46A1_AUDIT_INCOMPLETE", "The VNP46A1 audit reports unfinished target-days.", "Retry only retry_targets, mosaic pending_mosaic_targets, then audit again.", metrics)
+    return ToolResult.succeeded(tool="download_vnp46a1_official_h5", summary="The VNP46A1 audit is complete.", metrics=metrics, outputs=[OutputArtifact(path=str(audit_path), media_type="application/json", role="audit")])
+
+
+def _run_request(request: Vnp46a1DownloadRequest, progress: DownloadProgress | None) -> ToolResult:
+    if "download" in request.phase_list and not os.getenv(request.token_env, "").strip():
+        return _failed("EARTHDATA_TOKEN_MISSING", f"{request.token_env} is not configured.", "Set the token in NTL_MCP_ENV_FILE or the process environment, then retry.", {"run_root": str(request.run_root)})
+    request.run_root.mkdir(parents=True, exist_ok=True)
+    try:
+        target_geometry = _prepare_geometry(request)
+        for index, phase in enumerate(request.phase_list, start=1):
+            _report(progress, index - 1, len(request.phase_list), phase)
+            if phase == "prepare":
+                continue
+            if phase == "download":
+                _download_days(request, target_geometry)
+            elif phase == "mosaic":
+                _mosaic_days(request, target_geometry)
+            elif phase == "audit":
+                _write_audit(request)
+        _report(progress, len(request.phase_list), len(request.phase_list), "completed")
+        return inspect_vnp46a1_run(request.run_root) if "audit" in request.phase_list else ToolResult.succeeded(tool="download_vnp46a1_official_h5", summary=f"Completed VNP46A1 {request.phase} phase.", metrics={"run_root": str(request.run_root)})
+    except Exception as exc:  # noqa: BLE001
+        return _failed("VNP46A1_PHASE_FAILED", sanitize_download_text(str(exc) or type(exc).__name__), "Inspect the phase manifests and retry only the affected target-days.", {"run_root": str(request.run_root)})
+
+
+def _prepare_geometry(request: Vnp46a1DownloadRequest):
+    import geopandas as gpd
+    from shapely.geometry import box
+
+    path = request.run_root / "target.geojson"
+    if path.exists():
+        return gpd.read_file(path).to_crs("EPSG:4326").geometry.union_all()
+    if request.bbox:
+        geometry = box(*request.bbox)
+        gpd.GeoDataFrame({"target_id": [request.target_id]}, geometry=[geometry], crs="EPSG:4326").to_file(path, driver="GeoJSON")
+        return geometry
+    from tools.vnp46a2_official_h5.vnp46a2_country_common import fetch_osm_boundary, selected_countries, simplified_boundary
+
+    country = selected_countries(request.countries)[0]
+    source = fetch_osm_boundary(country, request.run_root / "osm_boundaries")
+    boundary = simplified_boundary(source, country, request.run_root / "osm_boundaries_simplified_0p001")
+    boundary.to_file(path, driver="GeoJSON")
+    return boundary.geometry.union_all()
+
+
+def _download_days(request: Vnp46a1DownloadRequest, geometry: Any) -> None:
+    from experiments.official_daily_ntl_fastpath.cmr_client import download_file_with_curl, extract_download_link, resolve_token, search_granules
+
+    token = resolve_token(request.token_env)
+    rows: list[dict[str, Any]] = []
+    for day in _days(request.start_date, request.end_date):
+        if request.targets and f"{request.target_id}:{day}" not in request.targets:
+            continue
+        entries = [entry for entry in search_granules("VNP46A1", day, day, geometry.bounds, page_size=200) if _is_day_entry(entry.producer_granule_id, day)]
+        day_dir = request.run_root / "official_raw_h5" / request.target_id / day
+        files: list[str] = []
+        failures: list[str] = []
+        for index, entry in enumerate(entries, start=1):
+            link = extract_download_link(entry.links)
+            if not link:
+                failures.append("missing_download_link")
+                continue
+            destination = day_dir / (Path(link.split("?", 1)[0]).name or f"VNP46A1_{index}.h5")
+            ok, detail = download_file_with_curl(link, destination, earthdata_token=token, timeout=request.download_timeout)
+            if ok:
+                files.append(str(destination))
+            else:
+                failures.append(sanitize_download_text(detail))
+        rows.append({"target_id": request.target_id, "date": day, "status": "official_h5_downloaded" if files and not failures else "official_h5_partial" if files else "no_granules" if not entries else "retry_download", "files": files, "failures": failures})
+    write_download_manifest(request.run_root / "vnp46a1_download_manifest.json", {"product": "VNP46A1", "rows": rows})
+
+
+def _mosaic_days(request: Vnp46a1DownloadRequest, geometry: Any) -> None:
+    manifest = json.loads((request.run_root / "vnp46a1_download_manifest.json").read_text(encoding="utf-8"))
+    rows: list[dict[str, Any]] = []
+    for row in manifest.get("rows", []):
+        day = row["date"]
+        paths = [Path(item) for item in row.get("files", []) if Path(item).exists()]
+        result: dict[str, Any] = {"target_id": request.target_id, "date": day, "status": "missing_h5"}
+        if paths:
+            tile_dir = request.run_root / "tile_tifs" / request.target_id / day
+            radiance_tiles: list[Path] = []
+            utc_tiles: list[Path] = []
+            for index, path in enumerate(paths, start=1):
+                radiance, utc = h5_to_target_tifs(path, tile_dir / f"tile_{index}.tif", target_geometry=geometry, include_utc_time=request.include_utc_time)
+                radiance_tiles.append(radiance)
+                if utc is not None:
+                    utc_tiles.append(utc)
+            output = request.run_root / "official_h5_mosaics" / request.target_id / f"VNP46A1_DNB_At_Sensor_Radiance_500m_{request.target_id}_{day}.tif"
+            _merge_tiles(radiance_tiles, output, {"product": "VNP46A1", "target_id": request.target_id, "semantic_role": "at_sensor_dnb_radiance"})
+            if utc_tiles:
+                _merge_tiles(utc_tiles, output.with_name(f"{output.stem}_UTC_Time.tif"), {"product": "VNP46A1", "target_id": request.target_id, "semantic_role": "acquisition_time_utc_hours"})
+            result = {"target_id": request.target_id, "date": day, "status": "mosaic_valid", "output_file": str(output)}
+        rows.append(result)
+    write_download_manifest(request.run_root / "vnp46a1_mosaic_manifest.json", {"product": "VNP46A1", "rows": rows})
+
+
+def _write_audit(request: Vnp46a1DownloadRequest) -> None:
+    downloads = json.loads((request.run_root / "vnp46a1_download_manifest.json").read_text(encoding="utf-8")).get("rows", [])
+    mosaics = {row["date"]: row for row in json.loads((request.run_root / "vnp46a1_mosaic_manifest.json").read_text(encoding="utf-8")).get("rows", [])}
+    rows = []
+    for row in downloads:
+        mosaic = mosaics.get(row["date"], {})
+        status = mosaic.get("status") if row.get("files") else row.get("status")
+        if row.get("files") and status != "mosaic_valid":
+            status = "downloaded_without_mosaic"
+        rows.append({"target_id": request.target_id, "date": row["date"], "status": status or "not_processed", "output_file": mosaic.get("output_file", "")})
+    write_download_manifest(request.run_root / "vnp46a1_audit.json", {"product": "VNP46A1", "rows": rows})
+
+
+def _merge_tiles(paths: list[Path], output: Path, tags: dict[str, str]) -> None:
+    sources = [rasterio.open(path) for path in paths]
+    try:
+        data, transform = merge(sources, nodata=NODATA)
+        profile = sources[0].profile.copy()
+        profile.update(height=data.shape[1], width=data.shape[2], transform=transform, compress="deflate")
+        output.parent.mkdir(parents=True, exist_ok=True)
+        with rasterio.open(output, "w", **profile) as dataset:
+            dataset.write(data)
+            dataset.update_tags(**tags)
+    finally:
+        for source in sources:
+            source.close()
+
+
+def _days(start: str, end: str) -> list[str]:
+    current = datetime.strptime(start, _DATE_FORMAT).date()
+    finish = datetime.strptime(end, _DATE_FORMAT).date()
+    out = []
+    while current <= finish:
+        out.append(current.isoformat())
+        current += timedelta(days=1)
+    return out
+
+
+def _is_day_entry(granule_id: str, day: str) -> bool:
+    return f".A{datetime.strptime(day, _DATE_FORMAT).strftime('%Y%j')}." in granule_id
+
+
+def _status_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        status = str(row.get("status") or "")
+        counts[status] = counts.get(status, 0) + 1
+    return counts
+
+
+def _report(progress: DownloadProgress | None, current: float, total: float, message: str) -> None:
+    if progress is not None:
+        progress(float(current), float(total), message)
+
+
+def _failed(code: str, message: str, suggestion: str, metrics: dict[str, Any]) -> ToolResult:
+    return ToolResult.failed(tool="download_vnp46a1_official_h5", error=ToolError(code=code, message=message, suggestion=suggestion, details=metrics))
 
 
 def _parse_date(value: str, name: str) -> None:

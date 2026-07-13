@@ -1,5 +1,11 @@
 [
   {
+    "name": "download_vnp46a1_official_h5",
+    "purpose": "Run official NASA Earthdata VNP46A1 HDF5 download and clipped daily radiance mosaics for one ISO3 country or WGS84 bounding box, optionally with UTC_Time companion rasters.",
+    "side_effects": "creates target geometry, run manifests, HDF5 files, radiance mosaics, optional UTC_Time mosaics, and audit files under output_root",
+    "common_error_codes": ["INVALID_PARAMETER", "EARTHDATA_TOKEN_MISSING", "VNP46A1_PHASE_FAILED", "VNP46A1_AUDIT_INCOMPLETE"]
+  },
+  {
     "name": "validate_download_environment",
     "purpose": "Inspect local GEE/Earthdata download readiness without exposing credentials.",
     "side_effects": "none",

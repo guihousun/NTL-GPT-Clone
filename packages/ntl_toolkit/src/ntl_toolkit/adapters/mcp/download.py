@@ -19,6 +19,7 @@ from ntl_toolkit.core.vnp46a2_download import (
     inspect_vnp46a2_run,
     run_vnp46a2_download,
 )
+from ntl_toolkit.core.vnp46a1_download import Vnp46a1DownloadRequest, run_vnp46a1_download
 from ntl_toolkit.runtime import (
     load_runtime_environment,
     resolve_local_path,
@@ -189,6 +190,17 @@ async def _run_vnp_tool(
     return _payload(result)
 
 
+async def _run_vnp46a1_tool(ctx: Context, arguments: dict[str, Any], workdir: Path) -> dict[str, Any]:
+    try:
+        values = {item.name: arguments[item.name] for item in fields(Vnp46a1DownloadRequest) if item.name in arguments}
+        values["countries"] = values.get("countries") or []
+        values["targets"] = values.get("targets") or []
+        request = Vnp46a1DownloadRequest(**{**values, "output_root": str(resolve_local_path(values["output_root"], workdir))})
+    except (KeyError, ValueError, TypeError) as exc:
+        return _failed_payload(tool="download_vnp46a1_official_h5", code="INVALID_PARAMETER", message=str(exc), suggestion="Provide exactly one target mode, valid dates, and an output path.")
+    return _payload(await _run_with_progress(ctx, lambda progress: run_vnp46a1_download(request, progress=progress)))
+
+
 async def _run_gee_tool(
     ctx: Context,
     arguments: dict[str, Any],
@@ -300,6 +312,30 @@ def build_download_mcp() -> FastMCP:
         project: str | None = None,
     ) -> dict[str, Any]:
         return await _run_gee_tool(ctx, locals(), captured_workdir)
+
+    @mcp.tool(
+        name="download_vnp46a1_official_h5",
+        description="Run official VNP46A1 Earthdata HDF5 retrieval for one country or WGS84 BBox, with optional UTC_Time GeoTIFF output.",
+        annotations=_WRITE_NEW,
+        structured_output=True,
+    )
+    async def download_vnp46a1_official_h5(
+        ctx: Context,
+        start_date: str,
+        end_date: str,
+        output_root: str,
+        countries: list[str] | None = None,
+        bbox: list[float] | None = None,
+        include_utc_time: bool = False,
+        phase: str = "full",
+        execution_mode: str = "plan",
+        targets: list[str] | None = None,
+        workers: int = 4,
+        download_timeout: int = 600,
+        token_env: str = "EARTHDATA_TOKEN",
+        force: bool = False,
+    ) -> dict[str, Any]:
+        return await _run_vnp46a1_tool(ctx, locals(), captured_workdir)
 
     @mcp.tool(
         name="download_vnp46a2_official_h5_country",

@@ -115,3 +115,30 @@ def test_plan_records_target_mode_and_utc_time(tmp_path: Path) -> None:
     assert result.metrics["target_mode"] == "bbox"
     assert result.metrics["include_utc_time"] is True
     assert result.metrics["short_name"] == "VNP46A1"
+
+
+def test_full_run_executes_download_mosaic_and_audit_phases(monkeypatch, tmp_path: Path) -> None:
+    from ntl_toolkit.core import vnp46a1_download
+    from ntl_toolkit.schemas import ToolResult
+
+    phases: list[str] = []
+    monkeypatch.setenv("EARTHDATA_TOKEN", "configured")
+    monkeypatch.setattr(vnp46a1_download, "_prepare_geometry", lambda _request: box(34, 29, 35, 30))
+    monkeypatch.setattr(vnp46a1_download, "_download_days", lambda *_: phases.append("download"))
+    monkeypatch.setattr(vnp46a1_download, "_mosaic_days", lambda *_: phases.append("mosaic"))
+    monkeypatch.setattr(vnp46a1_download, "_write_audit", lambda *_: phases.append("audit"))
+    monkeypatch.setattr(
+        vnp46a1_download,
+        "inspect_vnp46a1_run",
+        lambda _root: ToolResult.succeeded(tool="download_vnp46a1_official_h5", summary="done"),
+    )
+    messages: list[str] = []
+
+    result = vnp46a1_download.run_vnp46a1_download(
+        _request(tmp_path, execution_mode="run", phase="full"),
+        progress=lambda _current, _total, message: messages.append(message),
+    )
+
+    assert result.status == "succeeded"
+    assert phases == ["download", "mosaic", "audit"]
+    assert messages == ["prepare", "download", "mosaic", "audit", "completed"]

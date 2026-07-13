@@ -17,6 +17,7 @@ from ntl_toolkit.schemas import ToolResult
 EXPECTED_TOOLS = [
     "validate_download_environment",
     "download_gee_raster",
+    "download_vnp46a1_official_h5",
     "download_vnp46a2_official_h5_country",
     "inspect_download_run",
 ]

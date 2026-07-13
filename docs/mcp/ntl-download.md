@@ -1,7 +1,7 @@
 # `ntl-download` MCP
 
 `ntl-download` is a local, single-user stdio MCP service for synchronous Google
-Earth Engine raster exports and official NASA Earthdata VNP46A2 country mosaics.
+Earth Engine raster exports and official NASA Earthdata VNP46A1/VNP46A2 daily mosaics.
 It is intentionally separate from `ntl-gis-core`: the latter remains a
 network-independent local GIS and nighttime-light analysis service.
 
@@ -37,7 +37,8 @@ configuration or tool arguments.
 | `validate_download_environment` | Checks local download dependencies, Earthdata token presence, and optional non-interactive GEE initialization. |
 | `download_gee_raster` | Exports one explicit GEE image or collection reduction from a dataset, band, UTC dates, WGS84 bounding box, scale, CRS, and output path. |
 | `download_vnp46a2_official_h5_country` | Plans or runs the official VNP46A2 non-gap-filled HDF5 country workflow: boundaries, CMR, download, validation, mosaic, audit, and optional package. |
-| `inspect_download_run` | Reads the VNP46A2 audit and returns actual status counts, retry targets, and pending mosaic targets. |
+| `download_vnp46a1_official_h5` | Plans or runs official VNP46A1 HDF5 retrieval for exactly one country or WGS84 BBox, producing daily `DNB_At_Sensor_Radiance_500m` GeoTIFFs and optional `UTC_Time` companion GeoTIFFs. |
+| `inspect_download_run` | Reads a VNP46A1 or VNP46A2 audit and returns actual status counts, retry targets, and pending mosaic targets. |
 
 The service also publishes `ntl://download/capabilities` and the shared
 `ntl://schemas/result-v1` resource.
@@ -73,6 +74,12 @@ Use this official HDF5 route only for explicit raw country-scale daily
 non-gap-filled `DNB_BRDF_Corrected_NTL` rasters. For country statistics,
 long-series summaries, and many-feature comparisons, use GEE server-side
 reductions instead of downloading country rasters.
+
+For VNP46A1, provide exactly one of `countries=["ISR"]` or
+`bbox=[34.0,29.0,35.0,30.0]`. Its primary output is at-sensor radiance, not
+VNP46A2 BRDF-corrected light. Set `include_utc_time=true` only when validating
+UTC acquisition timing near a date boundary; it creates a separate decimal UTC
+hours raster and must never be interpreted as radiance.
 
 ## Troubleshooting
 
