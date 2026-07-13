@@ -172,7 +172,22 @@ def run_vnp46a1_download(request: Vnp46a1DownloadRequest, *, progress: DownloadP
 def inspect_vnp46a1_run(run_root: str | Path) -> ToolResult:
     root = Path(run_root).expanduser().resolve(strict=False)
     audit_path = root / "vnp46a1_audit.json"
+    runtime_path = root / "vnp46a1_runtime.json"
+    if runtime_path.exists():
+        runtime = json.loads(runtime_path.read_text(encoding="utf-8"))
+        if runtime.get("status") in {"running", "failed"}:
+            return ToolResult.succeeded(
+                tool="download_vnp46a1_official_h5",
+                summary=f"VNP46A1 run is {runtime['status']}.",
+                metrics={"run_root": str(root), "runtime_path": str(runtime_path), **runtime},
+            )
     if not audit_path.exists():
+        if runtime_path.exists():
+            return ToolResult.succeeded(
+                tool="download_vnp46a1_official_h5",
+                summary=f"VNP46A1 run is {runtime.get('status', 'running')}.",
+                metrics={"run_root": str(root), "runtime_path": str(runtime_path), **runtime},
+            )
         return _failed("VNP46A1_AUDIT_NOT_FOUND", "No VNP46A1 audit was found.", "Run the audit phase first.", {"run_root": str(root)})
     payload = json.loads(audit_path.read_text(encoding="utf-8"))
     rows = payload.get("rows", [])
@@ -188,22 +203,42 @@ def _run_request(request: Vnp46a1DownloadRequest, progress: DownloadProgress | N
     if "download" in request.phase_list and not os.getenv(request.token_env, "").strip():
         return _failed("EARTHDATA_TOKEN_MISSING", f"{request.token_env} is not configured.", "Set the token in NTL_MCP_ENV_FILE or the process environment, then retry.", {"run_root": str(request.run_root)})
     request.run_root.mkdir(parents=True, exist_ok=True)
+    completed: list[str] = []
+    _write_runtime(request, status="running", current_phase="prepare", completed_phases=completed)
     try:
         target_geometry = _prepare_geometry(request)
         for index, phase in enumerate(request.phase_list, start=1):
+            _write_runtime(request, status="running", current_phase=phase, completed_phases=completed)
             _report(progress, index - 1, len(request.phase_list), phase)
             if phase == "prepare":
-                continue
-            if phase == "download":
+                pass
+            elif phase == "download":
                 _download_days(request, target_geometry)
             elif phase == "mosaic":
                 _mosaic_days(request, target_geometry)
             elif phase == "audit":
                 _write_audit(request)
+            completed.append(phase)
+            _write_runtime(request, status="running", current_phase="", completed_phases=completed)
         _report(progress, len(request.phase_list), len(request.phase_list), "completed")
+        _write_runtime(request, status="completed", current_phase="", completed_phases=completed)
         return inspect_vnp46a1_run(request.run_root) if "audit" in request.phase_list else ToolResult.succeeded(tool="download_vnp46a1_official_h5", summary=f"Completed VNP46A1 {request.phase} phase.", metrics={"run_root": str(request.run_root)})
     except Exception as exc:  # noqa: BLE001
+        _write_runtime(request, status="failed", current_phase="", completed_phases=completed)
         return _failed("VNP46A1_PHASE_FAILED", sanitize_download_text(str(exc) or type(exc).__name__), "Inspect the phase manifests and retry only the affected target-days.", {"run_root": str(request.run_root)})
+
+
+def _write_runtime(request: Vnp46a1DownloadRequest, *, status: str, current_phase: str, completed_phases: list[str]) -> None:
+    write_download_manifest(
+        request.run_root / "vnp46a1_runtime.json",
+        {
+            "status": status,
+            "current_phase": current_phase,
+            "completed_phases": completed_phases,
+            "updated_at_utc": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            "target_id": request.target_id,
+        },
+    )
 
 
 def _prepare_geometry(request: Vnp46a1DownloadRequest):

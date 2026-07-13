@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import os
 import re
 import subprocess
@@ -130,33 +131,49 @@ def run_vnp46a2_download(
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
     total = len(request.phase_list)
+    completed: list[str] = []
+    _write_runtime_state(request, status="running", current_phase="", completed_phases=completed)
 
-    for index, phase in enumerate(request.phase_list, start=1):
-        _report(progress, index - 1, total, phase)
-        outcome = _run_phase(
-            phase,
-            commands[phase],
-            _script_dir(),
-            env,
-            lambda line: _report(progress, index - 1, total, sanitize_download_text(line)),
-        )
-        _write_phase_manifest(request.run_root, outcome)
-        if outcome.returncode:
-            if phase == "audit" and (request.run_root / "vnp46a2_country_day_coverage_audit.csv").exists():
-                return inspect_vnp46a2_run(request.run_root)
-            return _failed(
-                "VNP46A2_PHASE_FAILED",
-                f"{phase} exited with code {outcome.returncode}.",
-                "Inspect the stored phase manifest, then retry only the returned targets.",
-                metrics={
-                    "phase": phase,
-                    "run_root": str(request.run_root),
-                    "stdout_tail": sanitize_download_text(outcome.stdout[-2400:]),
-                    "stderr_tail": sanitize_download_text(outcome.stderr[-2400:]),
-                },
+    try:
+        for index, phase in enumerate(request.phase_list, start=1):
+            _write_runtime_state(request, status="running", current_phase=phase, completed_phases=completed)
+            _report(progress, index - 1, total, phase)
+            outcome = _run_phase(
+                phase,
+                commands[phase],
+                _script_dir(),
+                env,
+                lambda line: _report(progress, index - 1, total, sanitize_download_text(line)),
             )
+            _write_phase_manifest(request.run_root, outcome)
+            if outcome.returncode:
+                _write_runtime_state(request, status="failed", current_phase=phase, completed_phases=completed)
+                if phase == "audit" and (request.run_root / "vnp46a2_country_day_coverage_audit.csv").exists():
+                    return inspect_vnp46a2_run(request.run_root)
+                return _failed(
+                    "VNP46A2_PHASE_FAILED",
+                    f"{phase} exited with code {outcome.returncode}.",
+                    "Inspect the stored phase manifest, then retry only the returned targets.",
+                    metrics={
+                        "phase": phase,
+                        "run_root": str(request.run_root),
+                        "stdout_tail": sanitize_download_text(outcome.stdout[-2400:]),
+                        "stderr_tail": sanitize_download_text(outcome.stderr[-2400:]),
+                    },
+                )
+            completed.append(phase)
+            _write_runtime_state(request, status="running", current_phase="", completed_phases=completed)
+    except Exception as exc:  # noqa: BLE001
+        _write_runtime_state(request, status="failed", current_phase="", completed_phases=completed)
+        return _failed(
+            "VNP46A2_PHASE_FAILED",
+            sanitize_download_text(str(exc) or type(exc).__name__),
+            "Inspect the stored phase manifest and runtime status, then retry the affected phase.",
+            metrics={"run_root": str(request.run_root), "completed_phases": completed},
+        )
 
     _report(progress, total, total, "completed")
+    _write_runtime_state(request, status="completed", current_phase="", completed_phases=completed)
     if "audit" in request.phase_list:
         return inspect_vnp46a2_run(request.run_root)
     return ToolResult.succeeded(
@@ -170,7 +187,22 @@ def inspect_vnp46a2_run(run_root: str | Path) -> ToolResult:
     """Read an official VNP46A2 audit and expose exact retry actions."""
     root = Path(run_root).expanduser().resolve(strict=False)
     audit_path = root / "vnp46a2_country_day_coverage_audit.csv"
+    runtime_path = root / "ntl_download_runtime.json"
+    if runtime_path.exists():
+        runtime = json.loads(runtime_path.read_text(encoding="utf-8"))
+        if runtime.get("status") in {"running", "failed"}:
+            return ToolResult.succeeded(
+                tool="download_vnp46a2_official_h5_country",
+                summary=f"VNP46A2 run is {runtime['status']}.",
+                metrics={"run_root": str(root), "runtime_path": str(runtime_path), **runtime},
+            )
     if not audit_path.exists():
+        if runtime_path.exists():
+            return ToolResult.succeeded(
+                tool="download_vnp46a2_official_h5_country",
+                summary=f"VNP46A2 run is {runtime.get('status', 'running')}.",
+                metrics={"run_root": str(root), "runtime_path": str(runtime_path), **runtime},
+            )
         return _failed(
             "VNP46A2_AUDIT_NOT_FOUND",
             f"No country-day audit was found under {root}.",
@@ -297,6 +329,28 @@ def _write_phase_manifest(run_root: Path, outcome: PhaseOutcome) -> Path:
             "stdout_tail": outcome.stdout[-4000:],
             "stderr_tail": outcome.stderr[-4000:],
             "finished_at_utc": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        },
+    )
+
+
+def _write_runtime_state(
+    request: Vnp46a2DownloadRequest,
+    *,
+    status: str,
+    current_phase: str,
+    completed_phases: list[str],
+) -> Path:
+    return write_download_manifest(
+        request.run_root / "ntl_download_runtime.json",
+        {
+            "product": "VNP46A2",
+            "status": status,
+            "current_phase": current_phase,
+            "completed_phases": completed_phases,
+            "countries": request.countries,
+            "start_date": request.start_date,
+            "end_date": request.end_date,
+            "updated_at_utc": datetime.utcnow().isoformat(timespec="seconds") + "Z",
         },
     )
 

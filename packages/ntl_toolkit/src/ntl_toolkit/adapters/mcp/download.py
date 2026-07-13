@@ -378,7 +378,7 @@ def build_download_mcp() -> FastMCP:
     def inspect_download_run(run_root: str) -> dict[str, Any]:
         try:
             root = resolve_local_path(run_root, captured_workdir)
-            result = inspect_vnp46a1_run(root) if (root / "vnp46a1_audit.json").exists() else inspect_vnp46a2_run(root)
+            result = inspect_vnp46a1_run(root) if ((root / "vnp46a1_audit.json").exists() or (root / "vnp46a1_runtime.json").exists()) else inspect_vnp46a2_run(root)
             return _payload(result)
         except ValueError as exc:
             return _failed_payload(

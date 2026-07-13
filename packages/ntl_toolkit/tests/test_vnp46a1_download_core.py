@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import h5py
@@ -142,3 +143,26 @@ def test_full_run_executes_download_mosaic_and_audit_phases(monkeypatch, tmp_pat
     assert result.status == "succeeded"
     assert phases == ["download", "mosaic", "audit"]
     assert messages == ["prepare", "download", "mosaic", "audit", "completed"]
+    runtime = json.loads((_request(tmp_path).run_root / "vnp46a1_runtime.json").read_text(encoding="utf-8"))
+    assert runtime["status"] == "completed"
+    assert runtime["completed_phases"] == ["prepare", "download", "mosaic", "audit"]
+
+
+def test_inspect_vnp46a1_reports_runtime_before_audit(tmp_path: Path) -> None:
+    from ntl_toolkit.core import vnp46a1_download
+
+    request = _request(tmp_path, execution_mode="run")
+    request.run_root.mkdir(parents=True)
+    (request.run_root / "vnp46a1_audit.json").write_text('{"rows": []}', encoding="utf-8")
+    vnp46a1_download._write_runtime(
+        request,
+        status="running",
+        current_phase="mosaic",
+        completed_phases=["prepare", "download"],
+    )
+
+    result = vnp46a1_download.inspect_vnp46a1_run(request.run_root)
+
+    assert result.status == "succeeded"
+    assert result.metrics["status"] == "running"
+    assert result.metrics["current_phase"] == "mosaic"

@@ -91,6 +91,9 @@ def test_vnp_full_mode_runs_all_phases_and_reports_progress(
     assert messages.count("prepare: Bearer <REDACTED>") == 1
     phase_manifest = json.loads((run_root / "ntl_download_phase_download.json").read_text(encoding="utf-8"))
     assert "test-token" not in json.dumps(phase_manifest)
+    runtime = json.loads((run_root / "ntl_download_runtime.json").read_text(encoding="utf-8"))
+    assert runtime["status"] == "completed"
+    assert runtime["completed_phases"] == ["prepare", "download", "mosaic", "audit"]
 
 
 def test_plan_mode_preserves_retry_targets_and_never_spawns(
@@ -150,3 +153,21 @@ def test_inspect_vnp_treats_no_granules_and_all_nodata_as_terminal(tmp_path: Pat
 
     assert result.status == "succeeded"
     assert result.metrics["retry_targets"] == []
+
+
+def test_inspect_vnp_reports_runtime_before_audit(tmp_path: Path) -> None:
+    request = _request(tmp_path)
+    _write_audit(request.run_root, ["mosaic_valid"])
+    vnp46a2_download._write_runtime_state(
+        request,
+        status="running",
+        current_phase="download",
+        completed_phases=["prepare"],
+    )
+
+    result = inspect_vnp46a2_run(request.run_root)
+
+    assert result.status == "succeeded"
+    assert result.metrics["status"] == "running"
+    assert result.metrics["current_phase"] == "download"
+    assert result.metrics["completed_phases"] == ["prepare"]

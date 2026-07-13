@@ -25,7 +25,7 @@
   },
   {
     "name": "inspect_download_run",
-    "purpose": "Read an existing VNP46A2 country-day audit and return exact retry/mosaic targets.",
+    "purpose": "Read VNP46A1 or VNP46A2 runtime state during an active download, or a completed audit with exact retry/mosaic targets.",
     "side_effects": "none",
     "common_error_codes": ["VNP46A2_AUDIT_NOT_FOUND", "VNP46A2_AUDIT_INCOMPLETE"]
   }

@@ -38,7 +38,7 @@ configuration or tool arguments.
 | `download_gee_raster` | Exports one explicit GEE image or collection reduction from a dataset, band, UTC dates, WGS84 bounding box, scale, CRS, and output path. |
 | `download_vnp46a2_official_h5_country` | Plans or runs the official VNP46A2 non-gap-filled HDF5 country workflow: boundaries, CMR, download, validation, mosaic, audit, and optional package. |
 | `download_vnp46a1_official_h5` | Plans or runs official VNP46A1 HDF5 retrieval for exactly one country or WGS84 BBox, producing daily `DNB_At_Sensor_Radiance_500m` GeoTIFFs and optional `UTC_Time` companion GeoTIFFs. |
-| `inspect_download_run` | Reads a VNP46A1 or VNP46A2 audit and returns actual status counts, retry targets, and pending mosaic targets. |
+| `inspect_download_run` | Reads a VNP46A1 or VNP46A2 audit when available; during an active run, returns its persisted status, current phase, completed phases, and last update time. |
 
 The service also publishes `ntl://download/capabilities` and the shared
 `ntl://schemas/result-v1` resource.
@@ -59,9 +59,15 @@ The service also publishes `ntl://download/capabilities` and the shared
 ## Progress, recovery, and audit
 
 The GEE tool reports initialization, imagery selection, export, validation, and
-completion. The official VNP46A2 route reports each pipeline phase plus
-sanitized script output. If Codex disconnects, do not restart a country run by
-default: call `inspect_download_run` on the same run directory.
+completion. The official HDF5 routes report each pipeline phase plus sanitized
+script output and persist `*_runtime.json` state files. If the client does not
+render progress notifications, call `inspect_download_run` on the same run
+directory: before audit it reports `running`, the current phase, completed
+phases, and last update time; after audit it returns the exact recovery targets.
+An active or failed runtime state takes precedence over a stale audit from an
+earlier attempt in the same directory.
+For a long active call, a second local stdio client may inspect the same run
+directory without creating a service, queue, or database.
 
 For VNP46A2, `retry_download` and `not_processed` entries are returned as exact
 `ISO3:YYYY-MM-DD` retry targets. `downloaded_without_mosaic` entries are
