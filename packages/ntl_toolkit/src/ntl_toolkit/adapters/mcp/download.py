@@ -19,7 +19,11 @@ from ntl_toolkit.core.vnp46a2_download import (
     inspect_vnp46a2_run,
     run_vnp46a2_download,
 )
-from ntl_toolkit.core.vnp46a1_download import Vnp46a1DownloadRequest, run_vnp46a1_download
+from ntl_toolkit.core.vnp46a1_download import (
+    Vnp46a1DownloadRequest,
+    inspect_vnp46a1_run,
+    run_vnp46a1_download,
+)
 from ntl_toolkit.runtime import (
     load_runtime_environment,
     resolve_local_path,
@@ -367,13 +371,15 @@ def build_download_mcp() -> FastMCP:
 
     @mcp.tool(
         name="inspect_download_run",
-        description="Inspect a VNP46A2 run audit and return actual artifacts, status counts, and exact retry targets.",
+        description="Inspect a VNP46A1 or VNP46A2 run audit and return actual artifacts, status counts, and exact retry targets.",
         annotations=_READ_ONLY,
         structured_output=True,
     )
     def inspect_download_run(run_root: str) -> dict[str, Any]:
         try:
-            return _payload(inspect_vnp46a2_run(resolve_local_path(run_root, captured_workdir)))
+            root = resolve_local_path(run_root, captured_workdir)
+            result = inspect_vnp46a1_run(root) if (root / "vnp46a1_audit.json").exists() else inspect_vnp46a2_run(root)
+            return _payload(result)
         except ValueError as exc:
             return _failed_payload(
                 tool="inspect_download_run",

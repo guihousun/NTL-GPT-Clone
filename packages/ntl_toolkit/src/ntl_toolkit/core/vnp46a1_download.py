@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -22,6 +23,7 @@ from ntl_toolkit.schemas import OutputArtifact, ToolError, ToolResult
 NODATA = -9999.0
 _DATE_FORMAT = "%Y-%m-%d"
 _RADIANCE_DATASET = "DNB_At_Sensor_Radiance_500m"
+_RADIANCE_DATASET_CANDIDATES = (_RADIANCE_DATASET, "DNB_At_Sensor_Radiance")
 _UTC_TIME_DATASET = "UTC_Time"
 
 
@@ -116,7 +118,7 @@ def h5_to_target_tifs(
     output = Path(radiance_path)
     with h5py.File(source, "r") as handle:
         root_attrs = {name: _as_scalar(value) for name, value in handle.attrs.items()}
-        radiance_dataset_path, radiance_dataset = _find_dataset(handle, _RADIANCE_DATASET)
+        radiance_dataset_path, radiance_dataset = _find_dataset(handle, _RADIANCE_DATASET_CANDIDATES)
         transform = _geographic_transform(root_attrs, radiance_dataset.shape)
         radiance = _scaled_values(radiance_dataset)
         _write_clipped_tif(
@@ -225,6 +227,9 @@ def _prepare_geometry(request: Vnp46a1DownloadRequest):
 
 
 def _download_days(request: Vnp46a1DownloadRequest, geometry: Any) -> None:
+    repo_root = Path(__file__).resolve().parents[5]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
     from experiments.official_daily_ntl_fastpath.cmr_client import download_file_with_curl, extract_download_link, resolve_token, search_granules
 
     token = resolve_token(request.token_env)
@@ -283,7 +288,9 @@ def _write_audit(request: Vnp46a1DownloadRequest) -> None:
     for row in downloads:
         mosaic = mosaics.get(row["date"], {})
         status = mosaic.get("status") if row.get("files") else row.get("status")
-        if row.get("files") and status != "mosaic_valid":
+        if row.get("status") in {"official_h5_partial", "retry_download"}:
+            status = "retry_download"
+        elif row.get("files") and status != "mosaic_valid":
             status = "downloaded_without_mosaic"
         rows.append({"target_id": request.target_id, "date": row["date"], "status": status or "not_processed", "output_file": mosaic.get("output_file", "")})
     write_download_manifest(request.run_root / "vnp46a1_audit.json", {"product": "VNP46A1", "rows": rows})
@@ -351,16 +358,17 @@ def _normalize_bbox(value: list[float] | tuple[float, float, float, float] | Non
     return minx, miny, maxx, maxy
 
 
-def _find_dataset(handle: h5py.File, dataset_name: str) -> tuple[str, h5py.Dataset]:
+def _find_dataset(handle: h5py.File, dataset_names: str | tuple[str, ...]) -> tuple[str, h5py.Dataset]:
+    candidates = (dataset_names,) if isinstance(dataset_names, str) else dataset_names
     matches: list[str] = []
 
     def collect(name: str, value: Any) -> None:
-        if isinstance(value, h5py.Dataset) and name.replace("-", "_").endswith(dataset_name):
+        if isinstance(value, h5py.Dataset) and any(name.replace("-", "_").endswith(candidate) for candidate in candidates):
             matches.append(name)
 
     handle.visititems(collect)
     if not matches:
-        raise KeyError(f"{dataset_name} not found in {handle.filename}")
+        raise KeyError(f"{' or '.join(candidates)} not found in {handle.filename}")
     selected = matches[0]
     return selected, handle[selected]
 
