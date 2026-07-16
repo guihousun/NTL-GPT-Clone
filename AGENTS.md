@@ -57,8 +57,8 @@ This repository prefers robust, reusable capability upgrades over query-specific
 ### Environment and Secrets
 - Never commit `.env`, tokens, API keys, Earthdata credentials, GEE credentials, downloaded private data, or local user workspaces.
 - Keep `.env.example`, `README.md`, and `check_env.py` in sync when adding, renaming, or removing environment variables.
-- Current required DashScope variables are documented in `README.md` and checked by `check_env.py`.
-- `DASHSCOPE_API_KEY` and `DASHSCOPE_Qwen_plus_KEY` may serve different model channels; do not collapse them unless the runtime code and docs are updated together.
+- Current required DeepSeek and internal DashScope variables are documented in `README.md` and checked by `check_env.py`.
+- `DeepSeek_API_KEY` / `DeepSeek_Coding_URL` serve the selectable frontend models. `DASHSCOPE_API_KEY` and `DASHSCOPE_Qwen_plus_KEY` remain separate internal VLM, knowledge-base, and embedding channels; do not collapse them unless the runtime code and docs are updated together.
 
 ## Validation Baseline
 

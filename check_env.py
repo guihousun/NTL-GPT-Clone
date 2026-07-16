@@ -10,15 +10,15 @@ ROOT = Path(__file__).resolve().parent
 DOTENV_PATH = ROOT / ".env"
 
 REQUIRED_ENV = [
+    "DeepSeek_API_KEY",
+    "DeepSeek_Coding_URL",
     "DASHSCOPE_API_KEY",
     "DASHSCOPE_Qwen_plus_KEY",
     "DASHSCOPE_Qwen_plus_URL",
-    "DASHSCOPE_Coding_URL",
 ]
 
 OPTIONAL_ENV = [
-    "MINIMAX_API_KEY",
-    "MINIMAX_Coding_URL",
+    "NTL_VLM_MODEL",
     "GEE_DEFAULT_PROJECT_ID",
     "EARTHDATA_TOKEN",
     "NTL_TOOL_PROFILE",

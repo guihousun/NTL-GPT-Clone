@@ -5,7 +5,6 @@ import os
 from deepagents import create_deep_agent
 from deepagents.backends import CompositeBackend, FilesystemBackend
 from deepagents.middleware.skills import _list_skills
-from langchain.chat_models import init_chat_model
 from langchain_openai import ChatOpenAI
 from langgraph.store.memory import InMemoryStore
 from pathlib import Path
@@ -32,17 +31,17 @@ SKILLS_SOURCE = "/skills/"
 def _build_llm(model_name: str, api_key: str, request_timeout_s: int):
     model_config = get_model_config(model_name)
     api_model = get_api_model_name(model_name)
-    if model_config.provider in {"dashscope", "minimax"}:
-        return ChatOpenAI(
-            api_key=SecretStr(api_key),
-            base_url=get_base_url(model_name),
-            model=api_model,
-            timeout=request_timeout_s,
+    if model_config.provider != "deepseek":
+        raise ValueError(f"Unsupported frontend model provider: {model_config.provider}")
+    base_url = get_base_url(model_name)
+    if not api_key or not base_url:
+        raise RuntimeError(
+            f"{model_config.api_key_env} and {model_config.base_url_env} are required for {api_model}."
         )
-    return init_chat_model(
-        api_model,
-        model_provider="openai",
-        api_key=api_key,
+    return ChatOpenAI(
+        api_key=SecretStr(api_key),
+        base_url=base_url,
+        model=api_model,
         temperature=0,
         timeout=request_timeout_s,
         max_retries=3,
@@ -215,4 +214,3 @@ Delegation policy:
     )
 
     return ntl_agent
-

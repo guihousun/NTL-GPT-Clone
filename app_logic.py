@@ -369,7 +369,8 @@ def _extract_tool_usage(logs: list) -> tuple[list[str], dict]:
 
 def inject_selected_files_to_context(file_names: list[str], max_pages: int = 120) -> dict:
     thread_id = str(st.session_state.get("thread_id") or "debug")
-    vlm_model_name = str(st.session_state.get("cfg_model") or "qwen3.5-plus")
+    # Image understanding is an internal VLM channel, independent of the frontend chat model.
+    vlm_model_name = str(os.getenv("NTL_VLM_MODEL") or "qwen3.5-plus")
     result = file_context_service.build_context_items_for_files(
         thread_id=thread_id,
         file_names=file_names,

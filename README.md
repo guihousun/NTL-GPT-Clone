@@ -30,15 +30,15 @@ streamlit run Streamlit.py
 
 Required:
 
+- `DeepSeek_API_KEY`
+- `DeepSeek_Coding_URL`
 - `DASHSCOPE_API_KEY`
 - `DASHSCOPE_Qwen_plus_KEY`
 - `DASHSCOPE_Qwen_plus_URL`
-- `DASHSCOPE_Coding_URL`
 
 Optional:
 
-- `MINIMAX_API_KEY`
-- `MINIMAX_Coding_URL`
+- `NTL_VLM_MODEL`
 - `GEE_DEFAULT_PROJECT_ID`
 - `EARTHDATA_TOKEN`
 - `NTL_TOOL_PROFILE`
@@ -175,10 +175,11 @@ Additional setup for official VIIRS downloads:
   HDF5 route for non-gap-filled `DNB_BRDF_Corrected_NTL`, writes only inside the
   current thread workspace, and requires a country-day audit after mosaicking.
 
-DashScope channel mapping:
+Model and internal service channel mapping:
 
-- `DASHSCOPE_API_KEY` is used with `DASHSCOPE_Coding_URL`
-- `DASHSCOPE_Qwen_plus_KEY` is used with `DASHSCOPE_Qwen_plus_URL`
+- `DeepSeek_API_KEY` is used with `DeepSeek_Coding_URL` for the selectable frontend chat models.
+- `DASHSCOPE_API_KEY` is retained for internal image understanding; `NTL_VLM_MODEL` defaults to `qwen3.5-plus`.
+- `DASHSCOPE_Qwen_plus_KEY` is used with `DASHSCOPE_Qwen_plus_URL` for internal knowledge-base services and is also the default embedding key.
 
 ## RAG Embeddings
 
@@ -197,9 +198,8 @@ If an existing `RAG/*_RAG` Chroma store was built with OpenAI embeddings, rebuil
 
 Model channel mapping:
 
-- `qwen3.5-plus` and `qwen3.6-plus` use the DashScope coding channel.
-- `MiniMax-M2.7` uses `MINIMAX_API_KEY` and `MINIMAX_Coding_URL`.
-- `GPT-5.4`, `GPT-5.4-mini`, and `GPT-5.4-nano` use the OpenAI channel; API model names are normalized to lowercase.
+- `deepseek-v4-flash` and `deepseek-v4-pro` use the OpenAI-compatible endpoint configured by `DeepSeek_API_KEY` and `DeepSeek_Coding_URL`.
+- Qwen remains an internal-only dependency for image understanding, knowledge-base search, and the default embedding provider; it is no longer exposed in the frontend model selector.
 
 ## Startup Check
 

@@ -9,14 +9,9 @@ from dotenv import dotenv_values
 
 
 MODEL_OPTIONS = [
-    "qwen3.6-plus",
-    "qwen3.5-plus",
-    "MiniMax-M2.7",
-    "GPT-5.4",
-    "GPT-5.4-mini",
-    "GPT-5.4-nano",
+    "deepseek-v4-flash",
+    "deepseek-v4-pro",
 ]
-MINIMAX_DEFAULT_BASE_URL = "https://api.minimaxi.com/v1"
 PROJECT_DOTENV = Path(__file__).resolve().parent / ".env"
 
 
@@ -35,34 +30,21 @@ def get_model_config(model_name: str) -> ModelRuntimeConfig:
     name = str(model_name or "").strip()
     normalized = name.lower().replace("-", "").replace("_", "").replace(" ", "").replace(".", "")
 
-    if normalized.startswith("qwen"):
+    deepseek_models = {
+        "deepseekv4flash": "deepseek-v4-flash",
+        "deepseekv4pro": "deepseek-v4-pro",
+    }
+    if normalized in deepseek_models:
         return ModelRuntimeConfig(
-            provider="dashscope",
-            api_model=name,
-            api_key_env="DASHSCOPE_API_KEY",
-            base_url_env="DASHSCOPE_Coding_URL",
-            key_label="DashScope API Key",
+            provider="deepseek",
+            api_model=deepseek_models[normalized],
+            api_key_env="DeepSeek_API_KEY",
+            base_url_env="DeepSeek_Coding_URL",
+            key_label="DeepSeek API Key",
             uses_env_api_key=True,
         )
 
-    if normalized in {"minimax27", "minimaxm27", "codexminimaxm27"}:
-        return ModelRuntimeConfig(
-            provider="minimax",
-            api_model="MiniMax-M2.7",
-            api_key_env="MINIMAX_API_KEY",
-            base_url_env="MINIMAX_Coding_URL",
-            default_base_url=MINIMAX_DEFAULT_BASE_URL,
-            key_label="MiniMax API Key",
-            uses_env_api_key=True,
-        )
-
-    if normalized.startswith("gpt"):
-        return ModelRuntimeConfig(provider="openai", api_model=name.lower(), key_label="OpenAI API Key")
-
-    if "claude" in normalized:
-        return ModelRuntimeConfig(provider="anthropic", api_model=name, key_label="Anthropic API Key")
-
-    return ModelRuntimeConfig(provider="openai", api_model=name, key_label="OpenAI API Key")
+    raise ValueError(f"Unsupported frontend model: {name or '<empty>'}")
 
 
 def get_api_model_name(model_name: str) -> str:
@@ -104,6 +86,6 @@ def missing_env_for_model(model_name: str) -> list[str]:
     missing: list[str] = []
     if config.api_key_env and not _get_configured_env(config.api_key_env):
         missing.append(config.api_key_env)
-    if config.provider == "dashscope" and config.base_url_env and not _get_configured_env(config.base_url_env):
+    if config.base_url_env and not config.default_base_url and not _get_configured_env(config.base_url_env):
         missing.append(config.base_url_env)
     return missing
