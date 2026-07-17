@@ -640,10 +640,51 @@ def inject_css():
         background: transparent !important;
         height: 0 !important;
         min-height: 0 !important;
-        display: none !important;
+        display: block !important;
+        overflow: visible !important;
+        pointer-events: none !important;
     }
     div[data-testid="stDecoration"] { display: none !important; }
     [data-testid="stToolbar"] { display: none !important; }
+    [data-testid="stSidebarCollapsedControl"] {
+        display: flex !important;
+        position: fixed !important;
+        top: 0.75rem !important;
+        left: 0.75rem !important;
+        z-index: 1200 !important;
+        pointer-events: auto !important;
+    }
+    [data-testid="stSidebarCollapsedControl"] button {
+        width: 2.5rem !important;
+        height: 2.5rem !important;
+        min-height: 2.5rem !important;
+        border: 1px solid rgba(149, 176, 255, 0.46) !important;
+        border-radius: 8px !important;
+        background: rgba(10, 18, 40, 0.94) !important;
+        color: #eaf1ff !important;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28) !important;
+    }
+    [data-testid="stSidebarCollapsedControl"] button svg {
+        fill: #eaf1ff !important;
+        color: #eaf1ff !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stBaseButton-headerNoPadding"] {
+        width: 2.5rem !important;
+        height: 2.5rem !important;
+        min-height: 2.5rem !important;
+        border: 1px solid rgba(149, 176, 255, 0.46) !important;
+        border-radius: 8px !important;
+        background: rgba(10, 18, 40, 0.94) !important;
+        color: #eaf1ff !important;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28) !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stBaseButton-headerNoPadding"] *,
+    [data-testid="stSidebarCollapsedControl"] button * {
+        color: #eaf1ff !important;
+        fill: #eaf1ff !important;
+        -webkit-text-fill-color: #eaf1ff !important;
+        opacity: 1 !important;
+    }
     [data-testid="stAppViewContainer"] {
         background: transparent !important;
     }
@@ -956,6 +997,17 @@ def inject_css():
     button[data-baseweb="tab"] p { font-size: 0.95rem !important; font-weight: 650 !important; color: #ffffff !important; }
     button[aria-selected="true"][data-baseweb="tab"] p { color: #ff5f5f !important; }
     button[data-baseweb="tab"] { padding-right: 14px !important; padding-left: 14px !important; }
+    [data-testid="stMain"] [data-testid="stTabs"] [role="tablist"] {
+        gap: 0.25rem !important;
+    }
+    [data-testid="stMain"] [data-testid="stTabs"] button[data-baseweb="tab"] {
+        padding-left: 0.4rem !important;
+        padding-right: 0.4rem !important;
+    }
+    [data-testid="stMain"] [data-testid="stTabs"] button[data-baseweb="tab"] p {
+        font-size: 0.8rem !important;
+        white-space: nowrap !important;
+    }
     [data-testid="stSidebar"] button[data-baseweb="tab"] p {
         color: #ffffff !important;
         -webkit-text-fill-color: #ffffff !important;
@@ -966,6 +1018,25 @@ def inject_css():
     [data-testid="stSidebar"] .stDownloadButton button { min-height: 30px !important; }
     div[data-testid="stRadio"] label p { font-size: 0.78rem !important; }
     /* Language switch (CN / EN) contrast */
+    .st-key-ui_lang_switch {
+        min-width: 7.5rem !important;
+        width: 100% !important;
+    }
+    .st-key-ui_lang_switch [role="radiogroup"] {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        justify-content: flex-end !important;
+        gap: 0.75rem !important;
+        min-width: 7.5rem !important;
+    }
+    .st-key-ui_lang_switch label,
+    .st-key-ui_lang_switch label p,
+    .st-key-ui_lang_switch label span {
+        flex: 0 0 auto !important;
+        min-width: max-content !important;
+        white-space: nowrap !important;
+        word-break: keep-all !important;
+    }
     [data-testid="stRadio"] label,
     [data-testid="stRadio"] label p,
     [data-testid="stRadio"] label span,
@@ -974,6 +1045,15 @@ def inject_css():
         -webkit-text-fill-color: #eaf1ff !important;
         opacity: 1 !important;
         font-weight: 700 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="InputInstructions"] {
+        display: none !important;
+        pointer-events: none !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stTextInput"] button {
+        position: relative !important;
+        z-index: 2 !important;
+        pointer-events: auto !important;
     }
     .ntl-card { border:1px solid #d7e3e0;border-radius:10px;background:rgba(255,255,255,0.94);padding:10px 12px; color:#111827; }
     .ntl-card *, .ntl-card p, .ntl-card span, .ntl-card div { color:#111827 !important; }
@@ -1118,6 +1198,15 @@ def inject_css():
         color: #ffd6d6 !important;
         -webkit-text-fill-color: #ffd6d6 !important;
     }
+    [data-testid="stSidebar"] .st-key-delete_selected_thread_inline_trigger button p {
+        display: none !important;
+    }
+    [data-testid="stSidebar"] .st-key-delete_selected_thread_inline_trigger [data-testid="stIconMaterial"] {
+        color: #ffd6d6 !important;
+        -webkit-text-fill-color: #ffd6d6 !important;
+        font-size: 1.15rem !important;
+        opacity: 1 !important;
+    }
     [data-testid="stSidebar"] .st-key-delete_selected_thread_inline_trigger button:hover,
     [data-testid="stSidebar"] .stElementContainer.st-key-delete_selected_thread_inline_trigger [data-testid="stBaseButton-secondary"]:hover {
         border-color: rgba(255, 156, 156, 0.78) !important;
@@ -1230,7 +1319,9 @@ def inject_css():
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 0.8rem;
+        flex-wrap: wrap;
+        column-gap: 0.8rem;
+        row-gap: 0.32rem;
         color: #dce8ff;
         font-size: 0.93rem;
         margin-top: 0.2rem;
@@ -1240,6 +1331,9 @@ def inject_css():
         align-items: center;
         gap: 0.22rem;
         white-space: nowrap;
+    }
+    .ntl-thread-status-item:last-child {
+        flex-basis: 100%;
     }
     .ntl-thread-status-value {
         color: #f1f6ff;
@@ -1268,6 +1362,11 @@ def inject_css():
     }
     [data-testid="stSidebar"] [data-baseweb="select"] input {
         caret-color: transparent !important;
+        width: 0 !important;
+        min-width: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        opacity: 0 !important;
     }
     [data-testid="stSidebar"] [data-testid="stExpander"] details,
     [data-testid="stSidebar"] [data-testid="stExpander"] details * {
@@ -1311,6 +1410,56 @@ def inject_css():
     [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button span {
         color: #dce8ff !important;
         -webkit-text-fill-color: #dce8ff !important;
+    }
+    @media (max-width: 768px) {
+        .block-container {
+            padding: 4.25rem 1rem 7rem 1rem !important;
+        }
+        [data-testid="stSidebar"] {
+            width: min(82vw, 300px) !important;
+            min-width: min(82vw, 300px) !important;
+            max-width: min(82vw, 300px) !important;
+        }
+        [data-testid="stSidebar"][aria-expanded="false"] {
+            transform: translateX(calc(-100% + 52px)) !important;
+            background: transparent !important;
+            border-right: 0 !important;
+            box-shadow: none !important;
+        }
+        [data-testid="stSidebar"][aria-expanded="true"] {
+            transform: none !important;
+        }
+        [data-testid="stSidebar"][aria-expanded="false"] [data-testid="stSidebarContent"] {
+            background: transparent !important;
+            border-right: 0 !important;
+            box-shadow: none !important;
+        }
+        [data-testid="stSidebar"][aria-expanded="false"] [data-testid="stSidebarUserContent"] {
+            display: none !important;
+        }
+        [data-testid="stSidebar"] [data-testid="stBaseButton-headerNoPadding"] {
+            position: relative !important;
+            z-index: 1201 !important;
+            transform: translateX(30px) !important;
+            width: 2.5rem !important;
+            height: 2.5rem !important;
+            border: 1px solid rgba(149, 176, 255, 0.46) !important;
+            border-radius: 8px !important;
+            background: rgba(10, 18, 40, 0.94) !important;
+            color: #eaf1ff !important;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28) !important;
+        }
+        [data-testid="stSidebar"][aria-expanded="false"]
+        [data-testid="stBaseButton-headerNoPadding"] [data-testid="stIconMaterial"] {
+            transform: rotate(180deg) !important;
+        }
+        [data-testid="stSidebarCollapsedControl"] {
+            top: 0.8rem !important;
+            left: 0.8rem !important;
+        }
+        .st-key-ui_lang_switch [role="radiogroup"] {
+            justify-content: flex-start !important;
+        }
     }
     .ntl-step .streamlit-expanderHeader {
         font-weight: 600;
@@ -1471,6 +1620,15 @@ def scroll_to_bottom():
                 var sb = sidebar.getBoundingClientRect();
                 if (sb && sb.width > 40) sidebarRight = sb.right;
             }}
+            var mobileSidebarOpen = viewportW <= 768 && sidebar
+                && sidebar.getAttribute('aria-expanded') === 'true';
+            if (mobileSidebarOpen) {{
+                input.style.setProperty('visibility', 'hidden', 'important');
+                input.style.setProperty('pointer-events', 'none', 'important');
+                return;
+            }}
+            input.style.setProperty('visibility', 'visible', 'important');
+            input.style.setProperty('pointer-events', 'auto', 'important');
             var minLeft = Math.max(12, Math.round(sidebarRight + 12));
 
             var left = Math.max(minLeft, Math.round(chatRect.left + 10));
@@ -1504,6 +1662,26 @@ def scroll_to_bottom():
                 window.parent.addEventListener('resize', alignChatInput);
                 window.parent.addEventListener('scroll', alignChatInput, true);
                 window.parent.__ntlChatInputBound = true;
+            }}
+            var parentDoc = window.parent.document;
+            var sidebar = parentDoc.querySelector('section[data-testid="stSidebar"]');
+            var existingObserver = window.parent.__ntlSidebarAlignObserver;
+            if (sidebar && (!existingObserver || existingObserver.sidebar !== sidebar)) {{
+                if (existingObserver && existingObserver.observer) {{
+                    existingObserver.observer.disconnect();
+                }}
+                var observer = new MutationObserver(function(mutations) {{
+                    var changed = mutations.some(function(item) {{
+                        return item.type === 'attributes' && item.attributeName === 'aria-expanded';
+                    }});
+                    if (changed) {{
+                        [40, 220, 420].forEach(function(delay) {{
+                            setTimeout(alignChatInput, delay);
+                        }});
+                    }}
+                }});
+                observer.observe(sidebar, {{ attributes: true, attributeFilter: ['aria-expanded'] }});
+                window.parent.__ntlSidebarAlignObserver = {{ sidebar: sidebar, observer: observer }};
             }}
         }}
         setTimeout(scroll, 300);
@@ -2288,6 +2466,32 @@ def _logout_sidebar_session() -> None:
     st.rerun()
 
 
+_AUTH_ERROR_TRANSLATIONS = {
+    "Username is required.": "请输入用户名。",
+    "That username is reserved.": "该用户名为系统保留名称，请更换。",
+    "Username must be 3-40 characters using English letters, numbers, '_' or '-'.": (
+        "用户名须为 3-40 个字符，只能包含英文字母、数字、下划线或连字符。"
+    ),
+    "Username normalization failed.": "用户名格式无法规范化，请更换。",
+    "Password must be at least 8 characters.": "密码至少需要 8 个字符。",
+    "That username is already registered.": "该用户名已被注册。",
+    "History DB is not configured.": "账号数据库尚未配置。",
+    "User authentication requires NTL_HISTORY_DB_URL or NTL_LANGGRAPH_POSTGRES_URL.": (
+        "账号登录需要配置 NTL_HISTORY_DB_URL 或 NTL_LANGGRAPH_POSTGRES_URL。"
+    ),
+}
+
+
+def _localized_auth_error(exc: Exception) -> str:
+    message = str(exc).strip()
+    if message.startswith("History database is unavailable."):
+        return _tr("账号数据库暂时不可用，请检查 PostgreSQL 服务。", message)
+    translated = _AUTH_ERROR_TRANSLATIONS.get(message)
+    if translated:
+        return _tr(translated, message)
+    return message
+
+
 def _render_auth_panel() -> None:
     st.info(
         _tr(
@@ -2313,7 +2517,7 @@ def _render_auth_panel() -> None:
             try:
                 account = history_store.authenticate_user(login_username, login_password)
             except (RuntimeError, ValueError) as exc:
-                st.error(str(exc))
+                st.error(_localized_auth_error(exc))
             else:
                 if not account:
                     st.error(_tr("用户名或密码错误。", "Invalid username or password."))
@@ -2344,7 +2548,7 @@ def _render_auth_panel() -> None:
                 try:
                     account = history_store.register_user(register_username, register_password)
                 except (RuntimeError, ValueError) as exc:
-                    st.error(str(exc))
+                    st.error(_localized_auth_error(exc))
                 else:
                     migrated_from = str(account.get("legacy_migrated_from") or "").strip()
                     if migrated_from:
@@ -2413,9 +2617,10 @@ def render_sidebar():
             with thread_del_col:
                 st.markdown("<div style='height: 1.78rem;'></div>", unsafe_allow_html=True)
                 if st.button(
-                    "🗑",
+                    _tr("删除", "Delete"),
                     key="delete_selected_thread_inline_trigger",
                     help=_tr("删除当前选中线程", "Delete selected thread"),
+                    icon=":material/delete:",
                     width="stretch",
                 ):
                     st.session_state["confirm_delete_selected_thread_inline"] = True
@@ -4499,11 +4704,11 @@ def _build_subagent_lifecycle_state(logs: list, is_running: bool, last_terminal_
 def _render_subagent_lifecycle_cards(logs: list, is_running: bool, last_terminal_kind: str = "") -> None:
     lifecycle = _build_subagent_lifecycle_state(logs, is_running=is_running, last_terminal_kind=last_terminal_kind)
     status_map = {
-        "pending": ("#64748b", _tr("待命", "Pending")),
-        "running": ("#2563eb", _tr("运行中", "Running")),
-        "done": ("#059669", _tr("完成", "Done")),
-        "error": ("#dc2626", _tr("错误", "Error")),
-        "interrupted": ("#f59e0b", _tr("中断", "Interrupted")),
+        "pending": ("#94a3b8", _tr("待命", "Pending")),
+        "running": ("#60a5fa", _tr("运行中", "Running")),
+        "done": ("#34d399", _tr("完成", "Done")),
+        "error": ("#fb7185", _tr("错误", "Error")),
+        "interrupted": ("#fbbf24", _tr("中断", "Interrupted")),
     }
     # st.markdown("<div style='margin-bottom:1px;'>", unsafe_allow_html=True)
     cols = st.columns(len(_SUBAGENT_CARD_ORDER), gap="small")
