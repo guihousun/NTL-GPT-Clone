@@ -2455,6 +2455,7 @@ def _apply_authenticated_sidebar_session(account: dict) -> None:
         raise ValueError("Authenticated account is missing user identity.")
     st.cache_resource.clear()
     app_state.apply_authenticated_user(user_id, username)
+    _queue_sidebar_thread_selection(st.session_state.get("thread_id", ""))
     st.rerun()
 
 
@@ -2464,6 +2465,26 @@ def _logout_sidebar_session() -> None:
     st.cache_resource.clear()
     app_state.clear_authenticated_user()
     st.rerun()
+
+
+_SIDEBAR_THREAD_SELECTOR_KEY = "sidebar_thread_selector"
+_PENDING_SIDEBAR_THREAD_SELECTOR_KEY = "_pending_sidebar_thread_selector"
+
+
+def _queue_sidebar_thread_selection(thread_id: str) -> None:
+    selected = str(thread_id or "").strip()
+    if selected:
+        st.session_state[_PENDING_SIDEBAR_THREAD_SELECTOR_KEY] = selected
+
+
+def _apply_pending_sidebar_thread_selection(thread_ids: list[str]) -> str | None:
+    pending = str(
+        st.session_state.pop(_PENDING_SIDEBAR_THREAD_SELECTOR_KEY, "") or ""
+    ).strip()
+    if not pending or pending not in thread_ids:
+        return None
+    st.session_state[_SIDEBAR_THREAD_SELECTOR_KEY] = pending
+    return pending
 
 
 _AUTH_ERROR_TRANSLATIONS = {
@@ -2588,11 +2609,15 @@ def render_sidebar():
                 new_thread_id = history_store.generate_thread_id(current_user_id)
                 app_state.set_active_thread(new_thread_id)
                 history_store.bind_thread_to_user(current_user_id, new_thread_id)
+                _queue_sidebar_thread_selection(new_thread_id)
                 st.rerun()
 
             if current_tid not in thread_ids:
                 app_state.set_active_thread(thread_ids[0])
+                _queue_sidebar_thread_selection(thread_ids[0])
                 st.rerun()
+
+            _apply_pending_sidebar_thread_selection(thread_ids)
 
             thread_label_map = {}
             for row in user_threads:
@@ -2611,7 +2636,7 @@ def render_sidebar():
                     options=thread_ids,
                     index=default_idx,
                     format_func=lambda tid: thread_label_map.get(tid, tid),
-                    key="sidebar_thread_selector",
+                    key=_SIDEBAR_THREAD_SELECTOR_KEY,
                     label_visibility="visible",
                 )
             with thread_del_col:
@@ -2661,8 +2686,10 @@ def render_sidebar():
                             new_thread_id = history_store.generate_thread_id(current_user_id)
                             history_store.bind_thread_to_user(current_user_id, new_thread_id)
                             app_state.set_active_thread(new_thread_id)
+                            _queue_sidebar_thread_selection(new_thread_id)
                         else:
                             app_state.set_active_thread(remaining_ids[0])
+                            _queue_sidebar_thread_selection(remaining_ids[0])
 
                         st.session_state["confirm_delete_selected_thread_inline"] = False
                         if delete_result.get("deleted"):
@@ -2816,6 +2843,7 @@ def render_sidebar():
                 new_thread_id = history_store.generate_thread_id(uid)
                 app_state.set_active_thread(new_thread_id)
                 history_store.bind_thread_to_user(uid, new_thread_id)
+                _queue_sidebar_thread_selection(new_thread_id)
                 st.warning(_tr("已创建新会话。", "New session created."))
                 st.rerun()
 
