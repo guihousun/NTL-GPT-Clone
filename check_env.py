@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import importlib.metadata
 import os
 import sys
 from pathlib import Path
@@ -49,6 +50,10 @@ CORE_IMPORTS = {
     "deepagents": "deepagents",
     "geopandas": "geopandas",
     "rasterio": "rasterio",
+}
+
+PINNED_PACKAGE_VERSIONS = {
+    "streamlit": "1.55.0",
 }
 
 
@@ -115,6 +120,20 @@ def _check_imports() -> tuple[list[str], list[str]]:
     return ok, failed
 
 
+def _check_pinned_versions() -> tuple[list[str], list[str]]:
+    versions = []
+    mismatches = []
+    for package, expected in PINNED_PACKAGE_VERSIONS.items():
+        try:
+            installed = importlib.metadata.version(package)
+        except importlib.metadata.PackageNotFoundError:
+            installed = "MISSING"
+        versions.append(f"{package}: {installed} (required {expected})")
+        if installed != expected:
+            mismatches.append(f"{package}: installed {installed}, required {expected}")
+    return versions, mismatches
+
+
 def main() -> int:
     print("NTL-GPT stable environment check")
     print(f"Repository: {ROOT}")
@@ -130,17 +149,19 @@ def main() -> int:
     missing_env, optional_present = _check_env()
     missing_files = _check_files()
     ok_imports, failed_imports = _check_imports()
+    pinned_versions, version_mismatches = _check_pinned_versions()
 
     _print("Required env vars", [f"{name}: {'OK' if name not in missing_env else 'MISSING'}" for name in REQUIRED_ENV])
     _print("Optional env vars", [f"{name}: {'SET' if name in optional_present else 'EMPTY'}" for name in OPTIONAL_ENV])
     _print("Outbound SSL", [f"{ssl_mode}: {ssl_error or 'OK'}"])
+    _print("Pinned package versions", pinned_versions)
     _print("Core imports", [f"{name}: OK" for name in ok_imports] + [f"{msg}" for msg in failed_imports])
 
     if missing_files:
         _print("Missing files", missing_files)
 
     print("")
-    if missing_env or missing_files or failed_imports or ssl_error:
+    if missing_env or missing_files or failed_imports or ssl_error or version_mismatches:
         print("Result: NOT READY")
         if missing_env:
             print("Action: fill required values in .env before starting the app.")
@@ -148,6 +169,8 @@ def main() -> int:
             print("Action: recreate the conda environment with `conda env create -f environment.yml`.")
         if ssl_error:
             print("Action: repair the Python CA bundle before starting the app.")
+        if version_mismatches:
+            print("Action: install the pinned package versions from environment.yml.")
         return 1
 
     print("Result: READY")

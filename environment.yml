@@ -35,7 +35,7 @@ dependencies:
   - mercantile
   - python-dotenv
   - certifi
-  - streamlit
+  - streamlit=1.55.0
   - streamlit-folium
   - bcrypt
   - typing_extensions
