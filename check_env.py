@@ -5,6 +5,8 @@ import os
 import sys
 from pathlib import Path
 
+from ssl_compat import configure_outbound_ssl
+
 
 ROOT = Path(__file__).resolve().parent
 DOTENV_PATH = ROOT / ".env"
@@ -21,6 +23,7 @@ OPTIONAL_ENV = [
     "NTL_VLM_MODEL",
     "GEE_DEFAULT_PROJECT_ID",
     "EARTHDATA_TOKEN",
+    "amap_api_key",
     "NTL_TOOL_PROFILE",
     "NTL_CONTEXTILY_TMP",
     "NTL_HISTORY_DB_URL",
@@ -87,7 +90,14 @@ def _check_env() -> tuple[list[str], list[str]]:
 
 def _check_files() -> list[str]:
     missing = []
-    for rel in ("environment.yml", ".env.example", "Streamlit.py", "app_ui.py", "graph_factory.py"):
+    for rel in (
+        "environment.yml",
+        ".env.example",
+        "Streamlit.py",
+        "ssl_compat.py",
+        "app_ui.py",
+        "graph_factory.py",
+    ):
         if not (ROOT / rel).exists():
             missing.append(rel)
     return missing
@@ -110,24 +120,34 @@ def main() -> int:
     print(f"Repository: {ROOT}")
     print(f"Python: {sys.executable}")
 
+    ssl_mode = "FAILED"
+    ssl_error = ""
+    try:
+        ssl_mode = configure_outbound_ssl()
+    except Exception as exc:  # noqa: BLE001
+        ssl_error = str(exc)
+
     missing_env, optional_present = _check_env()
     missing_files = _check_files()
     ok_imports, failed_imports = _check_imports()
 
     _print("Required env vars", [f"{name}: {'OK' if name not in missing_env else 'MISSING'}" for name in REQUIRED_ENV])
     _print("Optional env vars", [f"{name}: {'SET' if name in optional_present else 'EMPTY'}" for name in OPTIONAL_ENV])
+    _print("Outbound SSL", [f"{ssl_mode}: {ssl_error or 'OK'}"])
     _print("Core imports", [f"{name}: OK" for name in ok_imports] + [f"{msg}" for msg in failed_imports])
 
     if missing_files:
         _print("Missing files", missing_files)
 
     print("")
-    if missing_env or missing_files or failed_imports:
+    if missing_env or missing_files or failed_imports or ssl_error:
         print("Result: NOT READY")
         if missing_env:
             print("Action: fill required values in .env before starting the app.")
         if failed_imports:
             print("Action: recreate the conda environment with `conda env create -f environment.yml`.")
+        if ssl_error:
+            print("Action: repair the Python CA bundle before starting the app.")
         return 1
 
     print("Result: READY")

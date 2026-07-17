@@ -4,6 +4,10 @@ load_dotenv(override=True)
 
 import logging
 
+from ssl_compat import SSL_MODE_CERTIFI, configure_outbound_ssl
+
+SSL_MODE = configure_outbound_ssl()
+
 import streamlit as st
 
 import app_logic
@@ -12,6 +16,11 @@ import app_ui
 from storage_manager import current_thread_id
 
 logging.basicConfig(level=logging.INFO)
+
+if SSL_MODE == SSL_MODE_CERTIFI:
+    logging.warning(
+        "Windows certificate store could not be parsed; using certifi for verified outbound TLS."
+    )
 
 
 def _safe_recover_runtime_health() -> bool:
@@ -45,7 +54,7 @@ def main():
     if st.session_state.get("ui_lang") == "中文":
         st.session_state["ui_lang"] = "CN"
 
-    top_left, top_right = st.columns([0.95, 0.05])
+    top_left, top_right = st.columns([0.88, 0.12], vertical_alignment="top")
     with top_right:
         is_running = bool(st.session_state.get("is_running", False))
         lang = st.radio(
