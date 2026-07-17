@@ -99,6 +99,7 @@ def _check_files() -> list[str]:
         "environment.yml",
         ".env.example",
         "Streamlit.py",
+        "run_streamlit.py",
         "sitecustomize.py",
         "ssl_compat.py",
         "app_ui.py",

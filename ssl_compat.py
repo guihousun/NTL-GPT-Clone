@@ -59,6 +59,9 @@ def configure_outbound_ssl(*, platform_name: str | None = None) -> str:
     global _certifi_cafile, _fallback_active
 
     if _fallback_active:
+        if _certifi_cafile:
+            os.environ["SSL_CERT_FILE"] = _certifi_cafile
+            os.environ.pop("SSL_CERT_DIR", None)
         return SSL_MODE_CERTIFI
 
     current_platform = platform_name or sys.platform

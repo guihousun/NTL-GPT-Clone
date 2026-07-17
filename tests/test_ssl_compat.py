@@ -57,6 +57,12 @@ def test_windows_asn1_failure_uses_certifi_with_verification(monkeypatch, tmp_pa
     assert calls[0] == ((), {})
     assert calls[1][1]["cafile"] == str(ca_bundle)
 
+    monkeypatch.setenv("SSL_CERT_FILE", "overridden-after-startup")
+    monkeypatch.setenv("SSL_CERT_DIR", "broken-store-again")
+    assert ssl_compat.configure_outbound_ssl(platform_name="win32") == ssl_compat.SSL_MODE_CERTIFI
+    assert os.environ["SSL_CERT_FILE"] == str(ca_bundle)
+    assert "SSL_CERT_DIR" not in os.environ
+
 
 def test_certifi_fallback_preserves_explicit_ca_settings(monkeypatch, tmp_path):
     ca_bundle = tmp_path / "cacert.pem"
