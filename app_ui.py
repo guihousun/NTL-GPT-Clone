@@ -4556,6 +4556,7 @@ def render_content_layout():
         chat_container = st.container(height=getattr(app_state, "CHAT_CONTAINER_HEIGHT", 640))
         with chat_container:
             chat_live_placeholder = st.empty()
+            chat_live_placeholder.empty()
             with chat_live_placeholder.container():
                 _render_chat_history_with_run_notice()
         chat_input_value = get_user_input(disabled=_is_current_thread_stopping())
@@ -4608,7 +4609,9 @@ def render_content_layout():
             with tab_reasoning:
                 try:
                     lifecycle_placeholder = st.empty()
+                    lifecycle_placeholder.empty()
                     reasoning_live_placeholder = st.empty()
+                    reasoning_live_placeholder.empty()
                     reasoning_placeholder = reasoning_live_placeholder
                     history = st.session_state.get("analysis_history", [])
                     is_running_now = st.session_state.get("is_running", False)
@@ -4639,6 +4642,7 @@ def render_content_layout():
             with tab_reasoning_graph:
                 try:
                     reasoning_graph_placeholder = st.empty()
+                    reasoning_graph_placeholder.empty()
                     reasoning_graph_live_placeholder = reasoning_graph_placeholder
                     history = st.session_state.get("analysis_history", [])
                     is_running_now = st.session_state.get("is_running", False)
