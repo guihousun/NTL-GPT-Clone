@@ -13,9 +13,27 @@
   },
   {
     "name": "download_gee_raster",
-    "purpose": "Export one explicit Earth Engine image or collection reduction as GeoTIFF.",
+    "purpose": "Export a validated Earth Engine Image or ImageCollection reduction as a single- or multi-band GeoTIFF, with controlled optical/QA/index preprocessing presets.",
     "side_effects": "creates a new GeoTIFF and a suffixed name when necessary",
     "common_error_codes": ["INVALID_PARAMETER", "GEE_NOT_INITIALIZED", "GEE_DOWNLOAD_FAILED"]
+  },
+  {
+    "name": "submit_gee_batch_export",
+    "purpose": "Submit a validated large GEE raster export to Drive, Cloud Storage, or an Earth Engine asset and persist a recoverable task manifest.",
+    "side_effects": "creates a remote Earth Engine batch task and a local ntl.gee.export.v1 manifest",
+    "common_error_codes": ["INVALID_PARAMETER", "GEE_BATCH_SUBMIT_FAILED"]
+  },
+  {
+    "name": "inspect_gee_batch_export",
+    "purpose": "Refresh live progress, terminal state, and failure details for a submitted Earth Engine export.",
+    "side_effects": "updates status history in the existing local export manifest",
+    "common_error_codes": ["INVALID_PARAMETER", "GEE_BATCH_STATUS_FAILED"]
+  },
+  {
+    "name": "cancel_gee_batch_export",
+    "purpose": "Request cancellation for a non-terminal Earth Engine export while retaining its manifest history.",
+    "side_effects": "may cancel a remote Earth Engine task and updates its local export manifest",
+    "common_error_codes": ["INVALID_PARAMETER", "GEE_BATCH_CANCEL_FAILED"]
   },
   {
     "name": "download_vnp46a2_official_h5_country",

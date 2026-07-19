@@ -40,7 +40,7 @@ Do not use GEE Python server-side execution just because the region is a country
 
 | User intent | Recommended mode | Avoid |
 | --- | --- | --- |
-| Download one small AOI GeoTIFF | `direct_download` first | assuming all country downloads fail |
+| Download one small validated AOI GeoTIFF | unified plan `direct_local` | assuming image count alone proves the request is small |
 | City/province local stats with existing files | local tool or local script | unnecessary GEE rewrite |
 | Country/all-province/multi-province stats | GEE server-side table | country GeoTIFF + bulk shp + local zonal stats |
 | Long daily/monthly aggregation | GEE server-side reduction/export | downloading hundreds of rasters |

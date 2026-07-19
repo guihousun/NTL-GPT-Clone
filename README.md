@@ -41,6 +41,7 @@ Optional:
 - `NTL_VLM_MODEL`
 - `GEE_DEFAULT_PROJECT_ID`
 - `EARTHDATA_TOKEN`
+- `amap_api_key`
 - `NTL_TOOL_PROFILE`
 - `NTL_USER_DATA_DIR`
 - `NTL_SHARED_DATA_DIR`
@@ -220,6 +221,10 @@ The checker verifies:
 The public HTTPS endpoint is available at:
 
 [https://ntl-gpt.gischaser.cn/](https://ntl-gpt.gischaser.cn/)
+
+Windows Server startup, update, HTTPS, database, backup, and troubleshooting procedures:
+
+[Windows Server Operations Guide](docs/WINDOWS_SERVER_OPERATIONS.md)
 
 ## Notes
 

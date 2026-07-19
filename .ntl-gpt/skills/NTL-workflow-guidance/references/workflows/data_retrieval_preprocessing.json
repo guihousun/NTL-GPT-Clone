@@ -308,7 +308,7 @@
       {
         "type": "subagent",
         "name": "data_retrieval_step",
-        "description": "Retrieve Fuding City administrative boundary and VNP46A2 daily NTL data for 2020-01-01 to 2020-01-07 (7 days). Use GEE_dataset_router_tool to determine retrieval strategy (direct_download for <=14 daily images). Ensure complete coverage (expected_count=7, actual_count=7).",
+        "description": "Retrieve Fuding City administrative boundary and VNP46A2 daily NTL data for 2020-01-01 to 2020-01-07 (7 days). Use GEE_request_plan_tool to select direct_local, server_reduce, or batch_export from the validated AOI and workload. Ensure complete coverage from actual tool outputs (expected_count=7, actual_count=7).",
         "input": {
           "study_area": "福鼎市",
           "scale_level": "city",

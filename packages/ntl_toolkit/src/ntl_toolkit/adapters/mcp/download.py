@@ -13,6 +13,12 @@ from typing import Any
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import TextContent, Tool, ToolAnnotations
 
+from ntl_toolkit.core.gee_batch import (
+    GeeBatchExportRequest,
+    cancel_gee_batch_export,
+    inspect_gee_batch_export,
+    submit_gee_batch_export,
+)
 from ntl_toolkit.core.gee_download import GeeDownloadRequest, download_gee_raster
 from ntl_toolkit.core.vnp46a2_download import (
     Vnp46a2DownloadRequest,
@@ -34,8 +40,8 @@ from ntl_toolkit.schemas import ToolError, ToolResult
 
 _CAPABILITIES_PATH = Path(__file__).with_name("download_capabilities.json")
 _SERVER_INSTRUCTIONS = (
-    "Local synchronous GEE and official VNP46A2 Earthdata download tools. "
-    "Long calls emit progress and write sanitized manifests under the requested output location. "
+    "Local direct GEE, recoverable GEE batch export, and official VNP Earthdata download tools. "
+    "Long calls emit progress and all asynchronous exports write sanitized manifests. "
     "Credentials are read only from environment variables or NTL_MCP_ENV_FILE."
 )
 _READ_ONLY = ToolAnnotations(
@@ -48,6 +54,12 @@ _WRITE_NEW = ToolAnnotations(
     readOnlyHint=False,
     destructiveHint=False,
     idempotentHint=False,
+    openWorldHint=True,
+)
+_READ_UPDATE = ToolAnnotations(
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=True,
     openWorldHint=True,
 )
 _DEPENDENCIES = ("ee", "geemap", "h5py", "rasterio", "geopandas", "osmnx")
@@ -224,10 +236,59 @@ async def _run_gee_tool(
             tool="download_gee_raster",
             code="INVALID_PARAMETER",
             message=str(exc),
-            suggestion="Correct the explicit dataset, band, dates, bbox, and output path then retry.",
+            suggestion="Correct the dataset, bands, asset type, dates, bbox, processing preset, and output path then retry.",
         )
     result = await _run_with_progress(ctx, lambda progress: download_gee_raster(request, progress=progress))
     return _payload(result)
+
+
+def _submit_gee_batch_tool(arguments: dict[str, Any], workdir: Path) -> dict[str, Any]:
+    try:
+        values = {
+            name: arguments[name]
+            for name in GeeBatchExportRequest.model_fields
+            if name in arguments
+        }
+        request = GeeBatchExportRequest(
+            **{
+                **values,
+                "manifest_path": str(resolve_local_path(values["manifest_path"], workdir)),
+            }
+        )
+    except (KeyError, ValueError, TypeError) as exc:
+        return _failed_payload(
+            tool="submit_gee_batch_export",
+            code="INVALID_PARAMETER",
+            message=str(exc),
+            suggestion="Correct the validated batch export request, destination, and manifest path then retry.",
+        )
+    return _payload(submit_gee_batch_export(request))
+
+
+def _inspect_gee_batch_tool(manifest_path: str, project: str | None, workdir: Path) -> dict[str, Any]:
+    try:
+        path = resolve_local_path(manifest_path, workdir)
+    except ValueError as exc:
+        return _failed_payload(
+            tool="inspect_gee_batch_export",
+            code="INVALID_PARAMETER",
+            message=str(exc),
+            suggestion="Use an ordinary relative path or a fully-qualified absolute manifest path.",
+        )
+    return _payload(inspect_gee_batch_export(str(path), project=project))
+
+
+def _cancel_gee_batch_tool(manifest_path: str, project: str | None, workdir: Path) -> dict[str, Any]:
+    try:
+        path = resolve_local_path(manifest_path, workdir)
+    except ValueError as exc:
+        return _failed_payload(
+            tool="cancel_gee_batch_export",
+            code="INVALID_PARAMETER",
+            message=str(exc),
+            suggestion="Use an ordinary relative path or a fully-qualified absolute manifest path.",
+        )
+    return _payload(cancel_gee_batch_export(str(path), project=project))
 
 
 async def _run_with_progress(
@@ -298,24 +359,93 @@ def build_download_mcp() -> FastMCP:
 
     @mcp.tool(
         name="download_gee_raster",
-        description="Synchronously export one explicit GEE image or collection reduction to a local GeoTIFF.",
+        description=(
+            "Export a validated GEE Image or ImageCollection reduction to a local GeoTIFF. Supports multiple "
+            "bands and controlled Sentinel-2, Landsat, MODIS, and normalized-difference preprocessing presets."
+        ),
         annotations=_WRITE_NEW,
         structured_output=True,
     )
     async def download_gee_raster_tool(
         ctx: Context,
         dataset_id: str,
-        band: str,
-        start_date: str,
-        end_date: str,
         bbox: list[float],
         output: str,
+        band: str | None = None,
+        bands: list[str] | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        asset_type: str = "auto",
         reducer: str = "first",
         scale: int = 500,
         crs: str = "EPSG:4326",
         project: str | None = None,
+        processing_preset: str = "raw",
+        quality_threshold: float = 0.60,
+        index_bands: list[str] | None = None,
+        output_band_name: str = "index",
     ) -> dict[str, Any]:
         return await _run_gee_tool(ctx, locals(), captured_workdir)
+
+    @mcp.tool(
+        name="submit_gee_batch_export",
+        description=(
+            "Submit a validated large Earth Engine raster export to Drive, Cloud Storage, or an EE asset. "
+            "Returns immediately with a task id and writes a recoverable status manifest."
+        ),
+        annotations=_WRITE_NEW,
+        structured_output=True,
+    )
+    def submit_gee_batch_export_tool(
+        dataset_id: str,
+        bands: list[str],
+        bbox: list[float],
+        manifest_path: str,
+        description: str,
+        destination: str = "drive",
+        start_date: str | None = None,
+        end_date: str | None = None,
+        asset_type: str = "auto",
+        reducer: str = "median",
+        scale: int = 500,
+        crs: str = "EPSG:4326",
+        project: str | None = None,
+        processing_preset: str = "raw",
+        quality_threshold: float = 0.60,
+        index_bands: list[str] | None = None,
+        output_band_name: str = "index",
+        file_name_prefix: str | None = None,
+        drive_folder: str | None = None,
+        bucket: str | None = None,
+        bucket_prefix: str | None = None,
+        asset_id: str | None = None,
+        max_pixels: int = 10_000_000_000_000,
+    ) -> dict[str, Any]:
+        return _submit_gee_batch_tool(locals(), captured_workdir)
+
+    @mcp.tool(
+        name="inspect_gee_batch_export",
+        description="Read a GEE export manifest, refresh its live task state, and report progress or exact failure details.",
+        annotations=_READ_UPDATE,
+        structured_output=True,
+    )
+    def inspect_gee_batch_export_tool(
+        manifest_path: str,
+        project: str | None = None,
+    ) -> dict[str, Any]:
+        return _inspect_gee_batch_tool(manifest_path, project, captured_workdir)
+
+    @mcp.tool(
+        name="cancel_gee_batch_export",
+        description="Request cancellation of a non-terminal GEE export represented by a local export manifest.",
+        annotations=_WRITE_NEW,
+        structured_output=True,
+    )
+    def cancel_gee_batch_export_tool(
+        manifest_path: str,
+        project: str | None = None,
+    ) -> dict[str, Any]:
+        return _cancel_gee_batch_tool(manifest_path, project, captured_workdir)
 
     @mcp.tool(
         name="download_vnp46a1_official_h5",

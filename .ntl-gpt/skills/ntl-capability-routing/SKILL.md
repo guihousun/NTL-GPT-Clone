@@ -25,7 +25,7 @@ Use that index as a compact map of tool ownership, direct exposure, and migratio
 
 ## Routing Rules
 
-- **Retrieval/download only**: delegate to `Data_Searcher`; use `GEE_dataset_router_tool` and `NTL_download_tool` when lightweight.
+- **Retrieval/download only**: delegate to `Data_Searcher`; call `GEE_request_plan_tool` first, then use `NTL_download_tool` for stable NTL direct-local plans, `GEE_raster_download_tool` for validated general-GEE direct-local plans, or `GEE_batch_export_tool` plus `GEE_export_status_tool` for large asynchronous exports.
 - **Country or multi-province statistics/ranking**: use GEE server-side `ee.Image.reduceRegions()` and return/export a table. Do not download a country-scale GeoTIFF or bulk shapefiles as the primary path.
 - **Local GeoTIFF + boundary statistics**: use `NTL_raster_statistics` only when files already exist and the spatial scope is not national-scale.
 - **Custom/event/code tasks**: Engineer designs `ntl.script.contract.v1`; `Code_Assistant` executes via saved script and validation tools.
@@ -35,7 +35,7 @@ Use that index as a compact map of tool ownership, direct exposure, and migratio
 
 - Treat `status: error`, non-empty `error`, or empty `output_files` from a download tool as failure.
 - If a GEE request-size/export limit appears, switch to server-side GEE planning.
-- If a router recommends a prohibited path, override older workflow templates that suggest that path.
+- If a compatibility router recommends a path that conflicts with `ntl.gee.plan.v1`, use the unified plan and record the conflict.
 
 ## Context Policy
 

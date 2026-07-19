@@ -6,7 +6,7 @@
       "area": ["gee_routing", "workflow", "server_side"],
       "prompt": "请计算中国2020年34个省级行政区的夜间灯光均值，并输出为表格，按灯光均值从高到低排序。",
       "expected": {
-        "route": "gee_server_side",
+        "route": "server_reduce",
         "dataset": "projects/sat-io/open-datasets/npp-viirs-ntl",
         "band": "b1",
         "method": "ee.Image.reduceRegions over a cloud-hosted province FeatureCollection",
@@ -24,7 +24,7 @@
       "area": ["gee_routing", "download_failure_semantics"],
       "prompt": "下载新加坡2020年年度NPP-VIIRS-like夜间灯光GeoTIFF。",
       "expected": {
-        "route": "direct_download_first",
+        "route": "direct_local",
         "dataset": "projects/sat-io/open-datasets/npp-viirs-ntl",
         "band": "b1"
       },
@@ -40,7 +40,7 @@
       "prompt": "下载中国2020年年度NTL GeoTIFF。",
       "expected": {
         "failure_semantics": "If GEE returns Total request size ... <= 50331648 error, tool returns status=error and no output_files.",
-        "next_route": "gee_server_side only if user intent is statistics; otherwise report file-download limitation"
+        "next_route": "server_reduce for statistics; otherwise tracked batch_export for the requested raster"
       },
       "prohibited": [
         "treating printed download error as successful output",

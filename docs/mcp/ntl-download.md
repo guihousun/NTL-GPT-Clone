@@ -1,13 +1,15 @@
 # `ntl-download` MCP
 
-`ntl-download` is a local, single-user stdio MCP service for synchronous Google
-Earth Engine raster exports and official NASA Earthdata VNP46A1/VNP46A2 daily mosaics.
+`ntl-download` is a local, single-user stdio MCP service for direct Google
+Earth Engine raster downloads, tracked Earth Engine batch exports, and official
+NASA Earthdata VNP46A1/VNP46A2 daily mosaics.
 It is intentionally separate from `ntl-gis-core`: the latter remains a
 network-independent local GIS and nighttime-light analysis service.
 
-Long downloads keep the MCP call open. They emit progress notifications and
-write sanitized manifests under the selected output directory. There is no web
-service, database, task queue, or remote account system.
+Long direct downloads keep the MCP call open and emit progress notifications.
+GEE batch export submission returns immediately and writes a sanitized local
+manifest for later status inspection or cancellation. There is no web service,
+database, local task queue, or remote account system.
 
 ## Install and configure
 
@@ -35,7 +37,10 @@ configuration or tool arguments.
 | Tool | What it does |
 | --- | --- |
 | `validate_download_environment` | Checks local download dependencies, Earthdata token presence, and optional non-interactive GEE initialization. |
-| `download_gee_raster` | Exports one explicit GEE image or collection reduction from a dataset, band, UTC dates, WGS84 bounding box, scale, CRS, and output path. |
+| `download_gee_raster` | Downloads a validated GEE Image or ImageCollection reduction with one or more bands, controlled QA/scaling/index presets, dates where applicable, WGS84 bounding box, scale, CRS, and output path. |
+| `submit_gee_batch_export` | Submits a validated large raster export to Drive, Cloud Storage, or an Earth Engine asset and writes an `ntl.gee.export.v1` manifest. |
+| `inspect_gee_batch_export` | Refreshes live task state, progress, destination, and exact Earth Engine failure details in the export manifest. |
+| `cancel_gee_batch_export` | Requests cancellation of a non-terminal export represented by an export manifest. |
 | `download_vnp46a2_official_h5_country` | Plans or runs the official VNP46A2 non-gap-filled HDF5 country workflow: boundaries, CMR, download, validation, mosaic, audit, and optional package. |
 | `download_vnp46a1_official_h5` | Plans or runs official VNP46A1 HDF5 retrieval for exactly one country or WGS84 BBox, producing daily `DNB_At_Sensor_Radiance_500m` GeoTIFFs and optional `UTC_Time` companion GeoTIFFs. |
 | `inspect_download_run` | Reads a VNP46A1 or VNP46A2 audit when available; during an active run, returns its persisted status, current phase, completed phases, and last update time. |
@@ -53,13 +58,16 @@ The service also publishes `ntl://download/capabilities` and the shared
   and tool results.
 - Relative paths resolve below `NTL_MCP_WORKDIR`; absolute Windows paths are
   accepted. Partially-qualified paths such as `D:output.tif` are rejected.
-- GEE output names are reserved with a numeric suffix instead of overwriting an
-  existing GeoTIFF. VNP46A2 runs retain their manifests to support retry.
+- Direct GEE output names are reserved with a numeric suffix instead of
+  overwriting an existing GeoTIFF. GEE batch and VNP runs retain their manifests
+  to support status recovery.
 
 ## Progress, recovery, and audit
 
-The GEE tool reports initialization, imagery selection, export, validation, and
-completion. The official HDF5 routes report each pipeline phase plus sanitized
+The direct GEE tool reports initialization, imagery selection, export,
+validation, and completion. Batch exports use `submit_gee_batch_export`, then
+`inspect_gee_batch_export` with the same manifest until a terminal state. A
+successful submission is not a completed export. The official HDF5 routes report each pipeline phase plus sanitized
 script output and persist `*_runtime.json` state files. If the client does not
 render progress notifications, call `inspect_download_run` on the same run
 directory: before audit it reports `running`, the current phase, completed
@@ -91,6 +99,10 @@ hours raster and must never be interpreted as radiance.
 
 - `GEE_NOT_INITIALIZED`: run EasyGEE environment/auth planning, complete the
   browser authorization locally if needed, then retry the MCP tool.
+- `GEE_BATCH_SUBMIT_FAILED`: verify dataset metadata, destination permissions,
+  AOI, bands, scale, and quota; preserve the failure manifest when one exists.
+- `GEE_BATCH_STATUS_FAILED`: provide the original `ntl.gee.export.v1` manifest
+  and the same Earth Engine project used for submission.
 - `EARTHDATA_TOKEN_MISSING`: set or refresh the token in the dotenv file named
   by `NTL_MCP_ENV_FILE`, then restart the MCP client.
 - `VNP46A2_AUDIT_INCOMPLETE`: call `inspect_download_run`, use its exact retry

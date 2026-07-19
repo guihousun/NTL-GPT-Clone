@@ -1565,6 +1565,124 @@
           }
         ]
       }
+    },
+    {
+      "key": "sentinel2_sr_harmonized",
+      "name": "Sentinel-2 MSI Level-2A Surface Reflectance Harmonized",
+      "dataset_id": "COPERNICUS/S2_SR_HARMONIZED",
+      "catalog_source": "official",
+      "category": "optical_surface_reflectance",
+      "asset_type": "ImageCollection",
+      "temporal_resolution": "subdaily",
+      "expected_temporal_coverage": {
+        "start": "2017-03-28",
+        "end": null,
+        "live_check_required": true
+      },
+      "scale_m": 10,
+      "primary_bands": [
+        {"band": "B2", "meaning": "blue surface reflectance", "unit": "scaled reflectance", "scale_factor": 0.0001},
+        {"band": "B3", "meaning": "green surface reflectance", "unit": "scaled reflectance", "scale_factor": 0.0001},
+        {"band": "B4", "meaning": "red surface reflectance", "unit": "scaled reflectance", "scale_factor": 0.0001},
+        {"band": "B8", "meaning": "near infrared surface reflectance", "unit": "scaled reflectance", "scale_factor": 0.0001},
+        {"band": "B11", "meaning": "shortwave infrared 1", "unit": "scaled reflectance", "scale_factor": 0.0001},
+        {"band": "B12", "meaning": "shortwave infrared 2", "unit": "scaled reflectance", "scale_factor": 0.0001},
+        {"band": "SCL", "meaning": "scene classification", "unit": "class", "scale_factor": 1}
+      ],
+      "processing_presets": ["sentinel2_cloud_score_plus", "sentinel2_scl_mask", "normalized_difference", "sentinel2_cloud_score_plus_normalized_difference", "sentinel2_scl_mask_normalized_difference"],
+      "qa_preset": "sentinel2_cloud_score_plus",
+      "use_when": [
+        "recent 10 m optical imagery",
+        "vegetation, water, urban, classification, or change analysis",
+        "Sentinel-2 NDVI or RGB composite"
+      ],
+      "avoid_when": [
+        "cloud masking cannot be applied",
+        "long historical analysis before Sentinel-2 coverage"
+      ],
+      "validation_status": "catalog_profile_requires_live_metadata",
+      "notes": "Use pixel-level Cloud Score+ or SCL masking; scene CLOUDY_PIXEL_PERCENTAGE alone is insufficient."
+    },
+    {
+      "key": "sentinel2_cloud_score_plus",
+      "name": "Cloud Score+ S2 Harmonized",
+      "dataset_id": "GOOGLE/CLOUD_SCORE_PLUS/V1/S2_HARMONIZED",
+      "catalog_source": "official",
+      "category": "quality_assurance",
+      "asset_type": "ImageCollection",
+      "temporal_resolution": "subdaily",
+      "expected_temporal_coverage": {
+        "start": null,
+        "end": null,
+        "live_check_required": true
+      },
+      "scale_m": 10,
+      "primary_bands": [
+        {"band": "cs", "meaning": "instantaneous spectral clear score", "unit": "probability-like score", "scale_factor": 1},
+        {"band": "cs_cdf", "meaning": "clear-score cumulative distribution value", "unit": "probability-like score", "scale_factor": 1}
+      ],
+      "use_when": ["pixel-level cloud and haze screening for Sentinel-2 Harmonized workflows"],
+      "avoid_when": ["used as the primary analysis image instead of a QA companion"],
+      "validation_status": "catalog_profile_requires_live_metadata",
+      "notes": "Link to COPERNICUS/S2_SR_HARMONIZED by shared system:index before masking."
+    },
+    {
+      "key": "landsat_c2_l2",
+      "name": "Landsat 8 and 9 Collection 2 Tier 1 Level 2",
+      "dataset_ids": [
+        "LANDSAT/LC08/C02/T1_L2",
+        "LANDSAT/LC09/C02/T1_L2"
+      ],
+      "catalog_source": "official",
+      "category": "optical_thermal_surface_products",
+      "asset_type": "ImageCollection",
+      "temporal_resolution": "subdaily",
+      "expected_temporal_coverage": {
+        "start": "2013-03-18",
+        "end": null,
+        "live_check_required": true
+      },
+      "scale_m": 30,
+      "primary_bands": [
+        {"band": "SR_B2", "meaning": "blue surface reflectance", "unit": "scaled reflectance", "scale_factor": 0.0000275},
+        {"band": "SR_B3", "meaning": "green surface reflectance", "unit": "scaled reflectance", "scale_factor": 0.0000275},
+        {"band": "SR_B4", "meaning": "red surface reflectance", "unit": "scaled reflectance", "scale_factor": 0.0000275},
+        {"band": "SR_B5", "meaning": "near infrared surface reflectance", "unit": "scaled reflectance", "scale_factor": 0.0000275},
+        {"band": "ST_B10", "meaning": "surface temperature", "unit": "scaled kelvin", "scale_factor": 0.00341802},
+        {"band": "QA_PIXEL", "meaning": "pixel quality bitmask", "unit": "bitmask", "scale_factor": 1}
+      ],
+      "processing_presets": ["landsat_c2_l2", "normalized_difference", "landsat_c2_l2_normalized_difference"],
+      "qa_preset": "landsat_qa_pixel_mask",
+      "use_when": ["30 m historical optical change", "surface temperature", "vegetation or water analysis"],
+      "avoid_when": ["raw bands are used without scale offsets and QA masking"],
+      "validation_status": "catalog_profile_requires_live_metadata",
+      "notes": "Optical reflectance also requires the Collection 2 additive offset; thermal conversion has a separate offset."
+    },
+    {
+      "key": "modis_mod13q1",
+      "name": "MODIS Terra Vegetation Indices 16-Day Global 250m",
+      "dataset_id": "MODIS/061/MOD13Q1",
+      "catalog_source": "official",
+      "category": "vegetation_index",
+      "asset_type": "ImageCollection",
+      "temporal_resolution": "16-day",
+      "expected_temporal_coverage": {
+        "start": "2000-02-18",
+        "end": null,
+        "live_check_required": true
+      },
+      "scale_m": 250,
+      "primary_bands": [
+        {"band": "NDVI", "meaning": "normalized difference vegetation index", "unit": "scaled index", "scale_factor": 0.0001},
+        {"band": "EVI", "meaning": "enhanced vegetation index", "unit": "scaled index", "scale_factor": 0.0001},
+        {"band": "DetailedQA", "meaning": "detailed vegetation index QA", "unit": "bitmask", "scale_factor": 1},
+        {"band": "SummaryQA", "meaning": "summary vegetation index QA", "unit": "class", "scale_factor": 1}
+      ],
+      "processing_presets": ["modis_vi_summary_qa"],
+      "qa_preset": "modis_vi_summary_qa",
+      "use_when": ["long dense vegetation time series", "phenology", "large-area NDVI analysis"],
+      "avoid_when": ["10-30 m local mapping is required"],
+      "validation_status": "catalog_profile_requires_live_metadata"
     }
   ],
   "last_live_validation": {

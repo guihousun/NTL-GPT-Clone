@@ -34,8 +34,13 @@
       {"tool": "uploaded_pdf_understanding_tool", "class": "core_execution", "use_when": "Uploaded PDF context must be parsed."}
     ],
     "Data_Searcher": [
-      {"tool": "GEE_dataset_router_tool", "class": "router", "use_when": "Any GEE retrieval or GEE execution planning task."},
+      {"tool": "GEE_request_plan_tool", "class": "router", "use_when": "Primary planner for every NTL or general-GEE retrieval, export, composite, or server-side analysis request."},
+      {"tool": "GEE_dataset_router_tool", "class": "compatibility_router", "use_when": "Only for legacy annual/monthly/daily handoffs that have not migrated to ntl.gee.plan.v1."},
       {"tool": "NTL_download_tool", "class": "core_execution", "use_when": "Lightweight direct NTL raster download; failure state must be treated as terminal for that path."},
+      {"tool": "GEE_raster_download_tool", "class": "core_execution", "use_when": "The unified plan selected direct_local for a live-validated general Earth Engine Image or ImageCollection."},
+      {"tool": "GEE_batch_export_tool", "class": "core_execution", "use_when": "The unified plan selected batch_export for a live-validated raster request."},
+      {"tool": "GEE_export_status_tool", "class": "job_status", "use_when": "Resume or inspect a submitted GEE export using its current-thread manifest."},
+      {"tool": "GEE_export_cancel_tool", "class": "job_control", "use_when": "The user explicitly requests cancellation of a non-terminal GEE export."},
       {"tool": "GEE_script_blueprint_tool", "class": "router", "use_when": "Server-side GEE script/table export is preferred or required."},
       {"tool": "GEE_dataset_metadata_tool", "class": "router", "use_when": "Dataset temporal coverage, bands, or metadata must be validated."},
       {"tool": "dataset_latest_availability_tool", "class": "router", "use_when": "Recent GEE or LAADS/CMR data availability must be checked before execution."},
@@ -57,13 +62,13 @@
     {
       "case": "download_only_lightweight",
       "route": "Data_Searcher",
-      "required_tools": ["GEE_dataset_router_tool", "NTL_download_tool"],
-      "notes": "Small-country GeoTIFF downloads are allowed. If export size fails or output_files is empty, treat as failed."
+      "required_tools": ["GEE_request_plan_tool", "NTL_download_tool or GEE_raster_download_tool or GEE_batch_export_tool"],
+      "notes": "Direct-local eligibility comes from AOI/resolution/band/output-size planning, not a global image-count threshold."
     },
     {
       "case": "country_or_multi_province_statistics",
       "route": "Data_Searcher -> Code_Assistant",
-      "required_tools": ["GEE_dataset_router_tool", "GEE_script_blueprint_tool", "execute_geospatial_script_tool"],
+      "required_tools": ["GEE_request_plan_tool", "GEE_script_blueprint_tool", "execute_geospatial_script_tool"],
       "prohibited_primary_paths": [
         "country-scale GeoTIFF download for statistics",
         "bulk provincial shapefile download for local zonal statistics",
@@ -80,7 +85,7 @@
     {
       "case": "custom_or_event_analysis",
       "route": "Engineer contract -> Data_Searcher as needed -> Code_Assistant",
-      "required_tools": ["GEE_dataset_router_tool", "GEE_script_blueprint_tool", "execute_geospatial_script_tool", "GeoCode_COT_Validation_tool"],
+      "required_tools": ["GEE_request_plan_tool", "GEE_script_blueprint_tool", "execute_geospatial_script_tool", "GeoCode_COT_Validation_tool"],
       "notes": "Engineer owns ntl.script.contract.v1; Code_Assistant executes the saved draft first."
     }
   ]

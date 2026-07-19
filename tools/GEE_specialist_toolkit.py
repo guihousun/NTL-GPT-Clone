@@ -15,6 +15,13 @@ from typing import Dict, List, Literal, Optional, Tuple
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 from dotenv import dotenv_values
+from ntl_toolkit.core.gee_planning import (
+    DatasetCandidate,
+    GeeRequest,
+    PlannerPolicy,
+    build_gee_plan,
+    classify_request_domain,
+)
 
 DEFAULT_GEE_PROJECT = "empyrean-caster-430308-m2"
 
@@ -356,6 +363,35 @@ def gee_dataset_router(
     end_dt = _parse_date(end_date, "end")
     if end_dt < start_dt:
         raise ValueError("End date must be >= start date.")
+
+    compatibility_request = GeeRequest(
+        query=query,
+        dataset_id=prefer_dataset_id,
+        dataset_name=prefer_dataset,
+        start_date=start_dt,
+        end_date=end_dt,
+        temporal_resolution=temporal_resolution,
+        analysis_kind=(
+            "statistics"
+            if (analysis_intent or "").strip().lower() in {"zonal_stats", "single_stat"}
+            else "time_series"
+            if (analysis_intent or "").strip().lower() in {"time_series", "long_series"}
+            else "composite"
+            if (analysis_intent or "").strip().lower() == "composite_export"
+            else "download"
+        ),
+    )
+    if classify_request_domain(compatibility_request) == "general_gee":
+        return gee_request_plan(
+            query=query,
+            dataset_id=prefer_dataset_id,
+            dataset_name=prefer_dataset,
+            start_date=start_date,
+            end_date=end_date,
+            temporal_resolution=temporal_resolution,
+            analysis_kind=compatibility_request.analysis_kind,
+            validate_live=True,
+        )
 
     spec = _resolve_dataset(
         temporal_resolution=temporal_resolution,
@@ -761,6 +797,39 @@ class GEEDatasetMetadataInput(BaseModel):
         default=True,
         description="If true, try to infer temporal coverage for image collections.",
     )
+
+
+class GEERequestPlanInput(BaseModel):
+    query: str = Field(..., description="Complete user request or normalized task summary.")
+    dataset_id: Optional[str] = Field(
+        default=None,
+        description="Optional exact Earth Engine asset id. Explicit ids are never replaced silently.",
+    )
+    dataset_name: Optional[str] = Field(default=None, description="Optional product alias or preferred dataset name.")
+    bands: List[str] = Field(default_factory=list, description="Requested bands, if already known.")
+    start_date: Optional[str] = Field(default=None, description="Optional start date: YYYY, YYYY-MM, or YYYY-MM-DD.")
+    end_date: Optional[str] = Field(default=None, description="Optional end date: YYYY, YYYY-MM, or YYYY-MM-DD.")
+    bbox: Optional[List[float]] = Field(
+        default=None,
+        min_length=4,
+        max_length=4,
+        description="Optional WGS84 bbox [minx,miny,maxx,maxy].",
+    )
+    aoi_area_sq_km: Optional[float] = Field(default=None, gt=0, description="Known AOI area when bbox is unavailable.")
+    temporal_resolution: Literal["static", "annual", "monthly", "daily", "subdaily", "unknown"] = "unknown"
+    output_kind: Literal["raster", "table", "vector", "map"] = "raster"
+    analysis_kind: Literal["download", "composite", "statistics", "time_series", "classification"] = "download"
+    reducer: Optional[str] = None
+    scale_m: Optional[float] = Field(default=None, gt=0)
+    destination: Literal["local", "drive", "cloud_storage", "asset", "unspecified"] = "local"
+    prefer_official: bool = True
+    require_official_hdf5: bool = False
+    processing_preset: Optional[str] = None
+    validate_live: bool = Field(
+        default=True,
+        description="Validate the selected candidates through Earth Engine before recommending execution.",
+    )
+    max_candidates: int = Field(default=8, ge=1, le=20)
 
 
 class DatasetLatestAvailabilityInput(BaseModel):
@@ -1219,10 +1288,12 @@ def gee_dataset_metadata(dataset_id: str, check_temporal: bool = True) -> str:
     # 1) Try as ImageCollection
     try:
         col = ee.ImageCollection(dataset_id)
-        size = col.size().getInfo()
         first = ee.Image(col.first())
         result["asset_type"] = "ImageCollection"
-        result["collection_size"] = size
+        # Full global collection counts are expensive for catalogs such as Sentinel-2.
+        # The unified planner requests check_temporal=False and performs a bounded,
+        # request-scoped existence probe instead.
+        result["collection_size"] = col.size().getInfo() if check_temporal else None
         result["band_names"] = first.bandNames().getInfo()
         if check_temporal:
             start_ms = col.aggregate_min("system:time_start").getInfo()
@@ -1275,6 +1346,354 @@ def gee_dataset_metadata(dataset_id: str, check_temporal: bool = True) -> str:
             indent=2,
             ensure_ascii=False,
         )
+
+
+def _safe_optional_date(value: object) -> Optional[date]:
+    if value in (None, ""):
+        return None
+    raw = str(value)
+    try:
+        return _parse_date(raw, "start")
+    except (TypeError, ValueError):
+        return None
+
+
+def _normalize_planner_temporal_resolution(value: object, asset_type: str = "unknown") -> str:
+    raw = str(value or "").strip().lower()
+    if raw in {"static", "annual", "monthly", "daily", "subdaily"}:
+        return raw
+    if raw in {"annual/static", "yearly"}:
+        return "annual"
+    if raw in {"hourly", "sub-daily", "sub_daily"}:
+        return "subdaily"
+    if asset_type == "Image" and not raw:
+        return "static"
+    return "unknown"
+
+
+def _curated_candidate(entry: Dict, query: str) -> List[DatasetCandidate]:
+    raw_ids: List[str] = []
+    if entry.get("dataset_id"):
+        raw_ids.append(str(entry["dataset_id"]))
+    if isinstance(entry.get("dataset_ids"), list):
+        raw_ids.extend(str(value) for value in entry["dataset_ids"] if value)
+    if not raw_ids:
+        return []
+
+    coverage = entry.get("expected_temporal_coverage") or {}
+    title = str(entry.get("name") or entry.get("key") or raw_ids[0])
+    description = " ".join(
+        [
+            str(entry.get("category") or ""),
+            " ".join(str(value) for value in entry.get("use_when", []) or []),
+            " ".join(str(value) for value in entry.get("avoid_when", []) or []),
+            str(entry.get("notes") or ""),
+        ]
+    )
+    match_score = _score_catalog_item(
+        {
+            "dataset_id": " ".join(raw_ids),
+            "title": title,
+            "description": description,
+        },
+        query,
+    )
+    primary_bands = _curated_band_names(entry)
+    source = "ntl_registry" if any(dataset_id in DATASET_BY_ID for dataset_id in raw_ids) else "curated"
+    candidates: List[DatasetCandidate] = []
+    for dataset_id in raw_ids:
+        candidates.append(
+            DatasetCandidate(
+                dataset_id=dataset_id,
+                title=title,
+                asset_type=str(entry.get("asset_type") or "unknown"),
+                bands=primary_bands,
+                default_bands=primary_bands[:1],
+                scale_m=entry.get("scale_m"),
+                temporal_resolution=_normalize_planner_temporal_resolution(
+                    entry.get("temporal_resolution"),
+                    str(entry.get("asset_type") or "unknown"),
+                ),
+                temporal_start=_safe_optional_date(coverage.get("start")),
+                temporal_end=_safe_optional_date(coverage.get("end")),
+                source=source,
+                official=(
+                    str(entry.get("catalog_source") or "").lower() == "official"
+                    or (not dataset_id.startswith("projects/sat-io/") and source != "curated")
+                ),
+                live_checked=False,
+                qa_preset=entry.get("qa_preset"),
+                processing_presets=[str(value) for value in entry.get("processing_presets", []) or []],
+                score=float(match_score),
+            )
+        )
+    return candidates
+
+
+def _official_catalog_candidate(record: Dict) -> Optional[DatasetCandidate]:
+    dataset_id = str(record.get("dataset_id") or "").strip()
+    if not dataset_id:
+        return None
+    return DatasetCandidate(
+        dataset_id=dataset_id,
+        title=str(record.get("title") or dataset_id),
+        source="official_catalog",
+        official=True,
+        score=float(record.get("match_score") or 0),
+        warnings=["Catalog candidate requires live asset and band validation."],
+    )
+
+
+def _candidate_with_live_metadata(candidate: DatasetCandidate, request: GeeRequest) -> DatasetCandidate:
+    try:
+        payload = json.loads(gee_dataset_metadata(candidate.dataset_id, check_temporal=False))
+    except Exception as exc:  # noqa: BLE001
+        return candidate.model_copy(
+            update={"warnings": [*candidate.warnings, f"Metadata validation failed: {exc}"]}
+        )
+
+    if payload.get("status") == "error":
+        return candidate.model_copy(
+            update={
+                "warnings": [
+                    *candidate.warnings,
+                    f"Metadata validation failed: {payload.get('error') or 'unknown error'}",
+                ]
+            }
+        )
+
+    coverage = payload.get("temporal_coverage") or {}
+    observed_bands = [str(value) for value in payload.get("band_names", []) or []]
+    curated_bands = [
+        str(value.get("band"))
+        for value in payload.get("curated_primary_bands", []) or []
+        if isinstance(value, dict) and value.get("band")
+    ]
+    asset_type = str(payload.get("asset_type") or candidate.asset_type or "unknown")
+    cadence = _normalize_planner_temporal_resolution(
+        payload.get("temporal_resolution") or candidate.temporal_resolution,
+        asset_type,
+    )
+    status = str(payload.get("status") or "")
+    warnings = list(candidate.warnings)
+    if payload.get("warning"):
+        warnings.append(str(payload["warning"]))
+    collection_size = payload.get("collection_size")
+    if status == "ok" and asset_type == "ImageCollection" and collection_size is None and (
+        request.start_date or request.end_date or request.bbox
+    ):
+        try:
+            import ee  # type: ignore
+
+            collection = ee.ImageCollection(candidate.dataset_id)
+            if request.start_date and request.end_date:
+                collection = collection.filterDate(
+                    request.start_date.isoformat(),
+                    (request.end_date + timedelta(days=1)).isoformat(),
+                )
+            if request.bbox:
+                collection = collection.filterBounds(ee.Geometry.Rectangle(list(request.bbox)))
+            exists = int(collection.limit(1).size().getInfo())
+            collection_size = 0 if exists == 0 else None
+            warnings.append("Live validation used a bounded request-scoped existence probe, not a global collection count.")
+        except Exception as exc:  # noqa: BLE001
+            warnings.append(f"Request-scoped availability probe failed: {exc}")
+    return candidate.model_copy(
+        update={
+            "asset_type": asset_type,
+            "bands": observed_bands or candidate.bands,
+            "default_bands": candidate.default_bands or curated_bands[:1] or observed_bands[:1],
+            "scale_m": payload.get("curated_scale_m") or candidate.scale_m,
+            "temporal_resolution": cadence,
+            "temporal_start": _safe_optional_date(coverage.get("start")) or candidate.temporal_start,
+            "temporal_end": _safe_optional_date(coverage.get("end")) or candidate.temporal_end,
+            "source": "live_metadata" if status == "ok" else candidate.source,
+            "live_checked": status == "ok" and asset_type != "unknown",
+            "collection_size": collection_size,
+            "warnings": warnings,
+        }
+    )
+
+
+def _merge_candidates(candidates: List[DatasetCandidate]) -> List[DatasetCandidate]:
+    merged: Dict[str, DatasetCandidate] = {}
+    for candidate in candidates:
+        existing = merged.get(candidate.dataset_id)
+        if existing is None:
+            merged[candidate.dataset_id] = candidate
+            continue
+        merged[candidate.dataset_id] = existing.model_copy(
+            update={
+                "title": existing.title or candidate.title,
+                "asset_type": existing.asset_type if existing.asset_type != "unknown" else candidate.asset_type,
+                "bands": existing.bands or candidate.bands,
+                "default_bands": existing.default_bands or candidate.default_bands,
+                "scale_m": existing.scale_m or candidate.scale_m,
+                "temporal_resolution": (
+                    existing.temporal_resolution
+                    if existing.temporal_resolution != "unknown"
+                    else candidate.temporal_resolution
+                ),
+                "temporal_start": existing.temporal_start or candidate.temporal_start,
+                "temporal_end": existing.temporal_end or candidate.temporal_end,
+                "official": existing.official or candidate.official,
+                "score": max(existing.score, candidate.score),
+                "warnings": list(dict.fromkeys([*existing.warnings, *candidate.warnings])),
+            }
+        )
+    return list(merged.values())
+
+
+def _candidate_pool_for_request(
+    request: GeeRequest,
+    *,
+    validate_live: bool,
+    max_candidates: int,
+) -> List[DatasetCandidate]:
+    curated_candidates: List[DatasetCandidate] = []
+    for entry in _load_curated_dataset_registry():
+        curated_candidates.extend(_curated_candidate(entry, request.query))
+
+    candidates = [
+        candidate
+        for candidate in curated_candidates
+        if candidate.score > 0 or candidate.dataset_id == request.dataset_id
+    ]
+
+    domain = classify_request_domain(request)
+    if request.dataset_id:
+        candidates.insert(
+            0,
+            DatasetCandidate(
+                dataset_id=request.dataset_id,
+                title=request.dataset_name or request.dataset_id,
+                bands=list(request.bands),
+                default_bands=list(request.bands),
+                scale_m=request.scale_m,
+                temporal_resolution=request.temporal_resolution,
+                source="explicit",
+                official=request.prefer_official,
+                score=10_000,
+            ),
+        )
+    elif domain == "ntl" and request.temporal_resolution in {"annual", "monthly", "daily"}:
+        spec = _resolve_dataset(
+            request.temporal_resolution,
+            request.dataset_name,
+            None,
+        )
+        candidates.insert(
+            0,
+            DatasetCandidate(
+                dataset_id=spec.dataset_id,
+                title=spec.name,
+                asset_type="ImageCollection",
+                bands=[spec.band],
+                default_bands=[spec.band],
+                scale_m=spec.spatial_resolution_m,
+                temporal_resolution=spec.temporal_resolution,
+                temporal_start=spec.start_date,
+                temporal_end=spec.end_date,
+                source="ntl_registry",
+                official=not spec.dataset_id.startswith("projects/sat-io/"),
+                score=10_000,
+            ),
+        )
+    else:
+        try:
+            discovery = json.loads(
+                gee_catalog_discovery(
+                    request.query,
+                    max_results=max_candidates,
+                    temporal_resolution=(
+                        request.temporal_resolution
+                        if request.temporal_resolution in {"annual", "monthly", "daily"}
+                        else None
+                    ),
+                )
+            )
+            for record in discovery.get("official_candidates", []) or []:
+                candidate = _official_catalog_candidate(record)
+                if candidate is not None:
+                    candidates.append(candidate)
+        except Exception:
+            pass
+
+    merged = _merge_candidates(candidates)
+    # Live probes are deliberately bounded: explicit id first, otherwise only the strongest candidates.
+    if validate_live:
+        from ntl_toolkit.core.gee_planning import rank_candidates
+
+        ranked = rank_candidates(request, merged)
+        if request.dataset_id:
+            probe_ids = {request.dataset_id}
+        else:
+            probe_count = 1 if domain == "ntl" else min(2, max_candidates)
+            probe_ids = {candidate.dataset_id for candidate in ranked[:probe_count]}
+        merged = [
+            _candidate_with_live_metadata(candidate, request) if candidate.dataset_id in probe_ids else candidate
+            for candidate in merged
+        ]
+    return merged
+
+
+def gee_request_plan(
+    query: str,
+    dataset_id: Optional[str] = None,
+    dataset_name: Optional[str] = None,
+    bands: Optional[List[str]] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    bbox: Optional[List[float]] = None,
+    aoi_area_sq_km: Optional[float] = None,
+    temporal_resolution: str = "unknown",
+    output_kind: str = "raster",
+    analysis_kind: str = "download",
+    reducer: Optional[str] = None,
+    scale_m: Optional[float] = None,
+    destination: str = "local",
+    prefer_official: bool = True,
+    require_official_hdf5: bool = False,
+    processing_preset: Optional[str] = None,
+    validate_live: bool = True,
+    max_candidates: int = 8,
+) -> str:
+    request = GeeRequest(
+        query=query,
+        dataset_id=dataset_id,
+        dataset_name=dataset_name,
+        bands=bands or [],
+        start_date=_parse_date(start_date, "start") if start_date else None,
+        end_date=_parse_date(end_date, "end") if end_date else None,
+        bbox=tuple(float(value) for value in bbox) if bbox else None,
+        aoi_area_sq_km=aoi_area_sq_km,
+        temporal_resolution=temporal_resolution,
+        output_kind=output_kind,
+        analysis_kind=analysis_kind,
+        reducer=reducer,
+        scale_m=scale_m,
+        destination=destination,
+        prefer_official=prefer_official,
+        require_official_hdf5=require_official_hdf5,
+        processing_preset=processing_preset,
+    )
+    candidates = _candidate_pool_for_request(
+        request,
+        validate_live=validate_live,
+        max_candidates=max_candidates,
+    )
+    plan = build_gee_plan(request, candidates, PlannerPolicy())
+    payload = plan.model_dump(mode="json", by_alias=True)
+    payload["planner"] = {
+        "name": "NTL-GPT unified GEE planner",
+        "catalog_sources": ["NTL-GPT curated registry", "official Earth Engine catalog"],
+        "easygee_alignment": [
+            "catalog-first discovery",
+            "live metadata before execution",
+            "task-kind and destination-aware export routing",
+        ],
+    }
+    return json.dumps(payload, indent=2, ensure_ascii=False)
 
 
 def _parse_bbox_text(raw: Optional[str]) -> Optional[Tuple[float, float, float, float]]:
@@ -1402,12 +1821,24 @@ def dataset_latest_availability(
     return json.dumps(payload, indent=2, ensure_ascii=False)
 
 
+GEE_request_plan_tool = StructuredTool.from_function(
+    func=gee_request_plan,
+    name="GEE_request_plan_tool",
+    description=(
+        "Primary planner for NTL and general Earth Engine requests. It preserves explicit dataset ids, "
+        "combines curated and official catalog candidates, validates live metadata, estimates AOI workload, "
+        "and returns a structured direct-local/server-reduce/batch-export/official-Earthdata execution plan."
+    ),
+    args_schema=GEERequestPlanInput,
+)
+
+
 GEE_dataset_router_tool = StructuredTool.from_function(
     func=gee_dataset_router,
     name="GEE_dataset_router_tool",
     description=(
-        "Route GEE tasks to the best dataset and execution mode. "
-        "Validates temporal coverage and decides between direct download vs server-side processing."
+        "Compatibility router for older annual/monthly/daily callers. NTL requests keep the stable curated "
+        "route; non-NTL or unknown explicit dataset ids delegate to GEE_request_plan_tool semantics."
     ),
     args_schema=GEEDatasetRouterInput,
 )

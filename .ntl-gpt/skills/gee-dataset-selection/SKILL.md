@@ -14,13 +14,14 @@ Use this skill before writing a GEE plan or script when the task depends on data
 
 1. Read `/skills/gee-dataset-selection/references/dataset-selection-rules.md`.
 2. Read `/skills/gee-dataset-selection/references/gee-dataset-registry.json` only for the dataset family needed by the task.
-3. Before event/daily/recent-date work, run the latest-availability gate:
+3. Call `GEE_request_plan_tool` to preserve explicit ids, combine curated and official-catalog candidates, and determine the execution mode.
+4. Before event/daily/recent-date work, run the latest-availability gate:
    - Preferred: call `dataset_latest_availability_tool`.
    - GEE path: validate selected `dataset_id`, bands, and latest `system:time_start` with `dataset_latest_availability_tool` or `GEE_dataset_metadata_tool`.
    - NASA LAADS path: validate the LAADS/CMR short_name has granules through the requested date with `dataset_latest_availability_tool` or the official pipeline query step.
-4. Validate the selected `dataset_id` and bands with `GEE_dataset_metadata_tool` when the plan will execute in GEE.
-5. If the selected dataset is unsupported or not yet updated for the requested date, choose a documented alternative, adjust the analysis window with user-visible justification, or return a clear coverage/latency error.
-6. Treat dataset metadata as evidence-scoped: prefer entries with `validation_status: task_tested`, but still validate live band/date coverage for the exact task.
+5. Validate the selected `dataset_id` and bands with `GEE_dataset_metadata_tool` when the unified plan is not already live-verified.
+6. If the selected dataset is unsupported or not yet updated for the requested date, choose a documented alternative, adjust the analysis window with user-visible justification, or return a clear coverage/latency error.
+7. Treat dataset metadata as evidence-scoped: prefer entries with `validation_status: task_tested`, but still validate live band/date coverage for the exact task.
 
 ## Registry Scope
 
@@ -29,6 +30,7 @@ The registry is curated for NTL-GPT, not a full Earth Engine catalog. It covers:
 - NTL products: annual, monthly, daily, legacy DMSP.
 - Administrative boundaries: geoBoundaries, project China assets, GAUL/LSIB fallback.
 - Population/electrification support: LandScan, WorldPop, GPW, GHSL population.
+- Optical/thermal imagery: Sentinel-2 SR Harmonized with Cloud Score+, Landsat 8/9 Collection 2 Level 2.
 - Environmental covariates: MODIS NDVI/EVI/NPP, land cover, WorldCover, DEM.
 - Event context: fire and flood context layers.
 
@@ -39,12 +41,13 @@ Auxiliary entries such as LandScan, GHSL, WorldPop, WorldCover, FIRMS, and Globa
 Every GEE handoff should state:
 
 - selected `dataset_id`
-- selected `band`
+- selected `bands`
 - `date_range` with end-exclusive convention for scripts
 - `scale_m`
 - reducer and aggregation parameters
 - why this dataset fits the task
 - known caveats and fallback dataset
+- validated processing/QA preset when scientific scaling or masking is required
 
 For common GEE parameter meanings, read:
 

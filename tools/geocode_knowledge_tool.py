@@ -512,8 +512,9 @@ def retrieve_geocode_knowledge(
         "matched_recipes": selected,
         "usage_note": (
             "Adapt recipe filenames to the current workspace and always resolve file paths via storage_manager. "
-            "For long daily time-series, prioritize GEE server-side aggregation and export only final tables. "
-            "For zonal_stats with image_count<=6 (daily/monthly/annual), prefer direct_download workflow."
+            "Call GEE_request_plan_tool before acquisition or cloud analysis. For zonal statistics and long "
+            "time-series, prioritize server_reduce and export compact tables. Use direct_local only when the "
+            "unified AOI/resolution/band/output-size policy allows it; use tracked batch_export otherwise."
         ),
     }
     return json.dumps(payload, indent=2, ensure_ascii=False)
