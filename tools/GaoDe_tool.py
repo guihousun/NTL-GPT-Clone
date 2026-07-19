@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 import pandas as pd
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
@@ -125,6 +128,32 @@ def convert_geom_to_wgs84(geom):
     return geom
 
 
+def _extract_polygonal_geometry(geom):
+    """Keep polygonal parts from geometries returned by ``make_valid``."""
+    if geom is None or geom.is_empty:
+        return None
+    if geom.geom_type == "Polygon":
+        return geom
+    if geom.geom_type == "MultiPolygon":
+        return geom
+
+    polygons = []
+    for part in getattr(geom, "geoms", ()):
+        polygonal = _extract_polygonal_geometry(part)
+        if polygonal is None:
+            continue
+        if polygonal.geom_type == "Polygon":
+            polygons.append(polygonal)
+        else:
+            polygons.extend(polygonal.geoms)
+
+    if not polygons:
+        return None
+    if len(polygons) == 1:
+        return polygons[0]
+    return MultiPolygon(polygons)
+
+
 import os
 import requests
 import geopandas as gpd
@@ -135,6 +164,7 @@ from pydantic.v1 import BaseModel, Field
 # Assuming these are defined elsewhere
 DISTRICT_URL = "https://restapi.amap.com/v3/config/district?keywords={city}&key={api_key}&subdistrict=0"
 GEO_JSON_URL = "https://geo.datav.aliyun.com/areas_v3/bound/geojson?code={city_code}_full"
+GEOCODE_URL = "https://restapi.amap.com/v3/geocode/geo"
 # And storage_manager, convert_geom_to_wgs84 are imported
 
 import os
@@ -153,6 +183,48 @@ class GetAdministrativeDivisionInput(BaseModel):
     city: str = Field(..., description="Name of the administrative division (e.g., 'Shanghai'). Chinese names are also accepted.")
     input_name: str = Field(..., description="input filename for the Shapefile (e.g., 'shanghai_boundary.shp').")
 
+
+def _resolve_amap_admin_code(city: str, api_key: str) -> tuple[str, str, str]:
+    """Resolve an Amap administrative code, with geocoding fallback for English names."""
+    resp = requests.get(
+        DISTRICT_URL.format(city=city, api_key=api_key),
+        timeout=20,
+    )
+    data, parse_error = _safe_response_json(resp)
+    if parse_error:
+        return "", "", f"Failed to parse district API response. {parse_error}"
+
+    districts = data.get("districts") or []
+    if data.get("status") == "1" and districts:
+        district = districts[0]
+        return str(district.get("adcode") or ""), str(district.get("name") or city), ""
+
+    geocode_resp = requests.get(
+        GEOCODE_URL,
+        params={"key": api_key, "address": city, "output": "json"},
+        timeout=20,
+    )
+    geocode_data, geocode_parse_error = _safe_response_json(geocode_resp)
+    if geocode_parse_error:
+        return "", "", f"Failed to parse geocoding API response. {geocode_parse_error}"
+
+    geocodes = geocode_data.get("geocodes") or []
+    if geocode_data.get("status") == "1" and geocodes:
+        geocode = geocodes[0]
+        adcode = str(geocode.get("adcode") or "").strip()
+        resolved_name = str(
+            geocode.get("formatted_address")
+            or geocode.get("district")
+            or geocode.get("city")
+            or geocode.get("province")
+            or city
+        ).strip()
+        if adcode:
+            return adcode, resolved_name, ""
+
+    error_info = str(data.get("info") or geocode_data.get("info") or "no matching administrative code")
+    return "", "", error_info
+
 def get_administrative_division_data(city: str, input_name: str, config: Optional[RunnableConfig] = None) -> str:
     """
     Fetches administrative boundary, converts to WGS-84, and saves as a Shapefile.
@@ -167,21 +239,18 @@ def get_administrative_division_data(city: str, input_name: str, config: Optiona
 
     try:
         # Step 1: Get adcode
-        resp = requests.get(DISTRICT_URL.format(city=city, api_key=api_key))
-        data, parse_error = _safe_response_json(resp)
-        if parse_error:
-            return f"Error: Failed to parse district API response. {parse_error}"
-        if data.get("status") != "1" or not data["districts"]:
-            return f"Error: Could not find adcode for '{city}'."
-        
-        city_code = data["districts"][0]["adcode"]
-        city_name_en = data["districts"][0]["name"]
+        city_code, resolved_name, resolve_error = _resolve_amap_admin_code(city, api_key)
+        if not city_code:
+            return f"Error: Could not find adcode for '{city}'. {resolve_error}"
 
         # Step 2: Get GeoJSON
-        geo_resp = requests.get(GEO_JSON_URL.format(city_code=city_code))
+        geo_resp = requests.get(GEO_JSON_URL.format(city_code=city_code), timeout=30)
         if geo_resp.status_code != 200:
             # Fallback to single boundary if full children boundary fails
-            geo_resp = requests.get(GEO_JSON_URL.format(city_code=city_code).replace("_full", ""))
+            geo_resp = requests.get(
+                GEO_JSON_URL.format(city_code=city_code).replace("_full", ""),
+                timeout=30,
+            )
         
         if geo_resp.status_code != 200:
             return "Error: Failed to download GeoJSON data from source."
@@ -199,10 +268,12 @@ def get_administrative_division_data(city: str, input_name: str, config: Optiona
 
         # Validate and fix geometries, but avoid changing types
         from shapely.validation import make_valid
-        gdf['geometry'] = gdf['geometry'].apply(lambda geom: make_valid(geom) if not geom.is_valid else geom)
+        gdf['geometry'] = gdf['geometry'].apply(
+            lambda geom: _extract_polygonal_geometry(make_valid(geom) if not geom.is_valid else geom)
+        )
 
-        # Filter to keep only polygon geometries (to avoid Shapefile type errors)
-        gdf = gdf[gdf.geometry.type.isin(['Polygon', 'MultiPolygon'])]
+        # Drop rows that contain no polygonal component after geometry repair.
+        gdf = gdf[gdf['geometry'].notna()]
 
         # If no polygons left, raise error
         if gdf.empty:
@@ -222,10 +293,56 @@ def get_administrative_division_data(city: str, input_name: str, config: Optiona
 
         # Step 4: Save
         gdf.to_file(abs_input_path, driver="ESRI Shapefile", encoding="utf-8")
-        
-        return (f"Success: Administrative data for '{city}' processed.\n"
-                f"Coordinates: WGS-84 (EPSG:4326)\n"
-                f"Saved to: {input_name} (Workspace: inputs/)")
+
+        feature_names = (
+            [str(value) for value in gdf["Name"].dropna().tolist()]
+            if "Name" in gdf.columns
+            else []
+        )
+        feature_adcodes = (
+            [str(value) for value in gdf["AdCode"].dropna().tolist()]
+            if "AdCode" in gdf.columns
+            else []
+        )
+        level_counts = (
+            {str(key): int(value) for key, value in gdf["Level"].astype(str).value_counts().items()}
+            if "Level" in gdf.columns
+            else {}
+        )
+        boundary_scope = (
+            "children"
+            if len(gdf) > 1 or any(adcode != str(city_code) for adcode in feature_adcodes)
+            else "self"
+        )
+        saved_base = Path(abs_input_path)
+        output_files = sorted(
+            f"inputs/{path.name}"
+            for path in saved_base.parent.glob(f"{saved_base.stem}.*")
+            if path.is_file()
+        )
+
+        return json.dumps(
+            {
+                "status": "success",
+                "source": "Amap administrative code + Aliyun DataV boundary",
+                "requested_name": city,
+                "resolved_name": resolved_name,
+                "adcode": str(city_code),
+                "boundary_scope": boundary_scope,
+                "feature_count": int(len(gdf)),
+                "feature_levels": level_counts,
+                "feature_names": feature_names,
+                "name_field": "Name",
+                "adcode_field": "AdCode",
+                "attribute_fields": [str(column) for column in gdf.columns if column != gdf.geometry.name],
+                "crs": "EPSG:4326",
+                "geometry_valid": bool(gdf.geometry.is_valid.all()),
+                "output_files": output_files,
+                "primary_file": f"inputs/{saved_base.name}",
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
 
     except Exception as e:
         return f"Error during processing: {str(e)}"
@@ -236,7 +353,10 @@ get_administrative_division_tool = StructuredTool.from_function(
     func=get_administrative_division_data,
     name="get_administrative_division_data",
     description=(
-        "Retrieves the administrative boundary (Shapefile) for a city or district in China. "
+        "Retrieves Chinese administrative boundaries as a Shapefile. Province, municipality, and city "
+        "queries return their child administrative divisions when the DataV _full layer is available; "
+        "district queries may return the district itself when no lower-level layer is published. "
+        "The structured result reports boundary_scope, feature_count, feature_levels, and feature_names. "
         "Automatically converts coordinates from GCJ-02 to WGS-84 for standard GIS analysis. "
         "The input is saved in the workspace's 'inputs/' folder. "
         "Ideal for generating ROI masks for NTL analysis."

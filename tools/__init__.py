@@ -119,6 +119,10 @@ _GROUPS: dict[str, list[str]] = {
         "GeoCode_COT_Validation_tool",
     ],
     "Engineer_tools": [
+        "execute_geospatial_script_tool",
+        "GeoCode_COT_Validation_tool",
+        "geodata_inspector_tool",
+        "geodata_quick_check_tool",
         "SDGSAT1_strip_removal_tool",
         "SDGSAT1_radiometric_calibration_tool",
         "VNP46A2_angular_correction_tool",

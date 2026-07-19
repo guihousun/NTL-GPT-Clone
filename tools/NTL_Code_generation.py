@@ -31,6 +31,21 @@ from storage_manager import (
 )
 
 DEFAULT_GEE_PROJECT = "empyrean-caster-430308-m2"
+SCRIPT_CONTRACT_SCHEMA = "ntl.script.contract.v2"
+SCRIPT_EXECUTION_MANIFEST_SCHEMA = "ntl.script.execution.manifest.v1"
+SCRIPT_CONTRACT_REQUIRED_FIELDS = (
+    "objective",
+    "input_manifest",
+    "method_steps",
+    "parameters",
+    "output_manifest",
+    "validation_checks",
+    "failure_gates",
+    "execution",
+)
+SCRIPT_EXECUTION_MODES = {"execute", "plan_only"}
+SCRIPT_TEST_STRATEGIES = {"auto", "none", "sample", "required"}
+SCRIPT_OVERWRITE_POLICIES = {"version", "replace"}
 
 
 def _live_storage_context_value(name: str, imported_context_var: Any) -> str:
@@ -212,6 +227,127 @@ class ExecuteScriptInput(BaseModel):
         default=False,
         description="If True, bypass dedupe skip and force re-execution even if script content is unchanged.",
     )
+
+
+def _extract_ntl_script_contract(script_content: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """Extract the literal NTL_SCRIPT_CONTRACT assignment without executing user code."""
+    try:
+        tree = ast.parse(script_content)
+    except SyntaxError as exc:
+        return None, f"Script syntax prevents contract parsing: {exc}"
+
+    for node in tree.body:
+        value_node: Optional[ast.AST] = None
+        if isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == "NTL_SCRIPT_CONTRACT"
+            for target in node.targets
+        ):
+            value_node = node.value
+        elif (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "NTL_SCRIPT_CONTRACT"
+        ):
+            value_node = node.value
+
+        if value_node is None:
+            continue
+        try:
+            payload = ast.literal_eval(value_node)
+        except Exception as exc:  # noqa: BLE001
+            return None, f"NTL_SCRIPT_CONTRACT must be a literal dictionary: {exc}"
+        if not isinstance(payload, dict):
+            return None, "NTL_SCRIPT_CONTRACT must be a dictionary."
+        return dict(payload), None
+
+    return None, "NTL_SCRIPT_CONTRACT assignment is required."
+
+
+def _validate_ntl_script_contract(script_content: str) -> Dict[str, Any]:
+    contract, extract_error = _extract_ntl_script_contract(script_content)
+    errors: List[str] = []
+    if extract_error:
+        errors.append(extract_error)
+    if contract is None:
+        return {
+            "pass": False,
+            "schema": None,
+            "errors": errors,
+            "contract": None,
+        }
+
+    schema = str(contract.get("schema") or "").strip()
+    if schema != SCRIPT_CONTRACT_SCHEMA:
+        errors.append(
+            f"Unsupported script contract schema '{schema or 'missing'}'; "
+            f"only '{SCRIPT_CONTRACT_SCHEMA}' is accepted."
+        )
+
+    for field_name in SCRIPT_CONTRACT_REQUIRED_FIELDS:
+        if field_name not in contract:
+            errors.append(f"Missing required contract field: {field_name}")
+
+    objective = contract.get("objective")
+    if not isinstance(objective, str) or not objective.strip():
+        errors.append("Contract objective must be a non-empty string.")
+
+    list_fields = (
+        "input_manifest",
+        "method_steps",
+        "output_manifest",
+        "validation_checks",
+        "failure_gates",
+    )
+    for field_name in list_fields:
+        if field_name in contract and not isinstance(contract.get(field_name), list):
+            errors.append(f"Contract field '{field_name}' must be a list.")
+    if "parameters" in contract and not isinstance(contract.get("parameters"), dict):
+        errors.append("Contract field 'parameters' must be a dictionary.")
+
+    execution = contract.get("execution")
+    if not isinstance(execution, dict):
+        errors.append("Contract field 'execution' must be a dictionary.")
+    else:
+        mode = str(execution.get("mode") or "execute").strip().lower()
+        test_strategy = str(execution.get("test_strategy") or "auto").strip().lower()
+        overwrite_policy = str(execution.get("overwrite_policy") or "version").strip().lower()
+        if mode not in SCRIPT_EXECUTION_MODES:
+            errors.append(f"execution.mode must be one of {sorted(SCRIPT_EXECUTION_MODES)}.")
+        if test_strategy not in SCRIPT_TEST_STRATEGIES:
+            errors.append(f"execution.test_strategy must be one of {sorted(SCRIPT_TEST_STRATEGIES)}.")
+        if overwrite_policy not in SCRIPT_OVERWRITE_POLICIES:
+            errors.append(
+                f"execution.overwrite_policy must be one of {sorted(SCRIPT_OVERWRITE_POLICIES)}."
+            )
+        timeout_seconds = execution.get("timeout_seconds", 1800)
+        if not isinstance(timeout_seconds, int) or isinstance(timeout_seconds, bool) or timeout_seconds <= 0:
+            errors.append("execution.timeout_seconds must be a positive integer.")
+        network_scope = execution.get("network_scope", [])
+        if not isinstance(network_scope, list) or not all(isinstance(item, str) for item in network_scope):
+            errors.append("execution.network_scope must be a list of service names.")
+        repair_history = execution.get("repair_history", [])
+        if not isinstance(repair_history, list):
+            errors.append("execution.repair_history must be a list.")
+        elif len(repair_history) > 1:
+            errors.append("execution.repair_history may contain at most one light repair record.")
+        elif repair_history:
+            repair = repair_history[0]
+            if not isinstance(repair, dict):
+                errors.append("execution.repair_history entries must be dictionaries.")
+            else:
+                for field_name in ("reason", "before", "after"):
+                    value = repair.get(field_name)
+                    if not isinstance(value, str) or not value.strip():
+                        errors.append(
+                            f"execution.repair_history[0].{field_name} must be a non-empty string."
+                        )
+
+    return {
+        "pass": not errors,
+        "schema": schema or None,
+        "errors": errors,
+        "contract": contract,
+    }
 
 def _sanitize_ansi(text: str) -> str:
     return re.sub(r"\x1b\[[0-9;]*m", "", text or "")
@@ -528,6 +664,194 @@ def _auto_migrate_cross_workspace_outputs(
 
 def _timestamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def _next_versioned_path(path: Path) -> Path:
+    if not path.exists():
+        return path
+    for version in range(2, 10000):
+        candidate = path.with_name(f"{path.stem}_v{version}{path.suffix}")
+        if not candidate.exists():
+            return candidate
+    raise RuntimeError(f"Unable to allocate a versioned path for {path.name}.")
+
+
+def _contract_execution_settings(contract: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    execution = contract.get("execution") if isinstance(contract, dict) else None
+    if not isinstance(execution, dict):
+        execution = {}
+    return {
+        "mode": str(execution.get("mode") or "execute").strip().lower(),
+        "timeout_seconds": int(execution.get("timeout_seconds") or 1800),
+        "overwrite_policy": str(execution.get("overwrite_policy") or "version").strip().lower(),
+        "network_scope": list(execution.get("network_scope") or []),
+        "test_strategy": str(execution.get("test_strategy") or "auto").strip().lower(),
+        "repair_history": list(execution.get("repair_history") or []),
+    }
+
+
+def _contract_output_path(entry: Any, *, thread_id: str) -> Tuple[Optional[Path], bool, str]:
+    required = True
+    raw_path = ""
+    if isinstance(entry, str):
+        raw_path = entry
+    elif isinstance(entry, dict):
+        required = bool(entry.get("required", True))
+        if str(entry.get("kind") or "").strip().lower() in {"remote", "gee_task", "external"}:
+            return None, required, "remote"
+        raw_path = str(
+            entry.get("path")
+            or entry.get("filename")
+            or entry.get("file")
+            or entry.get("name")
+            or ""
+        )
+    else:
+        return None, required, "invalid"
+
+    normalized = raw_path.strip().replace("\\", "/")
+    for prefix in ("/data/processed/", "data/processed/", "/outputs/", "outputs/"):
+        if normalized.startswith(prefix):
+            normalized = normalized[len(prefix) :]
+            break
+    if not normalized:
+        return None, required, "missing_path"
+    try:
+        resolved = storage_manager.resolve_workspace_relative_path(
+            normalized,
+            thread_id=thread_id,
+            default_root="outputs",
+            allow_memory=False,
+        )
+    except Exception:
+        return None, required, "invalid_path"
+    return resolved, required, "local"
+
+
+def _audit_contract_outputs(contract: Dict[str, Any], *, thread_id: str) -> Dict[str, Any]:
+    records: List[Dict[str, Any]] = []
+    errors: List[str] = []
+    for entry in contract.get("output_manifest") or []:
+        path, required, kind = _contract_output_path(entry, thread_id=thread_id)
+        if kind == "remote":
+            records.append({"kind": kind, "required": required, "exists": None, "entry": entry})
+            continue
+        if path is None:
+            message = f"Invalid output manifest entry: {entry!r}"
+            records.append({"kind": kind, "required": required, "exists": False, "entry": entry})
+            if required:
+                errors.append(message)
+            continue
+        exists = path.exists()
+        size_bytes = path.stat().st_size if exists and path.is_file() else None
+        non_empty = bool(exists and (not path.is_file() or int(size_bytes or 0) > 0))
+        record = {
+            "kind": "local",
+            "required": required,
+            "path": str(path),
+            "exists": exists,
+            "size_bytes": size_bytes,
+            "non_empty": non_empty,
+        }
+        records.append(record)
+        if required and not non_empty:
+            errors.append(f"Required output is missing or empty: {path.name}")
+    return {"pass": not errors, "errors": errors, "outputs": records}
+
+
+def _write_execution_manifest(
+    *,
+    script_name: str,
+    script_path: Path,
+    script_content: str,
+    contract: Optional[Dict[str, Any]],
+    contract_validation: Dict[str, Any],
+    result: Dict[str, Any],
+    thread_id: str,
+    logs: str = "",
+) -> Dict[str, Any]:
+    """Persist successful provenance under outputs and failed diagnostics under memory."""
+    workspace = storage_manager.get_workspace(thread_id)
+    settings = _contract_execution_settings(contract)
+    status = str(result.get("status") or "fail").strip().lower()
+    is_success = status in {"success", "success_with_warnings", "planned"}
+    script_stem = Path(script_name).stem or "analysis"
+    generated_at = datetime.now(timezone.utc).isoformat()
+    script_hash = hashlib.sha256(script_content.encode("utf-8")).hexdigest()
+    manifest_payload: Dict[str, Any] = {
+        "schema": SCRIPT_EXECUTION_MANIFEST_SCHEMA,
+        "generated_at_utc": generated_at,
+        "status": status,
+        "thread_id": thread_id,
+        "script_name": Path(script_name).name,
+        "script_sha256": script_hash,
+        "contract_schema": contract_validation.get("schema"),
+        "contract_validation": {
+            "pass": bool(contract_validation.get("pass")),
+            "errors": list(contract_validation.get("errors") or []),
+        },
+        "contract": contract,
+        "execution": settings,
+        "preflight": result.get("preflight"),
+        "artifact_audit": result.get("artifact_audit"),
+        "contract_output_audit": result.get("contract_output_audit"),
+        "error": {
+            "type": result.get("error_type"),
+            "message": result.get("error_message"),
+        }
+        if not is_success
+        else None,
+    }
+
+    if is_success:
+        outputs_dir = workspace / "outputs"
+        outputs_dir.mkdir(parents=True, exist_ok=True)
+        output_script_path = outputs_dir / Path(script_name).name
+        if script_path.resolve() != output_script_path.resolve():
+            if settings["overwrite_policy"] == "version":
+                output_script_path = _next_versioned_path(output_script_path)
+            output_script_path.write_text(script_content, encoding="utf-8")
+        else:
+            output_script_path = script_path
+
+        manifest_path = outputs_dir / f"{output_script_path.stem}.manifest.json"
+        if settings["overwrite_policy"] == "version":
+            manifest_path = _next_versioned_path(manifest_path)
+        manifest_payload["script_path"] = str(output_script_path)
+        manifest_payload["manifest_path"] = str(manifest_path)
+        manifest_path.write_text(
+            json.dumps(manifest_payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        return {
+            "script_path": str(output_script_path),
+            "manifest_path": str(manifest_path),
+        }
+
+    failed_dir = workspace / "memory" / "failed_runs"
+    failed_dir.mkdir(parents=True, exist_ok=True)
+    failure_stem = f"{script_stem}_{_timestamp()}_{uuid4().hex[:8]}"
+    failed_script_path = failed_dir / f"{failure_stem}.py"
+    failed_log_path = failed_dir / f"{failure_stem}.log"
+    failed_manifest_path = failed_dir / f"{failure_stem}.manifest.json"
+    failed_script_path.write_text(script_content, encoding="utf-8")
+    failed_log_path.write_text(str(logs or result.get("stdout") or ""), encoding="utf-8")
+    manifest_payload.update(
+        {
+            "script_path": str(failed_script_path),
+            "log_path": str(failed_log_path),
+            "manifest_path": str(failed_manifest_path),
+        }
+    )
+    failed_manifest_path.write_text(
+        json.dumps(manifest_payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return {
+        "script_path": str(failed_script_path),
+        "log_path": str(failed_log_path),
+        "manifest_path": str(failed_manifest_path),
+    }
 
 
 def _sanitize_workspace_path_parts(parts: Tuple[str, ...]) -> List[str]:
@@ -1177,9 +1501,12 @@ def _bind_thread_from_config(config: Optional[RunnableConfig]) -> Optional[Any]:
     return current_thread_id.set(str(thread_id))
 
 
-def _execute_code(code_block: str) -> Tuple[bool, str, Optional[str], Optional[str], Optional[str]]:
+def _execute_code(
+    code_block: str,
+    timeout_seconds: Optional[int] = None,
+) -> Tuple[bool, str, Optional[str], Optional[str], Optional[str]]:
     if _should_use_subprocess_sandbox():
-        return _execute_code_in_subprocess_sandbox(code_block)
+        return _execute_code_in_subprocess_sandbox(code_block, timeout_seconds=timeout_seconds)
 
     user_globals = _get_thread_context()
     user_globals["_active_gee_credentials"] = _active_gee_credentials
@@ -1287,6 +1614,7 @@ def _extract_error_type_and_message(logs: str) -> Tuple[Optional[str], Optional[
 
 def _execute_code_in_subprocess_sandbox(
     code_block: str,
+    timeout_seconds: Optional[int] = None,
 ) -> Tuple[bool, str, Optional[str], Optional[str], Optional[str]]:
     thread_id = str(current_thread_id.get() or "debug").strip() or "debug"
     repo_root = Path(__file__).resolve().parent.parent
@@ -1338,6 +1666,10 @@ def _execute_code_in_subprocess_sandbox(
         runner_path.write_text(runner, encoding="utf-8")
 
         env = _build_sandbox_env(thread_id, code_path)
+        configured_timeout = _sandbox_timeout_seconds()
+        effective_timeout = configured_timeout
+        if isinstance(timeout_seconds, int) and not isinstance(timeout_seconds, bool) and timeout_seconds > 0:
+            effective_timeout = min(timeout_seconds, configured_timeout)
         completed = subprocess.run(
             [sys.executable, str(runner_path)],
             # Run from thread workspace so legacy relative paths (inputs/outputs)
@@ -1347,7 +1679,7 @@ def _execute_code_in_subprocess_sandbox(
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=_sandbox_timeout_seconds(),
+            timeout=effective_timeout,
             env=env,
         )
         logs = _sanitize_ansi((completed.stdout or "") + (completed.stderr or ""))
@@ -1356,7 +1688,7 @@ def _execute_code_in_subprocess_sandbox(
         etype, emsg = _extract_error_type_and_message(logs)
         return False, logs, etype or "SubprocessExecutionError", emsg, logs
     except subprocess.TimeoutExpired as exc:
-        timeout_msg = f"Subprocess sandbox timed out after {_sandbox_timeout_seconds()} seconds."
+        timeout_msg = f"Subprocess sandbox timed out after {effective_timeout} seconds."
         return False, timeout_msg, "TimeoutError", str(exc), traceback.format_exc()
     except Exception as exc:  # noqa: BLE001
         return False, "", type(exc).__name__, str(exc), traceback.format_exc()
@@ -1684,6 +2016,7 @@ def execute_geospatial_script(
 
         script_content = script_path.read_text(encoding="utf-8-sig")
         if not script_content.strip():
+            contract_validation = _validate_ntl_script_contract(script_content)
             policy = _build_error_handling_policy(
                 "EmptyScriptError",
                 f"Script '{logical_script_name}' is empty.",
@@ -1707,7 +2040,17 @@ def execute_geospatial_script(
                 "execution_skipped": True,
                 "artifact_audit": empty_audit,
                 "runtime_path_rewrite": no_runtime_rewrite,
+                "contract_validation": contract_validation,
             }
+            result["failure_artifacts"] = _write_execution_manifest(
+                script_name=logical_script_name,
+                script_path=script_path,
+                script_content=script_content,
+                contract=None,
+                contract_validation=contract_validation,
+                result=result,
+                thread_id=thread_id,
+            )
             _append_run_history(
                 {
                     "timestamp": _timestamp(),
@@ -1720,10 +2063,66 @@ def execute_geospatial_script(
                 }
             )
             return json.dumps(result, indent=2, ensure_ascii=False)
+
+        contract_validation = _validate_ntl_script_contract(script_content)
+        contract = contract_validation.get("contract")
+        if not contract_validation.get("pass") or not isinstance(contract, dict):
+            error_message = "; ".join(contract_validation.get("errors") or ["Invalid script contract."])
+            policy = _build_error_handling_policy(
+                "ScriptContractError",
+                error_message,
+                preflight=None,
+                fix_suggestions=[
+                    f"Replace the script contract with schema '{SCRIPT_CONTRACT_SCHEMA}' and all required fields."
+                ],
+            )
+            result = {
+                "status": "fail",
+                "stdout": "",
+                "error_type": "ScriptContractError",
+                "error_message": error_message,
+                "traceback": None,
+                "script_name": logical_script_name,
+                "script_path": str(script_path),
+                "script_location": resolved_location or effective_location,
+                "code": script_content,
+                "contract_validation": contract_validation,
+                "fix_suggestions": policy.get("fix_suggestions") or [],
+                "error_handling_policy": policy,
+                "path_protocol_mode": path_mode,
+                "path_protocol_enforcement": path_protocol_enforcement,
+                "execution_skipped": True,
+                "artifact_audit": empty_audit,
+                "runtime_path_rewrite": no_runtime_rewrite,
+            }
+            result["failure_artifacts"] = _write_execution_manifest(
+                script_name=logical_script_name,
+                script_path=script_path,
+                script_content=script_content,
+                contract=contract,
+                contract_validation=contract_validation,
+                result=result,
+                thread_id=thread_id,
+            )
+            _append_run_history(
+                {
+                    "timestamp": _timestamp(),
+                    "tool": "execute_geospatial_script_tool",
+                    "status": "fail",
+                    "reason": "script_contract",
+                    "script_name": logical_script_name,
+                    "script_path": str(script_path),
+                    "thread_id": current_thread_id.get(),
+                }
+            )
+            return json.dumps(result, indent=2, ensure_ascii=False)
+
+        execution_settings = _contract_execution_settings(contract)
         preflight = _preflight_checks(script_content, strict_mode=enforced_strict_mode)
         # Security and integrity blocking errors are always enforced.
         preflight_blocking_enabled = bool(preflight.get("blocking_errors"))
         normalized_script_hash = hashlib.sha256(_normalize_whitespace(script_content).encode("utf-8")).hexdigest()
+        prior_contract_output_audit = _audit_contract_outputs(contract, thread_id=thread_id)
 
         if (
             (not bool(force_execute))
@@ -1731,6 +2130,7 @@ def execute_geospatial_script(
             and
             thread_ctx.get("__ntl_last_executed_success_hash") == normalized_script_hash
             and thread_ctx.get("__ntl_last_executed_success_script_path") == str(script_path)
+            and prior_contract_output_audit.get("pass", False)
         ):
             # Avoid repeated execution of unchanged successful scripts.
             result = {
@@ -1748,6 +2148,8 @@ def execute_geospatial_script(
                 "path_protocol_enforcement": path_protocol_enforcement,
                 "artifact_audit": empty_audit,
                 "runtime_path_rewrite": no_runtime_rewrite,
+                "contract_validation": contract_validation,
+                "contract_output_audit": prior_contract_output_audit,
             }
             _append_run_history(
                 {
@@ -1786,7 +2188,17 @@ def execute_geospatial_script(
                 "execution_skipped": True,
                 "artifact_audit": empty_audit,
                 "runtime_path_rewrite": no_runtime_rewrite,
+                "contract_validation": contract_validation,
             }
+            result["failure_artifacts"] = _write_execution_manifest(
+                script_name=logical_script_name,
+                script_path=script_path,
+                script_content=script_content,
+                contract=contract,
+                contract_validation=contract_validation,
+                result=result,
+                thread_id=thread_id,
+            )
             _append_run_history(
                 {
                     "timestamp": _timestamp(),
@@ -1800,14 +2212,60 @@ def execute_geospatial_script(
             )
             return json.dumps(result, indent=2, ensure_ascii=False)
 
+        if execution_settings["mode"] == "plan_only":
+            result = {
+                "status": "planned",
+                "stdout": "[plan_only] Contract and static preflight passed; execution was intentionally skipped.",
+                "script_name": logical_script_name,
+                "script_path": str(script_path),
+                "script_location": resolved_location or effective_location,
+                "code": script_content,
+                "contract_validation": contract_validation,
+                "preflight": preflight,
+                "execution_skipped": True,
+                "path_protocol_mode": path_mode,
+                "path_protocol_enforcement": path_protocol_enforcement,
+                "artifact_audit": empty_audit,
+                "runtime_path_rewrite": no_runtime_rewrite,
+            }
+            result["execution_manifest"] = _write_execution_manifest(
+                script_name=logical_script_name,
+                script_path=script_path,
+                script_content=script_content,
+                contract=contract,
+                contract_validation=contract_validation,
+                result=result,
+                thread_id=thread_id,
+            )
+            _append_run_history(
+                {
+                    "timestamp": _timestamp(),
+                    "tool": "execute_geospatial_script_tool",
+                    "status": "planned",
+                    "script_name": logical_script_name,
+                    "script_path": str(script_path),
+                    "thread_id": current_thread_id.get(),
+                }
+            )
+            return json.dumps(result, indent=2, ensure_ascii=False)
+
         runtime_code, runtime_path_rewrite = _rewrite_virtual_paths_for_runtime(script_content, thread_id=thread_id)
-        ok, logs, etype, emsg, tb = _execute_code(runtime_code)
+        ok, logs, etype, emsg, tb = _execute_code(
+            runtime_code,
+            timeout_seconds=execution_settings["timeout_seconds"],
+        )
         artifact_audit = _build_artifact_audit(logs, thread_id=thread_id)
         stdout_quality_audit = _build_stdout_quality_audit(logs)
         if ok and not stdout_quality_audit.get("pass", True):
             ok = False
             etype = str(stdout_quality_audit.get("error_type") or "EmptyResultError")
             emsg = str(stdout_quality_audit.get("error_message") or "Execution produced an empty result.")
+            tb = None
+        contract_output_audit = _audit_contract_outputs(contract, thread_id=thread_id)
+        if ok and not contract_output_audit.get("pass", True):
+            ok = False
+            etype = "OutputValidationError"
+            emsg = "; ".join(contract_output_audit.get("errors") or ["Declared outputs failed validation."])
             tb = None
         if ok:
             warning_messages: List[str] = []
@@ -1880,12 +2338,24 @@ def execute_geospatial_script(
                 "artifact_audit": artifact_audit,
                 "runtime_path_rewrite": runtime_path_rewrite,
                 "stdout_quality_audit": stdout_quality_audit,
+                "contract_validation": contract_validation,
+                "contract_output_audit": contract_output_audit,
             }
             if warning_messages:
                 result["warnings"] = warning_messages
                 result["warning_type"] = "CrossWorkspaceOutputWarning"
                 if warning_policy:
                     result["warning_handling_policy"] = warning_policy
+            result["execution_manifest"] = _write_execution_manifest(
+                script_name=logical_script_name,
+                script_path=script_path,
+                script_content=script_content,
+                contract=contract,
+                contract_validation=contract_validation,
+                result=result,
+                thread_id=thread_id,
+                logs=logs,
+            )
             _append_run_history(
                 {
                     "timestamp": _timestamp(),
@@ -1950,7 +2420,19 @@ def execute_geospatial_script(
             "artifact_audit": artifact_audit,
             "runtime_path_rewrite": runtime_path_rewrite,
             "stdout_quality_audit": stdout_quality_audit,
+            "contract_validation": contract_validation,
+            "contract_output_audit": contract_output_audit,
         }
+        result["failure_artifacts"] = _write_execution_manifest(
+            script_name=logical_script_name,
+            script_path=script_path,
+            script_content=script_content,
+            contract=contract,
+            contract_validation=contract_validation,
+            result=result,
+            thread_id=thread_id,
+            logs=logs,
+        )
         _append_run_history(
             {
                 "timestamp": _timestamp(),
@@ -1984,8 +2466,9 @@ execute_geospatial_script_tool = StructuredTool.from_function(
     execute_geospatial_script,
     name="execute_geospatial_script_tool",
     description=(
-        "Execute a previously saved .py geospatial script by filename under thread workspace sandbox. "
-        "Returns structured JSON with status, logs, script metadata, and traceback when failed."
+        "Execute a previously saved .py geospatial script under the thread workspace. Requires a literal "
+        "ntl.script.contract.v2, always performs static preflight, validates declared outputs, writes a success "
+        "manifest under outputs/, and archives failed scripts/logs under memory/failed_runs/."
     ),
     args_schema=ExecuteScriptInput,
 )

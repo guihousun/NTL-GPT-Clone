@@ -1,7 +1,5 @@
 ﻿from __future__ import annotations
 
-import os
-
 from deepagents import create_deep_agent
 from deepagents.backends import CompositeBackend, FilesystemBackend
 from deepagents.middleware.skills import _list_skills
@@ -13,7 +11,6 @@ from pydantic import SecretStr
 from agents.NTL_Code_Assistant import Code_Assistant_system_prompt_text
 from agents.NTL_Data_Searcher import system_prompt_data_searcher
 from agents.NTL_Engineer import system_prompt_text
-from agents.NTL_Knowledge_Subagent import system_prompt_kb_searcher
 from model_config import get_api_model_name, get_base_url, get_model_config
 from storage_manager import current_thread_id, storage_manager
 from tools import Code_tools, Engineer_tools, data_searcher_tools
@@ -104,12 +101,6 @@ def build_ntl_graph(
     #     default_api_key=api_key,
     #     request_timeout_s=request_timeout_s,
     # )
-    knowledge_base_llm = ChatOpenAI(
-        model_name="qwen-plus",
-        api_key=os.getenv("DASHSCOPE_Qwen_plus_KEY"),
-        base_url=os.getenv("DASHSCOPE_Qwen_plus_URL"),
-    )
-
     project_memory_path = Path(__file__).resolve().parent / ".ntl-gpt" / "NTL_AGENT_MEMORY.md"
 
     def _backend_factory(runtime):
@@ -148,25 +139,18 @@ def build_ntl_graph(
 
     code_assistant_subagent = {
         "name": "Code_Assistant",
-        "description": "NTL code execution specialist: geospatial processing, statistics, and script runtime.",
+        "description": (
+            "Optional independent code reviewer. Use only when the user requests review/verification "
+            "or NTL_Engineer explicitly requests a full independent review of a saved v2-contract script."
+        ),
         "system_prompt": Code_Assistant_system_prompt_text,
         "tools": Code_tools,
-        "skills": [SKILLS_SOURCE],
-    }
-
-    knowledge_base_subagent = {
-        "name": "Knowledge_Base_Searcher",
-        "description": "NTL domain knowledge specialist: grounded methods, workflow planning, and task-level JSON intent.",
-        "system_prompt": system_prompt_kb_searcher,
-        "model": knowledge_base_llm,
-        "tools": [NTL_Knowledge_Base],
         "skills": [SKILLS_SOURCE],
     }
 
     configured_skill_sources = [
         *data_searcher_subagent.get("skills", []),
         *code_assistant_subagent.get("skills", []),
-        *knowledge_base_subagent.get("skills", []),
         SKILLS_SOURCE,
     ]
     _validate_skill_sources(configured_skill_sources)
@@ -192,9 +176,11 @@ Deep Agents virtual-path compatibility (alias mapping):
 - `/shared/<file>` -> `base_data/<file>`
 
 Delegation policy:
-- Use `Knowledge_Base_Searcher` for methodology/workflow grounding and task-level JSON framing.
+- Read relevant workflow skills before using external knowledge retrieval.
+- `NTL_Knowledge_Base` is a supplemental Engineer tool, not a subagent. Use it only for theory/concept grounding or after the workflow skill reports a genuine coverage gap.
 - Use `Data_Searcher` for retrieval and metadata validation.
-- Use `Code_Assistant` for code validation and execution.
+- NTL_Engineer normally authors, preflights, executes, and validates custom scripts directly.
+- Use `Code_Assistant` only for explicitly requested independent review: either the user asked for review/verification or NTL_Engineer deliberately requests it with `review_requested: true` and `review_reason`.
 - Keep delegation sequential (one subagent at a time).
 
 {engineer_prompt}
@@ -202,8 +188,8 @@ Delegation policy:
 
     ntl_agent = create_deep_agent(
         model=llm,
-        tools=Engineer_tools,
-        subagents=[data_searcher_subagent, code_assistant_subagent, knowledge_base_subagent],
+        tools=[*Engineer_tools, NTL_Knowledge_Base],
+        subagents=[data_searcher_subagent, code_assistant_subagent],
         system_prompt=NTL_SYSTEM_PROMPT,
         skills=[SKILLS_SOURCE],
         memory=["/memories/NTL_AGENT_MEMORY.md"],

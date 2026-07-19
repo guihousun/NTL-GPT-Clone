@@ -23,8 +23,20 @@ except Exception:
 
 
 NTL_SCRIPT_CONTRACT = {
-    "schema": "ntl.script.contract.v1",
+    "schema": "ntl.script.contract.v2",
     "objective": "Compute annual NTL mean for local shapefile features using GEE server-side reduceRegions.",
+    "input_manifest": [
+        {"path": "inputs/shanghai_districts_boundary.shp", "kind": "vector", "crs": "required"},
+        {"kind": "gee_image_collection", "dataset_id": "projects/sat-io/open-datasets/npp-viirs-ntl", "band": "b1"},
+    ],
+    "method_steps": [
+        "load and validate the local boundary",
+        "reproject boundary features to EPSG:4326",
+        "filter the annual NTL collection",
+        "run server-side reduceRegions and write CSV",
+    ],
+    "parameters": {"reducer": "mean", "scale": 500, "nodata": "exclude masked pixels"},
+    "output_manifest": [{"path": "outputs/local_boundary_ntl_mean_2020.csv", "required": True}],
     "gee_project_id_env": "GEE_DEFAULT_PROJECT_ID",
     "input": {
         "boundary_filename": "shanghai_districts_boundary.shp",
@@ -51,6 +63,19 @@ NTL_SCRIPT_CONTRACT = {
         "image collection size > 0",
         "returned row count equals local feature count when all features have valid pixels",
     ],
+    "failure_gates": [
+        "missing or empty boundary file",
+        "missing boundary CRS",
+        "empty annual NTL collection",
+        "Earth Engine authentication, project, API, or quota failure",
+    ],
+    "execution": {
+        "mode": "execute",
+        "timeout_seconds": 1800,
+        "overwrite_policy": "version",
+        "network_scope": ["earth_engine"],
+        "test_strategy": "auto",
+    },
 }
 
 

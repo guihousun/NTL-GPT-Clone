@@ -21,8 +21,20 @@ except Exception:
 
 
 NTL_SCRIPT_CONTRACT = {
-    "schema": "ntl.script.contract.v1",
+    "schema": "ntl.script.contract.v2",
     "objective": "Compare daily VNP46A2 ANTL before/after an event over epicenter buffers.",
+    "input_manifest": [
+        {"kind": "gee_image_collection", "dataset_id": "NASA/VIIRS/002/VNP46A2", "band": "Gap_Filled_DNB_BRDF_Corrected_NTL"},
+        {"kind": "event_point", "coordinates": [95.9, 22.0], "crs": "EPSG:4326"},
+    ],
+    "method_steps": [
+        "construct geodesic event buffers",
+        "select baseline, first-night, and recovery periods with UTC-aware dates",
+        "compute server-side ANTL summaries for each buffer and period",
+        "validate temporal coverage and write CSV",
+    ],
+    "parameters": {"buffers_km": [25, 50, 100], "scale": 500, "nodata": "masked pixels excluded"},
+    "output_manifest": [{"path": "outputs/event_buffer_daily_antl.csv", "required": True}],
     "gee_project_id_env": "GEE_DEFAULT_PROJECT_ID",
     "event": {
         "name": "Myanmar M7.7 earthquake",
@@ -70,6 +82,20 @@ NTL_SCRIPT_CONTRACT = {
         "exact local acquisition time is only claimed when pixel-level UTC_Time or official metadata confirms it",
         "recent events beyond GEE VNP46A1 coverage use LAADS/CMR granule timing or official metadata",
     ],
+    "failure_gates": [
+        "USER_PROJECT_DENIED",
+        "authentication or quota failure",
+        "empty image collection for a required period",
+        "empty buffer FeatureCollection",
+        "missing UTC date-boundary evidence when exact timing is claimed",
+    ],
+    "execution": {
+        "mode": "execute",
+        "timeout_seconds": 1800,
+        "overwrite_policy": "version",
+        "network_scope": ["earth_engine"],
+        "test_strategy": "auto",
+    },
 }
 
 

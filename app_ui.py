@@ -1070,6 +1070,86 @@ def inject_css():
         color: #111827 !important;
     }
     [data-testid="stExpander"] .stCaption { color: #334155 !important; }
+    [data-testid="stMain"] [data-testid="stExpander"] details,
+    [data-testid="stMain"] [data-testid="stExpander"] details > summary,
+    [data-testid="stMain"] [data-testid="stExpander"] details[open] > summary {
+        background: #f8fafc !important;
+    }
+    [data-testid="stMain"] [data-testid="stExpander"] summary p,
+    [data-testid="stMain"] [data-testid="stExpander"] summary span,
+    [data-testid="stMain"] [data-testid="stExpander"] summary svg {
+        color: #0f172a !important;
+        fill: #0f172a !important;
+        -webkit-text-fill-color: #0f172a !important;
+        opacity: 1 !important;
+    }
+    [data-testid="stMain"] [data-testid="stJson"],
+    [data-testid="stMain"] .react-json-view,
+    [data-testid="stMain"] .pretty-json-container {
+        background: #0b1220 !important;
+        color: #e5eefc !important;
+    }
+    [data-testid="stMain"] [data-testid="stJson"] *,
+    [data-testid="stMain"] .react-json-view *,
+    [data-testid="stMain"] .pretty-json-container * {
+        color: #e5eefc !important;
+        -webkit-text-fill-color: #e5eefc !important;
+        opacity: 1 !important;
+    }
+    [data-testid="stMain"] .react-json-view .variable-value > div[style*="background-color"],
+    [data-testid="stMain"] .pretty-json-container .variable-value > div[style*="background-color"] {
+        background: #263449 !important;
+        color: #fecaca !important;
+        -webkit-text-fill-color: #fecaca !important;
+    }
+    /* Reasoning panel: keep controls and generated markdown readable on white surfaces. */
+    [data-testid="stMain"] .stPopover button,
+    [data-testid="stMain"] [data-testid="stPopover"] button {
+        min-width: 8.5rem !important;
+        background: #f8fafc !important;
+        border: 1px solid #94a3b8 !important;
+        color: #0f172a !important;
+        opacity: 1 !important;
+    }
+    [data-testid="stMain"] .stPopover button *,
+    [data-testid="stMain"] [data-testid="stPopover"] button * {
+        color: #0f172a !important;
+        fill: #0f172a !important;
+        -webkit-text-fill-color: #0f172a !important;
+        opacity: 1 !important;
+    }
+    [data-testid="stMain"] [data-testid="stExpander"] .stMarkdown p,
+    [data-testid="stMain"] [data-testid="stExpander"] .stMarkdown li,
+    [data-testid="stMain"] [data-testid="stExpander"] .stMarkdown h1,
+    [data-testid="stMain"] [data-testid="stExpander"] .stMarkdown h2,
+    [data-testid="stMain"] [data-testid="stExpander"] .stMarkdown h3,
+    [data-testid="stMain"] [data-testid="stExpander"] .stMarkdown h4 {
+        color: #111827 !important;
+        -webkit-text-fill-color: #111827 !important;
+        opacity: 1 !important;
+    }
+    [data-testid="stMain"] [data-testid="stExpander"] .stMarkdown code:not(pre code) {
+        background: #e2e8f0 !important;
+        color: #064e3b !important;
+        -webkit-text-fill-color: #064e3b !important;
+    }
+    [data-testid="stMain"] [data-testid="stExpander"] [data-testid="stCodeBlock"],
+    [data-testid="stMain"] [data-testid="stExpander"] .stCode {
+        background: #0b1220 !important;
+        border: 1px solid #334155 !important;
+    }
+    [data-testid="stMain"] [data-testid="stExpander"] [data-testid="stCodeBlock"] *,
+    [data-testid="stMain"] [data-testid="stExpander"] .stCode * {
+        color: #f8fafc !important;
+        -webkit-text-fill-color: #f8fafc !important;
+        opacity: 1 !important;
+    }
+    .ntl-reasoning-role {
+        color: #7c2d12 !important;
+        font-size: 0.9rem !important;
+        font-weight: 750 !important;
+        margin-bottom: 0.25rem !important;
+    }
     [data-testid="stSidebar"] [data-testid="stExpander"] details {
         background: #ffffff !important;
     }
@@ -1936,9 +2016,31 @@ def render_event_header(index):
     </div>
     """, unsafe_allow_html=True)
 
+def _human_message_display_label(content) -> str:
+    """Distinguish end-user input from supervisor-to-subagent handoffs."""
+    text = _normalize_content_to_text(content)
+    match = re.search(
+        r"\byou\s+are\s+the\s+([A-Za-z][A-Za-z0-9_-]*)\s+agent\b",
+        str(text or ""),
+        flags=re.IGNORECASE,
+    )
+    if match:
+        target = _normalize_subagent_name(match.group(1)) or match.group(1)
+        return _tr(
+            f"任务交接 → {_display_agent_label(target)}",
+            f"Task Handoff → {_display_agent_label(target)}",
+        )
+    return _tr("用户输入", "User")
+
+
 def render_event_human(content):
-    st.markdown("<div style='color:#8a1750;font-weight:700;font-size:16px;'>Human:</div>", unsafe_allow_html=True)
-    st.markdown(f"<div style='margin-left:15px;font-size:16px;'>{content}</div>", unsafe_allow_html=True)
+    label = _human_message_display_label(content)
+    st.markdown(
+        f"<div class='ntl-reasoning-role'>{label}</div>",
+        unsafe_allow_html=True,
+    )
+    text = _normalize_content_to_text(content)
+    st.markdown(_sanitize_paths_in_text(str(text or "")))
 
 
 _CHAT_INPUT_FILE_TYPES = [
@@ -3581,7 +3683,8 @@ def _build_reasoning_sections(events):
                 continue
 
             if isinstance(msg, AIMessage):
-                agent = (msg.name or "AI")
+                raw_agent = msg.name or "AI"
+                agent = _normalize_subagent_name(raw_agent) or raw_agent
                 if "(streaming)" in agent.lower():
                     # Skip transient streaming markers; final messages are rendered below.
                     continue
@@ -4130,20 +4233,39 @@ def render_reasoning_map(events, interactive: bool = True, show_sub_steps: bool 
 
 
 def _render_code_assistant_message(raw_content: str) -> None:
-    """Render Code_Assistant message by content shape (JSON vs non-JSON)."""
-    if isinstance(raw_content, (dict, list)):
-        st.json(_sanitize_paths_in_obj(raw_content))
-        return
-
+    """Keep review status concise while preserving details in a collapsed panel."""
     raw_text = raw_content if isinstance(raw_content, str) else str(raw_content)
-    parsed, rest = _extract_json(raw_text)
-    if isinstance(parsed, (dict, list)):
-        if isinstance(rest, str) and rest.strip():
-            st.write(_sanitize_paths_in_text(rest))
-        st.json(_sanitize_paths_in_obj(parsed))
-        return
+    parsed = raw_content if isinstance(raw_content, (dict, list)) else None
+    rest = ""
+    if parsed is None:
+        parsed, rest = _extract_json(raw_text)
 
-    st.code(raw_text, language="python")
+    status = ""
+    summary = ""
+    if isinstance(parsed, dict):
+        status = str(parsed.get("status") or parsed.get("stage") or "").strip()
+        summary = str(
+            parsed.get("summary")
+            or parsed.get("recommended_next_action")
+            or parsed.get("error_message")
+            or ""
+        ).strip()
+    if not summary:
+        lines = [line.strip() for line in str(rest or raw_text).splitlines() if line.strip()]
+        summary = lines[0] if lines else _tr("复核详情已记录", "Review details recorded")
+    summary = _sanitize_paths_in_text(summary)
+    if len(summary) > 180:
+        summary = summary[:177] + "..."
+    status_label = status or _tr("复核更新", "Review update")
+    st.caption(f"{status_label}: {summary}")
+
+    with st.expander(_tr("查看复核详情", "Review details"), expanded=False):
+        if isinstance(parsed, (dict, list)):
+            if isinstance(rest, str) and rest.strip():
+                st.write(_sanitize_paths_in_text(rest))
+            st.json(_sanitize_paths_in_obj(parsed))
+        else:
+            st.code(_sanitize_paths_in_text(raw_text), language="text")
 
 
 def _extract_todos_payload(raw_content) -> list[dict]:
@@ -4247,14 +4369,26 @@ def render_reasoning_content(events):
         st.caption(_tr("等待推理事件...", "Waiting for reasoning events..."))
         return
     has_final_kb_response = any(
-        step.get("kind") == "ai"
-        and (
-            str(step.get("agent") or "").strip().lower() == "knowledge_base_searcher"
-            or str(step.get("agent") or "").strip().lower() == "knowledge_base_subagent"
+        (
+            step.get("kind") == "ai"
+            and str(step.get("agent") or "").strip().lower()
+            in {"knowledge_base_searcher", "knowledge_base_subagent"}
+            and any(
+                str(
+                    _normalize_content_to_text(
+                        _strip_legacy_stream_marker(getattr(msg, "content", ""))
+                    )
+                    or ""
+                ).strip()
+                for msg in (step.get("messages") or [])
+            )
         )
-        and any(
-            str(_normalize_content_to_text(_strip_legacy_stream_marker(getattr(msg, "content", ""))) or "").strip()
-            for msg in (step.get("messages") or [])
+        or (
+            step.get("kind") == "tool"
+            and any(
+                str(getattr(msg, "name", "") or "").strip().lower() == "ntl_knowledge_base"
+                for msg in (step.get("messages") or [])
+            )
         )
         for step in grouped
     )
@@ -4265,7 +4399,7 @@ def render_reasoning_content(events):
                 render_event_human(msg.content)
                 st.markdown("<hr style='margin: 10px 0; border: 1px dashed #64748b;'>", unsafe_allow_html=True)
         elif step["kind"] == "ai":
-            agent_name = step["agent"]
+            agent_name = _normalize_subagent_name(step["agent"]) or step["agent"]
             render_label_ai(agent_name)
             effective_messages = []
             for msg in step["messages"]:
@@ -4296,13 +4430,12 @@ def render_reasoning_content(events):
         elif step["kind"] == "tool":
             tool_messages = _dedupe_tool_messages([m for m in step["messages"] if isinstance(m, ToolMessage)])
             for msg in tool_messages:
-                if msg.name and "NTL_Knowledge_Base" in msg.name:
-                    # KB output is now rendered on Knowledge_Base_Searcher AI messages.
-                    continue
                 exp_title = _tr(f"工具输出: {msg.name}", f"Tool Output: {msg.name}")
                 with st.expander(exp_title, expanded=False):
                     tool_name_norm = str(msg.name or "").strip().lower()
-                    if tool_name_norm == "write_todos":
+                    if tool_name_norm == "ntl_knowledge_base":
+                        render_kb_output(msg.content)
+                    elif tool_name_norm == "write_todos":
                         render_write_todos_output(msg.content)
                     elif tool_name_norm in {
                         "uploaded_pdf_understanding_tool",
@@ -4640,7 +4773,6 @@ def _render_chat_history_with_run_notice() -> None:
 
 
 _SUBAGENT_CARD_ORDER = [
-    "Knowledge_Base_Searcher",
     "Data_Searcher",
     "Code_Assistant",
     "NTL_Engineer",
@@ -4657,7 +4789,7 @@ def _normalize_subagent_name(raw_name: str) -> str:
         return "Data_Searcher"
     if "code_assistant" in name:
         return "Code_Assistant"
-    if "engineer" in name or name == "ntl-gpt":
+    if "engineer" in name or name in {"ntl-gpt", "general-purpose", "general_purpose"}:
         return "NTL_Engineer"
     return ""
 
@@ -4690,11 +4822,73 @@ def _display_agent_label(agent_name: str) -> str:
     return mapping.get(str(agent_name or "").strip(), str(agent_name or "").replace("_", " "))
 
 
+def _code_assistant_review_stage(logs: list, is_running: bool) -> str:
+    current_agent = ""
+    encountered = False
+    stage = "not_requested"
+
+    for event in logs or []:
+        if not isinstance(event, dict):
+            continue
+        for msg in event.get("messages", []) or []:
+            if isinstance(msg, AIMessage):
+                normalized_agent = _normalize_subagent_name(getattr(msg, "name", "") or "")
+                if normalized_agent:
+                    current_agent = normalized_agent
+                if current_agent != "Code_Assistant":
+                    continue
+                encountered = True
+                stage = "reviewing"
+                content = _normalize_content_to_text(getattr(msg, "content", "")).lower()
+                if "needs_engineer_decision" in content or "needs decision" in content:
+                    stage = "needs_decision"
+                elif '"status": "failed"' in content or '"status":"failed"' in content:
+                    stage = "failed"
+                elif '"status": "done"' in content or '"status":"done"' in content:
+                    stage = "done"
+                elif "validating outputs" in content or "output validation" in content:
+                    stage = "validating"
+                elif "sample testing" in content or "sample test" in content:
+                    stage = "testing"
+                elif "static preflight" in content or "preflight" in content:
+                    stage = "preflight"
+
+                for call in getattr(msg, "tool_calls", None) or []:
+                    call_name = str(call.get("name") or "").strip().lower() if isinstance(call, dict) else ""
+                    if "geocode_cot_validation" in call_name:
+                        stage = "testing"
+                    elif "execute_geospatial_script" in call_name:
+                        stage = "executing"
+                    elif "geocode_knowledge_recipes" in call_name:
+                        stage = "reviewing"
+            elif isinstance(msg, ToolMessage) and current_agent == "Code_Assistant":
+                encountered = True
+                tool_name = str(getattr(msg, "name", "") or "").strip().lower()
+                if "geocode_cot_validation" in tool_name:
+                    stage = "testing"
+                elif "execute_geospatial_script" in tool_name:
+                    payload, _ = _extract_json(_normalize_content_to_text(getattr(msg, "content", "")))
+                    tool_status = str(payload.get("status") or "").strip().lower() if isinstance(payload, dict) else ""
+                    if tool_status in {"success", "success_with_warnings", "planned"}:
+                        stage = "validating"
+                    elif tool_status == "fail":
+                        stage = "needs_decision"
+
+    if not encountered:
+        return "not_requested"
+    if not is_running and stage not in {"needs_decision", "failed"}:
+        return "done"
+    if is_running and current_agent != "Code_Assistant" and stage not in {"needs_decision", "failed"}:
+        return "done"
+    return stage
+
+
 def _build_subagent_lifecycle_state(logs: list, is_running: bool, last_terminal_kind: str = "") -> dict:
     state = {
         name: {"status": "pending", "summary": ""}
         for name in _SUBAGENT_CARD_ORDER
     }
+    state["Code_Assistant"]["status"] = "not_requested"
 
     grouped = _build_reasoning_sections(logs or [])
     encountered: list[str] = []
@@ -4726,6 +4920,9 @@ def _build_subagent_lifecycle_state(logs: list, is_running: bool, last_terminal_
     elif terminal == "interrupted":
         state["NTL_Engineer"]["status"] = "interrupted"
 
+    state["Code_Assistant"]["status"] = _code_assistant_review_stage(logs, is_running=is_running)
+    state["Code_Assistant"]["summary"] = ""
+
     return state
 
 
@@ -4733,6 +4930,14 @@ def _render_subagent_lifecycle_cards(logs: list, is_running: bool, last_terminal
     lifecycle = _build_subagent_lifecycle_state(logs, is_running=is_running, last_terminal_kind=last_terminal_kind)
     status_map = {
         "pending": ("#94a3b8", _tr("待命", "Pending")),
+        "not_requested": ("#94a3b8", _tr("未请求复核", "Not requested")),
+        "reviewing": ("#60a5fa", _tr("审阅中", "Reviewing")),
+        "preflight": ("#60a5fa", _tr("预检中", "Preflight")),
+        "testing": ("#a78bfa", _tr("样本测试", "Sample testing")),
+        "executing": ("#38bdf8", _tr("执行中", "Executing")),
+        "validating": ("#2dd4bf", _tr("验证输出", "Validating outputs")),
+        "needs_decision": ("#fbbf24", _tr("需要决策", "Needs decision")),
+        "failed": ("#fb7185", _tr("复核失败", "Failed")),
         "running": ("#60a5fa", _tr("运行中", "Running")),
         "done": ("#34d399", _tr("完成", "Done")),
         "error": ("#fb7185", _tr("错误", "Error")),

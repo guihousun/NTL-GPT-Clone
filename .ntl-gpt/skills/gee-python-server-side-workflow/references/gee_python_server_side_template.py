@@ -19,8 +19,20 @@ except Exception:  # Allows template linting outside the app runtime.
 
 
 NTL_SCRIPT_CONTRACT = {
-    "schema": "ntl.script.contract.v1",
+    "schema": "ntl.script.contract.v2",
     "objective": "Compute server-side NTL statistics and export a compact CSV table.",
+    "input_manifest": [
+        {"kind": "gee_image_collection", "dataset_id": "projects/sat-io/open-datasets/npp-viirs-ntl", "band": "b1"},
+        {"kind": "gee_feature_collection", "asset": "projects/empyrean-caster-430308-m2/assets/province"},
+    ],
+    "method_steps": [
+        "filter the annual image collection to the requested period",
+        "reduce imagery to one annual image",
+        "run ee.Image.reduceRegions over the administrative features",
+        "validate rows and write the sorted CSV",
+    ],
+    "parameters": {"reducer": "mean", "scale": 500, "nodata": "exclude masked pixels"},
+    "output_manifest": [{"path": "outputs/gee_ntl_zonal_stats.csv", "required": True}],
     "gee_project_id": "REPLACE_WITH_RUNTIME_GEE_PROJECT_ID",
     "dataset": {
         "dataset_id": "projects/sat-io/open-datasets/npp-viirs-ntl",
@@ -59,6 +71,13 @@ NTL_SCRIPT_CONTRACT = {
         "empty collection",
         "empty feature collection",
     ],
+    "execution": {
+        "mode": "execute",
+        "timeout_seconds": 1800,
+        "overwrite_policy": "version",
+        "network_scope": ["earth_engine"],
+        "test_strategy": "auto",
+    },
 }
 
 

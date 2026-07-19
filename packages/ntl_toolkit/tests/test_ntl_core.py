@@ -349,6 +349,35 @@ def test_calculate_zonal_statistics_writes_polygon_and_global_rows(
     assert frame["ANTL"].tolist() == [30.0, 40.0, 35.0]
 
 
+def test_calculate_zonal_statistics_prefers_case_insensitive_name_field(
+    matching_raster_path: Path,
+    runtime_workspace: Path,
+) -> None:
+    vector_path = _write_vector(
+        runtime_workspace / "inputs" / "amap_regions.geojson",
+        gpd.GeoDataFrame(
+            {
+                "Level": ["district", "district"],
+                "Name": ["west-name", "east-name"],
+                "geometry": [box(0.0, 1.0, 1.0, 2.0), box(1.0, 0.0, 2.0, 1.0)],
+            },
+            crs="EPSG:4326",
+        ),
+    )
+    output_path = Path("outputs") / "zonal_amap_names.csv"
+
+    result = _ntl_module().calculate_zonal_statistics(
+        raster_paths=[matching_raster_path],
+        vector_path=vector_path,
+        output_path=output_path,
+        selected_indices=["ANTL"],
+    )
+
+    assert result.status == "succeeded"
+    frame = pd.read_csv(runtime_workspace / output_path)
+    assert frame["Region"].tolist() == ["west-name", "east-name", "Global_Summary"]
+
+
 def test_calculate_zonal_statistics_only_global_supports_multi_raster_labels(
     admin_polygons_path: Path,
     runtime_workspace: Path,

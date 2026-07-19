@@ -7,7 +7,7 @@ import streamlit as st
 from graph_factory import build_ntl_graph
 
 
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def get_ntl_graph(model_name: str, api_key: str, request_timeout_s: int = 120, session_tag: str = ""):
     """
     Streamlit wrapper around the pure LangGraph factory.

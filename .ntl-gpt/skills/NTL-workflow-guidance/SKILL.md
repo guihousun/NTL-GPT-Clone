@@ -1,6 +1,6 @@
 ---
 name: ntl-workflow-guidance
-description: Preferred workflow-selection skill for NTL-GPT tasks. Use first for NTL retrieval, statistics, trend, event impact, urban extraction, regression/indicator, and validation workflows before calling Knowledge_Base_Searcher.
+description: Preferred workflow-selection skill for NTL-GPT tasks. Use first for NTL retrieval, statistics, trend, event impact, urban extraction, regression/indicator, and validation workflows before calling the supplemental NTL_Knowledge_Base tool.
 allowed-tools: "NTL_Solution_Knowledge"
 metadata:
   schema: "ntl.workflow.intent.router.v1"
@@ -11,7 +11,7 @@ metadata:
 
 # NTL Workflow Guidance
 
-Use this skill to select a reusable workflow template. It is the first stop for standard NTL tasks; use `Knowledge_Base_Searcher` only when no matching workflow exists or methodology research is genuinely needed.
+Use this skill to select a reusable workflow template. It is the first stop for standard NTL tasks; use `NTL_Knowledge_Base` only for theory/concept supplementation or when no matching workflow exists after the full skill lookup.
 
 ## Read Order
 
@@ -38,7 +38,7 @@ Do not full-scan all workflow JSON files unless the router index is missing or c
 - Exact task ID/name match: confidence `0.90-1.00`.
 - Strong semantic match: confidence `0.70-0.89`.
 - Usable but adapted template: confidence `0.40-0.69`.
-- No useful match: return `status: "no_match"` and then consider `Knowledge_Base_Searcher`.
+- No useful match: return `status: "no_match"`; only then may Engineer consider `NTL_Knowledge_Base` with `response_mode="workflow"` and `skill_gap_confirmed=true`.
 
 Before escalating, check whether the user request can be composed from existing retrieval + analysis workflows.
 
@@ -61,6 +61,8 @@ If a matched workflow uses `NTL_download_tool` + local boundary download + `NTL_
 - Include `adaptation_reason` and `replaced_steps` in the workflow contract.
 
 Small-country file retrieval is different: if the user asks to download a GeoTIFF for a small country or AOI, direct download may be attempted. Switch to server-side only after actual export-size/output failure.
+
+For `single_city_or_smaller` zonal statistics or ranking, missing inputs do not make the task custom. Request the imagery and multi-feature boundary together from Data_Searcher, then use `NTL_raster_statistics`; use `geodata_inspector_tool` for field/CRS validation instead of an inspection script. Escalate to a server-side custom workflow only when the unified GEE plan rejects direct-local execution or a concrete built-in capability gap remains.
 
 ## Workflow Contract
 

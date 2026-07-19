@@ -26,9 +26,11 @@ Use that index as a compact map of tool ownership, direct exposure, and migratio
 ## Routing Rules
 
 - **Retrieval/download only**: delegate to `Data_Searcher`; call `GEE_request_plan_tool` first, then use `NTL_download_tool` for stable NTL direct-local plans, `GEE_raster_download_tool` for validated general-GEE direct-local plans, or `GEE_batch_export_tool` plus `GEE_export_status_tool` for large asynchronous exports.
+- **Named China administrative AOI**: when no verified boundary input exists, delegate to `Data_Searcher` and use `get_administrative_division_data` before GAUL, geoBoundaries, or ad hoc GEE boundary searches. Verify the returned administrative level and WGS84 artifact.
 - **Country or multi-province statistics/ranking**: use GEE server-side `ee.Image.reduceRegions()` and return/export a table. Do not download a country-scale GeoTIFF or bulk shapefiles as the primary path.
-- **Local GeoTIFF + boundary statistics**: use `NTL_raster_statistics` only when files already exist and the spatial scope is not national-scale.
-- **Custom/event/code tasks**: Engineer designs `ntl.script.contract.v1`; `Code_Assistant` executes via saved script and validation tools.
+- **Single-city-or-smaller zonal statistics/ranking**: this is L2 when existing tools cover the metric. If inputs are missing, retrieve the annual/local GeoTIFF and the multi-feature administrative boundary in one Data_Searcher handoff, then use `NTL_raster_statistics` (for mean light, `selected_indices=["ANTL"]`) and rank the returned CSV. Do not write a GEE/Python script merely because the inputs had to be retrieved first.
+- **Local GeoTIFF + boundary statistics**: use `NTL_raster_statistics` when files exist and the spatial scope is not national-scale. Use `geodata_inspector_tool` or `geodata_quick_check_tool` for field/CRS checks; do not create an inspection script.
+- **Custom/event/code tasks**: Engineer designs `ntl.script.contract.v2`, saves, preflights, executes, and validates the script directly. Invoke `Code_Assistant` only when the user requests verification or Engineer explicitly requests independent full review.
 - **Rare specialty operations**: first read the relevant workflow skill and the capability index; do not assume the Engineer has every specialty tool directly exposed.
 
 ## Failure Semantics

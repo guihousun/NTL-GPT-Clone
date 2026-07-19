@@ -24,8 +24,20 @@ except Exception:
 
 
 NTL_SCRIPT_CONTRACT = {
-    "schema": "ntl.script.contract.v1",
+    "schema": "ntl.script.contract.v2",
     "objective": "Compute 2020 mean NTL for China province-level units using server-side GEE zonal statistics.",
+    "input_manifest": [
+        {"kind": "gee_image_collection", "dataset_id": "projects/sat-io/open-datasets/npp-viirs-ntl", "band": "b1"},
+        {"kind": "gee_feature_collection", "asset": "WM/geoLab/geoBoundaries/600/ADM1", "expected_rows": 34},
+    ],
+    "method_steps": [
+        "load the 2020 annual NTL image",
+        "assemble and validate all 34 province-level regions",
+        "run ee.Image.reduceRegions with a mean reducer",
+        "validate required regions and finite values, rank, and write CSV",
+    ],
+    "parameters": {"reducer": "mean", "scale": 500, "expected_rows": 34, "nodata": "exclude masked pixels"},
+    "output_manifest": [{"path": "outputs/china_province_ntl_mean_2020.csv", "required": True}],
     "gee_project_id_env": "GEE_DEFAULT_PROJECT_ID",
     "dataset": {
         "dataset_id": "projects/sat-io/open-datasets/npp-viirs-ntl",
@@ -67,6 +79,13 @@ NTL_SCRIPT_CONTRACT = {
         "empty province FeatureCollection",
         "all reducer outputs are null",
     ],
+    "execution": {
+        "mode": "execute",
+        "timeout_seconds": 1800,
+        "overwrite_policy": "version",
+        "network_scope": ["earth_engine"],
+        "test_strategy": "auto",
+    },
 }
 
 

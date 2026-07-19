@@ -8,7 +8,7 @@ import os
 import re
 import uuid
 from functools import lru_cache
-from typing import Annotated, Optional
+from typing import Annotated, Literal, Optional
 
 from langchain_core.messages import SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
@@ -1063,14 +1063,24 @@ graph = workflow.compile(checkpointer=memory)
 
 class NTL_Knowledge_Searcher_Input(BaseModel):
     query: str = Field(..., description="Your question plus brief context.")
-    response_mode: str = Field(
-        default="auto",
-        description="One of: auto|workflow|theory|code|mixed",
+    response_mode: Literal["theory", "workflow"] = Field(
+        default="theory",
+        description=(
+            "Use theory for concepts/methods. Use workflow only when the local workflow skills "
+            "have no relevant coverage."
+        ),
     )
     locale: str = Field(default="en", description="Output language preference (e.g., en|zh).")
     need_citations: bool = Field(
         default=True,
         description="Whether to include simple store/doc citations.",
+    )
+    skill_gap_confirmed: bool = Field(
+        default=False,
+        description=(
+            "Must be true for workflow mode, confirming that relevant /skills content was checked "
+            "and did not cover the requested workflow."
+        ),
     )
 
 
@@ -1107,11 +1117,23 @@ def _emit_kb_progress(
 
 def _NTL_Knowledge_Searcher(
     query: str,
-    response_mode: str = "auto",
+    response_mode: str = "theory",
     locale: str = "en",
     need_citations: bool = True,
+    skill_gap_confirmed: bool = False,
 ) -> str:
-    mode = (response_mode or "auto").lower()
+    mode = (response_mode or "theory").lower()
+    if mode == "workflow" and not skill_gap_confirmed:
+        return json.dumps(
+            {
+                "status": "skill_first_required",
+                "message": (
+                    "Check the relevant /skills workflow first. Retry with "
+                    "skill_gap_confirmed=true only when no relevant workflow coverage exists."
+                ),
+            },
+            ensure_ascii=False,
+        )
     unique_id = str(uuid.uuid4())[:8]
     run_id = f"kb_{unique_id}"
     writer = _safe_stream_writer()
@@ -1272,11 +1294,11 @@ NTL_Knowledge_Base = StructuredTool.from_function(
     func=_NTL_Knowledge_Searcher,
     name="NTL_Knowledge_Base",
     description=(
-        "Retrieve grounded knowledge for Nighttime Light (NTL) tasks from three internal stores:\n"
-        "- Literature (theory, equations)\n"
-        "- Solution (workflows, tools, datasets)\n"
-        "- Code (concise Python/GEE snippets)\n\n"
-        "Supports response modes: workflow | theory | code | mixed | auto."
+        "Supplement local NTL skills with grounded knowledge. Use theory mode only for concepts, "
+        "methods, equations, or literature context. Use workflow mode only after relevant /skills "
+        "content was checked and found to have no applicable workflow; in that case set "
+        "skill_gap_confirmed=true. Do not use this tool for routine routing, task-level framing, "
+        "dataset acquisition, or code execution."
     ),
     args_schema=NTL_Knowledge_Searcher_Input,
 )

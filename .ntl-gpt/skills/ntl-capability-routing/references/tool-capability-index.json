@@ -9,6 +9,10 @@
   },
   "direct_tools_by_agent": {
     "NTL_Engineer": [
+      {"tool": "execute_geospatial_script_tool", "class": "core_execution", "use_when": "Run an Engineer-authored saved script with mandatory ntl.script.contract.v2 validation, static preflight, output audit, and manifest persistence."},
+      {"tool": "GeoCode_COT_Validation_tool", "class": "core_validation", "use_when": "Run a bounded logic/sample validation when execution.test_strategy requires it or Engineer is diagnosing a failure."},
+      {"tool": "geodata_inspector_tool", "class": "core_validation", "use_when": "Inspect existing raster/vector metadata, attributes, CRS, geometry, and sample records without writing a custom inspection script."},
+      {"tool": "geodata_quick_check_tool", "class": "core_validation", "use_when": "Quickly validate required local geodata inputs before invoking an analysis tool."},
       {"tool": "SDGSAT-1_strip_removal_tool", "class": "rare_specialized", "use_when": "SDGSAT-1 striping artifact removal is explicitly required."},
       {"tool": "SDGSAT1_radiometric_calibration_tool", "class": "rare_specialized", "use_when": "SDGSAT-1 radiometric calibration is explicitly required."},
       {"tool": "VNP46A2_angular_correction_tool", "class": "rare_specialized", "use_when": "VNP46A2 angular correction/preprocessing is explicitly required."},
@@ -45,7 +49,7 @@
       {"tool": "GEE_dataset_metadata_tool", "class": "router", "use_when": "Dataset temporal coverage, bands, or metadata must be validated."},
       {"tool": "dataset_latest_availability_tool", "class": "router", "use_when": "Recent GEE or LAADS/CMR data availability must be checked before execution."},
       {"tool": "GEE_catalog_discovery_tool", "class": "router", "use_when": "Built-in dataset routing is insufficient."},
-      {"tool": "get_administrative_division_data", "class": "core_execution", "use_when": "China boundary artifacts are explicitly required."},
+      {"tool": "get_administrative_division_data", "class": "core_execution", "use_when": "A named China province, prefecture/city, county, district, or subdistrict boundary is required and no verified boundary input exists; this is the preferred China administrative-boundary route."},
       {"tool": "get_administrative_division_geoboundaries_tool", "class": "core_execution", "use_when": "Global boundary artifacts are explicitly required."},
       {"tool": "geocode_tool / reverse_geocode_tool / poi_search_tool", "class": "core_execution", "use_when": "Geocoding, reverse geocoding, or POI retrieval is required."},
       {"tool": "NDVI_download_tool / LandScan_download_tool", "class": "core_execution", "use_when": "Auxiliary NDVI or population raster data is required."},
@@ -54,11 +58,17 @@
     ],
     "Code_Assistant": [
       {"tool": "execute_geospatial_script_tool", "class": "core_execution", "use_when": "Run a saved Python script in the current thread workspace."},
-      {"tool": "GeoCode_COT_Validation_tool", "class": "core_execution", "use_when": "Validate code or diagnose the first execution failure."},
+      {"tool": "GeoCode_COT_Validation_tool", "class": "core_validation", "use_when": "Perform the requested full-review sample or focused logic validation after mandatory static review."},
       {"tool": "GeoCode_Knowledge_Recipes_tool", "class": "documentation_only", "use_when": "Only after an Engineer draft is missing method details or fails for method reasons."}
     ]
   },
   "routing_rules": [
+    {
+      "case": "named_china_administrative_aoi",
+      "route": "Data_Searcher -> get_administrative_division_data -> verify WGS84 boundary artifact",
+      "required_tools": ["get_administrative_division_data"],
+      "notes": "Use before GAUL, geoBoundaries, or ad hoc GEE boundary searches for Chinese named administrative units."
+    },
     {
       "case": "download_only_lightweight",
       "route": "Data_Searcher",
@@ -67,7 +77,7 @@
     },
     {
       "case": "country_or_multi_province_statistics",
-      "route": "Data_Searcher -> Code_Assistant",
+      "route": "Data_Searcher -> NTL_Engineer direct execution; optional Code_Assistant review",
       "required_tools": ["GEE_request_plan_tool", "GEE_script_blueprint_tool", "execute_geospatial_script_tool"],
       "prohibited_primary_paths": [
         "country-scale GeoTIFF download for statistics",
@@ -77,16 +87,27 @@
       "notes": "Use cloud-hosted NTL imagery and cloud-hosted administrative FeatureCollection with ee.Image.reduceRegions(); return/export CSV/table."
     },
     {
+      "case": "single_city_or_smaller_zonal_ranking",
+      "route": "Data_Searcher retrieves all missing imagery and boundary inputs once -> NTL_Engineer calls NTL_raster_statistics -> read and rank CSV",
+      "required_tools": ["NTL_download_tool", "get_administrative_division_data", "NTL_raster_statistics"],
+      "prohibited_primary_paths": [
+        "task-specific GEE reduceRegions script when direct-local download is eligible",
+        "task-specific Python script for reading or sorting the small result CSV",
+        "separate inspection script for boundary fields or CRS"
+      ],
+      "notes": "Classify as L2 when the requested metric is built in. Missing inputs do not create an algorithm gap; request them together and use geodata inspection tools when validation is needed."
+    },
+    {
       "case": "local_file_statistics",
-      "route": "NTL_Engineer direct tool or Code_Assistant",
-      "required_tools": ["NTL_raster_statistics or execute_geospatial_script_tool"],
-      "notes": "Allowed only when required raster/boundary files exist and the scope is suitable for local processing."
+      "route": "NTL_Engineer direct built-in tool",
+      "required_tools": ["geodata_quick_check_tool or geodata_inspector_tool", "NTL_raster_statistics"],
+      "notes": "Use built-in inspection and zonal-statistics tools when required raster/boundary files exist and the scope is suitable for local processing. Custom execution requires a separately documented algorithm gap."
     },
     {
       "case": "custom_or_event_analysis",
-      "route": "Engineer contract -> Data_Searcher as needed -> Code_Assistant",
+      "route": "Engineer ntl.script.contract.v2 -> Data_Searcher as needed -> Engineer direct execution; optional Code_Assistant review",
       "required_tools": ["GEE_request_plan_tool", "GEE_script_blueprint_tool", "execute_geospatial_script_tool", "GeoCode_COT_Validation_tool"],
-      "notes": "Engineer owns ntl.script.contract.v1; Code_Assistant executes the saved draft first."
+      "notes": "Engineer owns and directly executes ntl.script.contract.v2. Code_Assistant runs the full independent review only when the user asks for verification or Engineer explicitly sends review_requested=true with review_reason."
     }
   ]
 }

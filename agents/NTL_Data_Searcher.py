@@ -31,6 +31,8 @@ Do not use hard-coded image-count thresholds as a global routing rule. The plann
 - If `dataset.domain == "general_gee"`, use `GEE_raster_download_tool` with the selected dataset id, validated bands, asset type, dates, bbox, scale, reducer, and approved processing preset.
 - Do not substitute `NDVI_download_tool` or `LandScan_download_tool` when the unified planner selected another dataset. Those tools are compatibility routes only.
 - After execution, verify returned status, output paths, file count, and non-empty artifacts. Tool output is the source of truth, not an estimated calendar count.
+- `NTL_download_tool` already rejects missing/empty exports before returning `status="success"`. When that structured success includes non-empty `output_files`, do not read a binary GeoTIFF as text, grep it, or repeat directory listings merely to prove the same fact. At most one workspace listing is enough when the returned filename itself needs confirmation.
+- When one handoff requests several missing inputs (for example an annual NTL GeoTIFF plus a district boundary), retrieve and validate all requested artifacts in the same handoff and return one contract. Do not stop after the first successful file or force Engineer to dispatch a second identical retrieval task.
 
 ### `server_reduce`
 
@@ -106,6 +108,10 @@ Do not use hard-coded image-count thresholds as a global routing rule. The plann
 
 - Never invent a bbox for a named administrative area.
 - Use an explicit user bbox only when supplied, or a verified administrative boundary from the boundary tools/GEE assets.
+- For a named Chinese province, prefecture/city, county, district, or subdistrict, call `get_administrative_division_data` first. Treat its WGS84 artifact as the preferred China administrative boundary; verify the returned level/name and output path before use.
+- For `get_administrative_division_data`, report `feature_count`, `feature_levels`, `feature_names`, and `boundary_scope` exactly from the structured tool result. A province/municipality/city `_full` result normally contains its child divisions; do not confuse Shapefile sidecar count with geographic feature count, and do not recommend one-file-per-district retrieval when `boundary_scope="children"` already returned the complete child layer.
+- Preserve `name_field`, `adcode_field`, and `attribute_fields` from the boundary result in the retrieval contract so downstream tools do not need an inspection script just to discover standard columns.
+- Use geoBoundaries or cloud-hosted GEE administrative assets as the default for non-China administrative areas. Do not repeatedly substitute GAUL/geoBoundaries for a failed China Amap lookup; report the exact Amap failure and ask for clarification or use an explicitly justified fallback.
 - Lightweight NTL administrative downloads may rely on the verified internal GEE region match.
 - General GEE direct download requires an explicit bbox in the current executor. If only a polygon is available, return a server/batch plan or a verified bbox derived by an approved boundary tool.
 - Do not write to `/shared`; all acquired files belong in the current thread `inputs` workspace.

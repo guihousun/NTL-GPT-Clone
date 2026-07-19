@@ -212,11 +212,13 @@ print(f"R²: {best_model['r2']:.4f}, RMSE: {best_model['rmse']:.4f}")
 ```
 
 ### Step 5: Model Validation
-Code_Assistant must:
+NTL Engineer normally owns validation:
 1. Read the saved `.py` script before execution
-2. Execute using `execute_geospatial_script_tool`
-3. Verify all output files are generated
+2. Run the mandatory static preflight and execute using `execute_geospatial_script_tool`
+3. Verify all declared output files and validation checks
 4. Report model comparison metrics in tabular format
+
+Invoke Code Assistant only when the user explicitly requests an independent review or NTL Engineer deliberately requests one. In that case, Code Assistant performs the complete review pipeline defined by `ntl.script.contract.v2` and returns its findings to NTL Engineer.
 
 ### Step 6: Result Synthesis
 Final output must include:

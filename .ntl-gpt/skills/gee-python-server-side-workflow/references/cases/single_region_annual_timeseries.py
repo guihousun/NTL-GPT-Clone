@@ -21,8 +21,23 @@ except Exception:
 
 
 NTL_SCRIPT_CONTRACT = {
-    "schema": "ntl.script.contract.v1",
+    "schema": "ntl.script.contract.v2",
     "objective": "Extract annual mean NTL time series for one region using GEE server-side reductions.",
+    "input_manifest": [
+        {"kind": "gee_feature_collection", "asset": "FAO/GAUL/2015/level1", "region": "Shanghai"},
+        {"kind": "gee_image_collection", "dataset_id": "projects/sat-io/open-datasets/npp-viirs-ntl", "band": "b1"},
+    ],
+    "method_steps": [
+        "resolve and validate the target region",
+        "filter annual NTL images to the requested years",
+        "reduce each image over the region",
+        "validate the complete series and write annual and trend CSV files",
+    ],
+    "parameters": {"scale": 500, "trend_method": "linear", "nodata": "exclude masked pixels"},
+    "output_manifest": [
+        {"path": "outputs/region_annual_ntl_timeseries.csv", "required": True},
+        {"path": "outputs/region_annual_ntl_trend.csv", "required": True},
+    ],
     "gee_project_id_env": "GEE_DEFAULT_PROJECT_ID",
     "region": {
         "boundary_asset": "FAO/GAUL/2015/level1",
@@ -49,6 +64,19 @@ NTL_SCRIPT_CONTRACT = {
         "image collection has expected annual images",
         "returned rows have non-null NTL mean values",
     ],
+    "failure_gates": [
+        "empty region FeatureCollection",
+        "missing annual images",
+        "null or non-finite annual values",
+        "Earth Engine authentication, project, API, or quota failure",
+    ],
+    "execution": {
+        "mode": "execute",
+        "timeout_seconds": 1800,
+        "overwrite_policy": "version",
+        "network_scope": ["earth_engine"],
+        "test_strategy": "auto",
+    },
 }
 
 

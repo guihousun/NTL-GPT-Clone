@@ -297,8 +297,15 @@ def _read_vector(path: Path) -> gpd.GeoDataFrame:
 
 
 def _region_label_series(gdf: gpd.GeoDataFrame) -> pd.Series:
-    if "name" in gdf.columns:
-        return gdf["name"].astype(str)
+    columns_by_casefold = {
+        str(column).casefold(): column
+        for column in gdf.columns
+        if column != gdf.geometry.name
+    }
+    for preferred in ("name", "shapename", "adm_name", "admin_name", "region"):
+        matched = columns_by_casefold.get(preferred)
+        if matched is not None:
+            return gdf[matched].astype(str)
 
     non_geometry_columns = [column for column in gdf.columns if column != gdf.geometry.name]
     if non_geometry_columns:
