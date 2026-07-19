@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -151,3 +152,71 @@ def test_contract_rejects_more_than_one_light_repair(code_runtime) -> None:
 
     assert validation["pass"] is False
     assert any("at most one light repair" in error for error in validation["errors"])
+
+
+def test_sandbox_exposes_script_file_context(code_runtime) -> None:
+    module, storage_module = code_runtime
+    script = _script(
+        _contract(output_name="file_context.txt"),
+        "from pathlib import Path\n"
+        "Path('outputs').mkdir(exist_ok=True)\n"
+        "Path('outputs/file_context.txt').write_text(Path(__file__).name, encoding='utf-8')\n"
+        "print(__file__)",
+    )
+    _save_script(storage_module, "file_context.py", script)
+
+    result = json.loads(module.execute_geospatial_script("file_context.py"))
+
+    assert result["status"] == "success"
+    output_path = Path(storage_module.storage_manager.resolve_output_path("file_context.txt"))
+    assert output_path.read_text(encoding="utf-8").startswith("sandbox_exec_")
+
+
+def test_concurrent_identical_execution_is_serialized_and_deduplicated(code_runtime) -> None:
+    module, storage_module = code_runtime
+    script = _script(
+        _contract(output_name="concurrent.txt"),
+        "import time\n"
+        "from pathlib import Path\n"
+        "time.sleep(0.2)\n"
+        "Path('outputs').mkdir(exist_ok=True)\n"
+        "with Path('outputs/concurrent.txt').open('a', encoding='utf-8') as handle:\n"
+        "    handle.write('executed\\n')\n"
+        "print('outputs/concurrent.txt')",
+    )
+    _save_script(storage_module, "concurrent.py", script)
+    config = {"configurable": {"thread_id": "contract-v2-test"}}
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [
+            pool.submit(module.execute_geospatial_script, "concurrent.py", config=config)
+            for _ in range(2)
+        ]
+        results = [json.loads(future.result()) for future in futures]
+
+    assert sorted(result.get("already_executed", False) for result in results) == [False, True]
+    output_path = Path(storage_module.storage_manager.resolve_output_path("concurrent.txt"))
+    assert output_path.read_text(encoding="utf-8").splitlines() == ["executed"]
+
+
+def test_cross_workspace_output_is_rejected_without_copying(code_runtime) -> None:
+    module, storage_module = code_runtime
+    foreign_workspace = storage_module.storage_manager.get_workspace("another-thread")
+    foreign_output = foreign_workspace / "outputs" / "foreign.txt"
+    foreign_output.write_text("foreign", encoding="utf-8")
+    script = _script(
+        _contract(output_name="local.txt"),
+        "from pathlib import Path\n"
+        "Path('outputs').mkdir(exist_ok=True)\n"
+        "Path('outputs/local.txt').write_text('local', encoding='utf-8')\n"
+        f"print({str(foreign_output)!r})",
+    )
+    _save_script(storage_module, "cross_workspace.py", script)
+
+    result = json.loads(module.execute_geospatial_script("cross_workspace.py"))
+
+    assert result["status"] == "fail"
+    assert result["error_type"] == "CrossWorkspaceOutputError"
+    assert result["artifact_audit"]["pass"] is False
+    current_outputs = storage_module.storage_manager.get_workspace("contract-v2-test") / "outputs"
+    assert not (current_outputs / "foreign.txt").exists()

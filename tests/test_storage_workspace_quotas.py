@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import importlib
+import json
 import os
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 
@@ -75,6 +77,71 @@ class StorageWorkspaceQuotaTests(unittest.TestCase):
         self.assertFalse(snapshot["allowed"])
         self.assertGreater(snapshot["usage_bytes"], 1_500 * 1024)
         self.assertGreater(snapshot["projected_bytes"], snapshot["limit_bytes"])
+
+    def test_nested_paths_are_preserved_and_output_roots_are_enforced(self) -> None:
+        thread_id = "alice-nested"
+        workspace = self.storage_manager.get_workspace(thread_id)
+        nested_input = workspace / "inputs" / "boundaries" / "districts.shp"
+        nested_input.parent.mkdir(parents=True, exist_ok=True)
+        nested_input.write_bytes(b"shape")
+
+        self.assertEqual(
+            Path(self.storage_manager.resolve_input_path("boundaries/districts.shp", thread_id)),
+            nested_input.resolve(),
+        )
+        self.assertEqual(
+            Path(self.storage_manager.resolve_output_path("tables/result.csv", thread_id)),
+            (workspace / "outputs" / "tables" / "result.csv").resolve(),
+        )
+        self.assertEqual(
+            Path(self.storage_manager.resolve_input_path("", thread_id)),
+            (workspace / "inputs").resolve(),
+        )
+        with self.assertRaises(PermissionError):
+            self.storage_manager.resolve_output_path("inputs/not-an-output.txt", thread_id)
+        with self.assertRaises(PermissionError):
+            self.storage_manager.resolve_output_path("/data/raw/not-an-output.txt", thread_id)
+
+    def test_thread_ids_and_windows_absolute_paths_cannot_escape_workspace(self) -> None:
+        with self.assertRaises(ValueError):
+            self.storage_manager.get_workspace("../outside")
+        with self.assertRaises(ValueError):
+            self.storage_manager.get_workspace("nested/thread")
+        with self.assertRaises(ValueError):
+            self.storage_manager.resolve_output_path(r"C:\outside\result.txt", "alice-safe")
+
+    def test_atomic_write_rejects_quota_overflow_without_partial_file(self) -> None:
+        thread_id = "alice-atomic-quota"
+        workspace = self.storage_manager.get_workspace(thread_id)
+        self._write_bytes(workspace / "inputs" / "existing.bin", 900 * 1024)
+
+        with self.assertRaises(self.storage_manager_module.StorageQuotaExceededError):
+            self.storage_manager.atomic_write_text(
+                "too-large.txt",
+                "x" * (200 * 1024),
+                thread_id=thread_id,
+            )
+
+        self.assertFalse((workspace / "outputs" / "too-large.txt").exists())
+        self.assertEqual(list((workspace / "outputs").glob(".too-large.txt.*.tmp")), [])
+
+    def test_jsonl_appends_are_valid_under_thread_concurrency(self) -> None:
+        thread_id = "alice-jsonl"
+
+        def append_event(index: int) -> None:
+            self.storage_manager.append_jsonl(
+                "events.jsonl",
+                {"index": index},
+                thread_id=thread_id,
+            )
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            list(pool.map(append_event, range(40)))
+
+        history_path = self.storage_manager.get_workspace(thread_id) / "outputs" / "events.jsonl"
+        records = [json.loads(line) for line in history_path.read_text(encoding="utf-8").splitlines()]
+        self.assertEqual(len(records), 40)
+        self.assertEqual({record["index"] for record in records}, set(range(40)))
 
 
 if __name__ == "__main__":
