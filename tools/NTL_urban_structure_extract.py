@@ -222,8 +222,8 @@ def detect_urban_area_by_svm(tif_filename: str, output_filename: str, config: Ru
     print(f"[DEBUG] Input path exists: {os.path.exists(str(abs_input_path))}")
 
     # Path for pre-trained assets
-    model_path = os.path.join("./example/SVM_Build_up_area", "svm_built_up_model.joblib")
-    scaler_path = os.path.join("./example/SVM_Build_up_area", "svm_scaler.joblib")
+    model_path = os.path.join("./assets/models", "svm_built_up_model.joblib")
+    scaler_path = os.path.join("./assets/models", "svm_scaler.joblib")
 
     # --- 修改后的 Validations 部分 ---
     # 使用 os.path.exists() 来检查字符串路径是否存在

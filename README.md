@@ -1,149 +1,150 @@
-# NTL-GPT
+<p align="center">
+  <img src="assets/nasa_black_marble.jpg" width="100%" alt="Earth at night from NASA Black Marble">
+</p>
 
-NTL-GPT is an open-source Streamlit application for nighttime light analysis. It combines multi-agent orchestration, geospatial tooling, Google Earth Engine workflows, and official VIIRS data processing in a single local workspace.
+<h1 align="center">NTL-GPT</h1>
+
+<p align="center">
+  <strong>Multi-agent nighttime-light remote sensing, from data discovery to validated geospatial outputs.</strong>
+</p>
+
+<p align="center">
+  <a href="https://ntl-gpt.gischaser.cn/"><img alt="Live demo" src="https://img.shields.io/badge/live_demo-ntl--gpt.gischaser.cn-0f766e?style=flat-square"></a>
+  <img alt="Python 3.11" src="https://img.shields.io/badge/python-3.11-3776AB?style=flat-square&logo=python&logoColor=white">
+  <img alt="Streamlit 1.55" src="https://img.shields.io/badge/streamlit-1.55-FF4B4B?style=flat-square&logo=streamlit&logoColor=white">
+  <img alt="Google Earth Engine" src="https://img.shields.io/badge/Google_Earth_Engine-ready-4285F4?style=flat-square&logo=googleearthengine&logoColor=white">
+  <img alt="Status" src="https://img.shields.io/badge/status-research_preview-f59e0b?style=flat-square">
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="docs/README.md">Documentation</a> ·
+  <a href="docs/mcp/ntl-gis-core.md">GIS MCP</a> ·
+  <a href="docs/mcp/ntl-download.md">Download MCP</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
+
+NTL-GPT is a local-first Streamlit application for nighttime-light analysis. It combines coordinated agents, deterministic GIS tools, Google Earth Engine workflows, official VIIRS/Earthdata acquisition, local RAG, and isolated per-thread workspaces in one reproducible research environment.
+
+> NTL-GPT is under active development. Validate outputs before using them in operational or scientific decisions.
+
+## Preview
+
+<p align="center">
+  <img src="assets/ntl-gpt-console.png" width="100%" alt="NTL-GPT console running a Shanghai district nighttime-light analysis">
+</p>
+
+The interface keeps conversation, agent reasoning, data inputs, generated outputs, maps, and result previews together. The screenshot shows a complete Shanghai district ANTL workflow using built-in retrieval and zonal-statistics tools.
+
+## What It Does
+
+| Capability | Included workflows |
+|---|---|
+| NTL data retrieval | NPP-VIIRS, NPP-VIIRS-like, DMSP-OLS, VNP46A1, VNP46A2, SDGSAT-1 |
+| Cloud processing | GEE catalog planning, direct export, batch export, server-side reduction |
+| Official acquisition | Earthdata/CMR HDF5 retrieval, country or BBox download, mosaicking, progress and audit manifests |
+| Local GIS | Validation, reprojection, clipping, mosaicking, zonal statistics, NTL metrics, trend and anomaly analysis |
+| Agent workflows | Data Searcher, optional Code Assistant review, and NTL Engineer orchestration |
+| Research runtime | Account login, PostgreSQL history, concurrent runs, cancellation, quotas, and thread isolation |
+| Interoperability | Local stdio MCP services for GIS and download operations; EasyGEE and QGIS handoffs |
+
+## Architecture
+
+```mermaid
+flowchart LR
+    UI["Streamlit UI"] --> ENG["NTL Engineer"]
+    ENG --> SEARCH["Data Searcher"]
+    ENG -. optional review .-> CODE["Code Assistant"]
+    SEARCH --> GEE["Google Earth Engine"]
+    SEARCH --> EARTH["NASA Earthdata / CMR"]
+    ENG --> TOOLS["Runtime GIS and NTL tools"]
+    TOOLS --> MCP["ntl-gis-core / ntl-download MCP"]
+    UI --> STORE["PostgreSQL history"]
+    UI --> WORK["Per-thread workspace"]
+    WORK --> INPUTS["inputs/"]
+    WORK --> OUTPUTS["outputs/"]
+    WORK --> MEMORY["memory/"]
+```
+
+NTL-GPT runs geospatial code and tools on the local host because Earth Engine credentials, GDAL/PROJ libraries, RAG assets, shared reference data, and thread workspaces must remain available. It is a workspace-isolated local subprocess model, not a vendor-hosted sandbox.
 
 ## Quick Start
 
-macOS / Linux (`bash`):
+### 1. Create the environment
 
-```bash
-cd /path/to/NTL-GPT-stable
-conda env create -f environment.yml
-conda activate NTL-GPT-stable
-cp .env.example .env
-python check_env.py
-streamlit run Streamlit.py
-```
-
-Windows (`PowerShell`):
+Windows PowerShell:
 
 ```powershell
-Set-Location E:\NTL-GPT-stable
+git clone https://github.com/guihousun/NTL-GPT-Clone.git NTL-GPT
+Set-Location .\NTL-GPT
 conda env create -f environment.yml
 conda activate NTL-GPT-stable
 Copy-Item .env.example .env
-python check_env.py
-streamlit run Streamlit.py
 ```
 
-## Configure `.env`
+macOS or Linux:
 
-Required:
+```bash
+git clone https://github.com/guihousun/NTL-GPT-Clone.git NTL-GPT
+cd NTL-GPT
+conda env create -f environment.yml
+conda activate NTL-GPT-stable
+cp .env.example .env
+```
 
-- `DeepSeek_API_KEY`
-- `DeepSeek_Coding_URL`
-- `DASHSCOPE_API_KEY`
-- `DASHSCOPE_Qwen_plus_KEY`
-- `DASHSCOPE_Qwen_plus_URL`
+### 2. Configure services
 
-Optional:
+Set these values in `.env`:
 
-- `NTL_VLM_MODEL`
-- `GEE_DEFAULT_PROJECT_ID`
-- `EARTHDATA_TOKEN`
-- `amap_api_key`
-- `NTL_TOOL_PROFILE`
-- `NTL_USER_DATA_DIR`
-- `NTL_SHARED_DATA_DIR`
-- `NTL_CONTEXTILY_TMP`
-- `NTL_HISTORY_DB_URL`
-- `NTL_LANGGRAPH_POSTGRES_URL`
-- `NTL_MAX_ACTIVE_RUNS`
-- `NTL_MAX_ACTIVE_RUNS_PER_USER`
-- `NTL_THREAD_WORKSPACE_QUOTA_MB`
-- `NTL_USER_WORKSPACE_QUOTA_MB`
-- `NTL_EMBEDDING_PROVIDER`
-- `NTL_EMBEDDING_MODEL`
-- `NTL_EMBEDDING_BASE_URL`
-- `NTL_EMBEDDING_DIMENSIONS`
-- `NTL_EMBEDDING_API_KEY`
-- `NTL_FORCE_NATIVE_CHAT_INPUT`
-- `NTL_USE_CUSTOM_MULTIMODAL_CHAT_INPUT`
-- `NTL_MCP_ENV_FILE`
-- `NTL_MCP_WORKDIR`
-- `NTL_MCP_STATE_DIR`
+```env
+DeepSeek_API_KEY=your_key
+DeepSeek_Coding_URL=your_openai_compatible_endpoint
+DASHSCOPE_API_KEY=your_key
+DASHSCOPE_Qwen_plus_KEY=your_key
+DASHSCOPE_Qwen_plus_URL=your_openai_compatible_endpoint
+```
 
-## Main Capabilities
+For GEE and official Earthdata downloads, also configure:
 
-Available after basic setup:
+```env
+GEE_DEFAULT_PROJECT_ID=your_gee_project
+EARTHDATA_TOKEN=your_earthdata_token
+```
 
-- chat-based task handling
-- local tool orchestration
-- knowledge-guided geospatial code generation
-- account/password login
-- per-thread workspace isolation
-- configurable run concurrency and workspace quotas
+Never commit `.env`, API keys, database passwords, Earthdata tokens, or Earth Engine credentials.
 
-Additional setup for Google Earth Engine:
+### 3. Validate and launch
 
-- set `GEE_DEFAULT_PROJECT_ID`
-- authenticate locally with Earth Engine if needed
+```powershell
+python check_env.py
+python -m streamlit run Streamlit.py --server.address 127.0.0.1 --server.port 8501
+```
 
-## Local `ntl-gis-core` MCP
+Open [http://127.0.0.1:8501](http://127.0.0.1:8501). The public research preview is available at [https://ntl-gpt.gischaser.cn/](https://ntl-gpt.gischaser.cn/).
 
-The repository also ships a local stdio MCP service for deterministic GIS and
-nighttime-light operations. Install the package in the `NTL-GPT-Stable`
-environment and use the client configuration and workspace rules in
-[`docs/mcp/ntl-gis-core.md`](docs/mcp/ntl-gis-core.md). The service reads local
-inputs, writes new outputs without overwriting existing files, and does not
-access the repository's RAG stores or user workspaces unless they are
-explicitly selected as the MCP working directory.
+## Configuration
 
-## Local `ntl-download` MCP
+| Group | Variables |
+|---|---|
+| Frontend models | `DeepSeek_API_KEY`, `DeepSeek_Coding_URL` |
+| Internal VLM and RAG | `DASHSCOPE_API_KEY`, `DASHSCOPE_Qwen_plus_KEY`, `DASHSCOPE_Qwen_plus_URL`, `NTL_VLM_MODEL` |
+| Embeddings | `NTL_EMBEDDING_PROVIDER`, `NTL_EMBEDDING_MODEL`, `NTL_EMBEDDING_BASE_URL`, `NTL_EMBEDDING_DIMENSIONS`, `NTL_EMBEDDING_API_KEY` |
+| Data services | `GEE_DEFAULT_PROJECT_ID`, `EARTHDATA_TOKEN`, `amap_api_key` |
+| Persistence | `NTL_HISTORY_DB_URL`, `NTL_LANGGRAPH_POSTGRES_URL` |
+| Runtime limits | `NTL_MAX_ACTIVE_RUNS`, `NTL_MAX_ACTIVE_RUNS_PER_USER`, `NTL_THREAD_WORKSPACE_QUOTA_MB`, `NTL_USER_WORKSPACE_QUOTA_MB` |
+| Paths and MCP | `NTL_USER_DATA_DIR`, `NTL_SHARED_DATA_DIR`, `NTL_CONTEXTILY_TMP`, `NTL_MCP_ENV_FILE`, `NTL_MCP_WORKDIR`, `NTL_MCP_STATE_DIR` |
+| UI compatibility | `NTL_FORCE_NATIVE_CHAT_INPUT`, `NTL_USE_CUSTOM_MULTIMODAL_CHAT_INPUT` |
 
-`ntl-download` is the companion local stdio MCP for explicit GEE raster export
-and audited official VNP46A2 Earthdata HDF5 country mosaics. It runs
-synchronously, reports progress to the client, and keeps sanitized manifests
-so interrupted clients can inspect and retry only unfinished country-days. It
-does not require the Job Runtime, PostgreSQL, or a web service. Setup,
-credential handling, recovery, and Codex configuration are in
-[`docs/mcp/ntl-download.md`](docs/mcp/ntl-download.md). Use EasyGEE for GEE
-authentication planning, catalog search, quotas, and map preview.
+See [`.env.example`](.env.example) for the maintained template and run `python check_env.py` after every configuration change.
 
-## Runtime Execution Model
+### PostgreSQL
 
-NTL-GPT intentionally does not enable remote DeepAgents sandbox providers by default. Google Earth Engine authentication, local credential caches, GDAL/PROJ/Rasterio/GeoPandas native libraries, local RAG assets, `base_data`, and per-thread workspaces are expected to be available on the host machine.
-
-Generated geospatial code is executed through the project-local subprocess workspace model:
-
-- DeepAgents filesystem backends provide virtual file routing and skill discovery.
-- `tools/NTL_Code_generation.py` runs generated code in a subprocess with the current thread workspace as the working directory.
-- Relative `inputs/...` and `outputs/...` paths resolve under `user_data/<thread_id>/`.
-- This is not a vendor-hosted secure sandbox; safety relies on preflight checks, path protocol enforcement, subprocess timeouts, and workspace scoping.
-- `/shared/...` maps to `base_data/...` and is treated as shared read-only source data.
-
-## Multi-User Runtime Model
-
-The Streamlit runtime isolates work by thread:
-
-- each thread uses its own `user_data/<thread_id>/inputs`, `outputs`, `memory`, and history records
-- one run at a time is allowed per thread
-- different threads can run concurrently in background Python threads
-- global and per-user active-run limits are controlled by `NTL_MAX_ACTIVE_RUNS` and `NTL_MAX_ACTIVE_RUNS_PER_USER`
-- per-thread and per-user workspace storage quotas are controlled by `NTL_THREAD_WORKSPACE_QUOTA_MB` and `NTL_USER_WORKSPACE_QUOTA_MB`
-
-Set a limit to `0` to disable it.
-
-## PostgreSQL Persistence
-
-For production or multi-user use, configure PostgreSQL in `.env`:
+PostgreSQL is recommended for multi-user and production deployments:
 
 ```env
 NTL_HISTORY_DB_URL=postgresql://ntl_gpt:your_password@127.0.0.1:5432/ntl_gpt
 NTL_LANGGRAPH_POSTGRES_URL=postgresql://ntl_gpt:your_password@127.0.0.1:5432/ntl_gpt
 ```
-
-`NTL_HISTORY_DB_URL` stores users, password hashes, chat history, threads, profiles, and related app state. If it is empty, history storage falls back to `NTL_LANGGRAPH_POSTGRES_URL`.
-
-`NTL_LANGGRAPH_POSTGRES_URL` is reserved for LangGraph/Postgres-backed runtime memory and checkpoint storage where supported by the installed LangGraph packages.
-
-Local PostgreSQL and Docker PostgreSQL use the same URL format. Only the host name changes:
-
-- PostgreSQL installed directly on the same machine: `127.0.0.1:5432`
-- Docker PostgreSQL exposed with `-p 5432:5432`, while Streamlit runs in local conda: `127.0.0.1:5432`
-- Docker Compose where Streamlit and PostgreSQL run on the same Docker network: use the service name, for example `postgres:5432`
-
-Example local database bootstrap:
 
 ```sql
 CREATE USER ntl_gpt WITH PASSWORD 'your_password';
@@ -151,81 +152,78 @@ CREATE DATABASE ntl_gpt OWNER ntl_gpt;
 GRANT ALL PRIVILEGES ON DATABASE ntl_gpt TO ntl_gpt;
 ```
 
-Example Docker PostgreSQL:
+Local PostgreSQL and Docker PostgreSQL use the same URL format. Use `127.0.0.1` when Streamlit and PostgreSQL are exposed on the same host; use the Compose service name only when both services share a Docker network.
 
-```bash
-docker run --name ntl-gpt-postgres \
-  -e POSTGRES_USER=ntl_gpt \
-  -e POSTGRES_PASSWORD=your_password \
-  -e POSTGRES_DB=ntl_gpt \
-  -p 5432:5432 \
-  -d postgres:16
+## Local MCP Services
+
+The repository includes two standalone stdio MCP servers. They do not require the Streamlit application or PostgreSQL.
+
+| Service | Purpose | Guide |
+|---|---|---|
+| `ntl-gis-core` | Deterministic vector, raster, NTL metrics, zonal statistics, trend and anomaly operations | [Setup and tools](docs/mcp/ntl-gis-core.md) |
+| `ntl-download` | Explicit GEE exports, batch-task tracking, VNP46A1/VNP46A2 Earthdata downloads and recovery manifests | [Setup and tools](docs/mcp/ntl-download.md) |
+
+Install both through the editable `packages/ntl_toolkit` package included in `environment.yml`. External MCP clients should use a dedicated work directory rather than the Streamlit `user_data` tree.
+
+## Workspace Model
+
+Every conversation thread receives an isolated workspace:
+
+```text
+user_data/<thread_id>/
+├── inputs/     # uploads and retrieved source data
+├── outputs/    # generated rasters, vectors, tables and figures
+└── memory/     # thread-local runtime state and failed-run records
 ```
 
-After editing `.env`, run:
+One run is allowed per thread. Different threads may run concurrently subject to global and per-user limits. Generated paths are resolved through `storage_manager.py`, and shared `base_data` is treated as read-only source data.
 
-```bash
-python check_env.py
+## Repository Layout
+
+```text
+NTL-GPT/
+├── Streamlit.py              # application entrypoint
+├── app_ui.py                 # interface and result rendering
+├── app_logic.py              # run lifecycle and event streaming
+├── graph_factory.py          # agent graph and tool routing
+├── agents/                   # agent prompts and definitions
+├── tools/                    # runtime geospatial and NTL tools
+├── packages/ntl_toolkit/     # reusable GIS/download core
+├── mcp_servers/              # local stdio MCP entrypoints
+├── .ntl-gpt/skills/          # runtime workflow skills
+├── RAG/                      # local knowledge indexes and references
+├── tests/                    # application regression tests
+├── evaluations/              # MCP evaluation fixtures
+├── assets/                   # README/UI assets and runtime models
+└── docs/                     # deployment and MCP documentation
 ```
 
-Additional setup for official VIIRS downloads:
+## Documentation
 
-- set `EARTHDATA_TOKEN`
-- For explicit country-scale daily VNP46A2 raster retrieval, use
-  `official_vnp46a2_h5_country_mosaic_tool`. It follows the official CMR/Earthdata
-  HDF5 route for non-gap-filled `DNB_BRDF_Corrected_NTL`, writes only inside the
-  current thread workspace, and requires a country-day audit after mosaicking.
+- [Documentation index](docs/README.md)
+- [Windows Server deployment and operations](docs/deployment/windows-server.md)
+- [`ntl-gis-core` MCP](docs/mcp/ntl-gis-core.md)
+- [`ntl-download` MCP](docs/mcp/ntl-download.md)
+- [Contributing guide](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
 
-Model and internal service channel mapping:
+## Development
 
-- `DeepSeek_API_KEY` is used with `DeepSeek_Coding_URL` for the selectable frontend chat models.
-- `DASHSCOPE_API_KEY` is retained for internal image understanding; `NTL_VLM_MODEL` defaults to `qwen3.5-plus`.
-- `DASHSCOPE_Qwen_plus_KEY` is used with `DASHSCOPE_Qwen_plus_URL` for internal knowledge-base services and is also the default embedding key.
+Use the project environment for all checks:
 
-## RAG Embeddings
-
-The local NTL knowledge-base tools use DashScope embeddings by default through the OpenAI-compatible API:
-
-```env
-NTL_EMBEDDING_PROVIDER=dashscope
-NTL_EMBEDDING_MODEL=text-embedding-v4
-NTL_EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-NTL_EMBEDDING_DIMENSIONS=1024
+```powershell
+conda activate NTL-GPT-stable
+python -m py_compile Streamlit.py app_logic.py app_agents.py graph_factory.py
+python -m pytest tests -q
+python -m pytest packages/ntl_toolkit/tests -q
 ```
 
-If `NTL_EMBEDDING_API_KEY` is empty, the embedding client uses `DASHSCOPE_Qwen_plus_KEY`. `OPENAI_API_KEY` is only needed if you explicitly set `NTL_EMBEDDING_PROVIDER=openai`.
+Changes to routing or tools should test the target prompt and at least one neighboring scenario. New paths must remain inside the active thread workspace, and secrets or generated user data must never be committed.
 
-If an existing `RAG/*_RAG` Chroma store was built with OpenAI embeddings, rebuild it after switching to DashScope so stored document vectors and query vectors come from the same embedding model.
+## Contributing
 
-Model channel mapping:
+Issues and focused pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing changes, especially for agent routing, execution safety, storage paths, or dataset semantics.
 
-- `deepseek-v4-flash` and `deepseek-v4-pro` use the OpenAI-compatible endpoint configured by `DeepSeek_API_KEY` and `DeepSeek_Coding_URL`.
-- Qwen remains an internal-only dependency for image understanding, knowledge-base search, and the default embedding provider; it is no longer exposed in the frontend model selector.
+For vulnerabilities or accidental credential exposure, follow [SECURITY.md](SECURITY.md) instead of opening a public issue.
 
-## Startup Check
-
-Run this before first launch:
-
-```bash
-python check_env.py
-```
-
-The checker verifies:
-
-- required environment variables
-- key project files
-- core Python imports
-
-## Cloud Demo
-
-The public HTTPS endpoint is available at:
-
-[https://ntl-gpt.gischaser.cn/](https://ntl-gpt.gischaser.cn/)
-
-Windows Server startup, update, HTTPS, database, backup, and troubleshooting procedures:
-
-[Windows Server Operations Guide](docs/WINDOWS_SERVER_OPERATIONS.md)
-
-## Notes
-
-- `environment.yml` is the supported installation entry for this repository.
+<p align="center"><sub>Earth-at-night imagery: NASA Black Marble.</sub></p>

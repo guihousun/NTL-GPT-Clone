@@ -26,6 +26,8 @@ dist/
 .vibe/
 .agents/
 .adal/
+.codex/
+.playwright-cli/
 
 # Local temp and logs
 .tmp/
@@ -59,6 +61,9 @@ scripts/
 !.ntl-gpt/skills/**/scripts/
 !.ntl-gpt/skills/**/scripts/*.py
 ntl_paper_retrieval_app.py
+example/
+.learnings/
+docs/superpowers/
 experiments/**/workspace_validation/**/outputs/
 experiments/official_daily_ntl_fastpath/workspace/
 experiments/official_daily_ntl_fastpath/workspace*/
@@ -81,6 +86,8 @@ tools/bigquery/*.json
 # Local scratch copies
 * copy.py
 *_old.py
+session
+tehran_focus_hotspot_*.png
 
 # OS files
 .DS_Store
