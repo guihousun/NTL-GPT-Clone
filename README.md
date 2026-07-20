@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="assets/nasa_black_marble.jpg" width="100%" alt="Earth at night from NASA Black Marble">
+  <img src="assets/ntl-gpt-console.png" width="100%" alt="NTL-GPT logged-in workspace running a nighttime-light analysis">
 </p>
 
-<h1 align="center">NTL-GPT</h1>
+<h1 align="center">NTL-GPT：面向夜间灯光遥感任务的多智能体协同框架</h1>
 
 <p align="center">
-  <strong>Multi-agent nighttime-light remote sensing, from data discovery to validated geospatial outputs.</strong>
+  <strong>NTL-GPT: A Collaborative Multi-Agent System for Automating Nighttime Light Remote Sensing Tasks</strong>
 </p>
 
 <p align="center">
@@ -28,13 +28,7 @@ NTL-GPT is a local-first Streamlit application for nighttime-light analysis. It 
 
 > NTL-GPT is under active development. Validate outputs before using them in operational or scientific decisions.
 
-## Preview
-
-<p align="center">
-  <img src="assets/ntl-gpt-console.png" width="100%" alt="NTL-GPT console running a Shanghai district nighttime-light analysis">
-</p>
-
-The interface keeps conversation, agent reasoning, data inputs, generated outputs, maps, and result previews together. The screenshot shows a complete Shanghai district ANTL workflow using built-in retrieval and zonal-statistics tools.
+The interface keeps conversation, agent reasoning, data inputs, generated outputs, maps, and result previews together. The header image shows the authenticated workspace completing a Shanghai district ANTL workflow with built-in retrieval and zonal-statistics tools.
 
 ## What It Does
 
@@ -225,5 +219,3 @@ Changes to routing or tools should test the target prompt and at least one neigh
 Issues and focused pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing changes, especially for agent routing, execution safety, storage paths, or dataset semantics.
 
 For vulnerabilities or accidental credential exposure, follow [SECURITY.md](SECURITY.md) instead of opening a public issue.
-
-<p align="center"><sub>Earth-at-night imagery: NASA Black Marble.</sub></p>
