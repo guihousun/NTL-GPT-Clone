@@ -37,12 +37,19 @@ from orchestration.contracts_io import (
     save_contract,
     validate_contract_payload,
 )
+from orchestration.observation_runtime import (
+    ObservationToolEvidence,
+    consume_full_inspector_evidence,
+    restore_full_inspector_evidence,
+)
 from storage_manager import current_thread_id, storage_manager
 
 
 ArtifactType = Literal["TaskPlan", "EventContext", "ObservationPackage", "AnalysisPackage", "EvidenceReport"]
 
-_MODEL_HIDDEN_ENVELOPE_FIELDS = frozenset({"run_id", "task_id", "created_at_utc"})
+_MODEL_HIDDEN_ENVELOPE_FIELDS = frozenset(
+    {"run_id", "task_id", "created_at_utc", "query_executed_at_utc"}
+)
 _PACKAGE_HANDLE_PREFIX = "package/"
 _PACKAGE_HANDLE_LIMIT = 4096
 _PACKAGE_HANDLE_LOCK = RLock()
@@ -251,8 +258,9 @@ class SaveEventContextInput(_ToolInput):
 class SaveObservationPackageInput(_ToolInput):
     contract: ObservationPackageDraft = Field(
         description=(
-            "Complete ntl.contract.v1 ObservationPackage, including query time, product, availability, "
-            "validation, provenance, and any analysis-ready artifacts. Gold/evaluator fields are forbidden."
+            "Complete ntl.contract.v1 ObservationPackage with product, availability, validation, provenance, "
+            "and any analysis-ready artifacts. The query execution time is injected from the current task's "
+            "successful full geodata inspection; Gold/evaluator fields are forbidden."
         )
     )
 
@@ -379,6 +387,20 @@ def _coerce_tool_mapping(value: Any) -> dict[str, Any] | Any:
             return value
         return dict(parsed) if isinstance(parsed, dict) else value
     return dict(value) if isinstance(value, dict) else value
+
+
+def _strip_observation_query_time(value: Any) -> Any:
+    """Remove model-authored copies of the system-managed observation time."""
+
+    if isinstance(value, dict):
+        return {
+            key: _strip_observation_query_time(item)
+            for key, item in value.items()
+            if key != "query_executed_at_utc"
+        }
+    if isinstance(value, list):
+        return [_strip_observation_query_time(item) for item in value]
+    return value
 
 
 def _fill_missing_identity(raw: dict[str, Any], *, run_id: str, task_id: str) -> None:
@@ -606,17 +628,38 @@ def _save_typed_contract(
     tool_name: str,
     config: Optional[RunnableConfig],
 ) -> dict[str, Any]:
+    observation_evidence: ObservationToolEvidence | None = None
     try:
         thread_id = _resolve_thread_id(config)
+        contract_to_hydrate: ContractEnvelope | dict[str, Any] | str = contract
+        if artifact_type == "ObservationPackage":
+            raw = _coerce_tool_mapping(contract)
+            if not isinstance(raw, dict):
+                raise ContractIOError("ObservationPackage draft must be a mapping")
+            # Never accept a caller/model timestamp, including trusted direct
+            # Python callers that bypass the model-facing draft schema.  Free-
+            # form validation/provenance objects are scrubbed recursively too,
+            # so a conflicting duplicate cannot survive below the envelope.
+            raw = _strip_observation_query_time(raw)
+            observation_evidence = consume_full_inspector_evidence(config)
+            if observation_evidence is None:
+                raise ContractIOError(
+                    "ObservationPackage requires an unconsumed full geodata inspection "
+                    "from the current thread and submitted task"
+                )
+            raw["query_executed_at_utc"] = observation_evidence.completed_at_utc.isoformat()
+            contract_to_hydrate = raw
         return _model_facing_result(
             save_contract(
-                _hydrate_contract_identity(contract, config),
+                _hydrate_contract_identity(contract_to_hydrate, config),
                 thread_id=thread_id,
                 expected_artifact_type=artifact_type,
             ),
             thread_id=thread_id,
         )
     except Exception as exc:  # noqa: BLE001 - agent tools return structured failures
+        if observation_evidence is not None:
+            restore_full_inspector_evidence(observation_evidence, config)
         return _failure(tool_name, exc)
 
 

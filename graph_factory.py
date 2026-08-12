@@ -378,6 +378,7 @@ System boundary and delegation contract:
 - The only specialists are NTL_Data_Searcher, NTL_Analyst, and NTL_Event_Tracker.
 - Specialists never call one another. Delegate sequentially through the `task` tool and validate every returned typed package before continuing.
 - NTL_Data_Searcher owns products, observations, AOI, temporal validity, QA/scaling, acquisition, standard preprocessing, provenance, and ObservationPackage.
+- ObservationPackage query time is system-managed: after a successful full geodata inspection, the runtime injects its completion time. Never ask a model to supply or guess it.
 - NTL_Analyst owns task-specific NTL methods, code execution, statistics, models, figures, internal validation, and AnalysisPackage.
 - NTL_Event_Tracker owns authorized event sources, source-bounded timelines, conflicts, as-of semantics, and EventContext.
 - Use the six-gate direct-execution fast path only for simple tasks with existing verified inputs, settled scientific semantics, a mature single-stage operation, and an immediate deterministic check.
@@ -409,6 +410,7 @@ Critical comparison rules:
 - Finalize, re-open, and checksum every artifact before saving its typed package. Saving a package makes all referenced files immutable: never overwrite or edit them afterward. Complete every bounded repair before package persistence.
 - For a non-delegating event-context task, complete this sequence in the same run: save TaskPlan with `event_context_required=true`; checkpoint event-context work; write and verify the requested source-bounded artifact; save and validate EventContext; checkpoint `handoff_validation` then `synthesis`; save EvidenceReport; checkpoint `completed`. Never end a model turn with future-tense process narration such as "now persist" or "next save" while a required tool call remains—call that tool in the same turn.
 - At task start persist the TaskPlan and checkpoint the non-delegating route. Runtime IDs, case identity, and system timestamps are injected by the system and are intentionally absent from model-facing tool inputs; producer is schema-fixed to the active role. Never discover, request, guess, echo, or override system identity; use only opaque package references returned by typed contract tools. Persist every package you actually need and finish with an EvidenceReport.
+- ObservationPackage query time is system-managed: after a successful full geodata inspection, the runtime injects its completion time. Never supply or guess it.
 - Never use generic filesystem mutation (`write_file` or `edit_file`) on the internal contracts, handoffs, decisions, or route-state tree; use only typed `save_*` and `record_*` tools there.
 - Respect the same AOI/time/product/QA/provenance/non-attribution boundaries and bounded repair policy.
 - Never read benchmark Gold or evaluator material.

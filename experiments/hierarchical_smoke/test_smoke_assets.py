@@ -110,15 +110,15 @@ def test_conditional_architecture_route_criteria_are_explicit() -> None:
         assert "completed route" in route_text
 
 
-def test_observation_case_requires_specialist_owned_inspection_and_real_query_time() -> None:
+def test_observation_case_requires_specialist_owned_inspection_and_system_query_time() -> None:
     case = _record_by_case_id("cases.jsonl", "SMOKE-OBSERVATION-001")
     prompt = str(case["prompt"])
 
     for required in (
         "`geodata_inspector_tool` is the only permitted domain tool",
         "any live, network, retrieval, catalog, or download tool",
-        "Set `query_executed_at_utc` to the actual offset-aware UTC instant",
-        "not to midnight, a fixed or rounded placeholder",
+        "Do not supply or guess `query_executed_at_utc`",
+        "the runtime records its actual offset-aware UTC completion time",
         "NTL_Engineer must not call `geodata_inspector_tool` directly",
         "make exactly one successful `task` call to NTL_Data_Searcher",
         "require that single descendant to call `geodata_inspector_tool` in `full` mode",
@@ -173,12 +173,13 @@ def test_observation_eval_contract_has_strict_trace_tool_and_timestamp_gates() -
 
     timestamp_text = criteria["observation-timestamp"]
     for required in (
-        "non-placeholder `query_executed_at_utc`",
+        "system-injected, non-placeholder `query_executed_at_utc`",
         "valid offset-aware UTC",
         "greater than or equal to",
         "`created_at_utc`",
-        "`save_observation_package` timestamps",
-        "run start/end interval",
+        "must not expose that field",
+        "`save_observation_package` call",
+        "successful full `geodata_inspector_tool` completion",
     ):
         assert required in timestamp_text
 
@@ -198,10 +199,12 @@ def test_observation_eval_contract_has_strict_trace_tool_and_timestamp_gates() -
     assert reference["tool_policy"]["allowed_domain_tools"] == ["geodata_inspector_tool"]
     assert reference["tool_policy"]["live_retrieval_allowed"] is False
     timestamp = reference["query_timestamp"]
+    assert timestamp["authorship"] == "system"
+    assert timestamp["model_input_exposed"] is False
+    assert timestamp["source"] == "successful full geodata_inspector_tool completion"
     assert timestamp["placeholder_allowed"] is False
     assert timestamp["relation_to_package_created_at_utc"] == ">="
     assert "save_observation_package" in timestamp["preferred_trace_check"]
-    assert timestamp["fallback_without_tool_timestamps"] == "within run started_at and ended_at"
 
     routes = reference["architecture_route"]
     full = routes["full"]

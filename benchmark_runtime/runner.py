@@ -381,6 +381,8 @@ def _collect_architecture_evidence(
     payload: dict[str, Any],
     *,
     tool_trace: Any,
+    run_started_at: Any,
+    evidence_checked_at: Any,
 ) -> tuple[dict[str, Any], list[str], list[str], str | None]:
     """Import workspace-bound evidence code only after worker env initialization."""
 
@@ -389,6 +391,7 @@ def _collect_architecture_evidence(
         canonical_evidence_report_answer,
         collect_internal_evidence,
         minimum_architecture_evidence_issues,
+        observation_timestamp_trace_issues,
         package_artifact_integrity_issues,
     )
 
@@ -409,6 +412,18 @@ def _collect_architecture_evidence(
             architecture_mode=str(payload.get("architecture_mode") or ""),
             expected_run_id=str(payload.get("task_run_id") or ""),
             expected_task_id=str(case.get("case_id") or ""),
+        )
+    )
+    issues.extend(
+        observation_timestamp_trace_issues(
+            workspace / "outputs",
+            evidence,
+            tool_trace=tool_trace,
+            architecture_mode=str(payload.get("architecture_mode") or ""),
+            expected_run_id=str(payload.get("task_run_id") or ""),
+            expected_task_id=str(case.get("case_id") or ""),
+            run_started_at=run_started_at,
+            evidence_checked_at=evidence_checked_at,
         )
     )
     issues = list(dict.fromkeys(issues))
@@ -530,7 +545,13 @@ def execute_worker_payload(
         evidence_issues,
         artifact_integrity_issues,
         canonical_answer,
-    ) = _collect_architecture_evidence(workspace, payload, tool_trace=snapshot["tool_trace"])
+    ) = _collect_architecture_evidence(
+        workspace,
+        payload,
+        tool_trace=snapshot["tool_trace"],
+        run_started_at=started_at,
+        evidence_checked_at=_utc_now(),
+    )
     if graph_completed:
         if canonical_answer:
             # The validated typed system output is authoritative over a final
@@ -708,7 +729,13 @@ def abnormal_run_record(
         _evidence_issues,
         artifact_integrity_issues,
         _canonical_answer,
-    ) = _collect_architecture_evidence(workspace, payload, tool_trace=trace)
+    ) = _collect_architecture_evidence(
+        workspace,
+        payload,
+        tool_trace=trace,
+        run_started_at=payload.get("submitted_at"),
+        evidence_checked_at=_utc_now(),
+    )
     if artifact_integrity_issues:
         errors.append(
             {

@@ -35,6 +35,10 @@ from orchestration.contract_tools import (
     save_task_plan,
     validate_contract,
 )
+from orchestration.observation_runtime import (
+    observation_tool_started_at,
+    record_observation_tool_success,
+)
 from orchestration.contracts_io import (
     ContractIOError,
     load_contract,
@@ -302,7 +306,6 @@ def test_each_save_tool_exposes_its_exact_nested_contract_schema() -> None:
         },
         "save_observation_package": {
             "status",
-            "query_executed_at_utc",
         },
         "save_analysis_package": {
             "status",
@@ -356,7 +359,13 @@ def _all_schema_property_names(value: object) -> set[str]:
 
 
 def test_model_facing_contract_tools_hide_all_runtime_identity_fields() -> None:
-    forbidden = {"run_id", "task_id", "case_id", "created_at_utc"}
+    forbidden = {
+        "run_id",
+        "task_id",
+        "case_id",
+        "created_at_utc",
+        "query_executed_at_utc",
+    }
     for tool in [*CONTRACT_TOOLS[:5], CONTRACT_TOOLS[6], CONTRACT_TOOLS[7]]:
         schema = convert_to_openai_tool(tool)["function"]["parameters"]
         assert forbidden.isdisjoint(_all_schema_property_names(schema)), tool.name
@@ -430,18 +439,27 @@ def test_all_save_tools_accept_and_persist_their_parsed_nested_models(
         draft = model.model_dump(mode="json")
         for system_field in ("run_id", "task_id", "created_at_utc"):
             draft.pop(system_field)
+        config = {
+            "configurable": {"thread_id": "contract-thread"},
+            "metadata": {
+                "task_run_id": "run-1",
+                "case_id": "case-1",
+                "task_submitted_at": NOW.isoformat(),
+            },
+        }
+        if tool.name == "save_observation_package":
+            draft.pop("query_executed_at_utc")
+            record_observation_tool_success(
+                tool_name="geodata_inspector_tool",
+                mode="full",
+                started_at_utc=observation_tool_started_at(),
+                config=config,
+            )
         parsed = tool.args_schema.model_validate({"contract": draft})
         assert parsed.contract.__class__.__name__ == f"{model.artifact_type}Draft"
         result = tool.invoke(
             {"contract": draft},
-            config={
-                "configurable": {"thread_id": "contract-thread"},
-                "metadata": {
-                    "task_run_id": "run-1",
-                    "case_id": "case-1",
-                    "task_submitted_at": NOW.isoformat(),
-                },
-            },
+            config=config,
         )
         assert result["status"] == "success"
         assert result["artifact_type"] == model.artifact_type
@@ -550,8 +568,19 @@ def test_all_typed_save_tools_override_model_identity_and_creation_time_in_bench
     }
     config = {
         "configurable": {"thread_id": "contract-thread"},
-        "metadata": {"task_run_id": "runtime-run", "case_id": "runtime-case"},
+        "metadata": {
+            "task_run_id": "runtime-run",
+            "case_id": "runtime-case",
+            "task_submitted_at": TOOL_EXECUTED_AT.isoformat(),
+        },
     }
+    if artifact_type == "ObservationPackage":
+        record_observation_tool_success(
+            tool_name="geodata_inspector_tool",
+            mode="full",
+            started_at_utc=observation_tool_started_at(),
+            config=config,
+        )
 
     saved = getattr(contract_tools, save_name)(payload, config=config)
 
@@ -996,11 +1025,21 @@ def test_handoff_tool_normalizes_nested_revision_request_identity(
     )
     config = {
         "configurable": {"thread_id": "contract-thread"},
-        "metadata": {"task_run_id": "runtime-run", "case_id": "runtime-case"},
+        "metadata": {
+            "task_run_id": "runtime-run",
+            "case_id": "runtime-case",
+            "task_submitted_at": NOW.isoformat(),
+        },
     }
     draft = observation.model_dump(mode="json")
-    for system_field in ("run_id", "task_id", "created_at_utc"):
+    for system_field in ("run_id", "task_id", "created_at_utc", "query_executed_at_utc"):
         draft.pop(system_field)
+    record_observation_tool_success(
+        tool_name="geodata_inspector_tool",
+        mode="full",
+        started_at_utc=observation_tool_started_at(),
+        config=config,
+    )
     saved = contract_tools.save_observation_package_tool.invoke(
         {"contract": draft},
         config=config,

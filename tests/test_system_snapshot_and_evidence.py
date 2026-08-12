@@ -26,6 +26,7 @@ from contracts.agent_packages import (
     ArtifactRecord,
     ContractStatus,
     EvidenceReport,
+    ObservationPackage,
     TaskPlan,
     canonical_json,
 )
@@ -33,6 +34,7 @@ from orchestration.run_evidence import (
     PACKAGE_ARTIFACT_INTEGRITY_MISMATCH,
     architecture_expectation_issues,
     collect_internal_evidence,
+    observation_timestamp_trace_issues,
     package_artifact_integrity_issues,
     validate_architecture_expectations,
     validate_internal_evidence,
@@ -277,6 +279,7 @@ def test_system_snapshot_code_manifest_binds_runtime_tool_and_toolkit_sources() 
         "benchmark_runtime/runner.py",
         "benchmark_runtime/telemetry.py",
         "orchestration/run_evidence.py",
+        "orchestration/observation_runtime.py",
         "orchestration/system_snapshot.py",
         "tools/geodata_inspector_tool.py",
         "packages/ntl_toolkit/src/ntl_toolkit/adapters/langchain/local.py",
@@ -927,6 +930,230 @@ def test_architecture_expectation_issues_fail_closed_with_stable_codes() -> None
     ) == ["INVALID_ARCHITECTURE_EXPECTATIONS"]
 
 
+def _observation_timestamp_fixture(
+    tmp_path: Path,
+    *,
+    query: datetime,
+) -> tuple[Path, dict[str, object], list[dict[str, object]]]:
+    outputs = tmp_path / "outputs"
+    contract_dir = outputs / "runs" / "run-observation" / "contracts"
+    contract_dir.mkdir(parents=True)
+    package = ObservationPackage(
+        artifact_id="observation-trace",
+        run_id="run-observation",
+        task_id="case-observation",
+        created_at_utc=datetime(2026, 8, 12, 12, 0, tzinfo=timezone.utc),
+        query_executed_at_utc=query,
+        status=ContractStatus.READY,
+        product={"collection_id": "staged/synthetic"},
+        validation={"status": "passed"},
+    )
+    (contract_dir / "observation_package__observation-trace.json").write_text(
+        canonical_json(package), encoding="utf-8"
+    )
+    evidence = collect_internal_evidence(outputs)
+    metadata = {
+        "task_run_id": "run-observation",
+        "case_id": "case-observation",
+        "lc_agent_name": "NTL_Data_Searcher",
+    }
+    trace: list[dict[str, object]] = [
+        {
+            "tool_call_id": "task-observation",
+            "tool_name": "task",
+            "status": "succeeded",
+            "result_observed": True,
+            "arguments": {"subagent_type": "NTL_Data_Searcher"},
+            "metadata": {
+                "task_run_id": "run-observation",
+                "case_id": "case-observation",
+                "lc_agent_name": "NTL_Engineer",
+            },
+            "ancestor_tool_call_ids": [],
+            "started_at": "2026-08-12T12:00:01+00:00",
+            "ended_at": "2026-08-12T12:00:09+00:00",
+        },
+        {
+            "tool_call_id": "inspect-observation",
+            "tool_name": "geodata_inspector_tool",
+            "status": "succeeded",
+            "result_observed": True,
+            "arguments": {"mode": "full"},
+            "metadata": metadata,
+            "ancestor_tool_call_ids": ["task-observation"],
+            "started_at": "2026-08-12T12:00:04+00:00",
+            "ended_at": "2026-08-12T12:00:05.500000+00:00",
+        },
+        {
+            "tool_call_id": "save-observation",
+            "tool_name": "save_observation_package",
+            "status": "succeeded",
+            "result_observed": True,
+            "arguments": {"contract": {"artifact_id": "observation-trace"}},
+            "metadata": metadata,
+            "ancestor_tool_call_ids": ["task-observation"],
+            "started_at": "2026-08-12T12:00:06+00:00",
+            "ended_at": "2026-08-12T12:00:06.500000+00:00",
+        },
+    ]
+    return outputs, evidence, trace
+
+
+def test_observation_timestamp_gate_accepts_system_time_inside_full_trace(
+    tmp_path: Path,
+) -> None:
+    outputs, evidence, trace = _observation_timestamp_fixture(
+        tmp_path,
+        query=datetime(2026, 8, 12, 12, 0, 5, tzinfo=timezone.utc),
+    )
+    assert observation_timestamp_trace_issues(
+        outputs,
+        evidence,
+        tool_trace=trace,
+        architecture_mode="full",
+        expected_run_id="run-observation",
+        expected_task_id="case-observation",
+        run_started_at="2026-08-12T12:00:00+00:00",
+        evidence_checked_at="2026-08-12T12:00:10+00:00",
+    ) == []
+
+
+def test_observation_timestamp_gate_fails_closed_for_future_model_time(
+    tmp_path: Path,
+) -> None:
+    outputs, evidence, trace = _observation_timestamp_fixture(
+        tmp_path,
+        query=datetime(2026, 8, 12, 13, 0, tzinfo=timezone.utc),
+    )
+    issues = observation_timestamp_trace_issues(
+        outputs,
+        evidence,
+        tool_trace=trace,
+        architecture_mode="full",
+        expected_run_id="run-observation",
+        expected_task_id="case-observation",
+        run_started_at="2026-08-12T12:00:00+00:00",
+        evidence_checked_at="2026-08-12T12:00:10+00:00",
+    )
+    assert {
+        "OBSERVATION_TIMESTAMP_OUTSIDE_RUN",
+        "OBSERVATION_TIMESTAMP_OUTSIDE_INSPECTOR",
+        "OBSERVATION_TIMESTAMP_AFTER_SAVE",
+    } <= set(issues)
+
+
+def test_observation_timestamp_gate_requires_data_searcher_descendant(
+    tmp_path: Path,
+) -> None:
+    outputs, evidence, trace = _observation_timestamp_fixture(
+        tmp_path,
+        query=datetime(2026, 8, 12, 12, 0, 5, tzinfo=timezone.utc),
+    )
+    trace[1]["ancestor_tool_call_ids"] = []
+    trace[2]["ancestor_tool_call_ids"] = []
+    issues = observation_timestamp_trace_issues(
+        outputs,
+        evidence,
+        tool_trace=trace,
+        architecture_mode="full",
+        expected_run_id="run-observation",
+        expected_task_id="case-observation",
+        run_started_at="2026-08-12T12:00:00+00:00",
+        evidence_checked_at="2026-08-12T12:00:10+00:00",
+    )
+    assert "MISSING_OBSERVATION_INSPECTOR_DESCENDANT_TRACE" in issues
+    assert "MISSING_OBSERVATION_SAVE_TRACE" in issues
+
+
+def test_observation_timestamp_gate_accepts_single_direct_and_rejects_delegation(
+    tmp_path: Path,
+) -> None:
+    outputs, evidence, trace = _observation_timestamp_fixture(
+        tmp_path,
+        query=datetime(2026, 8, 12, 12, 0, 5, tzinfo=timezone.utc),
+    )
+    direct = deepcopy(trace[1:])
+    for row in direct:
+        row["metadata"] = {
+            **row["metadata"],
+            "lc_agent_name": "NTL_Engineer",
+        }
+        row["ancestor_tool_call_ids"] = []
+    kwargs = {
+        "architecture_mode": "single_agent",
+        "expected_run_id": "run-observation",
+        "expected_task_id": "case-observation",
+        "run_started_at": "2026-08-12T12:00:00+00:00",
+        "evidence_checked_at": "2026-08-12T12:00:10+00:00",
+    }
+    assert observation_timestamp_trace_issues(
+        outputs, evidence, tool_trace=direct, **kwargs
+    ) == []
+    delegated = [trace[0], *direct]
+    assert "FORBIDDEN_OBSERVATION_DELEGATION" in observation_timestamp_trace_issues(
+        outputs, evidence, tool_trace=delegated, **kwargs
+    )
+
+
+def test_observation_timestamp_gate_uses_strict_run_bounds_and_exact_save_identity(
+    tmp_path: Path,
+) -> None:
+    outputs, evidence, trace = _observation_timestamp_fixture(
+        tmp_path,
+        query=datetime(2026, 8, 12, 12, 0, 5, tzinfo=timezone.utc),
+    )
+    strict_issues = observation_timestamp_trace_issues(
+        outputs,
+        evidence,
+        tool_trace=trace,
+        architecture_mode="full",
+        expected_run_id="run-observation",
+        expected_task_id="case-observation",
+        run_started_at="2026-08-12T12:00:05.500000+00:00",
+        evidence_checked_at="2026-08-12T12:00:10+00:00",
+    )
+    assert "OBSERVATION_TIMESTAMP_OUTSIDE_RUN" in strict_issues
+
+    trace[2]["arguments"] = {"contract": {"artifact_id": "different-package"}}
+    identity_issues = observation_timestamp_trace_issues(
+        outputs,
+        evidence,
+        tool_trace=trace,
+        architecture_mode="full",
+        expected_run_id="run-observation",
+        expected_task_id="case-observation",
+        run_started_at="2026-08-12T12:00:00+00:00",
+        evidence_checked_at="2026-08-12T12:00:10+00:00",
+    )
+    assert "AMBIGUOUS_OBSERVATION_SAVE_TRACE" in identity_issues
+
+
+def test_observation_timestamp_gate_rejects_wrong_scope_task_and_failed_inspector(
+    tmp_path: Path,
+) -> None:
+    outputs, evidence, trace = _observation_timestamp_fixture(
+        tmp_path,
+        query=datetime(2026, 8, 12, 12, 0, 5, tzinfo=timezone.utc),
+    )
+    trace[0]["metadata"] = {
+        **trace[0]["metadata"],
+        "task_run_id": "other-run",
+    }
+    trace[1]["status"] = "failed"
+    issues = observation_timestamp_trace_issues(
+        outputs,
+        evidence,
+        tool_trace=trace,
+        architecture_mode="full",
+        expected_run_id="run-observation",
+        expected_task_id="case-observation",
+        run_started_at="2026-08-12T12:00:00+00:00",
+        evidence_checked_at="2026-08-12T12:00:10+00:00",
+    )
+    assert "MISSING_OBSERVATION_INSPECTOR_TRACE" in issues
+    assert "MISSING_OBSERVATION_SAVE_TRACE" in issues
+
+
 def _worker_payload(tmp_path: Path, *, snapshot: dict[str, object]) -> dict[str, object]:
     workspace_root = tmp_path / "workspaces"
     workspace_root.mkdir(exist_ok=True)
@@ -1039,6 +1266,30 @@ def test_worker_runner_applies_case_architecture_expectations_to_tool_trace(
             "FORBIDDEN_DELEGATION_OBSERVED"
         ),
     }
+
+
+def test_worker_runner_fails_terminal_on_observation_timestamp_gate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = _worker_payload(tmp_path, snapshot={})
+    payload.pop("system_snapshot")
+    payload.pop("system_snapshot_sha256")
+    monkeypatch.setattr(
+        run_evidence_module,
+        "observation_timestamp_trace_issues",
+        lambda *_args, **_kwargs: ["OBSERVATION_TIMESTAMP_OUTSIDE_RUN"],
+    )
+    record = execute_worker_payload(
+        payload,
+        graph_invoker=lambda *_args: {"messages": [AIMessage(content="done")]},
+    )
+    assert record["terminal_state"] == "failed"
+    assert any(
+        error["code"] == "ARCHITECTURE_EVIDENCE_INCOMPLETE"
+        and "OBSERVATION_TIMESTAMP_OUTSIDE_RUN" in error["message"]
+        for error in record["errors"]
+    )
 
 
 def test_worker_runner_fails_closed_when_typed_package_artifact_drifts(

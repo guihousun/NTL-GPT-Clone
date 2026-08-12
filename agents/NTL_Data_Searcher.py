@@ -215,7 +215,9 @@ dispatch NTL_Analyst or NTL_Event_Tracker.
    sanity. Write only beneath `/outputs/`; `/shared/` is read-only.
 6. Produce an `ObservationPackage` with product, availability, AOI, grid,
    QA/scaling/NoData, acquisition route, preprocessing, source records,
-   fallback audit, validation, and analysis-ready artifact records.
+   fallback audit, validation, and analysis-ready artifact records. Do not
+   supply `query_executed_at_utc`; after a successful full geodata inspection,
+   the runtime injects the trusted completion time when the package is saved.
 
 ## Boundaries and terminal return
 

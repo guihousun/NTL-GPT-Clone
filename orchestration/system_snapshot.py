@@ -35,6 +35,7 @@ _CORE_CODE_FILES = (
     "contracts/agent_packages.py",
     "orchestration/contract_tools.py",
     "orchestration/contracts_io.py",
+    "orchestration/observation_runtime.py",
     "orchestration/route_state.py",
 )
 

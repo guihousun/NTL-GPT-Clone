@@ -205,7 +205,14 @@ def test_specialist_prompts_enforce_typed_return_and_no_direct_dispatch() -> Non
 
 
 def test_all_formal_tool_schemas_hide_system_managed_identity_fields() -> None:
-    forbidden = {"run_id", "task_id", "case_id", "created_at_utc", "thread_id"}
+    forbidden = {
+        "run_id",
+        "task_id",
+        "case_id",
+        "created_at_utc",
+        "query_executed_at_utc",
+        "thread_id",
+    }
     groups = (engineer_tools, data_searcher_tools, analyst_tools, event_tracker_tools)
     for collection in groups:
         for candidate in collection:

@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
 import numpy as np
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import StructuredTool
 from pydantic.v1 import BaseModel, Field
 
@@ -26,6 +27,10 @@ except Exception:  # noqa: BLE001
 import storage_manager as sm_module
 from ntl_toolkit.adapters.langchain import raster_report as _core_raster_report
 from ntl_toolkit.adapters.langchain import vector_report as _core_vector_report
+from orchestration.observation_runtime import (
+    observation_tool_started_at,
+    record_observation_tool_success,
+)
 
 sm = sm_module.storage_manager
 DEFAULT_GEE_PROJECT = "empyrean-caster-430308-m2"
@@ -336,7 +341,7 @@ def _gee_asset_report(asset_id: str, mode: Literal["basic", "full"] = "basic") -
     return report
 
 
-def inspect_geospatial_assets(
+def _inspect_geospatial_assets_core(
     raster_paths: Optional[List[str]] = None,
     vector_paths: Optional[List[str]] = None,
     gee_assets: Optional[List[str]] = None,
@@ -507,18 +512,130 @@ def inspect_geospatial_assets(
     return json.dumps(report, indent=2, ensure_ascii=False)
 
 
+def _inspection_report_is_successful(
+    result: str,
+    *,
+    requested_target_count: int,
+    mode: Literal["basic", "full"],
+) -> bool:
+    """Return whether a report is strong enough to become runtime evidence."""
+
+    if requested_target_count <= 0:
+        return False
+    try:
+        report = json.loads(result)
+    except (TypeError, json.JSONDecodeError):
+        return False
+    if not isinstance(report, dict) or report.get("mode") != mode:
+        return False
+    groups = (
+        report.get("raster_reports"),
+        report.get("vector_reports"),
+        report.get("gee_reports"),
+    )
+    if not all(isinstance(group, list) for group in groups):
+        return False
+    items = [item for group in groups for item in group]
+    if len(items) != requested_target_count or any(
+        not isinstance(item, dict)
+        or not item.get("exists")
+        or not item.get("readable")
+        or item.get("error")
+        for item in items
+    ):
+        return False
+    summary = report.get("summary")
+    if not isinstance(summary, dict):
+        return False
+    if any(int(summary.get(key, -1)) != 0 for key in ("raster_fail", "vector_fail", "gee_fail")):
+        return False
+    if sum(int(summary.get(key, 0)) for key in ("raster_ok", "vector_ok", "gee_ok")) <= 0:
+        return False
+    if mode != "full":
+        return True
+
+    for raster in report["raster_reports"]:
+        stats = raster.get("band1_stats")
+        if (
+            not isinstance(stats, dict)
+            or int(stats.get("count_valid") or 0) <= 0
+            or any(stats.get(key) is None for key in ("min", "max", "mean", "std"))
+        ):
+            return False
+    for vector in report["vector_reports"]:
+        if int(vector.get("feature_count") or 0) <= 0 or not isinstance(
+            vector.get("sample_records"), list
+        ):
+            return False
+    for gee in report["gee_reports"]:
+        asset_type = gee.get("asset_type")
+        if asset_type in {"Image", "ImageCollection"}:
+            if not isinstance(gee.get("band_names"), list) or not gee["band_names"]:
+                return False
+        elif asset_type == "FeatureCollection":
+            if int(gee.get("collection_size") or 0) <= 0 or not isinstance(
+                gee.get("sample_properties"), list
+            ):
+                return False
+        else:
+            return False
+    return True
+
+
+def inspect_geospatial_assets(
+    raster_paths: Optional[List[str]] = None,
+    vector_paths: Optional[List[str]] = None,
+    gee_assets: Optional[List[str]] = None,
+    mode: Literal["basic", "full"] = "full",
+    sample_pixels: int = 0,
+    dedupe_mode: DedupeMode = "none",
+    workspace_lookup: Literal["auto", "inputs", "outputs"] = "auto",
+    include_cross_checks: bool = True,
+    config: Optional[RunnableConfig] = None,
+) -> str:
+    """Inspect assets and register a system-owned success timestamp."""
+
+    started_at = observation_tool_started_at()
+    result = _inspect_geospatial_assets_core(
+        raster_paths=raster_paths,
+        vector_paths=vector_paths,
+        gee_assets=gee_assets,
+        mode=mode,
+        sample_pixels=sample_pixels,
+        dedupe_mode=dedupe_mode,
+        workspace_lookup=workspace_lookup,
+        include_cross_checks=include_cross_checks,
+    )
+    if _inspection_report_is_successful(
+        result,
+        requested_target_count=sum(
+            len(paths or []) for paths in (raster_paths, vector_paths, gee_assets)
+        ),
+        mode=mode,
+    ):
+        record_observation_tool_success(
+            tool_name="geodata_inspector_tool",
+            mode=mode,
+            started_at_utc=started_at,
+            config=config,
+        )
+    return result
+
+
 def inspect_geospatial_assets_quick(
     raster_paths: Optional[List[str]] = None,
     vector_paths: Optional[List[str]] = None,
     gee_assets: Optional[List[str]] = None,
     dedupe_mode: DedupeMode = "none",
     workspace_lookup: Literal["auto", "inputs", "outputs"] = "auto",
+    config: Optional[RunnableConfig] = None,
 ) -> str:
     """
     Fast availability check for Data_Searcher:
     returns existence/readability + basic metadata only.
     """
-    return inspect_geospatial_assets(
+    started_at = observation_tool_started_at()
+    result = _inspect_geospatial_assets_core(
         raster_paths=raster_paths,
         vector_paths=vector_paths,
         gee_assets=gee_assets,
@@ -528,6 +645,20 @@ def inspect_geospatial_assets_quick(
         workspace_lookup=workspace_lookup,
         include_cross_checks=False,
     )
+    if _inspection_report_is_successful(
+        result,
+        requested_target_count=sum(
+            len(paths or []) for paths in (raster_paths, vector_paths, gee_assets)
+        ),
+        mode="basic",
+    ):
+        record_observation_tool_success(
+            tool_name="geodata_quick_check_tool",
+            mode="basic",
+            started_at_utc=started_at,
+            config=config,
+        )
+    return result
 
 
 geodata_inspector_tool = StructuredTool.from_function(

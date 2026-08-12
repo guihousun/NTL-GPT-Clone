@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from datetime import datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import stat
 from typing import Any, Mapping
@@ -65,6 +66,7 @@ _PACKAGE_ISSUE_NAMES = {
     "EvidenceReport": "EVIDENCE_REPORT",
 }
 PACKAGE_ARTIFACT_INTEGRITY_MISMATCH = "PACKAGE_ARTIFACT_INTEGRITY_MISMATCH"
+_OBSERVATION_TRACE_TOLERANCE = timedelta(seconds=2)
 _EVALUATOR_ONLY_KEYS = frozenset(
     {
         "gold",
@@ -859,6 +861,248 @@ def architecture_expectation_issues(
     return list(dict.fromkeys(issues))
 
 
+def _utc_datetime(value: Any) -> datetime | None:
+    """Parse an offset-aware timestamp and normalize it to UTC."""
+
+    if isinstance(value, datetime):
+        parsed = value
+    elif value not in (None, ""):
+        try:
+            parsed = datetime.fromisoformat(str(value).strip().replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    else:
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def observation_timestamp_trace_issues(
+    outputs_dir: str | Path,
+    value: Any,
+    *,
+    tool_trace: Any,
+    architecture_mode: str,
+    expected_run_id: str,
+    expected_task_id: str,
+    run_started_at: Any,
+    evidence_checked_at: Any,
+) -> list[str]:
+    """Reconcile every ready ObservationPackage with trusted tool telemetry.
+
+    The package timestamp is injected in-process, but this independent post-run
+    gate proves that it also falls inside the recorded successful full inspector
+    call and precedes the matching package save.  Package bodies are reopened
+    only from the already validated current-run inventory.
+    """
+
+    try:
+        evidence = validate_internal_evidence(value)
+        run_start = _utc_datetime(run_started_at)
+        gate_end = _utc_datetime(evidence_checked_at)
+        if run_start is None or gate_end is None or gate_end < run_start:
+            raise ValueError("invalid run interval")
+    except ValueError:
+        return ["INVALID_OBSERVATION_TIMESTAMP_EVIDENCE"]
+
+    packages = [
+        row
+        for row in evidence["packages"]
+        if row.get("artifact_type") == "ObservationPackage"
+        and row.get("status") == "ready"
+        and row.get("run_id") == expected_run_id
+        and row.get("task_id") == expected_task_id
+    ]
+    if not packages:
+        return []
+
+    trace = [row for row in tool_trace if isinstance(row, Mapping)] if isinstance(tool_trace, list) else []
+    if architecture_mode not in _ARCHITECTURE_MODES:
+        return ["INVALID_OBSERVATION_TIMESTAMP_EVIDENCE"]
+    expected_role = "NTL_Data_Searcher" if architecture_mode == "full" else "NTL_Engineer"
+
+    def _current_scope(row: Mapping[str, Any]) -> bool:
+        metadata = row.get("metadata")
+        return (
+            isinstance(metadata, Mapping)
+            and metadata.get("task_run_id") == expected_run_id
+            and metadata.get("case_id") == expected_task_id
+        )
+
+    current_tasks = [
+        row for row in trace if row.get("tool_name") == "task" and _current_scope(row)
+    ]
+    successful_tasks = [
+        row
+        for row in current_tasks
+        if row.get("status") == "succeeded"
+        and row.get("result_observed") is True
+        and isinstance(row.get("arguments"), Mapping)
+        and row["arguments"].get("subagent_type") == "NTL_Data_Searcher"
+        and isinstance(row.get("metadata"), Mapping)
+        and row["metadata"].get("lc_agent_name") == "NTL_Engineer"
+    ]
+    task_ids = {
+        str(row.get("tool_call_id"))
+        for row in successful_tasks
+        if str(row.get("tool_call_id") or "").strip()
+    }
+
+    inspectors = [
+        row
+        for row in trace
+        if row.get("tool_name") == "geodata_inspector_tool"
+        and row.get("status") == "succeeded"
+        and row.get("result_observed") is True
+        and isinstance(row.get("arguments"), Mapping)
+        and row["arguments"].get("mode") == "full"
+        and _current_scope(row)
+    ]
+    role_inspectors = [
+        row
+        for row in inspectors
+        if isinstance(row.get("metadata"), Mapping)
+        and row["metadata"].get("lc_agent_name") == expected_role
+    ]
+    if architecture_mode == "full":
+        role_inspectors = [
+            row
+            for row in role_inspectors
+            if task_ids.intersection(str(item) for item in (row.get("ancestor_tool_call_ids") or []))
+        ]
+
+    saves = [
+        row
+        for row in trace
+        if row.get("tool_name") == "save_observation_package"
+        and row.get("status") == "succeeded"
+        and row.get("result_observed") is True
+        and _current_scope(row)
+        and isinstance(row.get("metadata"), Mapping)
+        and row["metadata"].get("lc_agent_name") == expected_role
+    ]
+    if architecture_mode == "full":
+        saves = [
+            row
+            for row in saves
+            if task_ids.intersection(str(item) for item in (row.get("ancestor_tool_call_ids") or []))
+        ]
+
+    issues: list[str] = []
+    if architecture_mode == "single_agent" and current_tasks:
+        issues.append("FORBIDDEN_OBSERVATION_DELEGATION")
+    if not inspectors:
+        issues.append("MISSING_OBSERVATION_INSPECTOR_TRACE")
+    elif not role_inspectors:
+        issues.append(
+            "MISSING_OBSERVATION_INSPECTOR_DESCENDANT_TRACE"
+            if architecture_mode == "full"
+            else "INVALID_OBSERVATION_INSPECTOR_ROLE"
+        )
+    if not saves:
+        issues.append("MISSING_OBSERVATION_SAVE_TRACE")
+
+    outputs_root = Path(outputs_dir).resolve(strict=False)
+    for identity in packages:
+        relative = str(identity.get("relative_path") or "")
+        try:
+            logical = PurePosixPath(relative)
+            if not relative.startswith("outputs/") or logical.is_absolute():
+                raise ValueError("unsafe package path")
+            path = (outputs_root / logical.relative_to("outputs")).resolve(strict=True)
+            if (
+                not path.is_file()
+                or _linklike(path)
+                or path.stat().st_nlink > 1
+                or not _inside(path, outputs_root)
+                or _sha256(path) != identity.get("sha256")
+            ):
+                raise ValueError("invalid package identity")
+            package = _validate_contract_payload(json.loads(path.read_text(encoding="utf-8")))
+            if not isinstance(package, ObservationPackage):
+                raise ValueError("wrong package type")
+            query = _utc_datetime(package.query_executed_at_utc)
+            created = _utc_datetime(package.created_at_utc)
+            if query is None or created is None:
+                raise ValueError("invalid package timestamp")
+        except (OSError, UnicodeError, ValueError, TypeError, json.JSONDecodeError):
+            issues.append("INVALID_OBSERVATION_TIMESTAMP_EVIDENCE")
+            continue
+
+        if query < created:
+            issues.append("OBSERVATION_TIMESTAMP_BEFORE_CREATED")
+        if query < run_start or query > gate_end:
+            issues.append("OBSERVATION_TIMESTAMP_OUTSIDE_RUN")
+
+        inspector_matches: list[Mapping[str, Any]] = []
+        for row in role_inspectors:
+            started = _utc_datetime(row.get("started_at"))
+            ended = _utc_datetime(row.get("ended_at"))
+            if (
+                started is not None
+                and ended is not None
+                and started <= ended
+                and run_start <= started
+                and ended <= gate_end
+                and started <= query <= ended + _OBSERVATION_TRACE_TOLERANCE
+            ):
+                inspector_matches.append(row)
+        if role_inspectors and len(inspector_matches) != 1:
+            issues.append("OBSERVATION_TIMESTAMP_OUTSIDE_INSPECTOR")
+
+        package_saves = [
+            row
+            for row in saves
+            if isinstance(row.get("arguments"), Mapping)
+            and isinstance(row["arguments"].get("contract"), Mapping)
+            and row["arguments"]["contract"].get("artifact_id") == package.artifact_id
+        ]
+        if len(package_saves) != 1:
+            issues.append("AMBIGUOUS_OBSERVATION_SAVE_TRACE")
+        save_matches: list[Mapping[str, Any]] = []
+        for row in package_saves:
+            started = _utc_datetime(row.get("started_at"))
+            ended = _utc_datetime(row.get("ended_at"))
+            if (
+                started is None
+                or ended is None
+                or started > ended
+                or started < run_start
+                or ended > gate_end
+            ):
+                continue
+            if query <= started:
+                save_matches.append(row)
+        if package_saves and len(save_matches) != 1:
+            issues.append("OBSERVATION_TIMESTAMP_AFTER_SAVE")
+
+        if len(inspector_matches) == 1 and len(save_matches) == 1:
+            inspector = inspector_matches[0]
+            save = save_matches[0]
+            inspector_end = _utc_datetime(inspector.get("ended_at"))
+            save_start = _utc_datetime(save.get("started_at"))
+            if inspector_end is None or save_start is None or inspector_end > save_start:
+                issues.append("MISSING_OBSERVATION_INSPECTOR_SAVE_PAIR")
+            if architecture_mode == "full":
+                common_task_ids = (
+                    set(str(item) for item in (inspector.get("ancestor_tool_call_ids") or []))
+                    .intersection(str(item) for item in (save.get("ancestor_tool_call_ids") or []))
+                    .intersection(task_ids)
+                )
+                if len(common_task_ids) != 1:
+                    issues.append("MISSING_OBSERVATION_INSPECTOR_SAVE_PAIR")
+        elif architecture_mode == "full" and (inspector_matches or save_matches):
+            if not (
+                "OBSERVATION_TIMESTAMP_OUTSIDE_INSPECTOR" in issues
+                or "AMBIGUOUS_OBSERVATION_SAVE_TRACE" in issues
+                or "OBSERVATION_TIMESTAMP_AFTER_SAVE" in issues
+            ):
+                issues.append("MISSING_OBSERVATION_INSPECTOR_SAVE_PAIR")
+
+    return list(dict.fromkeys(issues))
+
+
 def canonical_evidence_report_answer(
     outputs_dir: str | Path,
     value: Any,
@@ -1006,6 +1250,7 @@ __all__ = [
     "canonical_evidence_report_answer",
     "collect_internal_evidence",
     "minimum_architecture_evidence_issues",
+    "observation_timestamp_trace_issues",
     "package_artifact_integrity_issues",
     "validate_architecture_expectations",
     "validate_internal_evidence",

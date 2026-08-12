@@ -14,6 +14,8 @@ the formal 200-task release and not manuscript results.
 - `SMOKE-OBSERVATION-001` checks the Data Searcher route over a checksum-bound
   synthetic 2x2 GeoTIFF. It requires a full local inspection and ready
   ObservationPackage while forbidding all live retrieval and download tools.
+  Its query timestamp is not model-authored: the runtime records the successful
+  full inspector completion time and injects it when the package is saved.
 
 Event fixture integrity anchors:
 
