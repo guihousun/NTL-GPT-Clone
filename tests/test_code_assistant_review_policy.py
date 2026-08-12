@@ -6,15 +6,18 @@ from agents.NTL_Engineer import system_prompt_text
 from tools import _GROUPS
 
 
-def test_engineer_has_direct_script_execution_tools() -> None:
-    engineer_tools = set(_GROUPS["Engineer_tools"])
+def test_formal_engineer_does_not_have_direct_script_execution_tools() -> None:
+    engineer_tools = set(_GROUPS["engineer_tools"])
+    analyst_tools = set(_GROUPS["analyst_tools"])
 
-    assert "execute_geospatial_script_tool" in engineer_tools
-    assert "GeoCode_COT_Validation_tool" in engineer_tools
+    assert "execute_geospatial_script_tool" not in engineer_tools
+    assert "GeoCode_COT_Validation_tool" not in engineer_tools
+    assert "execute_geospatial_script_tool" in analyst_tools
+    assert "GeoCode_COT_Validation_tool" not in analyst_tools
 
 
 def test_engineer_has_read_only_geodata_inspection_tools() -> None:
-    engineer_tools = set(_GROUPS["Engineer_tools"])
+    engineer_tools = set(_GROUPS["engineer_tools"])
 
     assert "geodata_inspector_tool" in engineer_tools
     assert "geodata_quick_check_tool" in engineer_tools

@@ -20,7 +20,7 @@ def test_official_vnp46a2_tool_is_registered_for_runtime_agents() -> None:
     name = "official_vnp46a2_h5_country_mosaic_tool"
     assert name in _EXPORTS
     assert name in _GROUPS["data_searcher_tools"]
-    assert name in _GROUPS["Engineer_tools"]
+    assert name not in _GROUPS["engineer_tools"]
     assert name in _GROUPS["specialized_tool_catalog"]
 
 

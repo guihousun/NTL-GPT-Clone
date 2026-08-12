@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import hashlib
 import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -43,7 +44,6 @@ def code_runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
     storage_manager = importlib.reload(storage_manager)
     module = importlib.reload(NTL_Code_generation)
-    monkeypatch.setattr(module, "_archive_success_script", lambda *args, **kwargs: {"archived": False})
     token = storage_manager.current_thread_id.set("contract-v2-test")
     try:
         yield module, storage_manager
@@ -77,6 +77,44 @@ def test_contract_v1_is_rejected_without_conversion(code_runtime) -> None:
     assert Path(result["failure_artifacts"]["manifest_path"]).exists()
 
 
+def test_invalid_contract_returns_compact_exact_literal_repair_guidance(code_runtime) -> None:
+    module, storage_module = code_runtime
+    invalid = _contract()
+    invalid["schema_version"] = invalid.pop("schema")
+    script = _script(invalid, "print('must not execute')")
+    _save_script(storage_module, "wrong_schema_key.py", script)
+
+    result = json.loads(module.execute_geospatial_script("wrong_schema_key.py"))
+
+    assert result["status"] == "fail"
+    assert result["error_type"] == "ScriptContractError"
+    assert "code" not in result
+    assert result["code_sha256"]
+    assert result["code_bytes"] == len(script.encode("utf-8"))
+    assert '"schema": "ntl.script.contract.v2"' in result["required_literal_assignment"]
+    assert result["schema_key_warning"] == "Use 'schema'; 'schema_version' is invalid."
+    assert result["required_contract_fields"] == [
+        "schema",
+        "objective",
+        "input_manifest",
+        "method_steps",
+        "parameters",
+        "output_manifest",
+        "validation_checks",
+        "failure_gates",
+        "execution",
+    ]
+
+
+def test_analyst_skill_contains_the_literal_v2_contract_shape() -> None:
+    skill_path = Path(__file__).resolve().parents[1] / ".ntl-gpt" / "skills" / "analyst" / "code-execution-validation" / "SKILL.md"
+    skill = skill_path.read_text(encoding="utf-8")
+
+    assert "NTL_SCRIPT_CONTRACT = {" in skill
+    assert '"schema": "ntl.script.contract.v2"' in skill
+    assert "The schema key is `schema`, not `schema_version`" in skill
+
+
 def test_valid_v2_script_executes_and_writes_manifest(code_runtime) -> None:
     module, storage_module = code_runtime
     script = _script(
@@ -93,6 +131,20 @@ def test_valid_v2_script_executes_and_writes_manifest(code_runtime) -> None:
     assert result["status"] == "success"
     assert result["contract_validation"]["schema"] == "ntl.script.contract.v2"
     assert result["contract_output_audit"]["pass"] is True
+    script_path = Path(storage_module.storage_manager.resolve_output_path("simple_task.py"))
+    assert result["script_artifact"] == {
+        "path": "outputs/simple_task.py",
+        "sha256": hashlib.sha256(script_path.read_bytes()).hexdigest(),
+        "bytes": script_path.stat().st_size,
+        "media_type": "text/x-python",
+        "role": "analysis_script",
+    }
+    assert result["code_guide_archive"]["archive_script_path"].startswith(
+        "/memories/code_guide_runtime/"
+    )
+    assert "contract-v2-test" not in json.dumps(
+        result["code_guide_archive"], sort_keys=True
+    )
     manifest_path = Path(result["execution_manifest"]["manifest_path"])
     assert manifest_path.name == "simple_task.manifest.json"
     assert manifest_path.exists()

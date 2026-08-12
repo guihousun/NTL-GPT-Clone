@@ -86,49 +86,17 @@ def Strip_removal(img_input_path: str, img_output_path: str, theta, threshold, m
     moban2 = RGB_Stripe_loc(I2, theta, threshold=threshold)
     moban3 = RGB_Stripe_loc(I3, theta, threshold=threshold)
 
-    # 鍘婚櫎娼滃湪鏉″甫鍍忓厓涓殑鏉″甫 \ Removing Stripes from Potential Striped Pixels
-    m1 = moban1 * I1
-    m2 = moban2 * I2
-    m3 = moban3 * I3
+    # Retain only Radon detections that are also candidate dark-stripe pixels.
+    # A union mask is used so that a stripe detected in one RGB channel is
+    # restored consistently in every channel.
+    m1 = np.asarray(moban1, dtype=bool) & np.asarray(I1, dtype=bool)
+    m2 = np.asarray(moban2, dtype=bool) & np.asarray(I2, dtype=bool)
+    m3 = np.asarray(moban3, dtype=bool) & np.asarray(I3, dtype=bool)
+    stripe_mask = np.logical_or.reduce((m1, m2, m3))
 
-    # 寰楀埌涓変釜閫氶亾鎵€鏈夋潯甯︾殑浣嶇疆 \ Obtain the positions of all stripes in the three channels
-    m = np.logical_not(m1) * np.logical_not(m2) * np.logical_not(m3)
-
-    # 瀵瑰師濮嬮€氶亾杩涜鏉″甫鍘婚櫎 \ Striping the original channel
-    b1 = m * band1
-    b2 = m * band2
-    b3 = m * band3
-
-    # 瀵瑰幓闄ょ殑鍍忓厓杩涜8鍍忓厓宸€硷紝浣跨敤涓夊垎浣嶆暟杩涜鎻掑€?\ Perform an 8-pixel difference on the removed pixels and interpolate using the third quantile
-    if method == 'median':
-        for i in range(h - 2):
-            for j in range(w - 2):
-                if b1[i, j] and b2[i, j] and b3[i, j] == 7:
-                    b1[i, j] = np.median([b1[i - 1, j - 1], b1[i, j - 1], b1[i + 1, j - 1], b1[i - 1, j], b1[i + 1, j],
-                                          b1[i + 1, j - 1], b1[i, j + 1], b1[i + 1, j + 1], b1[i - 1, j + 2],
-                                          b1[i, j + 2], b1[i + 1, j + 2]])
-                    b2[i, j] = np.median([b2[i - 1, j - 1], b2[i, j - 1], b2[i + 1, j - 1], b2[i - 1, j], b2[i + 1, j],
-                                          b2[i + 1, j - 1], b2[i, j + 1], b2[i + 1, j + 1], b2[i - 1, j + 2],
-                                          b2[i, j + 2], b2[i + 1, j + 2]])
-                    b3[i, j] = np.median([b3[i - 1, j - 1], b3[i, j - 1], b3[i + 1, j - 1], b3[i - 1, j], b3[i + 1, j],
-                                          b3[i + 1, j - 1], b3[i, j + 1], b3[i + 1, j + 1], b3[i - 1, j + 2],
-                                          b3[i, j + 2], b3[i + 1, j + 2]])
-    else:
-        for i in range(h - 2):
-            for j in range(w - 2):
-                if b1[i, j] and b2[i, j] and b3[i, j] == 7:
-                    b1[i, j] = np.percentile(
-                        [b1[i - 1, j - 1], b1[i, j - 1], b1[i + 1, j - 1], b1[i - 1, j], b1[i + 1, j],
-                         b1[i + 1, j - 1], b1[i, j + 1], b1[i + 1, j + 1], b1[i - 1, j + 2], b1[i, j + 2],
-                         b1[i + 1, j + 2]], 75)
-                    b2[i, j] = np.percentile(
-                        [b2[i - 1, j - 1], b2[i, j - 1], b2[i + 1, j - 1], b2[i - 1, j], b2[i + 1, j],
-                         b2[i + 1, j - 1], b2[i, j + 1], b2[i + 1, j + 1], b2[i - 1, j + 2], b2[i, j + 2],
-                         b2[i + 1, j + 2]], 75)
-                    b3[i, j] = np.percentile(
-                        [b3[i - 1, j - 1], b3[i, j - 1], b3[i + 1, j - 1], b3[i - 1, j], b3[i + 1, j],
-                         b3[i + 1, j - 1], b3[i, j + 1], b3[i + 1, j + 1], b3[i - 1, j + 2], b3[i, j + 2],
-                         b3[i + 1, j + 2]], 75)
+    b1 = _interpolate_detected_stripes(band1, stripe_mask, method)
+    b2 = _interpolate_detected_stripes(band2, stripe_mask, method)
+    b3 = _interpolate_detected_stripes(band3, stripe_mask, method)
 
     # 澶勭悊寮傚父鍍忓厓 \ Handling abnormal pixels
     for i in range(h):
@@ -157,37 +125,76 @@ def Strip_removal(img_input_path: str, img_output_path: str, theta, threshold, m
     write_img(output_path, im_proj, im_Geotrans, out)
 
 
+def _interpolate_detected_stripes(band, stripe_mask, method):
+    """Restore detected pixels from nearby non-stripe observations."""
+
+    restored = np.array(band, copy=True)
+    for row, col in np.argwhere(stripe_mask):
+        row_min = max(0, int(row) - 2)
+        row_max = min(restored.shape[0], int(row) + 3)
+        col_min = max(0, int(col) - 2)
+        col_max = min(restored.shape[1], int(col) + 3)
+        window = np.asarray(band[row_min:row_max, col_min:col_max])
+        window_mask = stripe_mask[row_min:row_max, col_min:col_max]
+        valid = (~window_mask) & np.isfinite(window) & (window >= 7)
+        values = window[valid]
+        if values.size == 0:
+            fill_value = 7.0
+        elif method == "median":
+            fill_value = float(np.median(values))
+        else:
+            fill_value = float(np.percentile(values, 75))
+        if np.issubdtype(restored.dtype, np.integer):
+            fill_value = np.rint(fill_value)
+        restored[row, col] = fill_value
+    return restored
+
+
 def RGB_Stripe_loc(I, theta, threshold):
-    a = np.rint((max(theta) - min(theta) / 0.01))  # 璁剧疆瑙掑害鑼冨洿 \ Set Angle Range
-    R = radon(I, theta=theta,
-              preserve_range=True)  # 璁＄畻鍚勮搴︽柟鍚戜笅鏉″甫娼滃湪鍍忓厓妯℃澘鐨勭Н鍒嗗€?\ Calculate the integration value of the potential pixel template of the strip in each angular direction
-    h, w = I.shape
-    si = R.size / a
-    dd = I
-    moban = np.zeros((h, w))
-    ij = 0
+    """Locate linear stripe candidates from peaks in a Radon sinogram."""
 
-    while ij < a:
-        [loc, peaks] = find_peaks(R[:, ij],
-                                  threshold=threshold)  # 鏍规嵁涓€瀹氱殑闃堝€艰寖鍥村鎵剧Н鍒嗗嘲鍊?\ Find the integration peak value according to a certain threshold range
-        # 鎵惧嚭婊¤冻鏉′欢宄板€肩殑鏉″甫
-        for iw in range(len(loc)):
-            k = np.tan((theta[ij] - 90) * np.pi / 180)
-            for j in range(h):
-                xx = np.int(loc[iw] + j)
-                yy = np.int(k * j)
-                if loc[iw] + j < w and yy + 6 < h:
-                    moban[yy, xx] = 1
-                    moban[yy + 1, xx] = 1
-                    moban[yy + 2, xx] = 1
-                    moban[yy + 3, xx] = 1
-                    moban[yy + 4, xx] = 1
-                    moban[yy + 5, xx] = 1
-                    moban[yy + 6, xx] = 1
+    image = np.asarray(I)
+    theta_values = np.asarray(theta, dtype=float)
+    if image.ndim != 2:
+        raise ValueError("stripe candidate image must be two-dimensional")
+    if theta_values.ndim != 1 or theta_values.size == 0:
+        raise ValueError("theta must contain at least one angle")
+    if not np.all(np.isfinite(theta_values)):
+        raise ValueError("theta contains a non-finite angle")
 
-        ij += 1
+    # circle=False retains the full rectangular raster instead of silently
+    # discarding its corners.  The number of angle columns is authoritative;
+    # it is not derived from the numeric angle span.
+    sinogram = radon(
+        image,
+        theta=theta_values,
+        preserve_range=True,
+        circle=False,
+    )
+    height, width = image.shape
+    row_coordinates = np.arange(height, dtype=float) - height // 2
+    col_coordinates = np.arange(width, dtype=float) - width // 2
+    x_grid, y_grid = np.meshgrid(col_coordinates, row_coordinates)
+    detector_center = sinogram.shape[0] // 2
+    stripe_mask = np.zeros((height, width), dtype=np.uint8)
 
-    return moban
+    for angle_index in range(sinogram.shape[1]):
+        peak_indices, _ = find_peaks(
+            sinogram[:, angle_index],
+            threshold=threshold,
+        )
+        if not peak_indices.size:
+            continue
+        angle_radians = np.deg2rad(theta_values[angle_index])
+        detector_coordinate = (
+            detector_center
+            + x_grid * np.cos(angle_radians)
+            - y_grid * np.sin(angle_radians)
+        )
+        for peak_index in peak_indices:
+            stripe_mask[np.abs(detector_coordinate - peak_index) <= 3.0] = 1
+
+    return stripe_mask
 
 
 # 杈撳嚭鍥惧儚 \ Output Image
@@ -214,10 +221,16 @@ def write_img(filename, im_proj, im_geotrans, im_data):
     dataset.SetProjection(im_proj)  # 鍐欏叆鎶曞奖 \ Write Projection
 
     if im_bands == 1:
-        dataset.GetRasterBand(1).WriteArray(im_data)  # 鍐欏叆鏁扮粍鏁版嵁 \ Write array data
+        output_band = dataset.GetRasterBand(1)
+        output_band.WriteArray(im_data)  # 鍐欏叆鏁扮粍鏁版嵁 \ Write array data
+        output_band.SetNoDataValue(0)
     else:
         for i in range(im_bands):
-            dataset.GetRasterBand(i + 1).WriteArray(im_data[i])
+            output_band = dataset.GetRasterBand(i + 1)
+            output_band.WriteArray(im_data[i])
+            output_band.SetNoDataValue(0)
+            if im_bands == 3:
+                output_band.SetDescription(("R", "G", "B")[i])
 
     del dataset
 
@@ -260,6 +273,9 @@ def run_strip_removal(
     if method not in {"median", "percentile"}:
         return "Error: Invalid method. Choose 'median' or 'percentile'."
 
+    if start_angle >= end_angle:
+        return "Error: start_angle must be smaller than end_angle."
+
     theta = np.arange(start_angle, end_angle)
     img_input_path = storage_manager.resolve_input_path(img_input_filename)
     img_output_path = storage_manager.resolve_output_path(img_output_filename)
@@ -268,7 +284,15 @@ def run_strip_removal(
         return f"Error: Input image not found at {img_input_path}"
 
     try:
-        Strip_removal(img_input_path, img_output_path, theta=theta, threshold=threshold, method=method)
+        # Strip_removal owns the workspace resolution step.  Passing the
+        # original relative names avoids resolving an absolute path twice.
+        Strip_removal(
+            img_input_filename,
+            img_output_filename,
+            theta=theta,
+            threshold=threshold,
+            method=method,
+        )
         return f"Striping removed. Output saved to {img_output_path}"
     except Exception as e:
         return f"Error during strip removal: {str(e)}"
@@ -940,7 +964,9 @@ class DMSPEVIPreprocessInput(BaseModel):
 def preprocess_dmsp_evi(dmsp_tif: str, evi_tif: str, output_tif: str) -> str:
     """
     Preprocess DMSP and EVI annual composite images using EANTLI transformation.
-    Implements EANTLI = [(1 + (nNTL - EVI)) / (1 - (nNTL - EVI))] * NTL.
+    Implements EANTLI = [(1 + (nNTL - EVI)) / (1 - (nNTL - EVI))] * NTL,
+    with nNTL fixed to DMSP stable-lights DN / 63 and EVI below 0.01
+    excluded from the valid domain.
     """
     try:
         # Resolve paths via storage_manager
@@ -950,46 +976,83 @@ def preprocess_dmsp_evi(dmsp_tif: str, evi_tif: str, output_tif: str) -> str:
 
         # Ensure input files exist
         if not os.path.exists(abs_dmsp_path):
-            return f"鉂?Error: DMSP file not found at 'inputs/{dmsp_tif}'"
+            return f"Error: DMSP file not found at 'inputs/{dmsp_tif}'"
         if not os.path.exists(abs_evi_path):
-            return f"鉂?Error: EVI file not found at 'inputs/{evi_tif}'"
+            return f"Error: EVI file not found at 'inputs/{evi_tif}'"
 
         # Read DMSP NTL raster
         with rasterio.open(abs_dmsp_path) as dmsp_src:
             ntl = dmsp_src.read(1).astype(np.float32)
-            profile = dmsp_src.profile
+            profile = dmsp_src.profile.copy()
+            dmsp_nodata = dmsp_src.nodata
+            dmsp_shape = dmsp_src.shape
+            dmsp_transform = dmsp_src.transform
+            dmsp_crs = dmsp_src.crs
 
         # Read EVI raster
         with rasterio.open(abs_evi_path) as evi_src:
             evi = evi_src.read(1).astype(np.float32)
+            evi_nodata = evi_src.nodata
+            evi_shape = evi_src.shape
+            evi_transform = evi_src.transform
+            evi_crs = evi_src.crs
 
-        # Mask invalid pixels
-        valid_mask = np.isfinite(ntl) & np.isfinite(evi) & (evi >= 0)
+        # The EANTLI equation is pixel-wise and therefore requires a common grid.
+        if dmsp_crs is None or evi_crs is None:
+            return "Error: DMSP and EVI rasters must both declare a CRS."
+        if (
+            dmsp_shape != evi_shape
+            or dmsp_transform != evi_transform
+            or dmsp_crs != evi_crs
+        ):
+            return (
+                "Error: DMSP and EVI rasters are not aligned; "
+                "shape, transform, and CRS must match exactly."
+            )
 
-        # Normalize NTL (scale to [0, 1])
-        max_ntl = np.nanmax(ntl)
-        if max_ntl > 0:
-            nntl = ntl / max_ntl
-        else:
-            return "鉂?Error: NTL raster contains only invalid values."
+        # Mask explicit NoData and enforce the published input domains.
+        valid_mask = np.isfinite(ntl) & np.isfinite(evi)
+        if dmsp_nodata is not None and np.isfinite(dmsp_nodata):
+            valid_mask &= ntl != np.float32(dmsp_nodata)
+        if evi_nodata is not None and np.isfinite(evi_nodata):
+            valid_mask &= evi != np.float32(evi_nodata)
+        valid_mask &= (ntl >= 0.0) & (ntl <= 63.0)
+        valid_mask &= (evi >= 0.01) & (evi <= 1.0)
+
+        if not np.any(valid_mask):
+            return "Error: no valid co-registered DMSP/EVI pixels remain."
+
+        # DMSP stable-lights DN has a fixed 0--63 range; image-wise maxima must
+        # not change the normalization from one AOI to another.
+        nntl = ntl / np.float32(63.0)
 
         # Compute EANTLI using provided equation
         numerator = 1 + (nntl - evi)
         denominator = 1 - (nntl - evi)
-        eantli = np.full_like(ntl, -9999.0, dtype=np.float32)
-        eantli[valid_mask] = (numerator[valid_mask] / denominator[valid_mask]) * ntl[valid_mask]
+        valid_mask &= np.abs(denominator) > np.float32(1e-6)
+        if not np.any(valid_mask):
+            return "Error: no valid EANTLI pixels remain after denominator safety checks."
+        output_nodata = np.float32(-9999.0)
+        eantli = np.full_like(ntl, output_nodata, dtype=np.float32)
+        eantli[valid_mask] = (
+            numerator[valid_mask] / denominator[valid_mask]
+        ) * ntl[valid_mask]
 
         # Update profile for output
-        profile.update(dtype='float32')
+        profile.update(dtype="float32", count=1, nodata=float(output_nodata))
 
         # Write output raster
+        Path(abs_output_path).parent.mkdir(parents=True, exist_ok=True)
         with rasterio.open(abs_output_path, 'w', **profile) as dst:
             dst.write(eantli, 1)
 
-        return f"鉁?EANTLI image saved to 'outputs/{output_tif}'"
+        return (
+            f"Success: EANTLI image saved to 'outputs/{output_tif}' "
+            f"with {int(np.count_nonzero(valid_mask))} valid pixels."
+        )
 
     except Exception as e:
-        return f"鉂?Error during preprocessing: {str(e)}"
+        return f"Error during preprocessing: {str(e)}"
 
 
 # Tool Registration
@@ -998,8 +1061,10 @@ dmsp_evi_preprocess_tool = StructuredTool.from_function(
     name="DMSP_Preprocess",
     description=(
         "Applies EANTLI preprocessing to DMSP nighttime light (NTL) and annual EVI raster imagery. "
-        "Based on the transformation: EANTLI = [(1 + (nNTL - EVI)) / (1 - (nNTL - EVI))] * NTL. "
-        "Inputs must be named rasters in the 'inputs/' workspace, and the resulting GeoTIFF is saved in 'outputs/'."
+        "Based on the transformation: EANTLI = [(1 + (nNTL - EVI)) / (1 - (nNTL - EVI))] * NTL, "
+        "where nNTL is stable-lights DN/63 and scaled EVI below 0.01 is excluded. "
+        "Inputs must be exactly aligned named rasters in the 'inputs/' workspace, with EVI scaled to [0, 1]; "
+        "the resulting float32 GeoTIFF uses NoData=-9999 and is saved in 'outputs/'."
         "\n\nExample:\n"
         "dmsp_tif='dmsp_ntl_2020.tif',\n"
         "evi_tif='annual_evi_2020.tif',\n"
@@ -1034,8 +1099,3 @@ if __name__ == "__main__":
     #     "sdr_input_dir": input_sdr_dir,
     #     "sdr_output_dir": output_sdr_dir
     # })
-
-
-
-
-

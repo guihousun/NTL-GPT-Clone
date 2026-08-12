@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from unittest.mock import patch
 
 
 class StorageWorkspaceQuotaTests(unittest.TestCase):
@@ -20,12 +21,15 @@ class StorageWorkspaceQuotaTests(unittest.TestCase):
                 "NTL_SHARED_DATA_DIR",
                 "NTL_THREAD_WORKSPACE_QUOTA_MB",
                 "NTL_USER_WORKSPACE_QUOTA_MB",
+                "NTL_HISTORY_DB_URL",
             )
         }
         os.environ["NTL_USER_DATA_DIR"] = str(Path(self.tempdir.name) / "user_data")
         os.environ["NTL_SHARED_DATA_DIR"] = str(Path(self.tempdir.name) / "base_data")
         os.environ["NTL_THREAD_WORKSPACE_QUOTA_MB"] = "1"
         os.environ["NTL_USER_WORKSPACE_QUOTA_MB"] = "2"
+        history_db = (Path(self.tempdir.name) / "history.sqlite3").as_posix()
+        os.environ["NTL_HISTORY_DB_URL"] = f"sqlite:///{history_db}"
         self.addCleanup(self._restore_env)
 
         import runtime_governance
@@ -123,7 +127,38 @@ class StorageWorkspaceQuotaTests(unittest.TestCase):
             )
 
         self.assertFalse((workspace / "outputs" / "too-large.txt").exists())
-        self.assertEqual(list((workspace / "outputs").glob(".too-large.txt.*.tmp")), [])
+        self.assertEqual(list((workspace / "outputs").glob(".tmp-*.tmp")), [])
+
+    def test_atomic_write_uses_short_temp_prefix_for_long_contract_names(self) -> None:
+        thread_id = "alice-long-contract"
+        workspace = self.storage_manager.get_workspace(thread_id)
+        parent = workspace / "outputs" / "runs" / "run-1" / "contracts"
+        desired_filename_chars = 248 - len(str(parent)) - 1
+        stem_budget = desired_filename_chars - len("event_context__") - len(".json")
+        self.assertGreater(stem_budget, 32)
+        long_name = "event_context__" + ("a" * stem_budget) + ".json"
+        self.assertLessEqual(len(str(parent / long_name)), 248)
+        captured_prefixes: list[str] = []
+        real_named_temporary_file = tempfile.NamedTemporaryFile
+
+        def capture_named_temporary_file(*args, **kwargs):
+            captured_prefixes.append(str(kwargs.get("prefix")))
+            return real_named_temporary_file(*args, **kwargs)
+
+        with patch.object(
+            self.storage_manager_module.tempfile,
+            "NamedTemporaryFile",
+            side_effect=capture_named_temporary_file,
+        ):
+            target = self.storage_manager.atomic_write_text(
+                f"runs/run-1/contracts/{long_name}",
+                '{"status":"ready"}',
+                thread_id=thread_id,
+            )
+
+        self.assertEqual(captured_prefixes, [".tmp-"])
+        self.assertEqual(target.read_text(encoding="utf-8"), '{"status":"ready"}')
+        self.assertEqual(list(target.parent.glob(".tmp-*.tmp")), [])
 
     def test_jsonl_appends_are_valid_under_thread_concurrency(self) -> None:
         thread_id = "alice-jsonl"

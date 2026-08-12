@@ -509,7 +509,7 @@ reverse_geocode_tool = StructuredTool.from_function(
         "### input:\n"
         "Returns the addresses corresponding to the provided latitudes and longitudes, and saves the results to a CSV file."
     ),
-    input_type=ReverseGeocodeInput,
+    args_schema=ReverseGeocodeInput,
 )
 
 
@@ -590,7 +590,7 @@ poi_search_tool = StructuredTool.from_function(
         "Returns a list of POIs containing name, address, type, and other information, saving the results to the specified CSV file. "
         "This information supports further analysis by providing insight into the types of nearby facilities around the selected grid cell."
     ),
-    input_type=POISearchInput,
+    args_schema=POISearchInput,
 )
 
 
@@ -670,7 +670,7 @@ geocode_tool = StructuredTool.from_function(
         "### input:\n"
         "Returns latitude and longitude for the specified address, saving the result to the specified CSV file. "
     ),
-    input_type=GeocodeInput,
+    args_schema=GeocodeInput,
 )
 
 

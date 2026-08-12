@@ -350,7 +350,11 @@ class StorageManager:
                 with tempfile.NamedTemporaryFile(
                     mode="wb",
                     dir=str(target.parent),
-                    prefix=f".{target.name}.",
+                    # Keep the temporary component independent of the final
+                    # filename.  Repeating a long immutable-contract name in
+                    # the prefix can push an otherwise valid Windows target
+                    # beyond the traditional MAX_PATH limit before replace.
+                    prefix=".tmp-",
                     suffix=".tmp",
                     delete=False,
                 ) as handle:

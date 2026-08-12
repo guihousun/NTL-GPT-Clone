@@ -4,7 +4,6 @@ import ast
 import contextlib
 import functools
 import hashlib
-import io
 import json
 import os
 import re
@@ -947,6 +946,24 @@ def _workspace_logical_name(resolved_path: Path, *, thread_id: str, root: str) -
     return str(relative).replace("\\", "/")
 
 
+def _virtual_workspace_path(path: Path | str, *, thread_id: str) -> str:
+    """Return a model-facing virtual path without the opaque workspace token."""
+
+    candidate = Path(path).resolve()
+    workspace = storage_manager.get_workspace(thread_id).resolve()
+    try:
+        relative = candidate.relative_to(workspace)
+    except (OSError, ValueError):
+        return Path(path).name
+    parts = relative.parts
+    if not parts:
+        return "/"
+    aliases = {"inputs": "/inputs", "outputs": "/outputs", "memory": "/memories"}
+    prefix = aliases.get(parts[0], "/workspace")
+    suffix = "/".join(parts[1:] if parts[0] in aliases else parts)
+    return prefix if not suffix else f"{prefix}/{suffix}"
+
+
 def _persist_script(
     script_content: str,
     script_name: Optional[str] = None,
@@ -1020,8 +1037,8 @@ def _runtime_code_guide_dir() -> Path:
     env_path = os.getenv("NTL_CODE_GUIDE_RUNTIME_DIR", "").strip()
     if env_path:
         return Path(env_path).resolve()
-    repo_root = Path(__file__).resolve().parents[1]
-    return (repo_root / "RAG" / "code_guide" / "tools_latest_runtime").resolve()
+    thread_id = str(current_thread_id.get() or "debug").strip() or "debug"
+    return (storage_manager.get_workspace(thread_id) / "memory" / "code_guide_runtime").resolve()
 
 
 def _archive_success_script(
@@ -1040,7 +1057,7 @@ def _archive_success_script(
     try:
         runtime_dir = _runtime_code_guide_dir()
         runtime_dir.mkdir(parents=True, exist_ok=True)
-        thread_id = str(current_thread_id.get() or "default")
+        thread_id = str(current_thread_id.get() or "debug").strip() or "debug"
         normalized = _normalize_whitespace(script_content)
         content_hash = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
@@ -1055,9 +1072,8 @@ def _archive_success_script(
         metadata = {
             "timestamp_utc": _timestamp(),
             "source_tool": source_tool,
-            "thread_id": thread_id,
             "original_script_name": script_name,
-            "original_script_path": script_path,
+            "original_script_path": _virtual_workspace_path(script_path, thread_id=thread_id),
             "content_hash": content_hash,
             "stdout_excerpt": (stdout or "")[:2000],
         }
@@ -1070,8 +1086,10 @@ def _archive_success_script(
         manifest_path = runtime_dir / "runtime_manifest.jsonl"
         manifest_entry = dict(metadata)
         manifest_entry["archive_script_name"] = archive_script_name
-        manifest_entry["archive_script_path"] = str(archive_script_path)
-        manifest_entry["archive_metadata_path"] = str(archive_meta_path)
+        manifest_entry["archive_script_path"] = f"/memories/code_guide_runtime/{archive_script_name}"
+        manifest_entry["archive_metadata_path"] = (
+            f"/memories/code_guide_runtime/{archive_meta_path.name}"
+        )
         with manifest_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(manifest_entry, ensure_ascii=False))
             f.write("\n")
@@ -1080,9 +1098,9 @@ def _archive_success_script(
             {
                 "archived": True,
                 "archive_script_name": archive_script_name,
-                "archive_script_path": str(archive_script_path),
-                "archive_metadata_path": str(archive_meta_path),
-                "archive_manifest_path": str(manifest_path),
+                "archive_script_path": f"/memories/code_guide_runtime/{archive_script_name}",
+                "archive_metadata_path": f"/memories/code_guide_runtime/{archive_meta_path.name}",
+                "archive_manifest_path": "/memories/code_guide_runtime/runtime_manifest.jsonl",
                 "content_hash": content_hash,
                 "source_tool": source_tool,
             }
@@ -1504,42 +1522,17 @@ def _execute_code(
     code_block: str,
     timeout_seconds: Optional[int] = None,
 ) -> Tuple[bool, str, Optional[str], Optional[str], Optional[str]]:
-    if _should_use_subprocess_sandbox():
-        return _execute_code_in_subprocess_sandbox(code_block, timeout_seconds=timeout_seconds)
-
-    user_globals = _get_thread_context()
-    user_globals["_active_gee_credentials"] = _active_gee_credentials
-    bootstrap = (
-        "import ee\n"
-        f"project_id = {_gee_project_id()!r}\n"
-        "ntl_ee_credentials = _active_gee_credentials()\n"
-        "try:\n"
-        "    ee.Initialize(credentials=ntl_ee_credentials, project=project_id) if ntl_ee_credentials else ee.Initialize(project=project_id)\n"
-        "except Exception:\n"
-        "    pass\n"
-    )
-    code_block = _patch_ee_initialize_for_active_credentials(code_block)
-
-    buf = io.StringIO()
-    try:
-        with _thread_bound_storage_paths(str(current_thread_id.get() or "debug")):
-            with _thread_workspace_cwd(str(current_thread_id.get() or "debug")):
-                with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
-                    exec(bootstrap, user_globals)
-                    exec(code_block, user_globals)
-        logs = _sanitize_ansi(buf.getvalue())
-        return True, logs, None, None, None
-    except Exception as exc:  # noqa: BLE001
-        logs = _sanitize_ansi(buf.getvalue())
-        return False, logs, type(exc).__name__, str(exc), traceback.format_exc()
-    finally:
-        buf.close()
+    # User-authored code must never execute in the application process where it
+    # could inherit live context objects or decrypted credentials. This child
+    # process boundary sanitizes environment state, but it is not an OS-level
+    # sandbox and must not be described as one.
+    return _execute_code_in_subprocess_sandbox(code_block, timeout_seconds=timeout_seconds)
 
 
 def _should_use_subprocess_sandbox() -> bool:
-    # Default ON for safer runtime execution. Set NTL_EXEC_SANDBOX=0 to disable.
-    raw = str(os.getenv("NTL_EXEC_SANDBOX", "1")).strip().lower()
-    return raw not in {"0", "false", "off", "no"}
+    # Compatibility probe only. The credential boundary is no longer
+    # disableable: every user-authored block runs in a sanitized child process.
+    return True
 
 
 def _sandbox_timeout_seconds() -> int:
@@ -1552,46 +1545,72 @@ def _sandbox_timeout_seconds() -> int:
 
 
 def _build_sandbox_env(thread_id: str, code_path: Path) -> Dict[str, str]:
+    """Return a minimal child environment with no application credentials.
+
+    This isolates environment values only; it is not an OS-level filesystem or
+    network sandbox. Analyst scripts must consume inputs prepared by Data
+    Searcher's bounded acquisition tools instead of receiving live GEE access.
+    """
+
     allowed_keys = {
         "PATH",
         "PATHEXT",
-        "PYTHONPATH",
-        "PYTHONHOME",
-        "CONDA_PREFIX",
-        "CONDA_DEFAULT_ENV",
-        "VIRTUAL_ENV",
         "SYSTEMROOT",
+        "SYSTEMDRIVE",
         "WINDIR",
+        "COMSPEC",
         "TMP",
         "TEMP",
-        "HOME",
-        "USERPROFILE",
-        "APPDATA",
-        "LOCALAPPDATA",
-        "GOOGLE_APPLICATION_CREDENTIALS",
-        "GOOGLE_CLOUD_PROJECT",
-        "EE_PROJECT",
-        "HTTP_PROXY",
-        "HTTPS_PROXY",
-        "NO_PROXY",
     }
-    env = {k: v for k, v in os.environ.items() if k in allowed_keys}
+    secret_key_fragments = (
+        "API_KEY",
+        "TOKEN",
+        "SECRET",
+        "PASSWORD",
+        "CREDENTIAL",
+        "AUTH",
+        "COOKIE",
+        "PRIVATE_KEY",
+        "PROXY",
+    )
+    secret_values = {
+        str(value)
+        for key, value in os.environ.items()
+        if value and any(fragment in key.upper() for fragment in secret_key_fragments)
+    }
+    for context_value in (
+        current_gee_encrypted_refresh_token.get(),
+        current_gee_token_scopes.get(),
+    ):
+        if context_value:
+            secret_values.add(str(context_value))
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key in allowed_keys
+        and not any(secret and secret in str(value) for secret in secret_values)
+    }
     repo_root = str(Path(__file__).resolve().parent.parent)
-    existing_pythonpath = env.get("PYTHONPATH", "").strip()
-    env["PYTHONPATH"] = repo_root if not existing_pythonpath else f"{repo_root}{os.pathsep}{existing_pythonpath}"
+    sandbox_home = code_path.parent / "sandbox_home"
+    sandbox_appdata = sandbox_home / "AppData" / "Roaming"
+    sandbox_local_appdata = sandbox_home / "AppData" / "Local"
+    sandbox_local_appdata.mkdir(parents=True, exist_ok=True)
+    sandbox_appdata.mkdir(parents=True, exist_ok=True)
+    # Never inherit PYTHONPATH: it can disclose host-specific credential or
+    # instrumentation paths. Add only the application import root required by
+    # the runner's storage-manager binding.
+    env["PYTHONPATH"] = repo_root
+    # Python and storage_manager need a home directory. Supply an empty,
+    # workspace-local replacement so credential discovery cannot fall back to
+    # the real user profile or cloud CLI configuration.
+    env["HOME"] = str(sandbox_home)
+    env["USERPROFILE"] = str(sandbox_home)
+    env["APPDATA"] = str(sandbox_appdata)
+    env["LOCALAPPDATA"] = str(sandbox_local_appdata)
     env["PYTHONUNBUFFERED"] = "1"
     env["PYTHONUTF8"] = "1"
     env["NTL_THREAD_ID"] = str(thread_id)
     env["NTL_CODE_PATH"] = str(code_path)
-    active_project_id = str(current_gee_project_id.get() or "").strip()
-    if active_project_id:
-        env["NTL_ACTIVE_GEE_PROJECT_ID"] = active_project_id
-    encrypted_refresh_token = str(current_gee_encrypted_refresh_token.get() or "").strip()
-    if encrypted_refresh_token:
-        env["NTL_ACTIVE_GEE_ENCRYPTED_REFRESH_TOKEN"] = encrypted_refresh_token
-    token_scopes = str(current_gee_token_scopes.get() or "").strip()
-    if token_scopes:
-        env["NTL_ACTIVE_GEE_TOKEN_SCOPES"] = token_scopes
     return env
 
 
@@ -1624,23 +1643,6 @@ def _execute_code_in_subprocess_sandbox(
     code_path = memory_dir / f"sandbox_exec_{uuid4().hex}.py"
     runner_path = memory_dir / f"sandbox_runner_{uuid4().hex}.py"
 
-    bootstrap = (
-        "import ee\n"
-        "import os\n"
-        f"project_id = {_gee_project_id()!r}\n"
-        "ntl_ee_credentials = None\n"
-        "encrypted = os.environ.get('NTL_ACTIVE_GEE_ENCRYPTED_REFRESH_TOKEN', '').strip()\n"
-        "if encrypted:\n"
-        "    import gee_auth\n"
-        "    refresh_token = gee_auth.decrypt_refresh_token(encrypted)\n"
-        "    scopes = os.environ.get('NTL_ACTIVE_GEE_TOKEN_SCOPES', '').split() or None\n"
-        "    ntl_ee_credentials = gee_auth.credentials_from_refresh_token(refresh_token, scopes=scopes)\n"
-        "try:\n"
-        "    ee.Initialize(credentials=ntl_ee_credentials, project=project_id) if ntl_ee_credentials else ee.Initialize(project=project_id)\n"
-        "except Exception:\n"
-        "    pass\n"
-    )
-    code_block = _patch_ee_initialize_for_active_credentials(code_block)
     runner = (
         "import os\n"
         "import traceback\n"
@@ -1651,9 +1653,7 @@ def _execute_code_in_subprocess_sandbox(
         "with open(code_path, 'r', encoding='utf-8') as f:\n"
         "    code_block = f.read()\n"
         "user_globals = {'__name__': '__main__', '__file__': code_path, '__package__': None}\n"
-        f"bootstrap = {bootstrap!r}\n"
         "try:\n"
-        "    exec(bootstrap, user_globals)\n"
         "    exec(code_block, user_globals)\n"
         "except Exception:\n"
         "    traceback.print_exc()\n"
@@ -2112,8 +2112,20 @@ def execute_geospatial_script(
                 "script_name": logical_script_name,
                 "script_path": str(script_path),
                 "script_location": resolved_location or effective_location,
-                "code": script_content,
+                "code_sha256": hashlib.sha256(script_content.encode("utf-8")).hexdigest(),
+                "code_bytes": len(script_content.encode("utf-8")),
                 "contract_validation": contract_validation,
+                "required_literal_assignment": (
+                    'NTL_SCRIPT_CONTRACT = {"schema": "ntl.script.contract.v2", '
+                    '"objective": "...", "input_manifest": [], "method_steps": ["..."], '
+                    '"parameters": {}, "output_manifest": [{"path": "/outputs/result.ext"}], '
+                    '"validation_checks": ["..."], "failure_gates": ["..."], '
+                    '"execution": {"mode": "execute", "timeout_seconds": 1800, '
+                    '"overwrite_policy": "version", "network_scope": [], '
+                    '"test_strategy": "auto", "repair_history": []}}'
+                ),
+                "required_contract_fields": ["schema", *SCRIPT_CONTRACT_REQUIRED_FIELDS],
+                "schema_key_warning": "Use 'schema'; 'schema_version' is invalid.",
                 "fix_suggestions": policy.get("fix_suggestions") or [],
                 "error_handling_policy": policy,
                 "path_protocol_mode": path_mode,
@@ -2342,6 +2354,15 @@ def execute_geospatial_script(
                 "contract_validation": contract_validation,
                 "contract_output_audit": contract_output_audit,
             }
+            final_script_bytes = script_path.read_bytes()
+            result["script_artifact"] = {
+                "path": "outputs/"
+                + _workspace_logical_name(script_path, thread_id=thread_id, root="outputs"),
+                "sha256": hashlib.sha256(final_script_bytes).hexdigest(),
+                "bytes": len(final_script_bytes),
+                "media_type": "text/x-python",
+                "role": "analysis_script",
+            }
             result["execution_manifest"] = _write_execution_manifest(
                 script_name=logical_script_name,
                 script_path=script_path,
@@ -2458,9 +2479,14 @@ execute_geospatial_script_tool = StructuredTool.from_function(
     execute_geospatial_script,
     name="execute_geospatial_script_tool",
     description=(
-        "Execute a previously saved .py geospatial script under the thread workspace. Requires a literal "
+        "Analyst-only local execution of a previously saved .py geospatial script under the thread workspace. "
+        "Inputs must already be prepared by bounded Data Searcher tools; the child receives no GEE, LLM, "
+        "tracing, proxy, or Google credential environment. Requires a literal "
         "ntl.script.contract.v2, always performs static preflight, validates declared outputs, writes a success "
-        "manifest under outputs/, and archives failed scripts/logs under memory/failed_runs/."
+        "manifest under outputs/, returns a final `script_artifact` identity that must be copied into any "
+        "AnalysisPackage, and archives failed scripts/logs under memory/failed_runs/. The saved script "
+        "must contain a literal assignment named NTL_SCRIPT_CONTRACT whose exact schema key is "
+        "'schema': 'ntl.script.contract.v2'; 'schema_version' and comment-only declarations are invalid."
     ),
     args_schema=ExecuteScriptInput,
 )

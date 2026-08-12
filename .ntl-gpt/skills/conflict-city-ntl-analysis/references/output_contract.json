@@ -1,0 +1,154 @@
+{
+  "schema": "conflict_city_ntl.output_contracts.v1",
+  "contracts": {
+    "conflict_city_ntl.event_ranking.v1": {
+      "description": "Deterministic result envelope for authorized event retrieval, normalization, source-record deduplication, and separate Iran/Israel city ranking with all maximum ties retained.",
+      "all_status_required_fields": [
+        "schema",
+        "status",
+        "thread_id",
+        "output_files"
+      ],
+      "complete_required_fields": [
+        "schema",
+        "status",
+        "thread_id",
+        "run_dir",
+        "count_semantics",
+        "summary",
+        "selected_cities",
+        "audit",
+        "source_fetch",
+        "output_files"
+      ],
+      "partial_required_fields": [
+        "schema",
+        "status",
+        "thread_id",
+        "run_dir",
+        "count_semantics",
+        "summary",
+        "selected_cities",
+        "audit",
+        "source_fetch",
+        "output_files"
+      ],
+      "authorization_failure_required_fields": [
+        "schema",
+        "status",
+        "thread_id",
+        "message",
+        "count_semantics",
+        "output_files"
+      ],
+      "status_rule": "Only status=complete permits boundary and NTL analysis. partial, needs_source_authorization, and fail are fail-closed for downstream analysis.",
+      "summary_required_fields": [
+        "raw_row_count",
+        "eligible_record_count",
+        "selected_city_count",
+        "countries_without_rankable_records",
+        "country_maxima"
+      ],
+      "audit_required_fields": [
+        "raw_row_count",
+        "distinct_record_key_count",
+        "eligible_record_count",
+        "excluded_counts",
+        "source_event_id_collision_group_count",
+        "source_event_id_collision_groups",
+        "missing_source_identity_record_count",
+        "country_maxima",
+        "countries_without_rankable_records"
+      ],
+      "recognized_exclusion_count_keys": [
+        "missing_source_identity",
+        "duplicate_record_key",
+        "non_target_or_missing_country",
+        "missing_city",
+        "missing_or_invalid_event_date",
+        "before_event_window",
+        "after_cutoff_date",
+        "excluded_event_type"
+      ],
+      "source_identity_rule": "Every ranked record must have a stable source namespace derived from source_layer_url, source_id, source_layer, or event_family. Records without one are excluded as missing_source_identity, counted in audit.missing_source_identity_record_count, must never share an unknown_source namespace, and force status=partial when the count is nonzero.",
+      "selected_city_required_fields": [
+        "country",
+        "city",
+        "city_key",
+        "attack_record_count",
+        "representative_latitude",
+        "representative_longitude",
+        "is_tied_maximum"
+      ],
+      "counting_unit": "retrieved_source_attack_record",
+      "required_countries": [
+        "Iran",
+        "Israel"
+      ],
+      "tie_rule": "Return every city whose eligible distinct source-record count equals the maximum within its country.",
+      "minimum_output_files": [
+        "event_records_snapshot",
+        "city_attack_record_counts",
+        "selected_cities",
+        "selected_city_event_centroids",
+        "ranking_metadata"
+      ],
+      "forbidden_interpretations": [
+        "independently verified physical attack count",
+        "damage confirmation",
+        "causal attribution"
+      ]
+    },
+    "conflict_city_ntl.analysis.v1": {
+      "description": "Final skill-level envelope joining ranked cities to explicit administrative boundaries and comparable pre/post nighttime-light statistics.",
+      "required_fields": [
+        "schema",
+        "status",
+        "as_of",
+        "event_ranking",
+        "boundaries",
+        "ntl_inputs",
+        "ntl_statistics",
+        "output_files",
+        "interpretation_guardrails"
+      ],
+      "as_of_required_fields": [
+        "resolved_test_date",
+        "timezone",
+        "event_cutoff_date"
+      ],
+      "boundary_required_fields": [
+        "country",
+        "city_name_canonical",
+        "boundary_source",
+        "administrative_level",
+        "boundary_file",
+        "proxy_status"
+      ],
+      "ntl_input_required_fields": [
+        "product",
+        "product_version",
+        "band",
+        "physical_units",
+        "qa_rule",
+        "pre_window",
+        "post_window",
+        "composite_rule",
+        "scale_m"
+      ],
+      "ntl_statistic_required_fields": [
+        "country",
+        "city_name_canonical",
+        "period",
+        "ANTL",
+        "TNTL",
+        "valid_pixel_count"
+      ],
+      "interpretation_guardrails": [
+        "Describe the ranking as most retrieved source attack records, not most independently verified attacks.",
+        "Nighttime-light differences are candidate remote-sensing observations only.",
+        "Do not infer damage, outage cause, responsibility, or causal impact from NTL change."
+      ]
+    }
+  }
+}

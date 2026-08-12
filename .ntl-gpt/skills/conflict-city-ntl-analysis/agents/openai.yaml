@@ -1,0 +1,4 @@
+interface:
+  display_name: "Conflict City NTL Analysis"
+  short_description: "Rank authorized conflict records and compare city NTL"
+  default_prompt: "Use $conflict-city-ntl-analysis to retrieve authorized conflict-event records through an explicit cutoff, retain all top-city ties for Iran and Israel, and prepare a traceable non-attributive pre/post nighttime-light analysis."
