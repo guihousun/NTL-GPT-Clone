@@ -105,9 +105,41 @@ def test_conditional_architecture_route_criteria_are_explicit() -> None:
         assert "architecture_mode" in route_text
         assert specialist in route_text
         assert package in route_text
+        assert "ntl.assignment-record.v2" in route_text
+        assert "ntl.handoff-record.v2" in route_text
+        assert "natural-language output" in route_text
         assert "single_agent" in route_text
         assert "no `task`" in route_text
         assert "completed route" in route_text
+
+
+def test_full_smoke_prompts_use_native_task_and_system_owned_records() -> None:
+    cases = {row["case_id"]: row for row in _jsonl("cases.jsonl")}
+    specs = {row["case_id"]: row for row in _jsonl("eval-specs.jsonl")}
+    for case_id in (
+        "SMOKE-ANALYSIS-001",
+        "SMOKE-EVENT-001",
+        "SMOKE-OBSERVATION-001",
+    ):
+        prompt = str(cases[case_id]["prompt"])
+        assert "native `task` call" in prompt
+        assert "ntl.assignment-record.v2" in prompt
+        assert "ntl.handoff-record.v2" in prompt
+        assert "model-authored HandoffEnvelope or EngineerDecision" in prompt
+        assert "then validate and accept" not in prompt
+        assert "persisted handoff acceptance" not in prompt
+        assert "require_accepted_handoff_decision" not in cases[case_id]["metadata"][
+            "architecture_expectations"
+        ]["full"]
+
+        route = specs[case_id]["reference"]["architecture_route"]["full"]
+        assert route["assignment_record_schema"] == "ntl.assignment-record.v2"
+        assert route["handoff_record_schema"] == "ntl.handoff-record.v2"
+        assert route["system_recorded"] is True
+        assert route["specialist_natural_language_json_required"] is False
+        assert "persisted_handoff" not in route
+        assert "accepted_engineer_decision" not in route
+        assert not any("record_path" in str(key) for key in route)
 
 
 def test_observation_case_requires_specialist_owned_inspection_and_system_query_time() -> None:
@@ -120,8 +152,9 @@ def test_observation_case_requires_specialist_owned_inspection_and_system_query_
         "Do not supply or guess `query_executed_at_utc`",
         "the runtime records its actual offset-aware UTC completion time",
         "NTL_Engineer must not call `geodata_inspector_tool` directly",
-        "make exactly one successful `task` call to NTL_Data_Searcher",
+        "make exactly one successful native `task` call to NTL_Data_Searcher",
         "require that single descendant to call `geodata_inspector_tool` in `full` mode",
+        "runtime automatically records `ntl.assignment-record.v2` and `ntl.handoff-record.v2`",
         "In matched Single-Agent mode, make no `task` call",
         "NTL_Engineer may call `geodata_inspector_tool` directly in `full` mode",
     ):
@@ -131,7 +164,6 @@ def test_observation_case_requires_specialist_owned_inspection_and_system_query_
     assert expectations["full"] == {
         "required_package_types": ["ObservationPackage"],
         "required_specialist": "NTL_Data_Searcher",
-        "require_accepted_handoff_decision": True,
         "require_completed_route": True,
     }
     assert expectations["single_agent"] == {
@@ -185,11 +217,13 @@ def test_observation_eval_contract_has_strict_trace_tool_and_timestamp_gates() -
 
     route_text = criteria["architecture-route"]
     for required in (
-        "exactly one `task` call total",
-        "require it to succeed",
+        "exactly one successful native `task` call total",
         "`subagent_type=NTL_Data_Searcher`",
         "`lc_agent_name=NTL_Data_Searcher`",
         "zero Engineer `geodata_inspector_tool` calls",
+        "`ntl.assignment-record.v2`",
+        "`ntl.handoff-record.v2`",
+        "natural-language output",
         "In `single_agent`, require no `task` call",
         "`lc_agent_name=NTL_Engineer`",
     ):
@@ -217,8 +251,10 @@ def test_observation_eval_contract_has_strict_trace_tool_and_timestamp_gates() -
         "must_descend_from_task": True,
     }
     assert full["engineer_inspector_call_count"] == 0
-    assert full["persisted_handoff"] is True
-    assert full["accepted_engineer_decision"] is True
+    assert full["assignment_record_schema"] == "ntl.assignment-record.v2"
+    assert full["handoff_record_schema"] == "ntl.handoff-record.v2"
+    assert full["system_recorded"] is True
+    assert full["specialist_natural_language_json_required"] is False
     assert full["terminal_route"] == "completed"
 
     single = routes["single_agent"]

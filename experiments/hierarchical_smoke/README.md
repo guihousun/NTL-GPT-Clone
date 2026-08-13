@@ -4,6 +4,13 @@ These case and evaluator contracts exercise the new Deep Agents Full and
 matched Single-Agent execution surfaces. They are engineering smoke tests, not
 the formal 200-task release and not manuscript results.
 
+Full uses the native Deep Agents `task` return path. The runtime, rather than
+either model, writes `ntl.assignment-record.v2` and `ntl.handoff-record.v2`
+process records. Evaluators use those records as route-integrity evidence; they
+do not require a specialist to emit a HandoffEnvelope or an Engineer to parse,
+validate, or accept specialist-authored JSON. Scientific packages remain the
+typed domain evidence.
+
 - `SMOKE-FAST-001` checks the bounded Engineer fast path and typed evidence.
 - `SMOKE-ANALYSIS-001` checks supplied-input scientific analysis and artifact
   generation on the verified BV1-091 synthetic city panel.
@@ -61,11 +68,14 @@ Run the same `cases.jsonl` once with `--architecture-mode full` and once with
 `--architecture-mode single_agent`, then prepare independent Luna packets with
 `eval-specs.jsonl`.
 
-The Analysis, Event, and Observation evaluator contracts condition their architecture checks
-on `run_record.environment.architecture_mode`: Full must show the named
-specialist, persisted typed package, accepted handoff, and completed route;
-matched Single-Agent must show no `task` delegation but the same ready typed
-package and completed route.
+The Analysis, Event, and Observation evaluator contracts condition their
+architecture checks on `run_record.environment.architecture_mode`: Full must
+show the correct successful specialist `task`, descendant telemetry, ready
+scientific package, the two system-authored v2 process records, and a completed
+route. Matched Single-Agent must show no `task` delegation but the same ready
+scientific package and completed route. Evaluation prioritizes the scientific
+answer and real route; the system records prove process completeness without
+turning specialist natural-language output into a second JSON contract.
 
 Run the deterministic asset checks with:
 

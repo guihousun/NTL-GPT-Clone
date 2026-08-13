@@ -6,8 +6,10 @@ from pathlib import Path
 
 from langchain_core.utils.function_calling import convert_to_openai_tool
 from agents.NTL_Analyst import system_prompt_analyst
+from agents.NTL_Data_Searcher import hierarchical_system_prompt_data_searcher
 from agents.NTL_Event_Tracker import system_prompt_event_tracker
 from agents.role_specs import ROLE_SKILL_SOURCES, ROLE_SPECS, get_role_spec
+from graph_factory import NTL_TASK_DESCRIPTION, _full_system_prompt, _single_agent_prompt
 from tools import (
     Code_tools,
     Engineer_tools,
@@ -55,6 +57,41 @@ def test_each_role_loads_common_then_only_its_role_namespace() -> None:
             namespace = SKILLS_ROOT / relative
             assert namespace.is_dir(), source
             assert any((child / "SKILL.md").is_file() for child in namespace.iterdir() if child.is_dir()), source
+
+
+def test_active_prompts_and_skills_exclude_retired_startup_memory_policies() -> None:
+    active_texts = [
+        _full_system_prompt(),
+        _single_agent_prompt(),
+        str(hierarchical_system_prompt_data_searcher.content),
+        str(system_prompt_analyst.content),
+        str(system_prompt_event_tracker.content),
+        NTL_TASK_DESCRIPTION,
+    ]
+    active_sources = {
+        source
+        for sources in ROLE_SKILL_SOURCES.values()
+        for source in sources
+    }
+    for source in sorted(active_sources):
+        relative = source.removeprefix("/skills/").strip("/")
+        active_texts.extend(
+            path.read_text(encoding="utf-8")
+            for path in sorted((SKILLS_ROOT / relative).glob("*/SKILL.md"))
+        )
+
+    combined = "\n".join(active_texts)
+    retired_markers = {
+        "Always query router FIRST",
+        "Workflow Router Protocol",
+        "Router Priority",
+        "Self-Evolution Policy",
+        "NTL_AGENT_MEMORY.md",
+        "Knowledge_Base_Searcher",
+        "Code_Assistant",
+    }
+    leaked = sorted(marker for marker in retired_markers if marker in combined)
+    assert not leaked, f"retired startup-memory policies leaked into active surfaces: {leaked}"
 
 
 def test_engineer_allowlist_is_narrow_fast_path_surface() -> None:
@@ -185,11 +222,19 @@ def test_migrated_benchmark_tool_exports_point_to_real_symbols() -> None:
         assert tool is not None
 
 
-def test_specialist_prompts_enforce_typed_return_and_no_direct_dispatch() -> None:
+def test_specialist_prompts_save_typed_package_and_return_native_result() -> None:
     analyst = str(system_prompt_analyst.content)
     tracker = str(system_prompt_event_tracker.content)
-    assert "HandoffEnvelope" in analyst and '"NTL_Analyst"' in analyst
-    assert "HandoffEnvelope" in tracker and '"NTL_Event_Tracker"' in tracker
+    assert "normal task result" in analyst
+    assert "normal task result" in tracker
+    assert "exact opaque package handle" in analyst
+    assert "exact opaque package handle" in tracker
+    assert "do not require an AssignmentEnvelope" in analyst
+    assert "do not require an AssignmentEnvelope" in tracker
+    assert "ntl.assignment.v1" not in analyst
+    assert "ntl.assignment.v1" not in tracker
+    assert "ntl.handoff.v1" not in analyst
+    assert "ntl.handoff.v1" not in tracker
     assert "never contact the user" in analyst
     assert "never contact the user" in tracker
     assert "directly dispatch" in analyst
@@ -198,7 +243,6 @@ def test_specialist_prompts_enforce_typed_return_and_no_direct_dispatch() -> Non
     assert "checksum-bound" in analyst
     assert "/inputs/" in analyst
     assert '"schema"' in analyst
-    assert "schema_version" in analyst
     assert "never overwrite, edit, or version-replace them" in analyst
     assert "workspace-relative" in tracker
     assert "without a leading slash" in tracker

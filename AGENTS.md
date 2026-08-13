@@ -51,6 +51,9 @@ This repository prefers robust, reusable capability upgrades over query-specific
   - `/data/processed/<file>` maps to thread `outputs`
   - `/memories/<file>` maps to thread `memory`
   - `/shared/<file>` maps to `base_data`
+- Treat thread `memory/` as runtime state only. Do not register mutable memory
+  Markdown as Deep Agents startup context; routing and role policy belong in
+  versioned system prompts and role-scoped Skills.
 - Preserve long-running Streamlit state contracts in `app_logic.py`; do not casually rename run, heartbeat, cancel, event, or terminal-state keys used across reruns.
 - Keep agent routing changes coherent across `graph_factory.py`, `agents/`, `.ntl-gpt/skills/`, and `tools/__init__.py`.
 

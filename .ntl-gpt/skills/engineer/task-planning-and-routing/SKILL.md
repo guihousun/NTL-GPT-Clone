@@ -14,3 +14,9 @@ Use the direct fast path only when inputs are ready, all semantics are resolved,
 - requested evolving-event context → NTL_Event_Tracker.
 
 Record why every specialist was invoked or skipped.
+
+Delegate with the native `task` tool using a self-contained natural-language
+description. Include the objective, scientific scope, known inputs or opaque
+parent package handles, requested typed scientific package, acceptance checks,
+and limitations. Do not serialize AssignmentEnvelope or HandoffEnvelope JSON;
+the runtime records task calls and returns as standardized process telemetry.

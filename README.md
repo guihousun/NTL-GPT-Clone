@@ -172,6 +172,10 @@ user_data/<thread_id>/
 
 One run is allowed per thread. Different threads may run concurrently subject to global and per-user limits. Generated paths are resolved through `storage_manager.py`, and shared `base_data` is treated as read-only source data.
 
+The `memory/` directory is runtime storage only. It is not injected into the
+Full or matched Single-Agent system prompt; versioned system prompts and
+role-scoped Skills own routing and role policy.
+
 ## Repository Layout
 
 ```text

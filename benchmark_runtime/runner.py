@@ -394,15 +394,35 @@ def _collect_architecture_evidence(
         observation_timestamp_trace_issues,
         package_artifact_integrity_issues,
     )
+    from orchestration.transfer_records import (
+        TRANSFER_RECORD_IO_ERROR,
+        reconcile_transfer_records,
+    )
 
+    case = payload.get("case") if isinstance(payload.get("case"), dict) else {}
+    expected_run_id = str(payload.get("task_run_id") or "")
+    expected_task_id = str(case.get("case_id") or "")
+    try:
+        transfer_result = reconcile_transfer_records(
+            workspace / "outputs",
+            tool_trace=tool_trace,
+            expected_run_id=expected_run_id,
+            expected_task_id=expected_task_id,
+        )
+        transfer_issues = [str(code) for code in transfer_result.get("issues", [])]
+    except (OSError, TypeError, ValueError):
+        transfer_issues = [TRANSFER_RECORD_IO_ERROR]
+
+    # Collect only after reconciliation so the run record and every downstream
+    # gate see the system-authored native-task transfer records.
     evidence = collect_internal_evidence(workspace / "outputs")
     issues = minimum_architecture_evidence_issues(
         evidence,
         architecture_mode=str(payload.get("architecture_mode") or ""),
-        expected_run_id=str(payload.get("task_run_id") or ""),
-        expected_task_id=str((payload.get("case") or {}).get("case_id") or ""),
+        expected_run_id=expected_run_id,
+        expected_task_id=expected_task_id,
     )
-    case = payload.get("case") if isinstance(payload.get("case"), dict) else {}
+    issues.extend(transfer_issues)
     metadata = case.get("metadata") if isinstance(case.get("metadata"), dict) else {}
     issues.extend(
         architecture_expectation_issues(
@@ -410,8 +430,8 @@ def _collect_architecture_evidence(
             tool_trace=tool_trace,
             expectations=metadata.get("architecture_expectations"),
             architecture_mode=str(payload.get("architecture_mode") or ""),
-            expected_run_id=str(payload.get("task_run_id") or ""),
-            expected_task_id=str(case.get("case_id") or ""),
+            expected_run_id=expected_run_id,
+            expected_task_id=expected_task_id,
         )
     )
     issues.extend(
@@ -420,8 +440,8 @@ def _collect_architecture_evidence(
             evidence,
             tool_trace=tool_trace,
             architecture_mode=str(payload.get("architecture_mode") or ""),
-            expected_run_id=str(payload.get("task_run_id") or ""),
-            expected_task_id=str(case.get("case_id") or ""),
+            expected_run_id=expected_run_id,
+            expected_task_id=expected_task_id,
             run_started_at=run_started_at,
             evidence_checked_at=evidence_checked_at,
         )
@@ -430,8 +450,8 @@ def _collect_architecture_evidence(
     artifact_integrity_issues = package_artifact_integrity_issues(
         workspace / "outputs",
         evidence,
-        expected_run_id=str(payload.get("task_run_id") or ""),
-        expected_task_id=str(case.get("case_id") or ""),
+        expected_run_id=expected_run_id,
+        expected_task_id=expected_task_id,
         opaque_package_bindings=_current_opaque_package_bindings(
             str(payload.get("thread_id") or "")
         ),

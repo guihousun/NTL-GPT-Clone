@@ -173,7 +173,7 @@ def test_system_snapshot_is_deterministic_secret_free_and_architecture_exact() -
     single = _snapshot("single_agent")
 
     assert full_a == full_b
-    assert full_a["schema_version"] == "ntl.system-snapshot.v2"
+    assert full_a["schema_version"] == "ntl.system-snapshot.v3"
     assert system_snapshot_sha256(full_a) == system_snapshot_sha256(full_b)
     validate_system_snapshot(
         full_a,
@@ -212,10 +212,16 @@ def test_system_snapshot_is_deterministic_secret_free_and_architecture_exact() -
         for name, role in full_a["tool_allowlists"].items()
         if name != "NTL_Engineer"
     )
+    assert "record_handoff_decision" not in full_a["tool_allowlists"]["NTL_Engineer"][
+        "contract_tools"
+    ]
     assert single["topology"]["active_roles"] == ["NTL_Engineer"]
     assert single["tool_allowlists"]["NTL_Engineer"]["middleware_tools"] == (
         native_filesystem_tools
     )
+    assert "record_handoff_decision" not in single["tool_allowlists"]["NTL_Engineer"][
+        "contract_tools"
+    ]
     assert set(single["tool_allowlists"]["NTL_Engineer"]["domain_tools"]) == {
         tool
         for role in full_a["tool_allowlists"].values()
@@ -223,6 +229,13 @@ def test_system_snapshot_is_deterministic_secret_free_and_architecture_exact() -
     }
     assert full_a["limits"]["specialist_max_revisions"] == 2
     assert full_a["limits"]["model_request_max_retries"] == 3
+    assert full_a["package_contracts"]["system_transfer_record_models"] == [
+        "AssignmentRecordV2",
+        "HandoffRecordV2",
+    ]
+    assert full_a["package_contracts"]["legacy_handoff_models"] == full_a[
+        "package_contracts"
+    ]["handoff_models"]
     assert full_a["runtime_versions"] == {
         distribution: metadata.version(distribution)
         for distribution in _EXPECTED_RUNTIME_DISTRIBUTIONS
@@ -244,6 +257,8 @@ def test_system_snapshot_is_deterministic_secret_free_and_architecture_exact() -
     }
     assert len(full_a["skill_files"]) >= 5
     assert system_snapshot_sha256(full_a) != system_snapshot_sha256(single)
+    assert full_a["startup_memory_sources"] == []
+    assert single["startup_memory_sources"] == []
 
     serialized = json.dumps(full_a, ensure_ascii=False).casefold()
     assert "api_key" not in serialized
@@ -281,6 +296,7 @@ def test_system_snapshot_code_manifest_binds_runtime_tool_and_toolkit_sources() 
         "orchestration/run_evidence.py",
         "orchestration/observation_runtime.py",
         "orchestration/system_snapshot.py",
+        "orchestration/transfer_records.py",
         "tools/geodata_inspector_tool.py",
         "packages/ntl_toolkit/src/ntl_toolkit/adapters/langchain/local.py",
         "packages/ntl_toolkit/src/ntl_toolkit/core/raster.py",
@@ -1249,8 +1265,15 @@ def test_worker_runner_applies_case_architecture_expectations_to_tool_trace(
             {"name": "task"},
             "",
             run_id=call_id,
-            inputs={"subagent_type": "NTL_Analyst"},
-            metadata={"lc_agent_name": "NTL_Engineer"},
+            inputs={
+                "subagent_type": "NTL_Analyst",
+                "description": "Analyze the staged input and save an AnalysisPackage.",
+            },
+            metadata={
+                "lc_agent_name": "NTL_Engineer",
+                "task_run_id": _payload["task_run_id"],
+                "case_id": _case["case_id"],
+            },
         )
         telemetry.on_tool_end("unexpected delegation", run_id=call_id)
         return {"messages": [AIMessage(content="done")]}
@@ -1258,6 +1281,10 @@ def test_worker_runner_applies_case_architecture_expectations_to_tool_trace(
     record = execute_worker_payload(payload, graph_invoker=graph_invoker)
     validate_run_record(record)
     assert record["terminal_state"] == "failed"
+    assert len(record["internal_evidence"]["assignment_records"]) == 1
+    assert len(record["internal_evidence"]["handoff_records"]) == 1
+    assert record["internal_evidence"]["handoff_records"][0]["outcome"] == "succeeded"
+    assert record["internal_evidence"]["handoff_records"][0]["package_association"] == "none"
     assert record["errors"][-1] == {
         "code": "ARCHITECTURE_EVIDENCE_INCOMPLETE",
         "message": (

@@ -26,6 +26,10 @@ from contracts.agent_packages import (
     canonical_json,
 )
 from orchestration.route_state import RouteState
+from orchestration.transfer_records import (
+    AssignmentRecordV2,
+    HandoffRecordV2,
+)
 
 
 INTERNAL_EVIDENCE_SCHEMA = "ntl-benchmark.internal-evidence.v1"
@@ -300,6 +304,8 @@ def _candidate_files(runs_root: Path) -> list[tuple[str, Path, str]]:
             ("handoff", "handoffs"),
             ("decision", "decisions"),
             ("route_state", "route"),
+            ("assignment_record", "assignment_records"),
+            ("handoff_record", "handoff_records"),
         ):
             directory = run_dir / relative
             if not directory.exists():
@@ -325,6 +331,8 @@ def collect_internal_evidence(outputs_dir: str | Path) -> dict[str, Any]:
     handoffs: list[dict[str, Any]] = []
     decisions: list[dict[str, Any]] = []
     route_states: list[dict[str, Any]] = []
+    assignment_records: list[dict[str, Any]] = []
+    handoff_records: list[dict[str, Any]] = []
     invalid: list[dict[str, Any]] = []
     runs_root = outputs_root / "runs"
 
@@ -441,6 +449,50 @@ def collect_internal_evidence(outputs_dir: str | Path) -> dict[str, Any]:
                             "terminal": value.terminal,
                         }
                     )
+                elif category == "assignment_record":
+                    value = AssignmentRecordV2.model_validate(raw)
+                    if value.run_id != expected_run_id:
+                        raise ValueError("run mismatch")
+                    if hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest() != identity["sha256"]:
+                        raise ValueError("noncanonical")
+                    assignment_records.append(
+                        {
+                            **identity,
+                            "schema_version": value.schema_version,
+                            "run_id": value.run_id,
+                            "task_id": value.task_id,
+                            "task_tool_call_id": value.task_tool_call_id,
+                            "source_role": value.source_role,
+                            "target_role": value.target_role,
+                            "started_at_utc": value.started_at_utc.isoformat(),
+                            "description_sha256": value.description_sha256,
+                            "description_bytes": value.description_bytes,
+                        }
+                    )
+                elif category == "handoff_record":
+                    value = HandoffRecordV2.model_validate(raw)
+                    if value.run_id != expected_run_id:
+                        raise ValueError("run mismatch")
+                    if hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest() != identity["sha256"]:
+                        raise ValueError("noncanonical")
+                    handoff_records.append(
+                        {
+                            **identity,
+                            "schema_version": value.schema_version,
+                            "run_id": value.run_id,
+                            "task_id": value.task_id,
+                            "task_tool_call_id": value.task_tool_call_id,
+                            "producer_role": value.producer_role,
+                            "recipient_role": value.recipient_role,
+                            "outcome": value.outcome,
+                            "response_observed": value.response_observed,
+                            "response_sha256": value.response_sha256,
+                            "response_bytes": value.response_bytes,
+                            "package_association": value.package_association,
+                            "package_type": value.package.artifact_type if value.package else None,
+                            "package_artifact_id": value.package.artifact_id if value.package else None,
+                        }
+                    )
             except json.JSONDecodeError:
                 issue_code = "INVALID_INTERNAL_JSON"
                 invalid.append(
@@ -466,6 +518,8 @@ def collect_internal_evidence(outputs_dir: str | Path) -> dict[str, Any]:
     handoffs.sort(key=lambda row: row["relative_path"].casefold())
     decisions.sort(key=lambda row: row["relative_path"].casefold())
     route_states.sort(key=lambda row: row["relative_path"].casefold())
+    assignment_records.sort(key=lambda row: row["relative_path"].casefold())
+    handoff_records.sort(key=lambda row: row["relative_path"].casefold())
     invalid.sort(key=lambda row: row["relative_path"].casefold())
     package_counts = {
         package_type: sum(1 for row in packages if row["artifact_type"] == package_type)
@@ -474,7 +528,14 @@ def collect_internal_evidence(outputs_dir: str | Path) -> dict[str, Any]:
     run_ids = sorted(
         {
             str(row["run_id"])
-            for group in (packages, handoffs, decisions, route_states)
+            for group in (
+                packages,
+                handoffs,
+                decisions,
+                route_states,
+                assignment_records,
+                handoff_records,
+            )
             for row in group
         }
     )
@@ -487,6 +548,8 @@ def collect_internal_evidence(outputs_dir: str | Path) -> dict[str, Any]:
         "handoffs": handoffs,
         "decisions": decisions,
         "route_states": route_states,
+        "assignment_records": assignment_records,
+        "handoff_records": handoff_records,
         "invalid_records": invalid,
         "issue_count": len(invalid),
         "discovered_run_ids": run_ids,
@@ -1203,8 +1266,19 @@ def validate_internal_evidence(value: Any) -> dict[str, Any]:
     if not isinstance(record["valid"], bool):
         raise ValueError("internal_evidence.valid must be boolean")
     all_paths: set[str] = set()
-    for group_name in ("packages", "handoffs", "decisions", "route_states", "invalid_records"):
-        rows = record[group_name]
+    evidence_groups = (
+        "packages",
+        "handoffs",
+        "decisions",
+        "route_states",
+        "assignment_records",
+        "handoff_records",
+        "invalid_records",
+    )
+    for group_name in evidence_groups:
+        # assignment/handoff record groups are additive to the v1 internal
+        # evidence envelope.  Historical run records remain valid when absent.
+        rows = record.get(group_name, [])
         if not isinstance(rows, list):
             raise ValueError(f"internal_evidence.{group_name} must be a list")
         for row in rows:
@@ -1221,6 +1295,12 @@ def validate_internal_evidence(value: Any) -> dict[str, Any]:
             byte_count = row.get("bytes")
             if isinstance(byte_count, bool) or not isinstance(byte_count, int) or byte_count < 0:
                 raise ValueError(f"internal_evidence.{group_name} contains invalid bytes")
+            if group_name == "assignment_records":
+                if row.get("schema_version") != "ntl.assignment-record.v2":
+                    raise ValueError("internal_evidence.assignment_records has the wrong schema")
+            elif group_name == "handoff_records":
+                if row.get("schema_version") != "ntl.handoff-record.v2":
+                    raise ValueError("internal_evidence.handoff_records has the wrong schema")
     invalid_count = len(record["invalid_records"])
     if record["issue_count"] != invalid_count or record["valid"] != (invalid_count == 0):
         raise ValueError("internal_evidence validity/count fields are inconsistent")

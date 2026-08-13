@@ -46,6 +46,7 @@ def test_full_architecture_uses_three_declarative_specialists(factory_without_pr
     assert graph.name == "NTL_Engineer"
     assert graph.system_prompt == graph_factory._full_system_prompt()
     assert graph.backend is graph_factory.RUNTIME_BACKEND
+    assert not hasattr(graph, "memory")
     assert [spec["name"] for spec in graph.subagents] == [
         "NTL_Data_Searcher",
         "NTL_Analyst",
@@ -53,12 +54,13 @@ def test_full_architecture_uses_three_declarative_specialists(factory_without_pr
     ]
     assert all("runnable" not in spec for spec in graph.subagents)
     assert "general-purpose" not in {spec["name"] for spec in graph.subagents}
-    assert {tool.name for tool in graph.tools if hasattr(tool, "name")} >= {
+    engineer_tool_names = {tool.name for tool in graph.tools if hasattr(tool, "name")}
+    assert engineer_tool_names >= {
         "save_task_plan",
         "save_evidence_report",
-        "record_handoff_decision",
         "record_route_transition",
     }
+    assert "record_handoff_decision" not in engineer_tool_names
 
     specialists = {spec["name"]: spec for spec in graph.subagents}
     expected_save_tool = {
@@ -85,15 +87,20 @@ def test_full_prompt_allows_checksum_bound_engineer_to_analyst_route() -> None:
     assert "general-purpose" not in prompt
 
 
-def test_full_prompt_requires_complete_specialist_acceptance_sequence() -> None:
+def test_full_prompt_uses_native_task_return_and_system_owned_handoff_records() -> None:
     prompt = graph_factory._full_system_prompt()
 
     assert "Engineer→Event Tracker" in prompt
-    assert "record_handoff_decision" in prompt
+    assert "native `task` result" in prompt
+    assert "first transition to `handoff_validation`" in prompt
+    assert "validate every ready package" in prompt
+    assert "runtime, not the model" in prompt
     assert "transition to `synthesis`" in prompt
     assert "save the final EvidenceReport" in prompt
     assert "then transition to `completed`" in prompt
-    assert "without a persisted handoff, decision, and EvidenceReport" in prompt
+    assert "record_handoff_decision" not in prompt
+    assert "ntl.assignment.v1" not in prompt
+    assert "ntl.handoff.v1" not in prompt
 
 
 def test_single_agent_has_union_skills_and_no_delegation(factory_without_provider) -> None:
@@ -112,7 +119,7 @@ def test_single_agent_has_union_skills_and_no_delegation(factory_without_provide
     assert graph.system_prompt == graph_factory._single_agent_prompt()
     assert getattr(graph, "subagents", None) is None
     assert graph.skills == union
-    assert graph.memory == [graph_factory.PROJECT_MEMORY_SOURCE]
+    assert not hasattr(graph, "memory")
     assert _permission_dicts(graph.permissions) == graph_factory.filesystem_runtime_descriptor(
         union, memory_access=True
     )["permissions"]
@@ -125,6 +132,7 @@ def test_single_agent_has_union_skills_and_no_delegation(factory_without_provide
         "save_evidence_report",
         "record_route_transition",
     } <= tool_names
+    assert "record_handoff_decision" not in tool_names
     assert "an analysis task must save a ready AnalysisPackage" in graph.system_prompt
     assert "event task must save a ready EventContext" in graph.system_prompt
     assert "EvidenceReport alone never substitutes" in graph.system_prompt
@@ -149,6 +157,9 @@ def test_exact_harness_profile_disables_general_purpose_and_overrides_task() -> 
     assert profile.general_purpose_subagent.enabled is False
     assert profile.tool_description_overrides["task"] == graph_factory.NTL_TASK_DESCRIPTION
     assert "{available_agents}" in graph_factory.NTL_TASK_DESCRIPTION
+    assert "self-contained natural-language task" in graph_factory.NTL_TASK_DESCRIPTION
+    assert "AssignmentEnvelope or HandoffEnvelope" in graph_factory.NTL_TASK_DESCRIPTION
+    assert "ntl.assignment.v1" not in graph_factory.NTL_TASK_DESCRIPTION
 
 
 def test_all_supported_models_build_with_an_exact_harness_profile(
@@ -189,6 +200,8 @@ def test_architecture_descriptor_and_mode_validation() -> None:
         "/outputs/runs/run-1/contracts/task_plan.json",
         "/outputs/runs/run-1/handoffs/handoff.json",
         "/outputs/runs/run-1/decisions/decision.json",
+        "/outputs/runs/run-1/assignment_records/assignment.json",
+        "/outputs/runs/run-1/handoff_records/handoff.json",
         "/outputs/runs/run-1/route/route_state.json",
         "/outputs/runs/run-1/ROUTE/Route_State__checkpoint.json",
         "/data/processed/runs/run-1/contracts/task_plan.json",
@@ -528,6 +541,28 @@ def test_runtime_backend_uses_state_for_internal_files_and_dynamic_thread_routes
     assert (manager.get_workspace("thread-a") / "outputs" / "result.txt").read_text() == "thread-a"
     assert (manager.get_workspace("thread-a") / "inputs" / "input.txt").read_text() == "input-a"
     assert (manager.get_workspace("thread-b") / "outputs" / "result.txt").read_text() == "thread-b"
+
+
+def test_runtime_memory_route_does_not_seed_legacy_agent_memory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manager = StorageManager(
+        base_dir=str(tmp_path / "user_data"), shared_dir=str(tmp_path / "shared")
+    )
+    monkeypatch.setattr(graph_factory, "storage_manager", manager)
+    backend = graph_factory._build_runtime_backend()
+
+    token = current_thread_id.set("thread-memory")
+    try:
+        assert backend.write("/memories/gee_exports/run.json", '{"state":"ready"}').error is None
+        loaded = backend.read("/memories/gee_exports/run.json")
+    finally:
+        current_thread_id.reset(token)
+
+    workspace = manager.get_workspace("thread-memory")
+    assert loaded.error is None
+    assert loaded.file_data == {"content": '{"state":"ready"}', "encoding": "utf-8"}
+    assert not (workspace / "memory" / "NTL_AGENT_MEMORY.md").exists()
 
 
 def test_runtime_descriptor_is_path_free_and_ordered() -> None:

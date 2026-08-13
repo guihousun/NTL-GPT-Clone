@@ -38,8 +38,6 @@ from agents.NTL_Event_Tracker import system_prompt_event_tracker
 from agents.role_specs import ROLE_SPECS
 from model_config import get_api_model_name, get_base_url, get_model_config
 from orchestration.contract_tools import (
-    CONTRACT_TOOLS,
-    record_handoff_decision_tool,
     record_route_transition_tool,
     save_analysis_package_tool,
     save_event_context_tool,
@@ -63,7 +61,6 @@ ARCHITECTURE_MODES: tuple[ArchitectureMode, ...] = ("full", "single_agent")
 
 checkpointer = MemorySaver()
 SKILLS_ROOT = Path(__file__).resolve().parent / ".ntl-gpt" / "skills"
-PROJECT_MEMORY_SOURCE = "/memories/NTL_AGENT_MEMORY.md"
 DEEPAGENTS_HARNESS_MODEL_SPECS = (
     "openai:deepseek-v4-flash",
     "openai:deepseek-v4-pro",
@@ -72,12 +69,12 @@ DEEPAGENTS_HARNESS_MODEL_SPEC = DEEPAGENTS_HARNESS_MODEL_SPECS[0]
 DEEPAGENTS_HARNESS_API_MODELS = tuple(
     spec.partition(":")[2] for spec in DEEPAGENTS_HARNESS_MODEL_SPECS
 )
-NTL_TASK_DESCRIPTION = """Delegate one complete model-facing `ntl.assignment.v1` draft to exactly one registered NTL specialist.
+NTL_TASK_DESCRIPTION = """Delegate one self-contained natural-language task to exactly one registered NTL specialist.
 
 Available specialists:
 {available_agents}
 
-Set `subagent_type` to one listed specialist name only. `description` must contain the scientific assignment fields and no benchmark Gold or evaluator material. Runtime run/task identity and timestamps are system-managed: omit them and never try to discover them.
+Set `subagent_type` to one listed specialist name only. In `description`, state the objective, scientific scope, known inputs or parent package handles, requested typed scientific package, acceptance checks, and relevant limitations in normal prose. Do not serialize an AssignmentEnvelope or HandoffEnvelope. Do not include benchmark Gold or evaluator material. Runtime identity, timestamps, and assignment/handoff records are system-managed; never try to discover or supply them.
 """
 
 NTL_HARNESS_PROFILE = HarnessProfile(
@@ -91,12 +88,20 @@ ENGINEER_CONTRACT_TOOLS = (
     save_task_plan_tool,
     save_evidence_report_tool,
     validate_contract_tool,
-    record_handoff_decision_tool,
     record_route_transition_tool,
 )
 DATA_SEARCHER_CONTRACT_TOOLS = (save_observation_package_tool, validate_contract_tool)
 ANALYST_CONTRACT_TOOLS = (save_analysis_package_tool, validate_contract_tool)
 EVENT_TRACKER_CONTRACT_TOOLS = (save_event_context_tool, validate_contract_tool)
+SINGLE_AGENT_CONTRACT_TOOLS = (
+    save_task_plan_tool,
+    save_event_context_tool,
+    save_observation_package_tool,
+    save_analysis_package_tool,
+    save_evidence_report_tool,
+    validate_contract_tool,
+    record_route_transition_tool,
+)
 
 
 def _prompt_text(value: Any) -> str:
@@ -196,8 +201,9 @@ def _is_protected_evidence_path(file_path: str) -> bool:
     the latter writes via ``storage_manager`` after schema validation.  Protect
     both the canonical ``/outputs`` tree and its documented
     ``/data/processed`` alias so an agent cannot overwrite or spoof contracts,
-    handoffs, decisions, or route checkpoints with ``write_file``/``edit_file``.
-    Reads remain available for Engineer acceptance and validation.
+    handoffs, decisions, system-authored transfer records, or route checkpoints
+    with ``write_file``/``edit_file``. The model-facing filesystem cannot read
+    this identity-bearing audit tree; typed tools and the runner own access.
     """
 
     raw = str(file_path or "").replace("\\", "/")
@@ -210,7 +216,15 @@ def _is_protected_evidence_path(file_path: str) -> bool:
     else:
         return False
     return any(
-        part in {"contracts", "handoffs", "decisions"} or part.startswith("route_state")
+        part
+        in {
+            "contracts",
+            "handoffs",
+            "decisions",
+            "assignment_records",
+            "handoff_records",
+        }
+        or part.startswith("route_state")
         for part in evidence_parts
     )
 
@@ -264,16 +278,6 @@ def _workspace_subdir(name: str) -> Path:
     return workspace / name
 
 
-def _memory_root() -> Path:
-    directory = _workspace_subdir("memory")
-    project_memory = Path(__file__).resolve().parent / ".ntl-gpt" / "NTL_AGENT_MEMORY.md"
-    target = directory / "NTL_AGENT_MEMORY.md"
-    if project_memory.is_file() and not target.exists():
-        directory.mkdir(parents=True, exist_ok=True)
-        target.write_text(project_memory.read_text(encoding="utf-8"), encoding="utf-8")
-    return directory
-
-
 def _build_skills_backend() -> CompositeBackend:
     return CompositeBackend(
         # The project tree is the catch-all skill mount so listing /skills works
@@ -291,7 +295,11 @@ def _build_skills_backend() -> CompositeBackend:
 def _build_runtime_backend() -> CompositeBackend:
     inputs = ContextFilesystemBackend(lambda: _workspace_subdir("inputs"))
     outputs = ContextFilesystemBackend(lambda: _workspace_subdir("outputs"))
-    memories = ContextFilesystemBackend(_memory_root)
+    # Thread memory remains an ordinary runtime-state route for export
+    # manifests and failed-run records. It is deliberately not registered as
+    # Deep Agents startup memory: scientific routing and role policy live in
+    # versioned system prompts and role skills, not mutable thread Markdown.
+    memories = ContextFilesystemBackend(lambda: _workspace_subdir("memory"))
     return CompositeBackend(
         default=StateBackend(),
         routes={
@@ -386,10 +394,11 @@ System boundary and delegation contract:
 - Never read benchmark Gold or evaluator material. Do not accept post-run repair suggestions during the tested run.
 - Produce an EvidenceReport for completed, limited, blocked, or failed tasks. The runtime owns contract storage paths and audit identity.
 - At task start save a TaskPlan and checkpoint legal route transitions. Runtime IDs, case identity, and system timestamps are injected by the system and are intentionally absent from model-facing tool inputs; producer is schema-fixed to the active role. Never discover, request, guess, echo, or override system identity; refer to saved packages only through the opaque references returned by typed contract tools.
-- Never use generic filesystem mutation (`write_file` or `edit_file`) on the internal contracts, handoffs, decisions, or route-state tree; use only typed `save_*` and `record_*` tools there.
-- Every `task` delegation description must be a complete model-facing `ntl.assignment.v1` draft with system-owned identity fields omitted. A specialist's ready return is only a proposal until `record_handoff_decision` accepts its persisted package and checksum.
+- Never use generic filesystem mutation (`write_file` or `edit_file`) on the internal contracts or route-state tree. Never create or modify system-owned assignment/handoff records. Use only typed `save_*`, `validate_contract`, and `record_route_transition` tools for model-owned contract work.
+- Every `task` delegation description must be a self-contained natural-language request: give the selected specialist the objective, scientific scope, known inputs or parent package handles, requested typed package, acceptance checks, and limitations. Do not ask for or emit an AssignmentEnvelope or HandoffEnvelope. The runtime records the native task call and return automatically.
 - Route only as needed: direct fast path; Engineer→Data Searcher; Engineer→Analyst when checksum-bound analysis-ready inputs are already staged and `observation_required=false`; Engineer→Event Tracker for a source-bounded event-context-only task; Engineer→Data Searcher→Analyst; or Engineer→Event Tracker→Data Searcher→Analyst. Record why unused specialists were skipped.
-- After any specialist returns, finish this exact acceptance sequence without stopping: validate its opaque package; transition to `handoff_validation`; call `record_handoff_decision` with the returned HandoffEnvelope and an explicit accept/revise/reject/block decision; on acceptance transition to `synthesis` with the same opaque package reference; save the final EvidenceReport; then transition to `completed`. A run left in `handoff_validation` or `synthesis`, or without a persisted handoff, decision, and EvidenceReport, is failed—not partially complete.
+- A specialist returns normally through the native `task` result with status, the exact opaque package handle when one was saved, an evidence-based summary, validation verdict, and limitations or error. After a specialist returns, first transition to `handoff_validation`, then inspect that result and validate every ready package before using it. Request a bounded revision or route another needed specialist when appropriate; otherwise transition to `synthesis` and continue from the validated package. The runtime, not the model, standardizes assignment/handoff process records.
+- Before completion, transition to `synthesis`, save the final EvidenceReport, and then transition to `completed`. Do not leave a run in `handoff_validation` or `synthesis` when the remaining required model action is available.
 - Do not emit a final answer before `save_evidence_report` succeeds. Afterwards output only the saved `EvidenceReport.direct_answer`, without process narration.
 
 Workspace protocol:
@@ -411,7 +420,7 @@ Critical comparison rules:
 - For a non-delegating event-context task, complete this sequence in the same run: save TaskPlan with `event_context_required=true`; checkpoint event-context work; write and verify the requested source-bounded artifact; save and validate EventContext; checkpoint `handoff_validation` then `synthesis`; save EvidenceReport; checkpoint `completed`. Never end a model turn with future-tense process narration such as "now persist" or "next save" while a required tool call remains—call that tool in the same turn.
 - At task start persist the TaskPlan and checkpoint the non-delegating route. Runtime IDs, case identity, and system timestamps are injected by the system and are intentionally absent from model-facing tool inputs; producer is schema-fixed to the active role. Never discover, request, guess, echo, or override system identity; use only opaque package references returned by typed contract tools. Persist every package you actually need and finish with an EvidenceReport.
 - ObservationPackage query time is system-managed: after a successful full geodata inspection, the runtime injects its completion time. Never supply or guess it.
-- Never use generic filesystem mutation (`write_file` or `edit_file`) on the internal contracts, handoffs, decisions, or route-state tree; use only typed `save_*` and `record_*` tools there.
+- Never use generic filesystem mutation (`write_file` or `edit_file`) on the internal contracts or route-state tree; use only typed `save_*`, `validate_contract`, and `record_route_transition` tools there. No assignment or handoff envelope is part of this non-delegating baseline.
 - Respect the same AOI/time/product/QA/provenance/non-attribution boundaries and bounded repair policy.
 - Never read benchmark Gold or evaluator material.
 - Do not emit a final answer before `save_evidence_report` succeeds. Afterwards output only the saved `EvidenceReport.direct_answer`, without process narration.
@@ -464,10 +473,9 @@ def build_ntl_graph(
         _validate_skill_sources(skill_sources)
         return create_deep_agent(
             model,
-            tools=[*single_agent_tools, *CONTRACT_TOOLS, _knowledge_base_tool()],
+            tools=[*single_agent_tools, *SINGLE_AGENT_CONTRACT_TOOLS, _knowledge_base_tool()],
             system_prompt=_single_agent_prompt(),
             skills=list(skill_sources),
-            memory=[PROJECT_MEMORY_SOURCE],
             permissions=filesystem_permissions(skill_sources, memory_access=True),
             backend=RUNTIME_BACKEND,
             store=store,
@@ -523,7 +531,6 @@ def build_ntl_graph(
         system_prompt=_full_system_prompt(),
         subagents=specialists,
         skills=list(engineer_sources),
-        memory=[PROJECT_MEMORY_SOURCE],
         permissions=filesystem_permissions(engineer_sources, memory_access=True),
         backend=RUNTIME_BACKEND,
         store=store,

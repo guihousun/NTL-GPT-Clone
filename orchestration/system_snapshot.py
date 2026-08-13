@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 
-SYSTEM_SNAPSHOT_SCHEMA = "ntl.system-snapshot.v2"
+SYSTEM_SNAPSHOT_SCHEMA = "ntl.system-snapshot.v3"
 
 _CORE_CODE_FILES = (
     "graph_factory.py",
@@ -47,6 +47,7 @@ _RUNTIME_CODE_FILES = (
     "benchmark_runtime/telemetry.py",
     "orchestration/run_evidence.py",
     "orchestration/system_snapshot.py",
+    "orchestration/transfer_records.py",
 )
 
 _NTL_TOOLKIT_SOURCE_ROOT = "packages/ntl_toolkit/src/ntl_toolkit"
@@ -64,6 +65,11 @@ _HANDOFF_MODEL_NAMES = (
     "HandoffEnvelope",
     "RevisionRequest",
     "EngineerDecision",
+)
+
+_SYSTEM_TRANSFER_RECORD_MODEL_NAMES = (
+    "AssignmentRecordV2",
+    "HandoffRecordV2",
 )
 
 _RUNTIME_DISTRIBUTIONS = (
@@ -304,11 +310,19 @@ def _skill_manifest(
 def _schema_manifest() -> dict[str, Any]:
     from contracts import agent_packages
     from orchestration.route_state import RouteState
+    from orchestration import transfer_records
 
-    model_names = (*_PACKAGE_MODEL_NAMES, *_HANDOFF_MODEL_NAMES)
     models: dict[str, dict[str, Any]] = {}
-    for model_name in model_names:
+    for model_name in (*_PACKAGE_MODEL_NAMES, *_HANDOFF_MODEL_NAMES):
         model = getattr(agent_packages, model_name)
+        schema = model.model_json_schema()
+        encoded = canonical_snapshot_json(schema).encode("utf-8")
+        models[model_name] = {
+            "schema_sha256": _sha256_bytes(encoded),
+            "schema_bytes": len(encoded),
+        }
+    for model_name in _SYSTEM_TRANSFER_RECORD_MODEL_NAMES:
+        model = getattr(transfer_records, model_name)
         schema = model.model_json_schema()
         encoded = canonical_snapshot_json(schema).encode("utf-8")
         models[model_name] = {
@@ -320,7 +334,11 @@ def _schema_manifest() -> dict[str, Any]:
     return {
         "contract_schema_version": agent_packages.CONTRACT_SCHEMA_VERSION,
         "package_models": list(_PACKAGE_MODEL_NAMES),
+        # Retained for loading historical records; these are no longer
+        # model-facing requirements in the native Deep Agents harness.
         "handoff_models": list(_HANDOFF_MODEL_NAMES),
+        "legacy_handoff_models": list(_HANDOFF_MODEL_NAMES),
+        "system_transfer_record_models": list(_SYSTEM_TRANSFER_RECORD_MODEL_NAMES),
         "models": models,
         "route_state": {
             "schema_version": str(RouteState.model_fields["schema_version"].default),
@@ -363,6 +381,7 @@ def build_system_snapshot(
         DATA_SEARCHER_CONTRACT_TOOLS,
         ENGINEER_CONTRACT_TOOLS,
         EVENT_TRACKER_CONTRACT_TOOLS,
+        SINGLE_AGENT_CONTRACT_TOOLS,
         DEEPAGENTS_HARNESS_MODEL_SPECS,
         NTL_TASK_DESCRIPTION,
         RUNTIME_BACKEND,
@@ -371,7 +390,6 @@ def build_system_snapshot(
         filesystem_runtime_descriptor,
     )
     from model_config import get_api_model_name
-    from orchestration import contract_tools
     from orchestration.route_state import RouteState
     from tools import (
         analyst_tools,
@@ -421,7 +439,7 @@ def build_system_snapshot(
             }
     else:
         active_roles = ["NTL_Engineer"]
-        single_contract_names = tuple(tool.name for tool in contract_tools.CONTRACT_TOOLS)
+        single_contract_names = tuple(tool.name for tool in SINGLE_AGENT_CONTRACT_TOOLS)
         tool_allowlists = {
             "NTL_Engineer": {
                 "domain_tools": list(single_agent_tools.export_names),
@@ -542,6 +560,9 @@ def build_system_snapshot(
             }
             for name, prompt in prompts.items()
         },
+        # Deep Agents startup-memory injection is disabled for both treatments.
+        # Thread memory remains available only as a runtime filesystem route.
+        "startup_memory_sources": [],
         "code_hashes": code,
         "filesystem_runtime": runtime_filesystems,
         "package_contracts": _schema_manifest(),
@@ -572,6 +593,7 @@ def validate_system_snapshot(
         "tool_allowlists",
         "skill_files",
         "prompt_hashes",
+        "startup_memory_sources",
         "code_hashes",
         "filesystem_runtime",
         "package_contracts",
@@ -583,6 +605,8 @@ def validate_system_snapshot(
         raise ValueError("system snapshot is missing fields: " + ", ".join(missing))
     if snapshot["schema_version"] != SYSTEM_SNAPSHOT_SCHEMA:
         raise ValueError("system snapshot has the wrong schema_version")
+    if snapshot["startup_memory_sources"] != []:
+        raise ValueError("system snapshot must disable startup memory sources")
     mode = snapshot["architecture_mode"]
     if mode not in {"full", "single_agent"}:
         raise ValueError("system snapshot has an invalid architecture_mode")

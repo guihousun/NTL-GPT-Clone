@@ -23,9 +23,7 @@ import orchestration.observation_runtime as observation_runtime
 from benchmark_runtime.telemetry import BenchmarkTelemetryCallback
 from contracts.agent_packages import (
     AgentRole,
-    AssignmentEnvelope,
     ContractStatus,
-    HandoffEnvelope,
     ObservationPackage,
     PackageRef,
     TaskPlan,
@@ -202,6 +200,8 @@ def test_real_full_graph_executes_engineer_specialist_engineer_chain(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     manager, thread_id = isolated_runtime
+    legacy_memory = manager.get_workspace(thread_id) / "memory" / "NTL_AGENT_MEMORY.md"
+    legacy_memory.write_text("STALE_AGENT_MEMORY_SENTINEL", encoding="utf-8")
     run_id = "full-provider-free"
     task_id = "case-full"
     observation = _observation_contract(run_id, task_id)
@@ -224,25 +224,19 @@ def test_real_full_graph_executes_engineer_specialist_engineer_chain(
         actual_observation_ref,
         thread_id=thread_id,
     )
-    assignment = AssignmentEnvelope(
-        assignment_id="assignment-provider-free",
-        run_id=run_id,
-        task_id=task_id,
-        target_agent=AgentRole.DATA_SEARCHER,
-        objective="Persist the scripted observation package.",
-        required_output_type="ObservationPackage",
-        acceptance_criteria=["The package validates and is persisted."],
+    assignment_text = (
+        "Prepare and persist an ObservationPackage for the staged provider-free "
+        "nighttime-light raster. Inspect the raster fully, preserve the scripted "
+        "product and 2026-08-11 observation date, and accept the result only if "
+        "the typed package validates. Return status, the exact opaque package "
+        "handle, a short evidence summary, validation verdict, and limitations."
     )
-    handoff = HandoffEnvelope(
-        handoff_id="handoff-provider-free",
-        assignment_id=assignment.assignment_id,
-        run_id=run_id,
-        task_id=task_id,
-        producer=AgentRole.DATA_SEARCHER,
-        status=ContractStatus.READY,
-        package=observation_ref,
-        summary=["Product fixed.", "Temporal record fixed.", "Validation passed."],
-        validation_verdict="passed",
+    specialist_result = (
+        "status: ready\n"
+        f"package_handle: {observation_ref.path}\n"
+        "summary: Product fixed; temporal record fixed; validation passed.\n"
+        "validation_verdict: passed\n"
+        "limitations: Provider-free deterministic fixture only."
     )
     model = ScriptedChat(
         responses=[
@@ -251,9 +245,7 @@ def test_real_full_graph_executes_engineer_specialist_engineer_chain(
                     {
                         "name": "task",
                         "args": {
-                            "description": assignment.model_dump_json(
-                                exclude={"run_id", "task_id"}
-                            ),
+                            "description": assignment_text,
                             "subagent_type": "NTL_Data_Searcher",
                         },
                         "id": "delegate-1",
@@ -291,33 +283,7 @@ def test_real_full_graph_executes_engineer_specialist_engineer_chain(
                     }
                 ]
             ),
-            _response(handoff.model_dump_json()),
-            _response(
-                tool_calls=[
-                    {
-                        "name": "record_handoff_decision",
-                        "args": {
-                            "handoff": handoff.model_dump(
-                                mode="json", exclude={"run_id", "task_id"}
-                            ),
-                            "decision": {
-                                "decision": "accepted",
-                                "validation": {
-                                    "schema_valid": True,
-                                    "artifact_exists": True,
-                                    "checksum_valid": True,
-                                    "assignment_scope_valid": True,
-                                    "semantic_consistency_valid": True,
-                                    "producer_validation_passed": True,
-                                },
-                                "reason": "All deterministic checks passed.",
-                            },
-                        },
-                        "id": "accept-handoff-1",
-                        "type": "tool_call",
-                    }
-                ]
-            ),
+            _response(specialist_result),
             _response("Engineer accepted the persisted ObservationPackage."),
         ]
     )
@@ -345,7 +311,7 @@ def test_real_full_graph_executes_engineer_specialist_engineer_chain(
     )
 
     assert result["messages"][-1].content == "Engineer accepted the persisted ObservationPackage."
-    assert model.cursor == 6
+    assert model.cursor == 5
     assert any("task" in names for names in model.bound_tool_sets)
     assert model.task_tool_descriptions
     task_description = "\n".join(model.task_tool_descriptions)
@@ -353,6 +319,9 @@ def test_real_full_graph_executes_engineer_specialist_engineer_chain(
     assert "NTL_Analyst" in task_description
     assert "NTL_Event_Tracker" in task_description
     assert "general-purpose" not in task_description
+    assert "self-contained natural-language task" in task_description
+    assert "ntl.assignment.v1" not in task_description
+    assert "ntl.handoff.v1" not in task_description
 
     workspace = manager.get_workspace(thread_id)
     assert (
@@ -363,30 +332,33 @@ def test_real_full_graph_executes_engineer_specialist_engineer_chain(
         / "contracts"
         / f"observation_package__{observation.artifact_id}.json"
     ).is_file()
-    assert list((workspace / "outputs" / "runs" / run_id / "handoffs").glob("*.json"))
-    assert list((workspace / "outputs" / "runs" / run_id / "decisions").glob("*.json"))
-
     snapshot = telemetry.snapshot()
-    assert snapshot["model_usage"]["llm_call_count"] == 6
+    assert snapshot["model_usage"]["llm_call_count"] == 5
     assert [call["agent_name"] for call in snapshot["model_usage"]["calls"]] == [
         "NTL_Engineer",
         "NTL_Data_Searcher",
         "NTL_Data_Searcher",
         "NTL_Data_Searcher",
         "NTL_Engineer",
-        "NTL_Engineer",
     ]
     assert [row["tool_name"] for row in snapshot["tool_trace"]] == [
         "task",
         "geodata_inspector_tool",
         "save_observation_package",
-        "record_handoff_decision",
     ]
+    task_call = snapshot["tool_trace"][0]
+    assert task_call["arguments"] == {
+        "description": assignment_text,
+        "subagent_type": "NTL_Data_Searcher",
+    }
+    assert task_call["result_observed"] is True
+    assert task_call["result_sha256"] is not None
     seen_prompts = "\n".join(model.seen_message_texts)
     for namespace in ("common", "engineer", "data_searcher"):
         assert f"provider-free-{namespace.replace('_', '-')}" in seen_prompts
     assert "provider-free-analyst" not in seen_prompts
     assert "provider-free-event-tracker" not in seen_prompts
+    assert "STALE_AGENT_MEMORY_SENTINEL" not in seen_prompts
 
 
 def test_real_single_agent_has_no_delegation_and_persists_task_plan(
@@ -394,6 +366,8 @@ def test_real_single_agent_has_no_delegation_and_persists_task_plan(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     manager, thread_id = isolated_runtime
+    legacy_memory = manager.get_workspace(thread_id) / "memory" / "NTL_AGENT_MEMORY.md"
+    legacy_memory.write_text("STALE_AGENT_MEMORY_SENTINEL", encoding="utf-8")
     run_id = "single-provider-free"
     task_id = "case-single"
     plan = TaskPlan(
@@ -460,6 +434,7 @@ def test_real_single_agent_has_no_delegation_and_persists_task_plan(
     seen_prompts = "\n".join(model.seen_message_texts)
     for namespace in ("common", "engineer", "data_searcher", "analyst", "event_tracker"):
         assert f"provider-free-{namespace.replace('_', '-')}" in seen_prompts
+    assert "STALE_AGENT_MEMORY_SENTINEL" not in seen_prompts
     assert (
         manager.get_workspace(thread_id)
         / "outputs"
@@ -587,7 +562,9 @@ def test_pro_model_uses_the_exact_ntl_harness_without_general_purpose(
     assert result["messages"][-1].content == "Pro harness is exact and provider-free."
     assert model.task_tool_descriptions
     task_description = model.task_tool_descriptions[-1]
-    assert "Delegate one complete model-facing `ntl.assignment.v1` draft" in task_description
+    assert "Delegate one self-contained natural-language task" in task_description
+    assert "AssignmentEnvelope or HandoffEnvelope" in task_description
+    assert "ntl.assignment.v1" not in task_description
     assert "NTL_Data_Searcher" in task_description
     assert "NTL_Analyst" in task_description
     assert "NTL_Event_Tracker" in task_description
