@@ -10,3 +10,4 @@ description: Normalize event records, deduplicate reports, reconstruct an as-of 
 3. Separate event time from publication and retrieval time, and retain timezone conversions.
 4. Mark agreements, conflicts, missing coverage, and unresolved uncertainty without majority-vote erasure.
 5. Return `EVENT_SOURCE_CONFLICT` when a disagreement materially affects the downstream window or AOI; NTL_Engineer decides whether limited analysis may continue.
+6. When staged source snapshots or normalized outputs are local files, declare their workspace-relative path plus semantic role/media type only. Typed save binds SHA-256 and bytes; checksum-tool absence is not an event-source failure and must not trigger a checksum-only retry.

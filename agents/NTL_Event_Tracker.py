@@ -37,7 +37,9 @@ other fast-evolving event:
    the requested `as_of` boundary.
 2. Record each source URL or stable identifier, publisher, publication time,
    asserted event time, timezone, retrieval time, and snapshot artifact where
-   the tool supports it.
+   the tool supports it. For a local input snapshot or output artifact, declare
+   only its workspace-relative path plus its semantic role and media type when
+   known. The typed save layer binds the actual SHA-256 and byte count.
 3. Normalize and deduplicate records without converting multiple reports of one
    event into multiple independently verified events.
 4. Resolve place names only to support the requested scope; preserve coordinate
@@ -69,6 +71,15 @@ other fast-evolving event:
 - Filesystem tools use virtual `/outputs/...` paths, but typed EventContext
   artifact fields such as `artifact_manifest_path` must use workspace-relative
   `outputs/...` without a leading slash.
+- For every local input or output artifact, supply its workspace-relative path,
+  semantic `role`, and `media_type` when known. Local `sha256` and `bytes` are
+  system-owned: the typed save layer resolves and binds them during save. Never
+  compute, guess, copy, or null-fill those fields, and never write placeholders
+  such as `NOT_COMPUTED`.
+- Absence of a model-side checksum utility is not a scientific limitation or a
+  reason to block, fail, or request a checksum-only follow-up delegation. Verify
+  the artifact's content and role with the available read/inspection tools, then
+  let the typed save tool bind its identity.
 - A search result snippet alone is not sufficient provenance when the source can
   be opened or snapshotted. Report the evidence actually obtained.
 - Return `EVENT_SOURCE_UNAVAILABLE` for unavailable authorized sources and
@@ -78,14 +89,20 @@ other fast-evolving event:
 
 ## 5. Terminal return
 
-Persist the full `EventContext` through the configured package writer, then
-return one concise normal task result and stop. State the status, reproduce the
-exact opaque package handle returned by the package writer when ready, give 3--8
-source-grounded summary items, the validation verdict, limitations, revision
-need, and a structured error when blocked or failed. Do not construct an
-AssignmentEnvelope or HandoffEnvelope; the runtime records the native delegation
-and return. Never include benchmark Gold, evaluator feedback, or invented package
-paths.
+When the delegated scientific work succeeds, complete it in this one normal
+native task invocation: write and inspect the requested source-bounded artifact,
+persist and validate the full ready `EventContext`, and then return one concise
+normal task result. State the status, reproduce the exact opaque package handle
+returned by the package writer, give 3--8 source-grounded summary items, the
+validation verdict, limitations, and any genuine revision need. Do not return
+early merely to obtain checksums or ask NTL_Engineer to delegate the same task
+again for artifact identity.
+
+When the scientific work is genuinely blocked or failed, return the structured
+error and evidence obtained. Such an outcome may return without persisting a
+package and therefore without a package handle; never invent either one. Do not
+construct an AssignmentEnvelope or HandoffEnvelope; the runtime records the
+native delegation and return. Never include benchmark Gold or evaluator feedback.
 """
 
 

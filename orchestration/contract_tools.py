@@ -21,6 +21,7 @@ from contracts.agent_packages import (
     EventContext,
     EvidenceReport,
     HandoffEnvelope,
+    LocalArtifactDraft,
     ObservationPackage,
     PackageRef,
     RevisionRequest,
@@ -36,6 +37,10 @@ from orchestration.contracts_io import (
     persist_route_transition,
     save_contract,
     validate_contract_payload,
+)
+from orchestration.artifact_runtime import (
+    hydrate_local_artifact_identities,
+    strip_model_facing_local_artifact_identity,
 )
 from orchestration.observation_runtime import (
     ObservationToolEvidence,
@@ -108,12 +113,14 @@ ObservationPackageDraft = _draft_model(
     "ObservationPackageDraft",
     ObservationPackage,
     exclude=_MODEL_HIDDEN_ENVELOPE_FIELDS,
+    annotations={"analysis_ready_artifacts": list[LocalArtifactDraft]},
 )
 AnalysisPackageDraft = _draft_model(
     "AnalysisPackageDraft",
     AnalysisPackage,
     exclude=_MODEL_HIDDEN_ENVELOPE_FIELDS,
     annotations={
+        "artifacts": list[LocalArtifactDraft],
         "linked_contracts": list[OpaquePackageRef],
         "revision_request": RevisionRequestDraft | None,
     },
@@ -122,6 +129,7 @@ EvidenceReportDraft = _draft_model(
     "EvidenceReportDraft",
     EvidenceReport,
     exclude=_MODEL_HIDDEN_ENVELOPE_FIELDS,
+    annotations={"representative_artifacts": list[LocalArtifactDraft]},
 )
 HandoffEnvelopeDraft = _draft_model(
     "HandoffEnvelopeDraft",
@@ -250,7 +258,9 @@ class SaveEventContextInput(_ToolInput):
     contract: EventContextDraft = Field(
         description=(
             "Complete ntl.contract.v1 EventContext, including as-of/retrieval timestamps, sources, and the "
-            "non-attribution boundary. Gold/evaluator fields are forbidden."
+            "non-attribution boundary. For staged-input or generated-output provenance, declare only the local "
+            "path and semantic metadata; the system injects SHA-256 and byte count. Gold/evaluator fields are "
+            "forbidden."
         )
     )
 
@@ -259,8 +269,9 @@ class SaveObservationPackageInput(_ToolInput):
     contract: ObservationPackageDraft = Field(
         description=(
             "Complete ntl.contract.v1 ObservationPackage with product, availability, validation, provenance, "
-            "and any analysis-ready artifacts. The query execution time is injected from the current task's "
-            "successful full geodata inspection; Gold/evaluator fields are forbidden."
+            "and any analysis-ready artifacts. For local artifacts declare only path, media_type, and role; "
+            "the system injects SHA-256 and byte count. The query execution time is injected from the current "
+            "task's successful full geodata inspection; Gold/evaluator fields are forbidden."
         )
     )
 
@@ -269,7 +280,9 @@ class SaveAnalysisPackageInput(_ToolInput):
     contract: AnalysisPackageDraft = Field(
         description=(
             "Complete ntl.contract.v1 AnalysisPackage, including the scientific question, analysis unit, "
-            "method, validation, findings, artifacts, and any revision request. Gold/evaluator fields are forbidden."
+            "method, validation, findings, artifacts, and any revision request. For local artifacts declare "
+            "only path, media_type, and role; the system injects SHA-256 and byte count. Gold/evaluator fields "
+            "are forbidden."
         )
     )
 
@@ -278,7 +291,8 @@ class SaveEvidenceReportInput(_ToolInput):
     contract: EvidenceReportDraft = Field(
         description=(
             "Complete ntl.contract.v1 EvidenceReport, including final status, direct answer, route evidence, "
-            "validation, limitations, and runtime metrics. Gold/evaluator fields are forbidden."
+            "validation, limitations, and runtime metrics. Local artifact references need only path and semantic "
+            "metadata; the system injects SHA-256 and byte count. Gold/evaluator fields are forbidden."
         )
     )
 
@@ -459,7 +473,19 @@ def _hydrate_contract_identity(
         task_id=task_id,
         authoritative=authoritative,
     )
-    _expand_contract_package_handles(raw, thread_id=_resolve_thread_id(config))
+    thread_id = _resolve_thread_id(config)
+    raw = hydrate_local_artifact_identities(
+        raw,
+        thread_id=thread_id,
+        run_id=run_id,
+        task_id=task_id,
+        fallback_workspace=(None if authoritative else storage_manager.get_workspace(thread_id)),
+        # Full ContractEnvelope instances are trusted Python inputs.  Their
+        # legacy identity fields are discarded and recomputed, while every
+        # model-facing draft (including raw dictionaries) must omit them.
+        reject_supplied_identity=not isinstance(contract, ContractEnvelope),
+    )
+    _expand_contract_package_handles(raw, thread_id=thread_id)
     return raw
 
 
@@ -602,7 +628,7 @@ def _model_facing_contract_content(package: ContractEnvelope, *, thread_id: str)
             revision["related_package"] = _register_package_handle(
                 related, thread_id=thread_id
             ).model_dump(mode="json")
-    return raw
+    return strip_model_facing_local_artifact_identity(raw)
 
 
 def _failure(tool: str, exc: Exception) -> dict[str, Any]:

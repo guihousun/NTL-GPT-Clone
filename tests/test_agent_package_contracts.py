@@ -35,6 +35,7 @@ from orchestration.contract_tools import (
     save_task_plan,
     validate_contract,
 )
+from orchestration.artifact_runtime import bind_artifact_scope
 from orchestration.observation_runtime import (
     observation_tool_started_at,
     record_observation_tool_success,
@@ -383,6 +384,26 @@ def test_model_facing_contract_tools_hide_all_runtime_identity_fields() -> None:
         CONTRACT_TOOLS[5].args_schema.model_validate(
             {"contract_path": "/data/processed/runs/secret/contracts/package.json"}
         )
+
+
+@pytest.mark.parametrize(
+    ("tool_name", "artifact_field"),
+    [
+        ("save_observation_package", "analysis_ready_artifacts"),
+        ("save_analysis_package", "artifacts"),
+        ("save_evidence_report", "representative_artifacts"),
+    ],
+)
+def test_model_facing_local_artifact_schema_hides_system_identity(
+    tool_name: str,
+    artifact_field: str,
+) -> None:
+    tool = next(candidate for candidate in CONTRACT_TOOLS if candidate.name == tool_name)
+    schema = convert_to_openai_tool(tool)["function"]["parameters"]
+    artifact_schema = schema["properties"]["contract"]["properties"][artifact_field]
+    names = _all_schema_property_names(artifact_schema)
+    assert {"path", "media_type", "role"}.issubset(names)
+    assert {"sha256", "bytes"}.isdisjoint(names)
 
 
 def test_all_save_tools_accept_and_persist_their_parsed_nested_models(

@@ -33,6 +33,7 @@ _CORE_CODE_FILES = (
     "tools/GaoDe_tool.py",
     "tools/NTL_Code_generation.py",
     "contracts/agent_packages.py",
+    "orchestration/artifact_runtime.py",
     "orchestration/contract_tools.py",
     "orchestration/contracts_io.py",
     "orchestration/observation_runtime.py",

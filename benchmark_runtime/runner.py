@@ -21,6 +21,7 @@ import uuid
 from . import ARCHITECTURE_MODES, CASE_SCHEMA, RUN_SCHEMA
 from .contracts import path_is_linklike
 from .telemetry import BenchmarkTelemetryCallback, incomplete_model_usage, redact_text
+from orchestration.artifact_runtime import bind_artifact_scope
 from orchestration.system_snapshot import build_system_snapshot, system_snapshot_sha256
 
 
@@ -547,14 +548,21 @@ def execute_worker_payload(
     graph_completed = False
     errors: list[dict[str, str]] = []
     try:
-        stage_case_inputs(
+        staged_inputs = stage_case_inputs(
             case,
             workspace=workspace,
             cases_base_dir=Path(payload["cases_base_dir"]).resolve(),
         )
-        result = (graph_invoker or _invoke_ntl_graph)(case, payload, telemetry)
-        final_answer = final_answer_from_result(result)
-        graph_completed = True
+        with bind_artifact_scope(
+            thread_id=thread_id,
+            run_id=str(payload["task_run_id"]),
+            task_id=str(case["case_id"]),
+            workspace=workspace,
+            staged_inputs=staged_inputs,
+        ):
+            result = (graph_invoker or _invoke_ntl_graph)(case, payload, telemetry)
+            final_answer = final_answer_from_result(result)
+            graph_completed = True
     except BaseException as exc:  # noqa: BLE001 - the worker must always emit a run record
         errors.append({"code": type(exc).__name__, "message": redact_text(exc)})
         terminal_state = "failed"

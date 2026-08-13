@@ -57,6 +57,8 @@ _ARCHITECTURE_EXPECTATION_FIELDS = frozenset(
         "required_specialist",
         "require_accepted_handoff_decision",
         "forbid_delegation",
+        "task_call_count",
+        "successful_task_call_count",
     }
 )
 _SPECIALIST_TYPES = frozenset(
@@ -784,6 +786,16 @@ def validate_architecture_expectations(value: Any) -> dict[str, dict[str, Any]]:
                     )
                 entry[field] = raw[field]
 
+        for field in ("task_call_count", "successful_task_call_count"):
+            if field in raw:
+                count = raw[field]
+                if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+                    raise ValueError(
+                        f"architecture_expectations.{mode}.{field} "
+                        "must be a non-negative integer"
+                    )
+                entry[field] = count
+
         if "required_specialist" in raw:
             specialist = raw["required_specialist"]
             if not isinstance(specialist, str) or specialist not in _SPECIALIST_TYPES:
@@ -807,6 +819,30 @@ def validate_architecture_expectations(value: Any) -> dict[str, dict[str, Any]]:
             raise ValueError(
                 f"architecture_expectations.{mode} cannot both require a specialist "
                 "and forbid delegation"
+            )
+        if (
+            "task_call_count" in entry
+            and "successful_task_call_count" in entry
+            and entry["successful_task_call_count"] > entry["task_call_count"]
+        ):
+            raise ValueError(
+                f"architecture_expectations.{mode}.successful_task_call_count "
+                "cannot exceed task_call_count"
+            )
+        if mode == "single_agent" and any(
+            entry.get(field, 0) != 0
+            for field in ("task_call_count", "successful_task_call_count")
+        ):
+            raise ValueError(
+                "architecture_expectations.single_agent task counts must be zero"
+            )
+        if entry.get("forbid_delegation") and any(
+            entry.get(field, 0) != 0
+            for field in ("task_call_count", "successful_task_call_count")
+        ):
+            raise ValueError(
+                f"architecture_expectations.{mode} cannot forbid delegation "
+                "and require non-zero task counts"
             )
         normalized[str(mode)] = entry
     return normalized
@@ -888,14 +924,57 @@ def architecture_expectation_issues(
         else []
     )
     task_rows = [row for row in trace if row.get("tool_name") == "task"]
+    exact_task_gate = any(
+        field in expected
+        for field in ("task_call_count", "successful_task_call_count")
+    )
+
+    def _current_scope(row: Mapping[str, Any]) -> bool:
+        metadata = row.get("metadata")
+        return (
+            isinstance(metadata, Mapping)
+            and metadata.get("task_run_id") == expected_run_id
+            and metadata.get("case_id") == expected_task_id
+        )
+
+    current_task_rows = [row for row in task_rows if _current_scope(row)]
+    successful_current_task_rows = [
+        row
+        for row in current_task_rows
+        if row.get("status") == "succeeded" and row.get("result_observed") is True
+    ]
+    if (
+        "task_call_count" in expected
+        and len(current_task_rows) != expected["task_call_count"]
+    ):
+        issues.append("TASK_CALL_COUNT_MISMATCH")
+    if (
+        "successful_task_call_count" in expected
+        and len(successful_current_task_rows)
+        != expected["successful_task_call_count"]
+    ):
+        issues.append("SUCCESSFUL_TASK_CALL_COUNT_MISMATCH")
+
+    # Exact-count cases are tied to the current benchmark run/case and to the
+    # native Engineer-to-specialist route.  Expectations without the new
+    # fields keep their legacy trace behavior.
+    expectation_task_rows = current_task_rows if exact_task_gate else task_rows
     specialist = expected.get("required_specialist")
     if specialist:
         specialist_tasks = [
             row
-            for row in task_rows
+            for row in expectation_task_rows
             if row.get("status") == "succeeded"
+            and (not exact_task_gate or row.get("result_observed") is True)
             and isinstance(row.get("arguments"), Mapping)
             and row["arguments"].get("subagent_type") == specialist
+            and (
+                not exact_task_gate
+                or (
+                    isinstance(row.get("metadata"), Mapping)
+                    and row["metadata"].get("lc_agent_name") == "NTL_Engineer"
+                )
+            )
         ]
         if not specialist_tasks:
             issues.append("MISSING_REQUIRED_SPECIALIST_TASK")
@@ -908,6 +987,7 @@ def architecture_expectation_issues(
             row.get("tool_name") != "task"
             and isinstance(row.get("metadata"), Mapping)
             and row["metadata"].get("lc_agent_name") == specialist
+            and (not exact_task_gate or _current_scope(row))
             and bool(
                 task_ids.intersection(
                     str(item)
@@ -919,7 +999,8 @@ def architecture_expectation_issues(
         if not descendant_observed:
             issues.append("MISSING_REQUIRED_SPECIALIST_DESCENDANT_TRACE")
 
-    if expected.get("forbid_delegation") and task_rows:
+    delegation_rows = current_task_rows if exact_task_gate else task_rows
+    if expected.get("forbid_delegation") and delegation_rows:
         issues.append("FORBIDDEN_DELEGATION_OBSERVED")
     return list(dict.fromkeys(issues))
 

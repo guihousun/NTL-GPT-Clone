@@ -131,6 +131,11 @@ def test_full_smoke_prompts_use_native_task_and_system_owned_records() -> None:
         assert "require_accepted_handoff_decision" not in cases[case_id]["metadata"][
             "architecture_expectations"
         ]["full"]
+        expectations = cases[case_id]["metadata"]["architecture_expectations"]
+        assert expectations["full"]["task_call_count"] == 1
+        assert expectations["full"]["successful_task_call_count"] == 1
+        assert expectations["single_agent"]["task_call_count"] == 0
+        assert expectations["single_agent"]["successful_task_call_count"] == 0
 
         route = specs[case_id]["reference"]["architecture_route"]["full"]
         assert route["assignment_record_schema"] == "ntl.assignment-record.v2"
@@ -140,6 +145,20 @@ def test_full_smoke_prompts_use_native_task_and_system_owned_records() -> None:
         assert "persisted_handoff" not in route
         assert "accepted_engineer_decision" not in route
         assert not any("record_path" in str(key) for key in route)
+
+
+def test_fast_smoke_case_forbids_native_tasks_in_both_modes() -> None:
+    case = _record_by_case_id("cases.jsonl", "SMOKE-FAST-001")
+    assert case["metadata"]["architecture_expectations"] == {
+        "full": {
+            "task_call_count": 0,
+            "successful_task_call_count": 0,
+        },
+        "single_agent": {
+            "task_call_count": 0,
+            "successful_task_call_count": 0,
+        },
+    }
 
 
 def test_observation_case_requires_specialist_owned_inspection_and_system_query_time() -> None:
@@ -165,11 +184,15 @@ def test_observation_case_requires_specialist_owned_inspection_and_system_query_
         "required_package_types": ["ObservationPackage"],
         "required_specialist": "NTL_Data_Searcher",
         "require_completed_route": True,
+        "task_call_count": 1,
+        "successful_task_call_count": 1,
     }
     assert expectations["single_agent"] == {
         "required_package_types": ["ObservationPackage"],
         "forbid_delegation": True,
         "require_completed_route": True,
+        "task_call_count": 0,
+        "successful_task_call_count": 0,
     }
 
 

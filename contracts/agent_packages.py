@@ -137,6 +137,24 @@ class ArtifactRecord(StrictModel):
         return _safe_artifact_path(value)
 
 
+class LocalArtifactDraft(StrictModel):
+    """Model-authored local artifact metadata before system identity binding.
+
+    Checksums and byte counts are deliberately absent.  They are injected by
+    the save layer from the runner's staged-input registry or from a safely
+    resolved output file in the current workspace.
+    """
+
+    path: str = Field(min_length=1)
+    media_type: str | None = None
+    role: str = Field(default="artifact", min_length=1)
+
+    @field_validator("path")
+    @classmethod
+    def _path_is_safe(cls, value: str) -> str:
+        return _safe_artifact_path(value)
+
+
 class ContractEnvelope(StrictModel):
     schema_version: Literal["ntl.contract.v1"] = CONTRACT_SCHEMA_VERSION
     artifact_type: str

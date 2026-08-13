@@ -78,12 +78,12 @@ def test_full_architecture_uses_three_declarative_specialists(factory_without_pr
         )["permissions"]
 
 
-def test_full_prompt_allows_checksum_bound_engineer_to_analyst_route() -> None:
+def test_full_prompt_allows_system_bound_engineer_to_analyst_route() -> None:
     prompt = graph_factory._full_system_prompt()
 
     assert "Engineer→Analyst" in prompt
     assert "observation_required=false" in prompt
-    assert "checksum-bound analysis-ready inputs" in prompt
+    assert "identity will be system-bound during save" in prompt
     assert "general-purpose" not in prompt
 
 
@@ -98,6 +98,10 @@ def test_full_prompt_uses_native_task_return_and_system_owned_handoff_records() 
     assert "transition to `synthesis`" in prompt
     assert "save the final EvidenceReport" in prompt
     assert "then transition to `completed`" in prompt
+    assert "blocked/failed specialist may return without a package or handle" in prompt
+    assert "never delegate a checksum-only retry" in prompt
+    assert "One normal scientifically successful Event Tracker task" in prompt
+    assert "Do not split that work across a second delegation" in prompt
     assert "record_handoff_decision" not in prompt
     assert "ntl.assignment.v1" not in prompt
     assert "ntl.handoff.v1" not in prompt
@@ -140,6 +144,9 @@ def test_single_agent_has_union_skills_and_no_delegation(factory_without_provide
     assert "non-delegating event-context task" in graph.system_prompt
     assert "save and validate EventContext" in graph.system_prompt
     assert "future-tense process narration" in graph.system_prompt
+    assert "typed save binds its SHA-256 and byte count" in graph.system_prompt
+    assert "Never compute, guess, copy, null-fill, or placeholder-fill" in graph.system_prompt
+    assert "blocked/failed task may finish without an intermediate package or handle" in graph.system_prompt
 
 
 def test_exact_harness_profile_disables_general_purpose_and_overrides_task() -> None:
@@ -158,6 +165,9 @@ def test_exact_harness_profile_disables_general_purpose_and_overrides_task() -> 
     assert profile.tool_description_overrides["task"] == graph_factory.NTL_TASK_DESCRIPTION
     assert "{available_agents}" in graph_factory.NTL_TASK_DESCRIPTION
     assert "self-contained natural-language task" in graph_factory.NTL_TASK_DESCRIPTION
+    assert "workspace-relative path and semantic role/media type only" in graph_factory.NTL_TASK_DESCRIPTION
+    assert "never include or request its SHA-256 or byte count" in graph_factory.NTL_TASK_DESCRIPTION
+    assert "local artifact identity" in graph_factory.NTL_TASK_DESCRIPTION
     assert "AssignmentEnvelope or HandoffEnvelope" in graph_factory.NTL_TASK_DESCRIPTION
     assert "ntl.assignment.v1" not in graph_factory.NTL_TASK_DESCRIPTION
 

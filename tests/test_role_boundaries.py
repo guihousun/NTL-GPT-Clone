@@ -225,6 +225,7 @@ def test_migrated_benchmark_tool_exports_point_to_real_symbols() -> None:
 def test_specialist_prompts_save_typed_package_and_return_native_result() -> None:
     analyst = str(system_prompt_analyst.content)
     tracker = str(system_prompt_event_tracker.content)
+    tracker_flat = " ".join(tracker.split())
     assert "normal task result" in analyst
     assert "normal task result" in tracker
     assert "exact opaque package handle" in analyst
@@ -246,6 +247,34 @@ def test_specialist_prompts_save_typed_package_and_return_native_result() -> Non
     assert "never overwrite, edit, or version-replace them" in analyst
     assert "workspace-relative" in tracker
     assert "without a leading slash" in tracker
+    assert "Local `sha256` and `bytes` are system-owned" in tracker_flat
+    assert "Never compute, guess, copy, or null-fill" in tracker_flat
+    assert "one normal native task invocation" in tracker_flat
+    assert "without persisting a package and therefore without a package handle" in tracker_flat
+    assert "checksum-only follow-up delegation" in tracker_flat
+
+
+def test_model_facing_skills_delegate_local_artifact_identity_to_typed_save() -> None:
+    common_workspace = (
+        SKILLS_ROOT / "common" / "workspace-and-artifact-contract" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    common_provenance = (
+        SKILLS_ROOT / "common" / "provenance-and-evidence-boundary" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    event_skills = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in sorted((SKILLS_ROOT / "event_tracker").glob("*/SKILL.md"))
+    )
+
+    assert "workspace-relative path, its semantic `role`, and `media_type`" in common_workspace
+    assert "injects its actual SHA-256 and byte count" in common_workspace
+    assert "Never calculate, guess, copy, null-fill, or placeholder-fill" in common_workspace
+    assert "no checksum utility is available" in common_workspace
+    assert "model declares only its workspace-relative path, semantic role" in common_provenance
+    assert "system-owned fields" in common_provenance
+    assert "checksum tooling is not missing scientific evidence" in common_provenance
+    assert "same native task" in event_skills
+    assert "must not trigger a checksum-only retry" in event_skills
 
 
 def test_all_formal_tool_schemas_hide_system_managed_identity_fields() -> None:

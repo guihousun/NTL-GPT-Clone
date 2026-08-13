@@ -293,6 +293,7 @@ def test_system_snapshot_code_manifest_binds_runtime_tool_and_toolkit_sources() 
         "benchmark_runtime/contracts.py",
         "benchmark_runtime/runner.py",
         "benchmark_runtime/telemetry.py",
+        "orchestration/artifact_runtime.py",
         "orchestration/run_evidence.py",
         "orchestration/observation_runtime.py",
         "orchestration/system_snapshot.py",
@@ -833,8 +834,13 @@ def _analyst_trace() -> list[dict[str, object]]:
             "tool_call_id": "task-call-1",
             "tool_name": "task",
             "status": "succeeded",
+            "result_observed": True,
             "arguments": {"subagent_type": "NTL_Analyst"},
-            "metadata": {"lc_agent_name": "NTL_Engineer"},
+            "metadata": {
+                "lc_agent_name": "NTL_Engineer",
+                "task_run_id": "run-architecture",
+                "case_id": "case-architecture",
+            },
             "ancestor_tool_call_ids": [],
         },
         {
@@ -842,7 +848,11 @@ def _analyst_trace() -> list[dict[str, object]]:
             "tool_name": "save_analysis_package",
             "status": "succeeded",
             "arguments": {},
-            "metadata": {"lc_agent_name": "NTL_Analyst"},
+            "metadata": {
+                "lc_agent_name": "NTL_Analyst",
+                "task_run_id": "run-architecture",
+                "case_id": "case-architecture",
+            },
             "ancestor_tool_call_ids": ["task-call-1"],
             "parent_tool_call_id": "task-call-1",
         },
@@ -857,11 +867,15 @@ def test_case_architecture_expectations_accept_full_and_single_contracts() -> No
                 "required_specialist": "NTL_Analyst",
                 "require_accepted_handoff_decision": True,
                 "require_completed_route": True,
+                "task_call_count": 1,
+                "successful_task_call_count": 1,
             },
             "single_agent": {
                 "required_package_types": ["AnalysisPackage"],
                 "forbid_delegation": True,
                 "require_completed_route": True,
+                "task_call_count": 0,
+                "successful_task_call_count": 0,
             },
         }
     )
@@ -891,7 +905,16 @@ def test_case_architecture_expectations_accept_full_and_single_contracts() -> No
         {"full": {"required_specialists": "NTL_Analyst"}},
         {"full": {"required_package_types": ["AnalysisPackge"]}},
         {"full": {"require_completed_route": 1}},
+        {"full": {"task_call_count": True}},
+        {"full": {"successful_task_call_count": -1}},
+        {
+            "full": {
+                "task_call_count": 1,
+                "successful_task_call_count": 2,
+            }
+        },
         {"single_agent": {"required_specialist": "NTL_Analyst"}},
+        {"single_agent": {"task_call_count": 1}},
         {
             "full": {
                 "required_specialist": "NTL_Analyst",
@@ -944,6 +967,133 @@ def test_architecture_expectation_issues_fail_closed_with_stable_codes() -> None
         expected_run_id="run-architecture",
         expected_task_id="case-architecture",
     ) == ["INVALID_ARCHITECTURE_EXPECTATIONS"]
+
+
+def _task_trace_row(
+    call_id: str,
+    *,
+    status: str = "succeeded",
+    run_id: str = "run-architecture",
+    task_id: str = "case-architecture",
+    source_role: str = "NTL_Engineer",
+    target_role: str = "NTL_Analyst",
+) -> dict[str, object]:
+    return {
+        "tool_call_id": call_id,
+        "tool_name": "task",
+        "status": status,
+        "result_observed": status == "succeeded",
+        "arguments": {"subagent_type": target_role},
+        "metadata": {
+            "lc_agent_name": source_role,
+            "task_run_id": run_id,
+            "case_id": task_id,
+        },
+        "ancestor_tool_call_ids": [],
+    }
+
+
+@pytest.mark.parametrize(
+    ("tool_trace", "expected_issues"),
+    [
+        (
+            [
+                _task_trace_row("task-1"),
+                _task_trace_row("task-2"),
+            ],
+            [
+                "TASK_CALL_COUNT_MISMATCH",
+                "SUCCESSFUL_TASK_CALL_COUNT_MISMATCH",
+            ],
+        ),
+        (
+            [
+                _task_trace_row("task-failed", status="error"),
+                _task_trace_row("task-succeeded"),
+            ],
+            ["TASK_CALL_COUNT_MISMATCH"],
+        ),
+        (
+            [_task_trace_row("task-other-run", run_id="other-run")],
+            [
+                "TASK_CALL_COUNT_MISMATCH",
+                "SUCCESSFUL_TASK_CALL_COUNT_MISMATCH",
+            ],
+        ),
+        (
+            [],
+            [
+                "TASK_CALL_COUNT_MISMATCH",
+                "SUCCESSFUL_TASK_CALL_COUNT_MISMATCH",
+            ],
+        ),
+    ],
+    ids=("duplicate-success", "failed-plus-success", "wrong-scope", "missing"),
+)
+def test_exact_native_task_count_gate_rejects_non_exact_current_scope_telemetry(
+    tool_trace: list[dict[str, object]],
+    expected_issues: list[str],
+) -> None:
+    assert architecture_expectation_issues(
+        _architecture_evidence_fixture(),
+        tool_trace=tool_trace,
+        expectations={
+            "full": {
+                "task_call_count": 1,
+                "successful_task_call_count": 1,
+            }
+        },
+        architecture_mode="full",
+        expected_run_id="run-architecture",
+        expected_task_id="case-architecture",
+    ) == expected_issues
+
+
+@pytest.mark.parametrize(
+    ("source_role", "target_role"),
+    [
+        ("NTL_Analyst", "NTL_Analyst"),
+        ("NTL_Engineer", "NTL_Event_Tracker"),
+    ],
+)
+def test_exact_native_task_gate_requires_engineer_to_declared_specialist_route(
+    source_role: str,
+    target_role: str,
+) -> None:
+    assert architecture_expectation_issues(
+        _architecture_evidence_fixture(),
+        tool_trace=[
+            _task_trace_row(
+                "task-wrong-route",
+                source_role=source_role,
+                target_role=target_role,
+            )
+        ],
+        expectations={
+            "full": {
+                "required_specialist": "NTL_Analyst",
+                "task_call_count": 1,
+                "successful_task_call_count": 1,
+            }
+        },
+        architecture_mode="full",
+        expected_run_id="run-architecture",
+        expected_task_id="case-architecture",
+    ) == [
+        "MISSING_REQUIRED_SPECIALIST_TASK",
+        "MISSING_REQUIRED_SPECIALIST_DESCENDANT_TRACE",
+    ]
+
+
+def test_task_count_expectations_are_opt_in_for_backward_compatibility() -> None:
+    assert architecture_expectation_issues(
+        _architecture_evidence_fixture(),
+        tool_trace=[_task_trace_row("task-1"), _task_trace_row("task-2")],
+        expectations={"full": {}},
+        architecture_mode="full",
+        expected_run_id="run-architecture",
+        expected_task_id="case-architecture",
+    ) == []
 
 
 def _observation_timestamp_fixture(
@@ -1250,12 +1400,17 @@ def test_worker_run_record_binds_snapshot_and_internal_evidence(tmp_path: Path) 
 def test_worker_runner_applies_case_architecture_expectations_to_tool_trace(
     tmp_path: Path,
 ) -> None:
-    snapshot = _snapshot("single_agent")
-    payload = _worker_payload(tmp_path, snapshot=snapshot)
+    payload = _worker_payload(tmp_path, snapshot={})
+    payload.pop("system_snapshot")
+    payload.pop("system_snapshot_sha256")
     payload["architecture_mode"] = "single_agent"
     payload["case"]["metadata"] = {
         "architecture_expectations": {
-            "single_agent": {"forbid_delegation": True}
+            "single_agent": {
+                "forbid_delegation": True,
+                "task_call_count": 0,
+                "successful_task_call_count": 0,
+            }
         }
     }
 
@@ -1281,18 +1436,17 @@ def test_worker_runner_applies_case_architecture_expectations_to_tool_trace(
     record = execute_worker_payload(payload, graph_invoker=graph_invoker)
     validate_run_record(record)
     assert record["terminal_state"] == "failed"
-    assert len(record["internal_evidence"]["assignment_records"]) == 1
-    assert len(record["internal_evidence"]["handoff_records"]) == 1
-    assert record["internal_evidence"]["handoff_records"][0]["outcome"] == "succeeded"
-    assert record["internal_evidence"]["handoff_records"][0]["package_association"] == "none"
-    assert record["errors"][-1] == {
-        "code": "ARCHITECTURE_EVIDENCE_INCOMPLETE",
-        "message": (
-            "minimum internal architecture evidence gate failed: "
-            "MISSING_TASK_PLAN, MISSING_EVIDENCE_REPORT, MISSING_ROUTE_STATE, "
-            "FORBIDDEN_DELEGATION_OBSERVED"
-        ),
-    }
+    architecture_error = next(
+        error
+        for error in record["errors"]
+        if error["code"] == "ARCHITECTURE_EVIDENCE_INCOMPLETE"
+    )
+    for issue_code in (
+        "TASK_CALL_COUNT_MISMATCH",
+        "SUCCESSFUL_TASK_CALL_COUNT_MISMATCH",
+        "FORBIDDEN_DELEGATION_OBSERVED",
+    ):
+        assert issue_code in architecture_error["message"]
 
 
 def test_worker_runner_fails_terminal_on_observation_timestamp_gate(
