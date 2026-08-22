@@ -181,7 +181,38 @@ GEO_JSON_URL = "https://geo.datav.aliyun.com/areas_v3/bound/geojson?code={city_c
 
 class GetAdministrativeDivisionInput(BaseModel):
     city: str = Field(..., description="Name of the administrative division (e.g., 'Shanghai'). Chinese names are also accepted.")
-    input_name: str = Field(..., description="input filename for the Shapefile (e.g., 'shanghai_boundary.shp').")
+    input_name: str = Field(
+        ...,
+        description=(
+            "Input filename for the Shapefile (e.g., 'shanghai_boundary.shp'). "
+            "For compatibility, a mistaken leading 'inputs/' or 'outputs/' is normalized "
+            "to the run's inputs directory; absolute or traversal paths remain invalid."
+        ),
+    )
+
+
+def _normalize_acquisition_input_name(input_name: str) -> tuple[str, bool]:
+    """Normalize the common model-side ``outputs/<name>`` typo for acquisition tools.
+
+    This tool is an input/source acquisition surface: its result is intentionally
+    staged under ``inputs/`` even though a model may describe every produced file
+    as an ``outputs/`` artifact.  Only the two known virtual-root prefixes are
+    stripped; traversal, absolute paths, and other path forms remain subject to
+    ``storage_manager.resolve_input_path`` fail-closed validation.
+    """
+    value = str(input_name or "").strip().replace("\\", "/")
+    normalized = value
+    for prefix in ("inputs/", "outputs/"):
+        if normalized.lower().startswith(prefix):
+            normalized = normalized[len(prefix) :]
+            break
+    return normalized, normalized != value
+
+
+def _resolve_acquisition_input_path(input_name: str, *, thread_id: str) -> str:
+    """Resolve an acquisition output under ``inputs/`` with typo tolerance."""
+    normalized_input_name, _ = _normalize_acquisition_input_name(input_name)
+    return storage_manager.resolve_input_path(normalized_input_name, thread_id=thread_id)
 
 
 def _resolve_amap_admin_code(city: str, api_key: str) -> tuple[str, str, str]:
@@ -233,9 +264,12 @@ def get_administrative_division_data(city: str, input_name: str, config: Optiona
     if not api_key:
         return "Error: Amap API key is missing in environment variables."
 
-    # 1. Resolve input path via storage_manager
+    # 1. Resolve input path via storage_manager.  Acquisition tools write to
+    # inputs/; tolerate the common ``outputs/<name>`` model typo without
+    # weakening traversal/absolute-path checks in the storage manager.
     thread_id = _resolve_thread_id_from_config(config)
-    abs_input_path = storage_manager.resolve_input_path(input_name, thread_id=thread_id)
+    normalized_input_name, path_was_normalized = _normalize_acquisition_input_name(input_name)
+    abs_input_path = _resolve_acquisition_input_path(input_name, thread_id=thread_id)
 
     try:
         # Step 1: Get adcode
@@ -326,6 +360,9 @@ def get_administrative_division_data(city: str, input_name: str, config: Optiona
                 "status": "success",
                 "source": "Amap administrative code + Aliyun DataV boundary",
                 "requested_name": city,
+                "requested_input_name": str(input_name),
+                "normalized_input_name": normalized_input_name,
+                "input_path_normalized": path_was_normalized,
                 "resolved_name": resolved_name,
                 "adcode": str(city_code),
                 "boundary_scope": boundary_scope,
@@ -393,7 +430,7 @@ def get_administrative_division_osm(
     - str: Message indicating the success or failure of the operation and the save location.
     """
     thread_id = _resolve_thread_id_from_config(config)
-    abs_input_path = storage_manager.resolve_input_path(input_name, thread_id=thread_id)
+    abs_input_path = _resolve_acquisition_input_path(input_name, thread_id=thread_id)
     os.makedirs(os.path.dirname(abs_input_path), exist_ok=True)
 
     try:
@@ -461,7 +498,7 @@ def reverse_geocode(
     """
     addresses = []
     thread_id = _resolve_thread_id_from_config(config)
-    abs_input_path = storage_manager.resolve_input_path(input_name, thread_id=thread_id)
+    abs_input_path = _resolve_acquisition_input_path(input_name, thread_id=thread_id)
     os.makedirs(os.path.dirname(abs_input_path), exist_ok=True)
     amap_api_key = os.environ.get("amap_api_key")
 
@@ -536,7 +573,7 @@ def search_poi_nearby(
 
 
     thread_id = _resolve_thread_id_from_config(config)
-    abs_in_path = storage_manager.resolve_input_path(input_name, thread_id=thread_id)
+    abs_in_path = _resolve_acquisition_input_path(input_name, thread_id=thread_id)
     os.makedirs(os.path.dirname(abs_in_path), exist_ok=True)
 
     amap_api_key = os.environ.get("amap_api_key")
@@ -619,7 +656,7 @@ def geocode_address(
     """
     input_name = input_name or "geocode_results.csv"
     thread_id = _resolve_thread_id_from_config(config)
-    abs_input_path = storage_manager.resolve_input_path(input_name, thread_id=thread_id)
+    abs_input_path = _resolve_acquisition_input_path(input_name, thread_id=thread_id)
     os.makedirs(os.path.dirname(abs_input_path), exist_ok=True)
     amap_api_key = os.environ.get("amap_api_key")
     if not amap_api_key:

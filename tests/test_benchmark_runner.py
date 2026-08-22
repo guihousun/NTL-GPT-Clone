@@ -35,6 +35,8 @@ from benchmark_runtime.runner import (
     human_message_state,
     _invoke_ntl_graph,
     _launch_worker,
+    _declared_scientific_block_reason,
+    _scientific_execution_block_reason,
     run_batch,
     sha256_file,
     stage_case_inputs,
@@ -624,6 +626,208 @@ def test_worker_failure_after_complete_model_call_preserves_usage(tmp_path: Path
     assert record["model_usage"]["total_tokens"] == 6
 
 
+def test_worker_rejects_planning_only_final_answer(tmp_path: Path) -> None:
+    payload = _payload(tmp_path, case_id="planning-only")
+
+    def planning_only(
+        _case_record: dict[str, object],
+        _payload_record: dict[str, object],
+        telemetry: BenchmarkTelemetryCallback,
+    ) -> object:
+        tool_run_id = uuid4()
+        telemetry.on_tool_start(
+            {"name": "read_file"},
+            '{"file_path":"/skills/engineer/task-planning-and-routing/SKILL.md"}',
+            run_id=tool_run_id,
+        )
+        telemetry.on_tool_end("instructions", run_id=tool_run_id)
+        return {"messages": [AIMessage(content="I will now execute the task.", name="NTL_Engineer")]}
+
+    record = execute_worker_payload(payload, graph_invoker=planning_only)
+
+    validate_run_record(record)
+    assert record["terminal_state"] == "failed"
+    assert {item["code"] for item in record["errors"]} >= {"NO_SUBSTANTIVE_EXECUTION"}
+
+
+def test_worker_accepts_registered_task_execution_before_final_answer(tmp_path: Path) -> None:
+    payload = _payload(tmp_path, case_id="registered-execution")
+
+    def executed(
+        _case_record: dict[str, object],
+        _payload_record: dict[str, object],
+        telemetry: BenchmarkTelemetryCallback,
+    ) -> object:
+        tool_run_id = uuid4()
+        telemetry.on_tool_start({"name": "NTL_download_tool"}, "{}", run_id=tool_run_id)
+        telemetry.on_tool_end({"status": "completed"}, run_id=tool_run_id)
+        return {"messages": [AIMessage(content="Retrieved the requested data.", name="NTL_Engineer")]}
+
+    record = execute_worker_payload(payload, graph_invoker=executed)
+
+    validate_run_record(record)
+    assert record["terminal_state"] == "succeeded"
+    assert not {item["code"] for item in record["errors"]} & {"NO_SUBSTANTIVE_EXECUTION"}
+
+
+def test_worker_inventories_runtime_generated_input_without_requiring_a_package(tmp_path: Path) -> None:
+    """Retrieval-only tools may write verified results under inputs/.
+
+    The runner records only files created after case staging, so a model does
+    not need to copy a successful download into outputs/ just to make it
+    auditable.
+    """
+
+    payload = _payload(tmp_path, case_id="generated-input")
+
+    def retrieved(
+        _case_record: dict[str, object],
+        payload_record: dict[str, object],
+        telemetry: BenchmarkTelemetryCallback,
+    ) -> object:
+        generated = (
+            Path(str(payload_record["workspace_root"]))
+            / str(payload_record["thread_id"])
+            / "inputs"
+            / "retrieved.tif"
+        )
+        generated.write_bytes(b"verified live retrieval")
+        tool_run_id = uuid4()
+        telemetry.on_tool_start({"name": "NTL_download_tool"}, "{}", run_id=tool_run_id)
+        telemetry.on_tool_end({"status": "completed"}, run_id=tool_run_id)
+        return {"messages": [AIMessage(content="Retrieved the requested layer.", name="NTL_Engineer")]}
+
+    record = execute_worker_payload(payload, graph_invoker=retrieved)
+
+    validate_run_record(record)
+    assert record["terminal_state"] == "succeeded"
+    assert [artifact["relative_path"] for artifact in record["artifacts"]] == [
+        "inputs/retrieved.tif"
+    ]
+
+
+def test_worker_marks_blocked_evidence_report_as_scientific_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A typed blocked result is useful evidence, but not a successful task."""
+
+    payload = _payload(tmp_path, case_id="blocked-evidence-report")
+
+    def blocked_evidence(*_args: object, **_kwargs: object) -> tuple[dict[str, object], list[str], list[str], str]:
+        return (
+            {
+                "schema_version": "ntl-benchmark.internal-evidence.v1",
+                "content_policy": "identity_metadata_and_hashes_only",
+                "valid": True,
+                "package_counts": {
+                    "TaskPlan": 0,
+                    "EventContext": 0,
+                    "ObservationPackage": 0,
+                    "AnalysisPackage": 0,
+                    "EvidenceReport": 1,
+                },
+                "packages": [
+                    {
+                        "relative_path": "outputs/runs/run-blocked/contracts/evidence_report.json",
+                        "sha256": "a" * 64,
+                        "bytes": 1,
+                        "artifact_type": "EvidenceReport",
+                        "status": "blocked",
+                    },
+                ]
+                ,
+                "handoffs": [],
+                "decisions": [],
+                "route_states": [],
+                "invalid_records": [],
+                "issue_count": 0,
+                "discovered_run_ids": ["run-blocked"],
+            },
+            [],
+            [],
+            "Earth Engine could not provide the requested qualified observation.",
+        )
+
+    monkeypatch.setattr("benchmark_runtime.runner._collect_architecture_evidence", blocked_evidence)
+
+    def executed_but_blocked(
+        _case_record: dict[str, object],
+        _payload_record: dict[str, object],
+        telemetry: BenchmarkTelemetryCallback,
+    ) -> object:
+        tool_run_id = uuid4()
+        telemetry.on_tool_start({"name": "NTL_download_tool"}, "{}", run_id=tool_run_id)
+        telemetry.on_tool_end({"status": "blocked"}, run_id=tool_run_id)
+        return {"messages": [AIMessage(content="No qualified observation was available.", name="NTL_Engineer")]}
+
+    record = execute_worker_payload(payload, graph_invoker=executed_but_blocked)
+
+    validate_run_record(record)
+    assert record["terminal_state"] == "failed"
+    assert {item["code"] for item in record["errors"]} >= {"SCIENTIFIC_EXECUTION_BLOCKED"}
+    assert _scientific_execution_block_reason({"packages": []}) is None
+
+
+def test_worker_marks_explicit_blocked_result_without_package_as_failure(tmp_path: Path) -> None:
+    """A natural-language blocked closeout is not counted as a successful answer."""
+
+    payload = _payload(tmp_path, case_id="blocked-natural-language")
+
+    def executed_but_explicitly_blocked(
+        _case_record: dict[str, object],
+        _payload_record: dict[str, object],
+        telemetry: BenchmarkTelemetryCallback,
+    ) -> object:
+        tool_run_id = uuid4()
+        telemetry.on_tool_start({"name": "NTL_download_tool"}, "{}", run_id=tool_run_id)
+        telemetry.on_tool_end({"status": "error"}, run_id=tool_run_id)
+        return {
+            "messages": [
+                AIMessage(
+                    content=(
+                        "## Result: requested daily layers — BLOCKED\\n\\n"
+                        "The layers could not be materialized and no data was acquired."
+                    ),
+                    name="NTL_Engineer",
+                )
+            ]
+        }
+
+    record = execute_worker_payload(payload, graph_invoker=executed_but_explicitly_blocked)
+
+    validate_run_record(record)
+    assert record["terminal_state"] == "failed"
+    assert {item["code"] for item in record["errors"]} >= {"SCIENTIFIC_EXECUTION_BLOCKED"}
+    assert _declared_scientific_block_reason({"packages": []}, "Retrieved an output.") is None
+
+
+def test_worker_rejects_process_only_answer_after_execution(tmp_path: Path) -> None:
+    payload = _payload(tmp_path, case_id="unfinished-closeout")
+
+    def executed_but_unfinished(
+        _case_record: dict[str, object],
+        _payload_record: dict[str, object],
+        telemetry: BenchmarkTelemetryCallback,
+    ) -> object:
+        tool_run_id = uuid4()
+        telemetry.on_tool_start({"name": "NTL_download_tool"}, "{}", run_id=tool_run_id)
+        telemetry.on_tool_end({"status": "completed"}, run_id=tool_run_id)
+        return {
+            "messages": [
+                AIMessage(
+                    content="Saving the final EvidenceReport, then delivering the direct answer.",
+                    name="NTL_Engineer",
+                )
+            ]
+        }
+
+    record = execute_worker_payload(payload, graph_invoker=executed_but_unfinished)
+
+    validate_run_record(record)
+    assert record["terminal_state"] == "no_final_answer"
+    assert {item["code"] for item in record["errors"]} >= {"PREMATURE_PROCESS_NARRATION"}
+
+
 def test_internal_worker_subprocess_emits_failed_record_without_provider_call(tmp_path: Path) -> None:
     payload = _payload(tmp_path, case_id="subprocess-case")
     payload_path = tmp_path / "payload.json"
@@ -798,7 +1002,7 @@ def test_human_message_state_contains_only_the_raw_prompt() -> None:
     assert state["messages"][0].content == prompt
 
 
-def test_graph_invocation_receives_architecture_mode_in_builder_and_metadata(
+def test_graph_invocation_receives_architecture_mode_and_resource_profile_in_builder_and_metadata(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     observed: dict[str, object] = {}
@@ -830,6 +1034,7 @@ def test_graph_invocation_receives_architecture_mode_in_builder_and_metadata(
     payload = {
         "model": "fake-model",
         "architecture_mode": "single_agent",
+        "resource_profile": "tools_prompt_only",
         "request_timeout_seconds": 30,
         "thread_id": "thread-mode-test",
         "task_run_id": "task-run-mode-test",
@@ -840,7 +1045,9 @@ def test_graph_invocation_receives_architecture_mode_in_builder_and_metadata(
     _invoke_ntl_graph(_case("mode-test"), payload, BenchmarkTelemetryCallback())
 
     assert observed["builder"]["architecture_mode"] == "single_agent"
+    assert observed["builder"]["resource_profile"] == "tools_prompt_only"
     assert observed["config"]["metadata"]["architecture_mode"] == "single_agent"
+    assert observed["config"]["metadata"]["resource_profile"] == "tools_prompt_only"
 
 
 def _write_cases(path: Path, count: int) -> None:
@@ -892,13 +1099,14 @@ def _fake_success_record(payload: dict[str, object]) -> dict[str, object]:
         "environment": {
             "workspace": str(workspace.resolve()),
             "architecture_mode": payload["architecture_mode"],
+            "resource_profile": payload.get("resource_profile", "standard"),
         },
     }
 
 
 def test_batch_runner_never_exceeds_four_concurrent_launches(tmp_path: Path) -> None:
     cases_path = tmp_path / "cases.jsonl"
-    _write_cases(cases_path, 8)
+    _write_cases(cases_path, 4)
     output_dir = tmp_path / "batch"
     guard = Lock()
     active = 0
@@ -932,18 +1140,32 @@ def test_batch_runner_never_exceeds_four_concurrent_launches(tmp_path: Path) -> 
     manifest = json.loads((output_dir / "batch-manifest.json").read_text(encoding="utf-8"))
     assert manifest["configured_concurrency"] == 4
     assert manifest["architecture_mode"] == "full"
-    assert manifest["task_count"] == 8
+    assert manifest["resource_profile"] == "standard"
+    assert manifest["task_count"] == 4
+    assert manifest["system_finalizer_excluded_from_task_model_usage"] is True
+    # This intentionally minimal fake record has no internal-evidence block;
+    # the collector therefore records it without claiming scientific closeout.
+    assert manifest["system_finalization_counts"] == {"completed_with_audit_warnings": 4}
+    system_evidence_dir = Path(manifest["system_evidence_dir"])
+    assert system_evidence_dir.is_dir()
+    system_evidence = list(system_evidence_dir.glob("*.json"))
+    assert len(system_evidence) == 4
+    assert all(
+        json.loads(path.read_text(encoding="utf-8"))["excluded_from_task_model_usage"] is True
+        for path in system_evidence
+    )
     assert isinstance(manifest["environment"]["system_git_dirty"], bool)
     assert len(manifest["environment"]["system_git_status_sha256"]) == 64
     records = [json.loads(line) for line in (output_dir / "task-runs.jsonl").read_text(encoding="utf-8").splitlines()]
-    assert len(records) == 8
+    assert len(records) == 4
     assert all(record["environment"]["architecture_mode"] == "full" for record in records)
+    assert all(record["environment"]["resource_profile"] == "standard" for record in records)
     assert all(validate_run_record(record) for record in records)
     payloads = [
         json.loads(path.read_text(encoding="utf-8"))
         for path in sorted((output_dir / "control").glob("*.json"))
     ]
-    assert len(payloads) == 8
+    assert len(payloads) == 4
     for payload in payloads:
         opaque = str(payload["thread_id"])
         assert re.fullmatch(r"ws-[0-9a-f]{32}", opaque)
@@ -984,7 +1206,7 @@ def test_parent_launcher_failure_still_emits_comparable_wall_clock_contract(
     validate_run_record(record)
 
 
-def test_batch_runner_rejects_more_than_four_workers_without_creating_output(tmp_path: Path) -> None:
+def test_batch_runner_rejects_more_than_eight_workers_without_creating_output(tmp_path: Path) -> None:
     cases_path = tmp_path / "cases.jsonl"
     _write_cases(cases_path, 1)
     output_dir = tmp_path / "batch"
@@ -993,7 +1215,7 @@ def test_batch_runner_rejects_more_than_four_workers_without_creating_output(tmp
         output_dir=str(output_dir),
         model="fake-model",
         architecture_mode="full",
-        max_workers=5,
+        max_workers=9,
         task_timeout_seconds=60,
         request_timeout_seconds=30,
         recursion_limit=20,
@@ -1044,6 +1266,7 @@ def test_cli_defaults_to_four_workers_and_supports_case_filters() -> None:
     )
     assert args.max_workers == 4
     assert args.architecture_mode == "full"
+    assert args.resource_profile == "standard"
     assert args.case_id == ["case-a", "case-b"]
     assert args.task_timeout_seconds == 1800.0
 

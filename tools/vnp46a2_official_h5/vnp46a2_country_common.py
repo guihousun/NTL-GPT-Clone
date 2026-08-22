@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -8,7 +7,7 @@ from typing import Iterable
 
 import geopandas as gpd
 import osmnx as ox
-from dotenv import load_dotenv
+from gee_runtime import initialize_ee
 
 
 DATASET_ID = "NASA/VIIRS/002/VNP46A2"
@@ -52,12 +51,6 @@ COUNTRIES: list[CountrySpec] = [
 ]
 
 
-def load_project_env() -> None:
-    for candidate in (Path.cwd() / ".env", Path(__file__).resolve().parents[1] / ".env"):
-        if candidate.exists():
-            load_dotenv(candidate)
-
-
 def iter_dates(start: str, end: str) -> list[str]:
     current = datetime.strptime(start, "%Y-%m-%d").date()
     end_day = datetime.strptime(end, "%Y-%m-%d").date()
@@ -89,13 +82,7 @@ def selected_countries(tokens: Iterable[str] | None) -> list[CountrySpec]:
 def init_ee() -> str:
     import ee
 
-    load_project_env()
-    project = os.getenv("GEE_DEFAULT_PROJECT_ID")
-    if project:
-        ee.Initialize(project=project)
-    else:
-        ee.Initialize()
-    return project or ""
+    return initialize_ee(ee_module=ee)
 
 
 def gee_latest_day() -> str:

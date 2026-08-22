@@ -34,6 +34,7 @@ from orchestration.run_evidence import (
     PACKAGE_ARTIFACT_INTEGRITY_MISMATCH,
     architecture_expectation_issues,
     collect_internal_evidence,
+    minimum_architecture_evidence_issues,
     observation_timestamp_trace_issues,
     package_artifact_integrity_issues,
     validate_architecture_expectations,
@@ -72,9 +73,17 @@ _GEOSPATIAL_RUNTIME_DISTRIBUTIONS = (
     "pandas",
 )
 
+_GEE_RUNTIME_DISTRIBUTIONS = (
+    "earthengine-api",
+    "geemap",
+    "google-auth",
+    "python-dotenv",
+)
+
 _EXPECTED_RUNTIME_DISTRIBUTIONS = (
     *_DEEPAGENTS_RUNTIME_PINS,
     *_GEOSPATIAL_RUNTIME_DISTRIBUTIONS,
+    *_GEE_RUNTIME_DISTRIBUTIONS,
 )
 
 
@@ -173,7 +182,7 @@ def test_system_snapshot_is_deterministic_secret_free_and_architecture_exact() -
     single = _snapshot("single_agent")
 
     assert full_a == full_b
-    assert full_a["schema_version"] == "ntl.system-snapshot.v3"
+    assert full_a["schema_version"] == "ntl.system-snapshot.v4"
     assert system_snapshot_sha256(full_a) == system_snapshot_sha256(full_b)
     validate_system_snapshot(
         full_a,
@@ -257,14 +266,54 @@ def test_system_snapshot_is_deterministic_secret_free_and_architecture_exact() -
     }
     assert len(full_a["skill_files"]) >= 5
     assert system_snapshot_sha256(full_a) != system_snapshot_sha256(single)
-    assert full_a["startup_memory_sources"] == []
-    assert single["startup_memory_sources"] == []
+    assert full_a["startup_memory_sources"] == single["startup_memory_sources"]
+    assert full_a["startup_memory_sources"][0]["source"] == "/memories/AGENTS.md"
+    assert full_a["startup_memory_sources"][0]["relative_path"] == ".ntl-gpt/AGENTS.md"
+    assert full_a["gee_runtime"] == single["gee_runtime"]
+    assert full_a["gee_runtime"]["descriptor"]["project_binding"] == "single_deployment_project"
+    assert full_a["gee_runtime"]["credential_mode"] in {"ambient", "service_account"}
 
     serialized = json.dumps(full_a, ensure_ascii=False).casefold()
+    assert "sound-dream" not in serialized
+    assert "empyrean-caster" not in serialized
     assert "api_key" not in serialized
     assert "password" not in serialized
     assert "gold_answer" not in serialized
     assert str(REPO_ROOT).casefold() not in serialized
+
+
+def test_tools_prompt_only_snapshot_records_the_frozen_resource_surface() -> None:
+    from graph_factory import _full_system_prompt, _prompt_for_resource_profile
+
+    snapshot = build_system_snapshot(
+        REPO_ROOT,
+        architecture_mode="full",
+        model_name="deepseek-v4-flash",
+        resource_profile="tools_prompt_only",
+    )
+
+    validate_system_snapshot(
+        snapshot,
+        expected_sha256=system_snapshot_sha256(snapshot),
+        architecture_mode="full",
+        model_name="deepseek-v4-flash",
+    )
+    assert snapshot["topology"]["resource_profile"] == "tools_prompt_only"
+    assert snapshot["topology"]["skills_enabled"] is False
+    assert snapshot["topology"]["rag_enabled"] is False
+    assert snapshot["topology"]["startup_memory_enabled"] is False
+    assert snapshot["skill_files"] == []
+    assert snapshot["startup_memory_sources"] == []
+    assert all(
+        not role["knowledge_tools"] for role in snapshot["tool_allowlists"].values()
+    )
+    assert all(
+        "/skills/" not in descriptor["routes"]
+        for descriptor in snapshot["filesystem_runtime"].values()
+    )
+    assert snapshot["prompt_hashes"]["NTL_Engineer"] == _caller_prompt_identity(
+        _prompt_for_resource_profile(_full_system_prompt(), "tools_prompt_only")
+    )
 
 
 def test_system_snapshot_code_manifest_binds_runtime_tool_and_toolkit_sources() -> None:
@@ -272,6 +321,9 @@ def test_system_snapshot_code_manifest_binds_runtime_tool_and_toolkit_sources() 
 
     snapshot = _snapshot("full")
     code_hashes = snapshot["code_hashes"]
+    assert "gee_runtime.py" in code_hashes
+    assert "runtime_governance.py" in code_hashes
+    assert "storage_manager.py" in code_hashes
     code_paths = list(code_hashes)
     expected_export_modules = {
         f"tools/{module_name.removeprefix('.')}.py"
@@ -292,6 +344,7 @@ def test_system_snapshot_code_manifest_binds_runtime_tool_and_toolkit_sources() 
         "packages/ntl_toolkit/pyproject.toml",
         "benchmark_runtime/contracts.py",
         "benchmark_runtime/runner.py",
+        "benchmark_runtime/system_finalizer.py",
         "benchmark_runtime/telemetry.py",
         "orchestration/artifact_runtime.py",
         "orchestration/run_evidence.py",
@@ -299,6 +352,10 @@ def test_system_snapshot_code_manifest_binds_runtime_tool_and_toolkit_sources() 
         "orchestration/system_snapshot.py",
         "orchestration/transfer_records.py",
         "tools/geodata_inspector_tool.py",
+        "tools/NTL_Knowledge_Base.py",
+        "tools/NTL_Knowledge_Base_Searcher.py",
+        "tools/vnp46a2_official_h5/vnp46a2_country_common.py",
+        "utils/ntl_embeddings.py",
         "packages/ntl_toolkit/src/ntl_toolkit/adapters/langchain/local.py",
         "packages/ntl_toolkit/src/ntl_toolkit/core/raster.py",
         "packages/ntl_toolkit/src/ntl_toolkit/core/urban_structure.py",
@@ -311,6 +368,24 @@ def test_system_snapshot_code_manifest_binds_runtime_tool_and_toolkit_sources() 
         and ".." not in relative_path.split("/")
         for relative_path, row in code_hashes.items()
     )
+
+
+def test_system_snapshot_gee_config_fingerprint_changes_without_exposing_ids(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("GEE_DEFAULT_PROJECT_ID", "runtime-project-a")
+    monkeypatch.setenv("GEE_BOUNDARY_ASSET_PROJECT_ID", "boundary-project-a")
+    first = _snapshot("full")
+    monkeypatch.setenv("GEE_DEFAULT_PROJECT_ID", "runtime-project-b")
+    second = _snapshot("full")
+
+    assert first["gee_runtime"]["project_fingerprint"] != second["gee_runtime"][
+        "project_fingerprint"
+    ]
+    assert first["gee_runtime"]["boundary_owner_configured_separately"] is True
+    serialized = json.dumps(first, ensure_ascii=False)
+    assert "runtime-project-a" not in serialized
+    assert "boundary-project-a" not in serialized
 
 
 def test_code_manifest_hash_changes_when_temporary_source_changes(
@@ -826,6 +901,54 @@ def _architecture_evidence_fixture() -> dict[str, object]:
     }
     validate_internal_evidence(evidence)
     return evidence
+
+
+def test_minimum_architecture_evidence_allows_multiple_valid_task_plans() -> None:
+    evidence = _architecture_evidence_fixture()
+    run_id = "run-architecture"
+    task_id = "case-architecture"
+    evidence["packages"].extend(
+        [
+            {
+                "relative_path": (
+                    f"outputs/runs/{run_id}/contracts/task_plan__plan-{index}.json"
+                ),
+                "sha256": f"{10 + index:064x}",
+                "bytes": 200 + index,
+                "artifact_type": "TaskPlan",
+                "artifact_id": f"plan-{index}",
+                "run_id": run_id,
+                "task_id": task_id,
+                "producer": "NTL_Engineer",
+                "status": "ready",
+            }
+            for index in (1, 2)
+        ]
+    )
+    evidence["packages"].append(
+        {
+            "relative_path": (
+                f"outputs/runs/{run_id}/contracts/evidence_report__report-1.json"
+            ),
+            "sha256": f"{13:064x}",
+            "bytes": 213,
+            "artifact_type": "EvidenceReport",
+            "artifact_id": "report-1",
+            "run_id": run_id,
+            "task_id": task_id,
+            "producer": "NTL_Engineer",
+            "status": "ready",
+        }
+    )
+    evidence["package_counts"].update({"TaskPlan": 2, "EvidenceReport": 1})
+
+    assert validate_internal_evidence(evidence)["package_counts"]["TaskPlan"] == 2
+    assert minimum_architecture_evidence_issues(
+        evidence,
+        architecture_mode="full",
+        expected_run_id=run_id,
+        expected_task_id=task_id,
+    ) == []
 
 
 def _analyst_trace() -> list[dict[str, object]]:
@@ -1387,8 +1510,13 @@ def test_worker_run_record_binds_snapshot_and_internal_evidence(tmp_path: Path) 
         "AnalysisPackage": 0,
         "EvidenceReport": 0,
     }
+    # A graph that emits only prose has not performed the benchmark task.
+    # Architecture diagnostics remain useful, but cannot upgrade that run to success.
     assert record["terminal_state"] == "failed"
-    assert record["errors"][-1] == {
+    assert any(
+        error["code"] == "NO_SUBSTANTIVE_EXECUTION" for error in record["errors"]
+    )
+    assert record["audit_issues"][0] == {
         "code": "ARCHITECTURE_EVIDENCE_INCOMPLETE",
         "message": (
             "minimum internal architecture evidence gate failed: "
@@ -1435,10 +1563,13 @@ def test_worker_runner_applies_case_architecture_expectations_to_tool_trace(
 
     record = execute_worker_payload(payload, graph_invoker=graph_invoker)
     validate_run_record(record)
-    assert record["terminal_state"] == "failed"
+    # The native task call is substantive execution.  This test verifies that
+    # architecture diagnostics are recorded, while the runner leaves the
+    # terminal state to the task-level success policy.
+    assert record["terminal_state"] == "succeeded"
     architecture_error = next(
         error
-        for error in record["errors"]
+        for error in record["audit_issues"]
         if error["code"] == "ARCHITECTURE_EVIDENCE_INCOMPLETE"
     )
     for issue_code in (
@@ -1467,9 +1598,12 @@ def test_worker_runner_fails_terminal_on_observation_timestamp_gate(
     )
     assert record["terminal_state"] == "failed"
     assert any(
+        error["code"] == "NO_SUBSTANTIVE_EXECUTION" for error in record["errors"]
+    )
+    assert any(
         error["code"] == "ARCHITECTURE_EVIDENCE_INCOMPLETE"
         and "OBSERVATION_TIMESTAMP_OUTSIDE_RUN" in error["message"]
-        for error in record["errors"]
+        for error in record["audit_issues"]
     )
 
 
@@ -1538,13 +1672,15 @@ def test_worker_runner_fails_closed_when_typed_package_artifact_drifts(
     validate_run_record(record)
     assert record["internal_evidence"]["valid"] is True
     assert record["terminal_state"] == "failed"
-    assert record["errors"][-1] == {
-        "code": PACKAGE_ARTIFACT_INTEGRITY_MISMATCH,
-        "message": (
+    assert any(
+        issue["code"] == PACKAGE_ARTIFACT_INTEGRITY_MISMATCH
+        and issue["message"]
+        == (
             "post-run typed-package artifact integrity gate failed: "
             "PACKAGE_ARTIFACT_INTEGRITY_MISMATCH"
-        ),
-    }
+        )
+        for issue in record["audit_issues"]
+    )
 
 
 def test_runner_import_before_worker_env_still_persists_contracts_in_batch_workspace(
@@ -1557,6 +1693,7 @@ import json
 import os
 from pathlib import Path
 import sys
+from uuid import uuid4
 
 from benchmark_runtime.runner import execute_worker_payload
 
@@ -1640,6 +1777,18 @@ def graph_invoker(_case, _payload, _telemetry):
         config=config,
     )
     assert report["status"] == "success", report
+    # This test is about worker storage isolation.  Record a bounded domain
+    # operation so the run also satisfies the runner's substantive-execution
+    # requirement rather than relying on contracts alone.
+    call_id = uuid4()
+    _telemetry.on_tool_start(
+        {"name": "geodata_quick_check_tool"},
+        "",
+        run_id=call_id,
+        metadata={"task_run_id": task_run_id, "case_id": case_id},
+        inputs={"path": "inputs/checked.txt"},
+    )
+    _telemetry.on_tool_end({"status": "success"}, run_id=call_id)
     return {"messages": [{"type": "ai", "content": "done"}]}
 
 record = execute_worker_payload(payload, graph_invoker=graph_invoker)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import requests
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -57,7 +58,18 @@ def _run_curl_json(url: str, headers: list[str] | None = None, timeout: int = 12
         check=False,
     )
     if proc.returncode != 0:
-        raise RuntimeError(f"curl failed ({proc.returncode}): {proc.stderr.strip()}")
+        request_headers: dict[str, str] = {}
+        for header in headers or []:
+            name, separator, value = header.partition(":")
+            if separator and name.strip():
+                request_headers[name.strip()] = value.strip()
+        try:
+            response = requests.get(url, headers=request_headers, timeout=timeout)
+            response.raise_for_status()
+            return response.json()
+        except (requests.RequestException, ValueError) as exc:
+            curl_detail = (proc.stderr or "").strip() or f"curl exited with code {proc.returncode}"
+            raise RuntimeError(f"CMR transport failed after curl fallback: {curl_detail}; requests={type(exc).__name__}") from exc
     try:
         return json.loads(proc.stdout)
     except json.JSONDecodeError as exc:

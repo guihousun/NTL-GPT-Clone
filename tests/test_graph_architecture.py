@@ -59,6 +59,7 @@ def test_full_architecture_uses_three_declarative_specialists(factory_without_pr
         "save_task_plan",
         "save_evidence_report",
         "record_route_transition",
+        "execute_geospatial_script_tool",
     }
     assert "record_handoff_decision" not in engineer_tool_names
 
@@ -84,7 +85,11 @@ def test_full_prompt_allows_system_bound_engineer_to_analyst_route() -> None:
     assert "Engineer→Analyst" in prompt
     assert "observation_required=false" in prompt
     assert "identity will be system-bound during save" in prompt
-    assert "general-purpose" not in prompt
+    assert "ordinary local code" in prompt
+    assert "nighttime-light-specific" in prompt
+    assert "complex work merely because it is complex" in prompt
+    assert "general-purpose analysis" in prompt
+    assert "general-purpose subagent" not in prompt
 
 
 def test_full_prompt_uses_native_task_return_and_system_owned_handoff_records() -> None:
@@ -93,11 +98,18 @@ def test_full_prompt_uses_native_task_return_and_system_owned_handoff_records() 
     assert "Engineer→Event Tracker" in prompt
     assert "native `task` result" in prompt
     assert "first transition to `handoff_validation`" in prompt
-    assert "validate every ready package" in prompt
+    assert "validate only its exact ready package handle once" in prompt
     assert "runtime, not the model" in prompt
     assert "transition to `synthesis`" in prompt
     assert "save the final EvidenceReport" in prompt
-    assert "then transition to `completed`" in prompt
+    assert "system finalizer collects run-level audit evidence" in prompt
+    assert "failed save must never block the direct answer" in prompt
+    assert "Do not wait for or retry an EvidenceReport save" in prompt
+    assert "An intent, route recommendation, or plan is never a task result" in prompt
+    assert "never finish after merely saying that you will do so" in prompt
+    assert "retrieval-only request" in prompt
+    assert "do not create a TaskPlan or ObservationPackage purely for audit" in prompt
+    assert "then `completed` after required scientific work" in prompt
     assert "blocked/failed specialist may return without a package or handle" in prompt
     assert "never delegate a checksum-only retry" in prompt
     assert "One normal scientifically successful Event Tracker task" in prompt
@@ -105,6 +117,49 @@ def test_full_prompt_uses_native_task_return_and_system_owned_handoff_records() 
     assert "record_handoff_decision" not in prompt
     assert "ntl.assignment.v1" not in prompt
     assert "ntl.handoff.v1" not in prompt
+    assert "Preserve every returned workspace-relative artifact path" in prompt
+    assert "status: failed` is an audit diagnostic" in prompt
+
+
+def test_full_mode_requests_serial_tool_calls_without_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    requested: list[dict[str, Any]] = []
+
+    def _fake_build_llm(**kwargs: Any) -> object:
+        requested.append(kwargs)
+        return object()
+
+    monkeypatch.setattr(graph_factory, "_build_llm", _fake_build_llm)
+    monkeypatch.setattr(graph_factory, "_knowledge_base_tool", lambda: object())
+    monkeypatch.setattr(graph_factory, "create_deep_agent", _fake_create_deep_agent)
+    monkeypatch.setattr(graph_factory, "_validate_skill_sources", lambda _sources: None)
+
+    graph_factory.build_ntl_graph("deepseek-v4-flash", "test", architecture_mode="full")
+    graph_factory.build_ntl_graph("deepseek-v4-flash", "test", architecture_mode="single_agent")
+
+    assert requested[0]["parallel_tool_calls"] is False
+    assert requested[1]["parallel_tool_calls"] is None
+
+
+def test_build_llm_places_serial_tool_call_option_in_openai_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        graph_factory,
+        "get_model_config",
+        lambda _name: SimpleNamespace(provider="deepseek", api_key_env="KEY", base_url_env="URL"),
+    )
+    monkeypatch.setattr(graph_factory, "get_api_model_name", lambda _name: "deepseek-v4-flash")
+    monkeypatch.setattr(graph_factory, "get_base_url", lambda _name: "https://example.invalid/v1")
+
+    model = graph_factory._build_llm(
+        "deepseek-v4-flash",
+        "test",
+        request_timeout_s=1,
+        parallel_tool_calls=False,
+    )
+    assert model.model_kwargs["parallel_tool_calls"] is False
 
 
 def test_single_agent_has_union_skills_and_no_delegation(factory_without_provider) -> None:
@@ -147,6 +202,45 @@ def test_single_agent_has_union_skills_and_no_delegation(factory_without_provide
     assert "typed save binds its SHA-256 and byte count" in graph.system_prompt
     assert "Never compute, guess, copy, null-fill, or placeholder-fill" in graph.system_prompt
     assert "blocked/failed task may finish without an intermediate package or handle" in graph.system_prompt
+    assert "TaskPlan and EvidenceReport are optional audit aids" in graph.system_prompt
+    assert "Do not wait for or retry an EvidenceReport save" in graph.system_prompt
+    assert "An intent, route recommendation, or plan is never a task result" in graph.system_prompt
+
+
+@pytest.mark.parametrize("architecture_mode", ["full", "single_agent"])
+def test_tools_prompt_only_profile_excludes_skills_rag_and_startup_memory(
+    monkeypatch: pytest.MonkeyPatch,
+    architecture_mode: str,
+) -> None:
+    monkeypatch.setattr(graph_factory, "_build_llm", lambda **_kwargs: object())
+    monkeypatch.setattr(graph_factory, "create_deep_agent", _fake_create_deep_agent)
+    monkeypatch.setattr(
+        graph_factory,
+        "_knowledge_base_tool",
+        lambda: (_ for _ in ()).throw(AssertionError("RAG must not be constructed")),
+    )
+
+    graph = graph_factory.build_ntl_graph(
+        "deepseek-v4-flash",
+        "test",
+        architecture_mode=architecture_mode,
+        resource_profile="tools_prompt_only",
+    )
+
+    tool_names = {tool.name for tool in graph.tools if hasattr(tool, "name")}
+    assert "NTL_Knowledge_Base" not in tool_names
+    assert graph.skills == []
+    assert graph.middleware == []
+    assert graph.backend is not graph_factory.RUNTIME_BACKEND
+    assert "/skills/" not in graph.backend.routes
+    assert "tools_prompt_only" in graph.system_prompt
+    assert "Do not attempt to read `/skills/`" in graph.system_prompt
+    assert "/skills" not in graph_factory.filesystem_runtime_descriptor(
+        (), memory_access=False, skills_enabled=False
+    )["routes"]
+    if architecture_mode == "full":
+        assert all(spec["skills"] == [] for spec in graph.subagents)
+        assert all("tools_prompt_only" in spec["system_prompt"] for spec in graph.subagents)
 
 
 def test_exact_harness_profile_disables_general_purpose_and_overrides_task() -> None:
@@ -165,6 +259,9 @@ def test_exact_harness_profile_disables_general_purpose_and_overrides_task() -> 
     assert profile.tool_description_overrides["task"] == graph_factory.NTL_TASK_DESCRIPTION
     assert "{available_agents}" in graph_factory.NTL_TASK_DESCRIPTION
     assert "self-contained natural-language task" in graph_factory.NTL_TASK_DESCRIPTION
+    assert "typed_package" in graph_factory.NTL_TASK_DESCRIPTION
+    assert "summary_only" in graph_factory.NTL_TASK_DESCRIPTION
+    assert "Do not request a typed package merely to make a route look complete" in graph_factory.NTL_TASK_DESCRIPTION
     assert "workspace-relative path and semantic role/media type only" in graph_factory.NTL_TASK_DESCRIPTION
     assert "never include or request its SHA-256 or byte count" in graph_factory.NTL_TASK_DESCRIPTION
     assert "local artifact identity" in graph_factory.NTL_TASK_DESCRIPTION
@@ -593,3 +690,19 @@ def test_runtime_descriptor_is_path_free_and_ordered() -> None:
     rendered = repr(descriptor)
     assert str(graph_factory.SKILLS_ROOT) not in rendered
     assert str(graph_factory.storage_manager.base_dir) not in rendered
+
+
+def test_startup_runtime_memory_is_seeded_and_read_only() -> None:
+    assert graph_factory.RUNTIME_MEMORY_TEMPLATE == (
+        graph_factory.SKILLS_ROOT.parent / "AGENTS.md"
+    )
+    permissions = graph_factory.filesystem_permissions(
+        graph_factory.ROLE_SPECS["NTL_Engineer"].skill_sources,
+        memory_access=True,
+    )
+    assert any(
+        rule.operations == ["write"]
+        and rule.paths == [graph_factory.RUNTIME_MEMORY_SOURCE]
+        and rule.mode == "deny"
+        for rule in permissions
+    )

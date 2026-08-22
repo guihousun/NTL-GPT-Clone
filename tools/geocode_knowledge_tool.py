@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
+from gee_runtime import initialize_ee, resolve_gee_boundary_asset_project_id
 
 
 class GeoCodeKnowledgeInput(BaseModel):
@@ -18,10 +19,10 @@ class GeoCodeKnowledgeInput(BaseModel):
         description="Optional preferred library, e.g. gee, rasterio, geopandas, shapely.",
     )
     include_runtime: bool = Field(
-        default=True,
+        default=False,
         description=(
-            "Whether to include curated runtime templates from "
-            "RAG/code_guide/tools_latest_runtime_curated."
+            "Compatibility flag. Dynamic host runtime templates are disabled in the formal role tool; "
+            "only snapshot-bound static recipes are returned."
         ),
     )
 
@@ -57,10 +58,10 @@ import ee
 import geopandas as gpd
 import pandas as pd
 import json
+from gee_runtime import initialize_ee
 from storage_manager import storage_manager
 
-project_id = 'empyrean-caster-430308-m2'
-ee.Initialize(project=project_id)
+initialize_ee(ee_module=ee)
 
 boundary_path = storage_manager.resolve_input_path('shanghai_districts_boundary.shp')
 gdf = gpd.read_file(boundary_path)
@@ -103,14 +104,15 @@ print(out_csv)
         "code": """
 import ee
 import pandas as pd
+from gee_runtime import initialize_ee, resolve_gee_boundary_asset_project_id
 from storage_manager import storage_manager
 
-project_id = 'empyrean-caster-430308-m2'
-ee.Initialize(project=project_id)
+initialize_ee(ee_module=ee)
 
 year = 2022
 region_name = 'Shanghai'
-city_fc = ee.FeatureCollection('projects/empyrean-caster-430308-m2/assets/city')
+boundary_project = resolve_gee_boundary_asset_project_id()
+city_fc = ee.FeatureCollection(f'projects/{boundary_project}/assets/city')
 region = city_fc.filter(ee.Filter.eq('name', region_name))
 
 ntl = (
@@ -156,10 +158,10 @@ print(out_csv)
         "code": """
 import ee
 import pandas as pd
+from gee_runtime import initialize_ee
 from storage_manager import storage_manager
 
-project_id = 'empyrean-caster-430308-m2'
-ee.Initialize(project=project_id)
+initialize_ee(ee_module=ee)
 
 region = ee.FeatureCollection('FAO/GAUL/2015/level1').filter(
     ee.Filter.eq('ADM1_NAME', 'Shanghai')
@@ -481,15 +483,15 @@ def retrieve_geocode_knowledge(
     query: str,
     top_k: int = 3,
     library_focus: Optional[str] = None,
-    include_runtime: bool = True,
+    include_runtime: bool = False,
 ) -> str:
     tokens = _normalize_tokens(query)
     recipe_pool: List[Dict[str, Any]] = list(GEOCODE_RECIPES)
     runtime_count = 0
-    if include_runtime:
-        runtime = _load_runtime_recipes()
-        runtime_count = len(runtime)
-        recipe_pool.extend(runtime)
+    # Formal role output must be deterministic, snapshot-bound, and free of
+    # host paths or stale credential/project material.  The dynamic curated
+    # archive is retained for offline maintenance only, not model delivery.
+    include_runtime = False
 
     ranked = sorted(
         recipe_pool,

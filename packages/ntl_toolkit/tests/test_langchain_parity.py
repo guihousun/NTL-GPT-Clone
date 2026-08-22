@@ -206,4 +206,6 @@ def test_legacy_function_signatures_and_structured_tool_names_remain_stable() ->
         "ntl_tif_path", "ntl_tif_paths", "shapefile_path", "output_csv_path", "selected_indices", "only_global"
     }
     assert field_names(trend.MaskedTrendAnalysisInput) == {"raster_files", "vector_file", "out_prefix"}
-    assert field_names(anomaly.SimpleAnomalyDetectionInput) == {"raster_files", "target_index", "k_sigma", "save_filename"}
+    assert field_names(anomaly.SimpleAnomalyDetectionInput) == {
+        "raster_files", "target_index", "k_sigma", "save_filename", "vector_file"
+    }

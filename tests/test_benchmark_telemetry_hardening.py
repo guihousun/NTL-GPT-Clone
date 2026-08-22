@@ -6,7 +6,7 @@ from langchain_core.messages import AIMessage
 from langchain_core.outputs import ChatGeneration, LLMResult
 import pytest
 
-from benchmark_runtime.telemetry import ProviderUsageCallback
+from benchmark_runtime.telemetry import BenchmarkTelemetryCallback, ProviderUsageCallback
 
 
 @pytest.fixture(autouse=True)
@@ -246,3 +246,51 @@ def test_lc_agent_name_preserves_main_and_subagent_ownership() -> None:
         "NTL_Engineer",
         "Data_Searcher",
     ]
+
+
+@pytest.mark.parametrize(
+    "output",
+    [
+        {
+            "status": "failed",
+            "tool": "save_analysis_package",
+            "error": {"code": "CONTRACT_SCHEMA_INVALID", "message": "missing field"},
+        },
+        '{"status":"failed","tool":"save_analysis_package","error":{"code":"CONTRACT_SCHEMA_INVALID","message":"missing field"}}',
+    ],
+)
+def test_structured_typed_save_failure_is_not_recorded_as_success(output: object) -> None:
+    callback = BenchmarkTelemetryCallback(tested_model_ids=())
+    run_id = uuid4()
+    callback.on_tool_start(
+        {"name": "save_analysis_package"},
+        '{"contract":{}}',
+        run_id=run_id,
+        inputs={"contract": {}},
+        metadata={"lc_agent_name": "NTL_Analyst"},
+    )
+    callback.on_tool_end(output, run_id=run_id)
+
+    row = callback.tool_trace_snapshot()[0]
+    assert row["status"] == "error"
+    assert row["result_observed"] is True
+    assert row["error"] == {
+        "code": "CONTRACT_SCHEMA_INVALID",
+        "message": "missing field",
+    }
+
+
+def test_non_save_structured_outcome_remains_domain_tool_success() -> None:
+    callback = BenchmarkTelemetryCallback(tested_model_ids=())
+    run_id = uuid4()
+    callback.on_tool_start(
+        {"name": "ntl_daily_statistics"},
+        "{}",
+        run_id=run_id,
+        inputs={},
+    )
+    callback.on_tool_end({"status": "failed", "reason": "no valid observations"}, run_id=run_id)
+
+    row = callback.tool_trace_snapshot()[0]
+    assert row["status"] == "succeeded"
+    assert row["error"] is None

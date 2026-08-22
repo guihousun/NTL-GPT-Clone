@@ -200,7 +200,15 @@ def inspect_vnp46a1_run(run_root: str | Path) -> ToolResult:
 
 
 def _run_request(request: Vnp46a1DownloadRequest, progress: DownloadProgress | None) -> ToolResult:
-    if "download" in request.phase_list and not os.getenv(request.token_env, "").strip():
+    # The official CMR client already supports the repository dotenv fallback;
+    # use the same resolver for the preflight guard so a configured token is
+    # not rejected merely because it was not exported into the process.
+    token_configured = os.getenv(request.token_env, "").strip()
+    if "download" in request.phase_list and not token_configured:
+        from experiments.official_daily_ntl_fastpath.cmr_client import resolve_token
+
+        token_configured = str(resolve_token(request.token_env) or "").strip()
+    if "download" in request.phase_list and not token_configured:
         return _failed("EARTHDATA_TOKEN_MISSING", f"{request.token_env} is not configured.", "Set the token in NTL_MCP_ENV_FILE or the process environment, then retry.", {"run_root": str(request.run_root)})
     request.run_root.mkdir(parents=True, exist_ok=True)
     completed: list[str] = []
@@ -273,7 +281,9 @@ def _download_days(request: Vnp46a1DownloadRequest, geometry: Any) -> None:
         if request.targets and f"{request.target_id}:{day}" not in request.targets:
             continue
         entries = [entry for entry in search_granules("VNP46A1", day, day, geometry.bounds, page_size=200) if _is_day_entry(entry.producer_granule_id, day)]
-        day_dir = request.run_root / "official_raw_h5" / request.target_id / day
+        # One request has one target, so repeating the target id in every raw
+        # file path only creates avoidable Windows MAX_PATH failures.
+        day_dir = request.run_root / "raw_h5" / day
         files: list[str] = []
         failures: list[str] = []
         for index, entry in enumerate(entries, start=1):
@@ -299,7 +309,7 @@ def _mosaic_days(request: Vnp46a1DownloadRequest, geometry: Any) -> None:
         paths = [Path(item) for item in row.get("files", []) if Path(item).exists()]
         result: dict[str, Any] = {"target_id": request.target_id, "date": day, "status": "missing_h5"}
         if paths:
-            tile_dir = request.run_root / "tile_tifs" / request.target_id / day
+            tile_dir = request.run_root / "tiles" / day
             radiance_tiles: list[Path] = []
             utc_tiles: list[Path] = []
             for index, path in enumerate(paths, start=1):
@@ -307,7 +317,7 @@ def _mosaic_days(request: Vnp46a1DownloadRequest, geometry: Any) -> None:
                 radiance_tiles.append(radiance)
                 if utc is not None:
                     utc_tiles.append(utc)
-            output = request.run_root / "official_h5_mosaics" / request.target_id / f"VNP46A1_DNB_At_Sensor_Radiance_500m_{request.target_id}_{day}.tif"
+            output = request.run_root / "mosaics" / f"VNP46A1_{day}_radiance.tif"
             _merge_tiles(radiance_tiles, output, {"product": "VNP46A1", "target_id": request.target_id, "semantic_role": "at_sensor_dnb_radiance"})
             if utc_tiles:
                 _merge_tiles(utc_tiles, output.with_name(f"{output.stem}_UTC_Time.tif"), {"product": "VNP46A1", "target_id": request.target_id, "semantic_role": "acquisition_time_utc_hours"})

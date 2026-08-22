@@ -689,6 +689,81 @@ def test_structured_save_tool_receives_authoritative_identity_from_runnable_conf
         )
 
 
+def test_task_plan_output_declarations_do_not_require_files_at_planning_time(
+    isolated_workspace: Path,
+) -> None:
+    payload = _task_plan(
+        artifact_id="plan-future-output-declarations",
+        expected_outputs=[
+            {
+                "path": "outputs/future-result.csv",
+                "role": "planned result",
+                "media_type": "text/csv",
+            },
+            {
+                "path": "outputs/future-metrics.json",
+                "role": "planned metrics",
+                "media_type": "application/json",
+            },
+        ],
+    ).model_dump(mode="json")
+    for system_field in ("run_id", "task_id", "created_at_utc"):
+        payload.pop(system_field)
+    config = {
+        "configurable": {"thread_id": "contract-thread"},
+        "metadata": {"task_run_id": "runtime-run", "case_id": "runtime-case"},
+    }
+
+    saved = save_task_plan(payload, config=config)
+
+    assert saved["status"] == "success"
+    checked = validate_contract(contract_path=saved["path"], config=config)
+    assert checked["status"] == "success"
+    assert checked["contract"]["expected_outputs"] == payload["expected_outputs"]
+    assert not (isolated_workspace / "outputs" / "future-result.csv").exists()
+
+
+def test_contract_tool_reports_safe_actionable_schema_errors(
+    isolated_workspace: Path,
+) -> None:
+    payload = _task_plan(artifact_id="plan-open-clarification").model_dump(mode="json")
+    payload["clarification_fields"] = ["AOI still unresolved"]
+
+    failed = save_task_plan(payload)
+
+    assert failed["status"] == "failed"
+    assert failed["error"]["code"] == "CONTRACT_SCHEMA_INVALID"
+    assert failed["error"]["issues"]
+    serialized = json.dumps(failed, sort_keys=True)
+    assert "AOI still unresolved" not in serialized
+    assert "run-1" not in serialized
+
+
+def test_contract_tool_explains_system_managed_local_artifact_identity(
+    isolated_workspace: Path,
+) -> None:
+    failed = contract_tools.save_analysis_package(
+        {
+            "status": "ready",
+            "scientific_question": "Test a deterministic result.",
+            "analysis_unit": "one fixture row",
+            "artifacts": [
+                {
+                    "path": "outputs/result.csv",
+                    "role": "result",
+                    "media_type": "text/csv",
+                    "sha256": "a" * 64,
+                    "bytes": 1,
+                }
+            ],
+        }
+    )
+
+    assert failed["status"] == "failed"
+    assert failed["error"]["code"] == "LOCAL_ARTIFACT_IDENTITY_IS_SYSTEM_MANAGED"
+    assert "Remove sha256 and bytes" in failed["error"]["suggestion"]
+
+
 def test_opaque_package_handle_is_thread_scoped_and_hides_runtime_identity(
     isolated_workspace: Path,
 ) -> None:
@@ -1176,6 +1251,27 @@ def test_route_state_machine_enforces_revision_budget_and_is_replayable() -> Non
     assert restored.terminal
     with pytest.raises(ValueError):
         machine.transition(RouteStatus.PLANNING, actor="NTL_Engineer", reason="illegal")
+
+
+def test_route_state_allows_summary_only_native_task_to_reach_handoff_validation() -> None:
+    """A summary-only specialist result has no package-specific route phase."""
+
+    machine = RouteStateMachine(RouteState(run_id="run-summary", task_id="case-summary"))
+    machine.transition(RouteStatus.PLANNING, actor="NTL_Engineer", reason="start")
+    machine.transition(
+        RouteStatus.SPECIALIST_ROUTING,
+        actor="NTL_Engineer",
+        reason="dispatch summary-only retrieval",
+    )
+    machine.transition(
+        RouteStatus.HANDOFF_VALIDATION,
+        actor="NTL_Engineer",
+        reason="accept the native summary without a package",
+    )
+    machine.transition(RouteStatus.SYNTHESIS, actor="NTL_Engineer", reason="result accepted")
+    state = machine.transition(RouteStatus.COMPLETED, actor="NTL_Engineer", reason="answer returned")
+    assert state.status == RouteStatus.COMPLETED
+    assert state.terminal
 
 
 def test_route_state_rejects_tampered_event_chain() -> None:

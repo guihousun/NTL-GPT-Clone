@@ -586,6 +586,13 @@ def _package_for_task(
         if row.get("tool_name") in _SPECIALIST_SAVE_TOOLS
         and row.get("status") == "succeeded"
         and row.get("result_observed") is True
+        # ``save_*`` returns structured persistence failures rather than
+        # raising. Telemetry marks those responses as ``error``; never infer a
+        # package link from a same-role package merely because such a response
+        # was observed in the specialist's descendant trace.
+        and row.get("error") in (None, "")
+        and isinstance(row.get("metadata"), Mapping)
+        and row["metadata"].get("lc_agent_name") == target_role
     ]
     candidates: list[_PackageCandidate] = []
     for row in successful_saves:
@@ -602,17 +609,33 @@ def _package_for_task(
         ):
             raise LookupError(TRANSFER_PACKAGE_LINK_INVALID)
         contract = arguments["contract"]
+        # Typed save tools deliberately hide artifact_id/artifact_type from
+        # model-facing specialist arguments; the runtime injects those fields
+        # into the persisted package.  When identity is present (legacy or
+        # explicit tool trace), match it exactly.  When it is absent, bind the
+        # native save to the unique ready package produced by this role and
+        # task.  Ambiguous or wrong explicit identity remains fail-closed.
         artifact_id = str(contract.get("artifact_id") or "").strip()
-        declared_type = str(contract.get("artifact_type") or expected_type).strip()
-        if not artifact_id or declared_type != expected_type:
+        declared_type = str(contract.get("artifact_type") or "").strip()
+        if declared_type and declared_type != expected_type:
             raise LookupError(TRANSFER_PACKAGE_LINK_INVALID)
-        matches = [
-            package
-            for package in packages
-            if package.value.artifact_id == artifact_id
-            and package.value.artifact_type == expected_type
-            and str(package.value.producer) == target_role
-        ]
+        if artifact_id:
+            matches = [
+                package
+                for package in packages
+                if package.value.artifact_id == artifact_id
+                and package.value.artifact_type == expected_type
+                and str(package.value.producer) == target_role
+                and str(package.value.status) in {"ready", "ContractStatus.READY"}
+            ]
+        else:
+            matches = [
+                package
+                for package in packages
+                if package.value.artifact_type == expected_type
+                and str(package.value.producer) == target_role
+                and str(package.value.status) in {"ready", "ContractStatus.READY"}
+            ]
         if len(matches) != 1:
             raise LookupError(TRANSFER_PACKAGE_LINK_INVALID)
         if all(existing.reference != matches[0].reference for existing in candidates):

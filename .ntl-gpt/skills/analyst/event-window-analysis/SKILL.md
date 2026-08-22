@@ -1,5 +1,5 @@
 ---
-name: ntl-analyst-event-window-analysis
+name: event-window-analysis
 description: Analyze accepted pre-event, event, and post-event nighttime-light windows while preserving temporal and non-attribution limits.
 ---
 

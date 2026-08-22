@@ -3,17 +3,21 @@ from __future__ import annotations
 from agents.NTL_Code_Assistant import Code_Assistant_system_prompt_text
 from agents.NTL_Data_Searcher import system_prompt_data_searcher
 from agents.NTL_Engineer import system_prompt_text
-from tools import _GROUPS
+from tools import _GROUPS, execute_geospatial_script_tool
 
 
-def test_formal_engineer_does_not_have_direct_script_execution_tools() -> None:
+def test_formal_engineer_has_bounded_script_execution_but_not_review_tools() -> None:
     engineer_tools = set(_GROUPS["engineer_tools"])
     analyst_tools = set(_GROUPS["analyst_tools"])
 
-    assert "execute_geospatial_script_tool" not in engineer_tools
-    assert "GeoCode_COT_Validation_tool" not in engineer_tools
+    assert "execute_geospatial_script_tool" in engineer_tools
     assert "execute_geospatial_script_tool" in analyst_tools
+    assert "GeoCode_COT_Validation_tool" not in engineer_tools
     assert "GeoCode_COT_Validation_tool" not in analyst_tools
+
+
+def test_script_execution_does_not_replace_registered_methods() -> None:
+    assert "Do not use this tool to recreate a named scientific method" in execute_geospatial_script_tool.description
 
 
 def test_engineer_has_read_only_geodata_inspection_tools() -> None:

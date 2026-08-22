@@ -1,5 +1,5 @@
 ---
-name: ntl-data-searcher-analysis-ready-preprocessing
+name: analysis-ready-preprocessing
 description: Apply accepted standard preprocessing and reusable fixed-formula features to produce a validated ObservationPackage.
 ---
 

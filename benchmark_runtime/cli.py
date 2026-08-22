@@ -280,6 +280,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="tested architecture: hierarchical Full system or matched Single-Agent",
     )
     run_parser.add_argument(
+        "--resource-profile",
+        choices=("standard", "tools_prompt_only"),
+        default="standard",
+        help="runtime resources: standard, or prompts plus registered tools only",
+    )
+    run_parser.add_argument(
         "--max-workers",
         type=int,
         default=MAX_BATCH_WORKERS,

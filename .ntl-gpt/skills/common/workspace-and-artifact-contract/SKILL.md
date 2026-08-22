@@ -1,5 +1,5 @@
 ---
-name: ntl-common-workspace-and-artifact-contract
+name: workspace-and-artifact-contract
 description: Enforce the isolated NTL-GPT workspace, artifact paths, manifests, and checksum rules shared by all four roles.
 ---
 

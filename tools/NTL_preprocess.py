@@ -347,9 +347,13 @@ def calibrate_rgb_from_calib_file(
 
         valid_mask = (dn_red > 0) | (dn_green > 0) | (dn_blue > 0)
 
-        l_red = np.zeros_like(dn_red)
-        l_green = np.zeros_like(dn_green)
-        l_blue = np.zeros_like(dn_blue)
+        # The calibrated products declare -9999 as NoData.  Initialise with
+        # that same sentinel so invalid source pixels cannot silently become
+        # plausible zero-radiance observations in downstream statistics.
+        output_nodata = np.float32(-9999.0)
+        l_red = np.full_like(dn_red, output_nodata, dtype=np.float32)
+        l_green = np.full_like(dn_green, output_nodata, dtype=np.float32)
+        l_blue = np.full_like(dn_blue, output_nodata, dtype=np.float32)
 
         l_red[valid_mask] = dn_red[valid_mask] * gain["R"] + bias["R"]
         l_green[valid_mask] = dn_green[valid_mask] * gain["G"] + bias["G"]
@@ -357,7 +361,7 @@ def calibrate_rgb_from_calib_file(
 
         calibrated = np.array([l_red, l_green, l_blue])
 
-        gray = np.zeros_like(l_red)
+        gray = np.full_like(l_red, output_nodata, dtype=np.float32)
         gray[valid_mask] = (
             0.2989 * l_red[valid_mask]
             + 0.5870 * l_green[valid_mask]
@@ -373,7 +377,7 @@ def calibrate_rgb_from_calib_file(
         for i in range(3):
             band = out_ds.GetRasterBand(i + 1)
             band.WriteArray(calibrated[i])
-            band.SetNoDataValue(-9999.0)
+            band.SetNoDataValue(float(output_nodata))
         out_ds.FlushCache()
         del out_ds
 
@@ -382,7 +386,7 @@ def calibrate_rgb_from_calib_file(
         gray_ds.SetProjection(projection)
         band = gray_ds.GetRasterBand(1)
         band.WriteArray(gray)
-        band.SetNoDataValue(-9999.0)
+        band.SetNoDataValue(float(output_nodata))
         gray_ds.FlushCache()
         del gray_ds
 

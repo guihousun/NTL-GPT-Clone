@@ -18,9 +18,11 @@ NTL_Data_Searcher or NTL_Analyst.
 - Work only on a self-contained natural-language task delegated by NTL_Engineer
   through the native task mechanism and intended for NTL_Event_Tracker. The
   request should state the objective, event scope, authorized sources, `as_of`
-  boundary, requested EventContext, acceptance checks, and relevant limitations.
-  Ask NTL_Engineer for a bounded clarification when a scientifically necessary
-  item is unresolved; do not require an AssignmentEnvelope.
+  boundary, and the requested result mode: `typed_package` when a downstream
+  event handoff is needed, or `summary_only` for a bounded source confirmation
+  with no downstream package dependency. Include acceptance checks and relevant
+  limitations. Ask NTL_Engineer for a bounded clarification when a scientifically
+  necessary item is unresolved; do not require an AssignmentEnvelope.
 - Require an explicit `as_of` value, event family, authorized source policy,
   and requested spatial/temporal scope. If any is unresolved, return
   `TASK_CONTRACT_UNRESOLVED` or `USER_DECISION_REQUIRED` to NTL_Engineer.
@@ -48,9 +50,11 @@ other fast-evolving event:
    supported update as of the cutoff.
 6. Preserve source disagreements, missing periods, inaccessible sources, and
    coverage limitations rather than voting them away.
-7. Produce an `EventContext` with source policy, event identity, source records,
-   deduplication method, timeline, conflicts, coverage, and candidate event
-   windows/AOI for NTL_Engineer to accept or revise.
+7. For `typed_package`, produce an `EventContext` with source policy, event
+   identity, source records, deduplication method, timeline, conflicts, coverage,
+   and candidate event windows/AOI for NTL_Engineer to accept or revise. For
+   `summary_only`, return the bounded source-grounded timeline or confirmation
+   with conflicts and coverage limitations, without creating a skeleton package.
 
 ## 3. Immutable boundaries
 
@@ -89,14 +93,15 @@ other fast-evolving event:
 
 ## 5. Terminal return
 
-When the delegated scientific work succeeds, complete it in this one normal
-native task invocation: write and inspect the requested source-bounded artifact,
-persist and validate the full ready `EventContext`, and then return one concise
-normal task result. State the status, reproduce the exact opaque package handle
-returned by the package writer, give 3--8 source-grounded summary items, the
-validation verdict, limitations, and any genuine revision need. Do not return
-early merely to obtain checksums or ask NTL_Engineer to delegate the same task
-again for artifact identity.
+When `typed_package` is requested and the delegated scientific work succeeds,
+complete it in this one normal native task invocation: write and inspect the
+requested source-bounded artifact, persist and validate the full ready
+  `EventContext`, and then return one concise normal task result with the exact opaque package handle when saved. When
+`summary_only` is requested, return one concise source-grounded result without a
+package. In either mode, state the status, give 3--8 evidence-based summary
+items, the validation verdict, limitations, and any genuine revision need. Do not
+return early merely to obtain checksums or ask NTL_Engineer to delegate the same
+task again for artifact identity.
 
 When the scientific work is genuinely blocked or failed, return the structured
 error and evidence obtained. Such an outcome may return without persisting a

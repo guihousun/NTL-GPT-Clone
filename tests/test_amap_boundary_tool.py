@@ -135,3 +135,45 @@ def test_boundary_result_reports_child_feature_evidence(tmp_path) -> None:
     assert payload["feature_names"] == ["甲区", "乙区"]
     assert payload["geometry_valid"] is True
     assert payload["primary_file"] == "inputs/test_city.shp"
+
+
+def test_boundary_acquisition_normalizes_common_outputs_prefix(tmp_path) -> None:
+    district_response = _response(
+        {"status": "1", "districts": [{"name": "测试市", "adcode": "990100"}]}
+    )
+    boundary_response = _response(
+        {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": {"name": "甲区", "adcode": 990101, "level": "district"},
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[110, 30], [111, 30], [111, 31], [110, 30]]],
+                    },
+                }
+            ],
+        }
+    )
+    output_path = tmp_path / "test_city.shp"
+    with (
+        patch.dict("os.environ", {"amap_api_key": "test-key"}),
+        patch(
+            "tools.GaoDe_tool.requests.get",
+            side_effect=[district_response, boundary_response],
+        ),
+        patch(
+            "tools.GaoDe_tool.storage_manager.resolve_input_path",
+            return_value=str(output_path),
+        ) as resolve_input,
+    ):
+        payload = json.loads(
+            get_administrative_division_data("测试市", "outputs/test_city.shp")
+        )
+
+    resolve_input.assert_called_once()
+    assert resolve_input.call_args.args[0] == "test_city.shp"
+    assert payload["status"] == "success"
+    assert payload["input_path_normalized"] is True
+    assert payload["normalized_input_name"] == "test_city.shp"

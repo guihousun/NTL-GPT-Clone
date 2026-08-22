@@ -619,6 +619,22 @@ def package_artifact_integrity_issues(
             if canonical_json(package).encode("utf-8") != package_path.read_bytes():
                 raise ValueError("package is not canonical")
 
+            # A failed or blocked specialist package is a diagnostic
+            # checkpoint. Its
+            # declared script may be the pre-repair version while the same
+            # workspace path was deliberately reused for the single bounded
+            # repair that produced the later ready package.  Keep validating
+            # the failed package envelope itself, but do not treat that
+            # superseded draft's nested artifact identity as the authoritative
+            # post-run output.
+            if str(getattr(package, "status", "")) in {
+                "failed",
+                "blocked",
+                "ContractStatus.FAILED",
+                "ContractStatus.BLOCKED",
+            }:
+                continue
+
             for record in _declared_local_artifact_records(raw):
                 digest = record.get("sha256")
                 byte_count = record.get("bytes")
@@ -666,9 +682,10 @@ def minimum_architecture_evidence_issues(
 ) -> list[str]:
     """Return stable issue codes for the minimum auditable architecture trace.
 
-    Both Full and matched Single-Agent must persist exactly one TaskPlan and one
-    final EvidenceReport for the tested task, plus at least one route-state
-    checkpoint.  This is a system-compliance gate, not a scientific score.
+    Both Full and matched Single-Agent must persist at least one valid TaskPlan
+    and exactly one final EvidenceReport for the tested task, plus at least one
+    route-state checkpoint. TaskPlan revisions are valid intermediate planning
+    records; their count remains available in the evidence inventory.
     """
 
     if architecture_mode not in {"full", "single_agent"}:
@@ -697,7 +714,7 @@ def minimum_architecture_evidence_issues(
         total = int(evidence["package_counts"].get(package_type, 0))
         if len(matching) == 0:
             issues.append(f"MISSING_{code_name}")
-        elif len(matching) > 1 or total != 1:
+        elif package_type != "TaskPlan" and (len(matching) > 1 or total != 1):
             issues.append(f"NON_UNIQUE_{code_name}")
 
     matching_routes = [

@@ -13,6 +13,8 @@ def test_batch_export_uses_thread_memory_and_returns_virtual_manifest(
     tmp_path: Path,
 ) -> None:
     captured = {}
+    monkeypatch.setattr(batch_tool, "resolve_gee_project_id", lambda _project=None: "test-project")
+    monkeypatch.setattr(batch_tool, "initialize_ee", lambda **_kwargs: "test-project")
     manifest = tmp_path / "gee_exports" / "test.json"
     monkeypatch.setattr(batch_tool, "_resolve_thread_id", lambda _config: "thread-1")
     monkeypatch.setattr(
@@ -21,8 +23,9 @@ def test_batch_export_uses_thread_memory_and_returns_virtual_manifest(
         lambda *args, **kwargs: manifest,
     )
 
-    def fake_submit(request):
+    def fake_submit(request, *, ee_module=None):
         captured["request"] = request
+        captured["ee_module"] = ee_module
         return ToolResult.succeeded(
             tool="submit_gee_batch_export",
             summary="submitted",
@@ -45,11 +48,15 @@ def test_batch_export_uses_thread_memory_and_returns_virtual_manifest(
     assert result["job_id"] == "task-1"
     assert result["outputs"][0]["path"] == "/memories/gee_exports/test.json"
     assert captured["request"].manifest_path == str(manifest)
+    assert captured["request"].project == "test-project"
+    assert captured["ee_module"] is not None
 
 
 def test_status_uses_returned_manifest(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     manifest = tmp_path / "gee_exports" / "test.json"
     monkeypatch.setattr(batch_tool, "_resolve_thread_id", lambda _config: "thread-1")
+    monkeypatch.setattr(batch_tool, "resolve_gee_project_id", lambda _project=None: "test-project")
+    monkeypatch.setattr(batch_tool, "initialize_ee", lambda **_kwargs: "test-project")
     monkeypatch.setattr(
         batch_tool.storage_manager,
         "resolve_workspace_relative_path",
@@ -58,7 +65,7 @@ def test_status_uses_returned_manifest(monkeypatch: pytest.MonkeyPatch, tmp_path
     monkeypatch.setattr(
         batch_tool,
         "inspect_gee_batch_export",
-        lambda path, project=None: ToolResult.succeeded(
+        lambda path, project=None, ee_module=None: ToolResult.succeeded(
             tool="inspect_gee_batch_export",
             summary="running",
             outputs=[OutputArtifact(path=path, media_type="application/json", role="manifest")],

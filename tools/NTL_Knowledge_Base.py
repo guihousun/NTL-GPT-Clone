@@ -32,22 +32,38 @@ def _resolve_rag_persist_dir(store_name: str) -> str:
     return str((root / store_name).resolve())
 
 
-def _make_empty_store_tool(tool_name: str, description: str, store_name: str) -> StructuredTool:
-    def _empty_store(query: str) -> str:
-        return json.dumps(
-            {
-                "status": "empty_store",
-                "store": store_name,
-                "reason": f"{store_name} currently has no indexed documents.",
-                "query": query,
-            },
-            ensure_ascii=False,
-        )
+def _empty_store_response(store_name: str, query: str) -> str:
+    return json.dumps(
+        {
+            "status": "empty_store",
+            "store": store_name,
+            "reason": f"{store_name} currently has no indexed documents.",
+            "query": query,
+        },
+        ensure_ascii=False,
+    )
 
-    return StructuredTool.from_function(
-        func=_empty_store,
-        name=tool_name,
-        description=description,
+
+def _unavailable_store_response(store_name: str, query: str, exc: Exception) -> str:
+    """Return a safe, non-blocking response for an optional knowledge store.
+
+    Chroma persistent stores can be mounted read-only in a benchmark worker, or
+    be temporarily locked by a different process.  The knowledge base is an
+    optional source of supplemental context, so its storage implementation
+    details must not terminate a task (or disclose host paths to the model).
+    """
+
+    return json.dumps(
+        {
+            "status": "knowledge_unavailable",
+            "store": store_name,
+            "reason_code": "supplemental_store_unavailable",
+            "error_type": type(exc).__name__,
+            "message": "Supplemental knowledge retrieval is unavailable for this call.",
+            "fallback": "Continue with the active role Skills and registered tools.",
+            "query": query,
+        },
+        ensure_ascii=False,
     )
 
 
@@ -57,27 +73,52 @@ def _build_retriever_tool(
     persist_directory: str,
     tool_name: str,
     description: str,
-    embeddings: Any,
+    embeddings: Any | None,
     k: int,
     score_threshold: float,
 ) -> StructuredTool:
-    vector_store = Chroma(
-        collection_name=collection_name,
-        persist_directory=persist_directory,
-        embedding_function=embeddings,
+    """Build a lazily opened, read-safe Chroma retrieval tool.
+
+    Tool registration happens while the runtime graph is constructed.  Opening
+    a persistent Chroma collection at that point can try to create or update
+    local metadata and used to make unrelated local tasks fail when the store
+    was read-only.  Defer opening until the tool is actually selected, never
+    request collection creation, and turn a store exception into an explicit
+    supplemental-knowledge fallback.
+    """
+
+    def _retrieve(query: str) -> str:
+        store_path = Path(persist_directory)
+        if not store_path.is_dir():
+            return _empty_store_response(collection_name, query)
+
+        try:
+            vector_store = Chroma(
+                collection_name=collection_name,
+                persist_directory=persist_directory,
+                embedding_function=(
+                    embeddings if embeddings is not None else create_text_embeddings()
+                ),
+                create_collection_if_not_exists=False,
+            )
+            count = vector_store._collection.count()
+            if count == 0:
+                return _empty_store_response(collection_name, query)
+
+            retriever = vector_store.as_retriever(
+                search_type="similarity_score_threshold",
+                search_kwargs={"k": k, "score_threshold": score_threshold},
+            )
+            retriever_tool = create_retriever_tool(retriever, name=tool_name, description=description)
+            return retriever_tool.invoke({"query": query})
+        except Exception as exc:
+            return _unavailable_store_response(collection_name, query, exc)
+
+    return StructuredTool.from_function(
+        func=_retrieve,
+        name=tool_name,
+        description=description,
     )
-    count = vector_store._collection.count()
-    if count == 0:
-        return _make_empty_store_tool(tool_name, description, collection_name)
-
-    retriever = vector_store.as_retriever(
-        search_type="similarity_score_threshold",
-        search_kwargs={"k": k, "score_threshold": score_threshold},
-    )
-    return create_retriever_tool(retriever, name=tool_name, description=description)
-
-
-_EMBEDDINGS = create_text_embeddings()
 
 
 NTL_Literature_Knowledge = _build_retriever_tool(
@@ -89,7 +130,7 @@ NTL_Literature_Knowledge = _build_retriever_tool(
         "Nighttime Light (NTL) remote sensing. Includes theory, equations, and "
         "scientific definitions."
     ),
-    embeddings=_EMBEDDINGS,
+    embeddings=None,
     k=2,
     score_threshold=0.33,
 )
@@ -103,21 +144,31 @@ NTL_Solution_Knowledge = _build_retriever_tool(
         "Use this tool to retrieve structured workflows, tool usage guides, "
         "dataset access instructions, and end-to-end NTL application solutions."
     ),
-    embeddings=_EMBEDDINGS,
+    embeddings=None,
     k=3,
     score_threshold=0.3,
 )
 
 
-NTL_Code_Knowledge = _build_retriever_tool(
-    collection_name="Code_RAG",
-    persist_directory=_resolve_rag_persist_dir("Code_RAG"),
-    tool_name="NTL_Code_Knowledge",
-    description=(
-        "Use this tool to retrieve Python and GEE code snippets relevant to NTL tasks. "
-        "Focused on executable logic."
-    ),
-    embeddings=_EMBEDDINGS,
-    k=5,
-    score_threshold=0.3,
+def _code_rag_disabled(query: str) -> str:
+    return json.dumps(
+        {
+            "status": "disabled_store",
+            "store": "Code_RAG",
+            "reason": (
+                "The legacy code corpus is excluded from the formal runtime until "
+                "it is rebuilt and snapshot-bound against the unified GEE runtime."
+            ),
+            "query": query,
+        },
+        ensure_ascii=False,
+    )
+
+
+# Compatibility export only. Do not open the legacy Code_RAG database at import
+# time: current agents use role Skills and registered tools for executable code.
+NTL_Code_Knowledge = StructuredTool.from_function(
+    func=_code_rag_disabled,
+    name="NTL_Code_Knowledge",
+    description="Compatibility stub for the disabled legacy Code_RAG corpus.",
 )

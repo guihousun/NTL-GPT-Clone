@@ -1,4 +1,7 @@
+from typing import Any
+
 from pydantic import BaseModel, Field
+from gee_runtime import initialize_ee, resolve_gee_boundary_asset_project_id
 from storage_manager import storage_manager
 class DailyANTLInput(BaseModel):
     study_area: str = Field(..., description="Name of the study area (in Chinese for China, English for others). Example: '上海市'")
@@ -13,6 +16,26 @@ import os
 from datetime import datetime
 from langchain_core.tools import StructuredTool
 
+
+def _daily_rows(features: list[dict[str, Any]], study_area: str) -> list[dict[str, Any]]:
+    """Normalize valid reduceRegion rows without failing on a null/omitted property."""
+
+    rows: list[dict[str, Any]] = []
+    for feature in features:
+        properties = dict(feature.get("properties") or {})
+        date_value = properties.get("date")
+        daily_mean = properties.get("daily_mean_ntl")
+        if date_value is None or daily_mean is None:
+            continue
+        rows.append(
+            {
+                "Date": date_value,
+                "Daily_Mean_ANTL": daily_mean,
+                "Region": study_area,
+            }
+        )
+    return rows
+
 def calculate_daily_antl_tool(
     study_area: str,
     scale_level: str,
@@ -25,11 +48,14 @@ def calculate_daily_antl_tool(
     using the NASA VNP46A2 dataset on Google Earth Engine and exports a CSV trend file.
     """
     import ee
+
+    initialize_ee(ee_module=ee)
+    boundary_assets = f"projects/{resolve_gee_boundary_asset_project_id()}/assets"
     
     # 1. 行政边界选择逻辑 (与系统其他工具保持一致)
-    province_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/province")
-    city_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/city")
-    county_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/county")
+    province_collection = ee.FeatureCollection(f"{boundary_assets}/province")
+    city_collection = ee.FeatureCollection(f"{boundary_assets}/city")
+    county_collection = ee.FeatureCollection(f"{boundary_assets}/county")
 
     def get_region(area, level):
         directly_governed = ['北京市', '天津市', '上海市', '重庆市']
@@ -77,18 +103,11 @@ def calculate_daily_antl_tool(
     stats_fc = vnp_col.map(calculate_mean)
     
     # 获取数据属性
-    features = stats_fc.getInfo()['features']
+    payload = stats_fc.getInfo() or {}
+    features = list(payload.get('features') or [])
     
     # 5. 整理数据
-    data_list = []
-    for f in features:
-        props = f['properties']
-        if props['daily_mean_ntl'] is not None:
-            data_list.append({
-                'Date': props['date'],
-                'Daily_Mean_ANTL': props['daily_mean_ntl'],
-                'Region': study_area
-            })
+    data_list = _daily_rows(features, study_area)
 
     if not data_list:
         return "Error: All retrieved data points were null (possibly due to cloud cover or data gaps)."

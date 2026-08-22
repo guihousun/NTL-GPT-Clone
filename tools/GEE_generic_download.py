@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from ntl_toolkit.core.gee_download import GeeDownloadRequest, download_gee_raster
 from ntl_toolkit.core.gee_planning import estimate_bbox_area_sq_km
+from gee_runtime import initialize_ee, resolve_gee_project_id
 from storage_manager import current_thread_id, storage_manager
 
 
@@ -44,7 +45,6 @@ class GEERasterDownloadInput(BaseModel):
     quality_threshold: float = Field(default=0.60, ge=0, le=1)
     index_bands: Optional[List[str]] = Field(default=None, min_length=2, max_length=2)
     output_band_name: str = "index"
-    project: Optional[str] = None
 
 
 def _resolve_thread_id(config: Optional[RunnableConfig]) -> str:
@@ -102,6 +102,7 @@ def gee_raster_download(
                 "metrics": {"estimated_bytes": estimated_bytes, "quota": quota},
             }
 
+        runtime_project = resolve_gee_project_id(project)
         request = GeeDownloadRequest(
             dataset_id=dataset_id,
             bands=bands,
@@ -113,13 +114,16 @@ def gee_raster_download(
             reducer=reducer,
             scale=scale,
             crs=crs,
-            project=project,
+            project=runtime_project,
             processing_preset=processing_preset,
             quality_threshold=quality_threshold,
             index_bands=tuple(index_bands) if index_bands else None,
             output_band_name=output_band_name,
         )
-        result = download_gee_raster(request)
+        import ee
+
+        initialize_ee(explicit_project_id=runtime_project, ee_module=ee)
+        result = download_gee_raster(request, ee_module=ee)
         payload = result.model_dump(mode="json", by_alias=True)
         payload.setdefault("metrics", {})
         payload["metrics"].update(

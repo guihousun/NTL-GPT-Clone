@@ -2,19 +2,18 @@ from __future__ import annotations
 
 import calendar
 import json
-import os
 import re
 import requests
 import time
 from html import unescape
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Literal, Optional, Tuple
 
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
-from dotenv import dotenv_values
+from gee_runtime import initialize_ee
 from ntl_toolkit.core.gee_planning import (
     DatasetCandidate,
     GeeRequest,
@@ -23,20 +22,6 @@ from ntl_toolkit.core.gee_planning import (
     classify_request_domain,
 )
 
-DEFAULT_GEE_PROJECT = "empyrean-caster-430308-m2"
-
-
-def _configured_gee_project_id() -> str:
-    dotenv_path = Path(__file__).resolve().parents[1] / ".env"
-    project_id = ""
-    if dotenv_path.exists():
-        project_id = str(dotenv_values(dotenv_path).get("GEE_DEFAULT_PROJECT_ID") or "").strip()
-    if not project_id:
-        project_id = str(os.getenv("GEE_DEFAULT_PROJECT_ID") or "").strip()
-    return project_id or DEFAULT_GEE_PROJECT
-
-
-REQUIRED_GEE_PROJECT = _configured_gee_project_id()
 EE_CATALOG_PAGE = "https://developers.google.com/earth-engine/datasets/catalog"
 _CATALOG_CACHE: Dict[str, object] = {"items": [], "fetched_at": 0.0}
 _DATASET_ID_CACHE: Dict[str, str] = {}
@@ -77,6 +62,23 @@ class DatasetSpec:
 
 def _today() -> date:
     return date.today()
+
+
+def _utc_now_iso() -> str:
+    """Return an explicit UTC timestamp for source-availability audit records."""
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _availability_lag_days(latest_value: object, queried_at_utc: str) -> Optional[int]:
+    """Compute a calendar-day lag without implying that it is a product SLA."""
+    if not latest_value:
+        return None
+    try:
+        latest = date.fromisoformat(str(latest_value)[:10])
+        queried = date.fromisoformat(queried_at_utc[:10])
+    except (TypeError, ValueError):
+        return None
+    return (queried - latest).days
 
 
 def _vnp46a2_end() -> date:
@@ -493,7 +495,7 @@ class GEEScriptBlueprintInput(BaseModel):
         default='ee.FeatureCollection("FAO/GAUL/2015/level1").filterBounds(region)',
         description=(
             "Python/JS expression for zonal-statistics zones. For China province-level stats, use "
-            "ee.FeatureCollection('projects/empyrean-caster-430308-m2/assets/province')."
+            "ee.FeatureCollection('projects/<configured-project>/assets/province')."
         ),
     )
 
@@ -515,10 +517,10 @@ def _python_blueprint(
     if output_format == "tif":
         return f"""import ee
 import geemap
+from gee_runtime import initialize_ee
 from storage_manager import storage_manager
 
-PROJECT_ID = "{REQUIRED_GEE_PROJECT}"
-ee.Initialize(project=PROJECT_ID)
+initialize_ee(ee_module=ee)
 
 region = {region_template}
 image = (
@@ -544,10 +546,10 @@ print(out_tif)
     if analysis_mode == "zonal_stats":
         return f"""import ee
 import pandas as pd
+from gee_runtime import initialize_ee
 from storage_manager import storage_manager
 
-PROJECT_ID = "{REQUIRED_GEE_PROJECT}"
-ee.Initialize(project=PROJECT_ID)
+initialize_ee(ee_module=ee)
 
 region = {region_template}
 zones = {zones_template}
@@ -576,10 +578,10 @@ print(out_csv)
     if analysis_mode == "single_stat":
         return f"""import ee
 import pandas as pd
+from gee_runtime import initialize_ee
 from storage_manager import storage_manager
 
-PROJECT_ID = "{REQUIRED_GEE_PROJECT}"
-ee.Initialize(project=PROJECT_ID)
+initialize_ee(ee_module=ee)
 
 region = {region_template}
 image = (
@@ -604,10 +606,10 @@ print(out_csv)
 
     return f"""import ee
 import pandas as pd
+from gee_runtime import initialize_ee
 from storage_manager import storage_manager
 
-PROJECT_ID = "{REQUIRED_GEE_PROJECT}"
-ee.Initialize(project=PROJECT_ID)
+initialize_ee(ee_module=ee)
 
 region = {region_template}
 collection = (
@@ -776,7 +778,7 @@ def gee_script_blueprint(
         "notes": [
             "For Python execution in this project, keep storage_manager path resolution.",
             "Validate with GeoCode_COT_Validation_tool block-by-block before final execution.",
-            f"Use ee.Initialize(project='{REQUIRED_GEE_PROJECT}').",
+            "Python execution delegates project resolution and initialization to gee_runtime.initialize_ee.",
         ],
     }
     return json.dumps(payload, indent=2, ensure_ascii=False)
@@ -1270,7 +1272,7 @@ def gee_dataset_metadata(dataset_id: str, check_temporal: bool = True) -> str:
         )
 
     try:
-        ee.Initialize(project=REQUIRED_GEE_PROJECT)
+        initialize_ee(ee_module=ee)
     except Exception as exc:
         if known:
             base_result["status"] = "partial"
@@ -1282,6 +1284,15 @@ def gee_dataset_metadata(dataset_id: str, check_temporal: bool = True) -> str:
             base_result["source"] = "curated_registry"
             base_result["warning"] = f"ee.Initialize failed: {exc}"
             return json.dumps(base_result, indent=2, ensure_ascii=False)
+        return json.dumps(
+            {
+                "status": "error",
+                "dataset_id": dataset_id,
+                "error": f"Earth Engine initialization failed: {exc}",
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
 
     result = dict(base_result)
 
@@ -1746,11 +1757,18 @@ def dataset_latest_availability(
     bbox: Optional[str] = None,
     lookback_days: int = 30,
 ) -> str:
+    queried_at_utc = _utc_now_iso()
     checks: List[Dict[str, object]] = []
 
     for dataset_id in gee_dataset_ids or []:
         payload = json.loads(gee_dataset_metadata(dataset_id, check_temporal=True))
         payload["source"] = "gee"
+        payload["source_channel"] = "gee_catalog"
+        payload["query_executed_at_utc"] = queried_at_utc
+        payload["availability_scope"] = "dataset_collection_extent_not_AOI_QA"
+        payload["availability_lag_days"] = _availability_lag_days(
+            payload.get("latest_available_date"), queried_at_utc
+        )
         payload["coverage_status"] = _compare_requested_end_date(
             payload.get("latest_available_date"),
             requested_end_date,
@@ -1762,7 +1780,9 @@ def dataset_latest_availability(
         from experiments.official_daily_ntl_fastpath.cmr_client import search_granules, select_latest_day_entries
 
         bbox_value = _parse_bbox_text(bbox)
-        search_end = _today()
+        # CMR/LAADS search windows are UTC date windows. Do not use the
+        # workstation's local calendar date here, which can be one day ahead.
+        search_end = date.fromisoformat(queried_at_utc[:10])
         search_start = search_end - timedelta(days=max(1, int(lookback_days)))
         for short_name in laads_short_names:
             granules = search_granules(
@@ -1776,6 +1796,9 @@ def dataset_latest_availability(
             checks.append(
                 {
                     "source": "laads_cmr",
+                    "source_channel": "nasa_earthdata_cmr_laads",
+                    "query_executed_at_utc": queried_at_utc,
+                    "availability_scope": "granule_listing_not_AOI_QA",
                     "short_name": short_name,
                     "status": "ok" if latest_day else "empty",
                     "temporal_resolution": "daily",
@@ -1784,6 +1807,7 @@ def dataset_latest_availability(
                     "latest_available_date": latest_day,
                     "latest_available_period": latest_day,
                     "latest_date_semantics": "observation_date",
+                    "availability_lag_days": _availability_lag_days(latest_day, queried_at_utc),
                     "latest_granule_ids": [g.producer_granule_id for g in entries[:5]],
                     "coverage_status": _compare_requested_end_date(latest_day, requested_end_date, "daily"),
                 }
@@ -1815,6 +1839,10 @@ def dataset_latest_availability(
     payload = {
         "status": "ok",
         "requested_end_date": requested_end_date,
+        "query_executed_at_utc": queried_at_utc,
+        "channels_checked": sorted({str(item.get("source_channel")) for item in checks}),
+        "channel_comparison_required": len({str(item.get("source_channel")) for item in checks}) > 1,
+        "quality_eligibility_checked": False,
         "overall_status": overall_status,
         "checks": checks,
     }

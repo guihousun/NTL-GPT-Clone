@@ -25,8 +25,7 @@ Do not use GEE Python server-side execution just because the region is a country
 
 1. Define `NTL_SCRIPT_CONTRACT` before code generation.
 2. Select dataset, band, scale, and auxiliary layers using `/skills/gee-dataset-selection/` when not already fixed by the handoff.
-3. Initialize Earth Engine with the runtime project from Engineer handoff:
-   `ee.Initialize(project="<GEE_DEFAULT_PROJECT_ID>")`.
+3. Treat Earth Engine project resolution and initialization as system-managed. Registered host tools use `gee_runtime.initialize_ee`; do not ask the model to supply a project or start interactive OAuth.
 4. Load cloud-hosted imagery and cloud-hosted boundaries.
 5. Keep computation server-side:
    - use `ee.Image.reduceRegions()` for feature collections,
@@ -51,7 +50,7 @@ Do not use GEE Python server-side execution just because the region is a country
 The Engineer handoff must include:
 
 - `objective`
-- `gee_project_id`
+- the system-managed GEE runtime source (not a model-supplied project ID)
 - `dataset_id`, `band`, date range, reducer, scale
 - boundary source or AOI source
 - expected output filename(s)

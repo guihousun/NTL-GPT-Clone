@@ -23,7 +23,6 @@ from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
 
 from tools.NTL_Knowledge_Base import (
-    NTL_Code_Knowledge,
     NTL_Literature_Knowledge,
     NTL_Solution_Knowledge,
 )
@@ -42,7 +41,11 @@ class State(TypedDict):
     intent_profile: Optional[dict]
 
 
-TOOLS = [NTL_Literature_Knowledge, NTL_Solution_Knowledge, NTL_Code_Knowledge]
+# The current Code_RAG was built from legacy runtime snippets that predate the
+# unified GEE runtime. Keep it outside the formal agent surface until that
+# corpus is rebuilt and bound into the system snapshot. Active workflow code
+# comes from role Skills and registered tools instead.
+TOOLS = [NTL_Literature_Knowledge, NTL_Solution_Knowledge]
 
 
 @lru_cache(maxsize=1)
@@ -952,18 +955,18 @@ Intent Type Guidelines:
 - **general_query**: Other general questions about NTL
 
 ### Tool Selection
-You have access to 3 knowledge stores. Follow this strict retrieval budget policy:
+You have access to 2 formal knowledge stores. Follow this strict retrieval budget policy:
 - Always prioritize **NTL_Solution_Knowledge** first.
-- Query at most **1-2 stores** per request (never all 3 by default).
+- Query at most **1-2 stores** per request.
 - Choose the second store by mode:
   - **theory** -> add **NTL_Literature_Knowledge**
-  - **workflow/code/mixed/auto** -> add **NTL_Code_Knowledge**
+  - **workflow/code/mixed/auto** -> do not retrieve legacy code; use current role Skills and registered tools
 - Only use a single store when confidence is already high from Solution retrieval.
 
 **Store Selection Guide:**
 - **NTL_Literature_Knowledge**: Use for theory, formulas, scientific definitions, methodology reproduction
 - **NTL_Solution_Knowledge**: Use for workflows, best practices, tool usage patterns, datasets
-- **NTL_Code_Knowledge**: Use for Python/GEE code snippets, implementation examples
+- The legacy Code_RAG corpus is disabled until it is rebuilt and snapshot-bound against the current runtime.
 
 ### Available Tools
 {_tool_manual_str()}
@@ -1024,7 +1027,7 @@ Rules:
 - ONLY use tool names from the Available Tools list above
 - If a workflow step doesn't need a tool call, use {{"type": "instruction", "description": "..."}}
 - Valid step types: "builtin_tool" (for actual tool calls), "instruction" (for guidance only)
-- Handle Code_RAG empty status by reporting "code corpus unavailable".
+- When code examples are requested, rely on current role Skills and registered tools; report the legacy code corpus as disabled rather than calling it.
 - Treat "first night after event" as the first post-event nighttime overpass at epicenter local time.
 - If the target daily product/file is UTC-indexed, convert that local acquisition time to UTC before selecting the image/file date.
 
@@ -1041,7 +1044,10 @@ Current Mode: {mode}
 
     # 缁戝畾鎵€鏈夊伐鍏凤紝璁?LLM 鑷繁鍒ゆ柇浣跨敤鍝釜
     model = llm_gpt.bind_tools(TOOLS)
-    response = model.invoke(formatted_prompt)
+    # ChatPromptValue is accepted by some OpenAI-compatible endpoints but is
+    # serialized as an unsupported ``contents`` object by the provider used in
+    # benchmark runs.  Pass the concrete message list at this adapter boundary.
+    response = model.invoke(formatted_prompt.to_messages())
 
     return {
         "messages": [response],
@@ -1113,6 +1119,26 @@ def _emit_kb_progress(
         writer(payload)
     except Exception:
         pass
+
+
+def _knowledge_unavailable_response(*, error_type: str) -> str:
+    """Keep supplemental-retrieval failures from becoming task failures.
+
+    Do not include provider, Chroma, SQLite, or filesystem exception text: the
+    caller only needs to know that it should continue with its local Skill and
+    registered-tool route.
+    """
+
+    return json.dumps(
+        {
+            "status": "knowledge_unavailable",
+            "reason_code": "supplemental_knowledge_unavailable",
+            "error_type": error_type,
+            "message": "Supplemental knowledge retrieval is unavailable for this call.",
+            "fallback": "Continue with the active role Skills and registered tools.",
+        },
+        ensure_ascii=False,
+    )
 
 
 def _NTL_Knowledge_Searcher(
@@ -1285,9 +1311,9 @@ def _NTL_Knowledge_Searcher(
             phase="structured_output",
             status="error",
             label="Knowledge base execution failed",
-            meta={"error_summary": str(exc)[:280]},
+            meta={"error_type": type(exc).__name__},
         )
-        raise
+        return _knowledge_unavailable_response(error_type=type(exc).__name__)
 
 
 NTL_Knowledge_Base = StructuredTool.from_function(
@@ -1298,7 +1324,8 @@ NTL_Knowledge_Base = StructuredTool.from_function(
         "methods, equations, or literature context. Use workflow mode only after relevant /skills "
         "content was checked and found to have no applicable workflow; in that case set "
         "skill_gap_confirmed=true. Do not use this tool for routine routing, task-level framing, "
-        "dataset acquisition, or code execution."
+        "dataset acquisition, or code execution. The legacy Code_RAG corpus is intentionally "
+        "excluded from this formal surface until it is rebuilt against the current runtime."
     ),
     args_schema=NTL_Knowledge_Searcher_Input,
 )

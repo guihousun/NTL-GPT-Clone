@@ -1,9 +1,9 @@
 """Google Earth Engine implementation of VNP46A2 16-day angle correction.
 
 All raster filtering, quality masking, group means, correction, stacking, and
-regional statistics are evaluated in Earth Engine.  The client receives only
-small provenance/statistics records and one remote output asset; daily source
-rasters are never downloaded to the local workspace.
+regional statistics are evaluated in Earth Engine. The client receives only
+small provenance/statistics records and, when explicitly requested, one remote
+output asset; daily source rasters are never downloaded to the local workspace.
 """
 
 from __future__ import annotations
@@ -11,7 +11,6 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
-import os
 import re
 import time
 from datetime import date, datetime, timezone
@@ -23,12 +22,13 @@ from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from storage_manager import storage_manager
+from gee_runtime import initialize_ee, resolve_gee_boundary_asset_project_id
 
 
 DATASET_ID = "NASA/VIIRS/002/VNP46A2"
 RADIANCE_BAND = "DNB_BRDF_Corrected_NTL"
 QA_BANDS = ["Mandatory_Quality_Flag", "QF_Cloud_Mask", "Snow_Flag"]
-DEFAULT_BOUNDARY_ASSET = "projects/empyrean-caster-430308-m2/assets/province"
+DEFAULT_BOUNDARY_ASSET = ""
 METHOD_NAME = "fixed-anchor 16-day group-mean angle-effect correction"
 STATISTICS_BATCH_SIZE = 8
 
@@ -46,12 +46,19 @@ class VNP46A2AngularCorrectionInput(BaseModel):
     group_period_days: Literal[16] = Field(16, description="Fixed 16-day grouping period.")
     boundary_asset_id: str = Field(
         DEFAULT_BOUNDARY_ASSET,
-        description="Earth Engine FeatureCollection containing the study-area boundary.",
+        description=(
+            "Earth Engine FeatureCollection containing the study-area boundary. "
+            "When empty, use the system-configured boundary asset project."
+        ),
     )
     boundary_name_field: str = Field("name", description="Boundary attribute matched to study_area.")
     output_asset_id: str = Field(
-        ...,
-        description="Full Earth Engine image asset id for the corrected daily multiband stack.",
+        "",
+        description=(
+            "Optional full Earth Engine image asset id for a persistent corrected daily "
+            "multiband stack. Leave empty when compact corrected daily statistics and "
+            "metadata are the requested outputs."
+        ),
     )
     output_statistics_csv: str = Field(
         "vnp46a2_angular_correction_daily_statistics.csv",
@@ -63,10 +70,6 @@ class VNP46A2AngularCorrectionInput(BaseModel):
     )
     scale_m: Literal[500] = Field(500, description="Fixed VNP46A2 export scale in metres.")
     crs: Literal["EPSG:4326"] = Field("EPSG:4326", description="Fixed output CRS.")
-    project: Optional[str] = Field(
-        None,
-        description="Optional Earth Engine billing/quota project; no interactive authentication is attempted.",
-    )
     wait_for_completion: bool = Field(
         True,
         description="Wait for the single remote asset export to reach a terminal state.",
@@ -84,6 +87,8 @@ class VNP46A2AngularCorrectionInput(BaseModel):
     @classmethod
     def _asset_id(cls, value: str) -> str:
         normalized = value.strip()
+        if not normalized:
+            return ""
         if not re.fullmatch(r"projects/[^/]+/assets/[A-Za-z0-9_./-]+", normalized):
             raise ValueError("output_asset_id must be a full projects/<project>/assets/<name> id")
         return normalized
@@ -130,10 +135,7 @@ def _validate_dates(start_date: str, end_date: str, anchor_date: str) -> None:
 def _load_ee(project: Optional[str]):
     import ee  # imported lazily so registry discovery does not initialize Earth Engine
 
-    if project:
-        ee.Initialize(project=project)
-    else:
-        ee.Initialize()
+    initialize_ee(explicit_project_id=project, ee_module=ee)
     return ee
 
 
@@ -366,12 +368,16 @@ def run_vnp46a2_angular_correction(
         _validate_dates(start_date, end_date, anchor_date)
         if group_period_days != 16 or scale_m != 500 or crs != "EPSG:4326":
             raise ValueError("group_period_days, scale_m, and crs are fixed at 16, 500, and EPSG:4326")
-        if not output_asset_id:
-            raise ValueError("output_asset_id is required")
-        if not re.fullmatch(r"projects/[^/]+/assets/[A-Za-z0-9_./-]+", output_asset_id):
+        if output_asset_id and not re.fullmatch(
+            r"projects/[^/]+/assets/[A-Za-z0-9_./-]+", output_asset_id
+        ):
             raise ValueError("output_asset_id must be a full projects/<project>/assets/<name> id")
 
-        ee = _load_ee(project or os.getenv("GEE_DEFAULT_PROJECT_ID") or None)
+        ee = _load_ee(project)
+        if not boundary_asset_id:
+            boundary_asset_id = (
+                f"projects/{resolve_gee_boundary_asset_project_id()}/assets/province"
+            )
         workflow = _build_gee_workflow(
             ee,
             study_area=study_area,
@@ -389,28 +395,36 @@ def run_vnp46a2_angular_correction(
         )
         _write_statistics(statistics_path, statistics)
 
-        export_task = ee.batch.Export.image.toAsset(
-            image=workflow["stack"],
-            description=f"VNP46A2_angle_corrected_{start_date}_{end_date}",
-            assetId=output_asset_id,
-            region=workflow["region"],
-            scale=scale_m,
-            crs=crs,
-            maxPixels=10**13,
-        )
-        export_task.start()
-        export_status = (
-            _wait_for_export(
-                export_task,
-                max_wait_seconds=max_wait_seconds,
-                poll_seconds=poll_seconds,
+        export_task = None
+        if output_asset_id:
+            export_task = ee.batch.Export.image.toAsset(
+                image=workflow["stack"],
+                description=f"VNP46A2_angle_corrected_{start_date}_{end_date}",
+                assetId=output_asset_id,
+                region=workflow["region"],
+                scale=scale_m,
+                crs=crs,
+                maxPixels=10**13,
             )
-            if wait_for_completion
-            else dict(export_task.status() or {})
-        )
-        state = str(export_status.get("state") or "SUBMITTED").upper()
+            export_task.start()
+            export_status = (
+                _wait_for_export(
+                    export_task,
+                    max_wait_seconds=max_wait_seconds,
+                    poll_seconds=poll_seconds,
+                )
+                if wait_for_completion
+                else dict(export_task.status() or {})
+            )
+            state = str(export_status.get("state") or "SUBMITTED").upper()
+        else:
+            export_status = {
+                "state": "NOT_REQUESTED",
+                "reason": "compact daily statistics and metadata were requested without a remote asset",
+            }
+            state = "NOT_REQUESTED"
         remote_asset_metadata = None
-        if state == "COMPLETED":
+        if state == "COMPLETED" and output_asset_id:
             remote_asset_metadata = ee.data.getAsset(output_asset_id)
 
         config_record = {
@@ -432,7 +446,7 @@ def run_vnp46a2_angular_correction(
         }
         metadata = {
             "schema": "ntl_gpt.vnp46a2_angular_correction.gee.v1",
-            "status": "success" if state == "COMPLETED" else "submitted" if state not in {"FAILED", "CANCELLED", "TIMED_OUT"} else "error",
+            "status": "success" if state in {"COMPLETED", "NOT_REQUESTED"} else "submitted" if state not in {"FAILED", "CANCELLED", "TIMED_OUT"} else "error",
             "started_at_utc": started_at,
             "recorded_at_utc": datetime.now(timezone.utc).isoformat(),
             "method": METHOD_NAME,
@@ -453,7 +467,7 @@ def run_vnp46a2_angular_correction(
                 "task_id": getattr(export_task, "id", None),
                 "state": state,
                 "status": export_status,
-                "asset_id": output_asset_id,
+                "asset_id": output_asset_id or None,
                 "asset_metadata": remote_asset_metadata,
                 "asset_metadata_sha256": _canonical_sha256(remote_asset_metadata) if remote_asset_metadata else None,
                 "pixel_checksum_status": "requires post-export frozen reference validation",
@@ -482,12 +496,13 @@ def run_vnp46a2_angular_correction(
 
 
 VNP46A2_angular_correction_tool = StructuredTool.from_function(
-    func=run_vnp46a2_angular_correction,
+    func=lambda **kwargs: run_vnp46a2_angular_correction(project=None, **kwargs),
     name="VNP46A2_angular_correction_tool",
     description=(
         "Apply the fixed-anchor 16-day group-mean angle-effect correction to a VNP46A2 daily series entirely "
         "in Google Earth Engine. The tool uses the direct BRDF-corrected radiance band with explicit Collection 2 "
-        "QA, exports one corrected daily multiband asset, and writes only compact daily statistics and metadata locally."
+        "QA and writes compact corrected daily statistics and metadata locally; it exports a remote multiband asset only "
+        "when an explicit output_asset_id is requested."
     ),
     args_schema=VNP46A2AngularCorrectionInput,
 )

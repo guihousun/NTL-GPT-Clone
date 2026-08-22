@@ -28,6 +28,38 @@ def _metadata(
     )
 
 
+def test_latest_availability_records_utc_and_channel_semantics(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        toolkit,
+        "gee_dataset_metadata",
+        lambda dataset_id, check_temporal=True: json.dumps(
+            {
+                "status": "ok",
+                "dataset_id": dataset_id,
+                "temporal_resolution": "daily",
+                "latest_available_date": "2026-08-13",
+                "latest_date_semantics": "observation_date",
+            }
+        ),
+    )
+
+    payload = json.loads(
+        toolkit.dataset_latest_availability(
+            gee_dataset_ids=["NASA/VIIRS/002/VNP46A2"],
+        )
+    )
+
+    assert payload["channels_checked"] == ["gee_catalog"]
+    assert payload["channel_comparison_required"] is False
+    assert payload["query_executed_at_utc"].endswith("Z")
+    check = payload["checks"][0]
+    assert check["source_channel"] == "gee_catalog"
+    assert check["query_executed_at_utc"] == payload["query_executed_at_utc"]
+    assert check["availability_scope"] == "dataset_collection_extent_not_AOI_QA"
+    assert payload["quality_eligibility_checked"] is False
+    assert check["availability_lag_days"] is not None
+
+
 def test_general_explicit_dataset_gets_live_plan_without_ntl_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

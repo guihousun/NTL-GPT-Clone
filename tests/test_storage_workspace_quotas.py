@@ -106,6 +106,35 @@ class StorageWorkspaceQuotaTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             self.storage_manager.resolve_output_path("/data/raw/not-an-output.txt", thread_id)
 
+    def test_deepagents_inputs_outputs_aliases_resolve_with_their_workspace_roots(self) -> None:
+        thread_id = "alice-aliases"
+        workspace = self.storage_manager.get_workspace(thread_id)
+
+        self.assertEqual(
+            self.storage_manager.resolve_workspace_relative_path(
+                "/inputs/source.json",
+                thread_id,
+                default_root="outputs",
+                allowed_roots=("inputs",),
+            ),
+            (workspace / "inputs" / "source.json").resolve(),
+        )
+        self.assertEqual(
+            self.storage_manager.resolve_workspace_relative_path(
+                "/outputs/results/table.csv",
+                thread_id,
+                default_root="inputs",
+                allowed_roots=("outputs",),
+            ),
+            (workspace / "outputs" / "results" / "table.csv").resolve(),
+        )
+        with self.assertRaises(ValueError):
+            self.storage_manager.resolve_workspace_relative_path(
+                "/outputs/../escape.csv",
+                thread_id,
+                allowed_roots=("outputs",),
+            )
+
     def test_thread_ids_and_windows_absolute_paths_cannot_escape_workspace(self) -> None:
         with self.assertRaises(ValueError):
             self.storage_manager.get_workspace("../outside")

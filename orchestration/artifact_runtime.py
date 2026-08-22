@@ -118,12 +118,18 @@ def _normalize_local_path(path_value: Any, *, force_output_relative: bool = Fals
     if raw.startswith("/data/raw/"):
         root = "inputs"
         tail = raw[len("/data/raw/") :]
+    elif raw.startswith("/inputs/"):
+        root = "inputs"
+        tail = raw[len("/inputs/") :]
     elif raw.startswith("inputs/"):
         root = "inputs"
         tail = raw[len("inputs/") :]
     elif raw.startswith("/data/processed/"):
         root = "outputs"
         tail = raw[len("/data/processed/") :]
+    elif raw.startswith("/outputs/"):
+        root = "outputs"
+        tail = raw[len("/outputs/") :]
     elif raw.startswith("outputs/"):
         root = "outputs"
         tail = raw[len("outputs/") :]

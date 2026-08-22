@@ -184,6 +184,41 @@ def test_output_identity_is_computed_inside_bound_workspace(
     assert report.representative_artifacts[0].bytes == output.stat().st_size
 
 
+def test_deepagents_output_alias_is_normalized_before_identity_binding(
+    artifact_workspace: Path,
+) -> None:
+    output = artifact_workspace / "outputs" / "event" / "timeline.json"
+    output.parent.mkdir(parents=True)
+    output.write_bytes(b'{"timeline":[]}')
+    config = _config()
+    with bind_artifact_scope(
+        thread_id="artifact-thread",
+        run_id="runtime-run",
+        task_id="runtime-case",
+        workspace=artifact_workspace,
+        staged_inputs=[],
+    ):
+        result = contract_tools.save_evidence_report_tool.invoke(
+            {
+                "contract": _report_draft(
+                    artifact={
+                        "path": "/outputs/event/timeline.json",
+                        "media_type": "application/json",
+                        "role": "normalized_timeline",
+                    }
+                )
+            },
+            config=config,
+        )
+    assert result["status"] == "success"
+    report = EvidenceReport.model_validate_json(
+        _persisted_contract(
+            artifact_workspace, "evidence_report", "report-artifact-identity"
+        ).read_text(encoding="utf-8")
+    )
+    assert report.representative_artifacts[0].path == "outputs/event/timeline.json"
+
+
 @pytest.mark.parametrize(
     "supplied",
     [

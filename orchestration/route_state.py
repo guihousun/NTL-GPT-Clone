@@ -42,7 +42,16 @@ ALLOWED_TRANSITIONS: dict[RouteStatus, frozenset[RouteStatus]] = {
     RouteStatus.NEEDS_CLARIFICATION: frozenset({RouteStatus.PLANNING, RouteStatus.BLOCKED}),
     RouteStatus.DIRECT_EXECUTION: frozenset({RouteStatus.SYNTHESIS, RouteStatus.FAILED}),
     RouteStatus.SPECIALIST_ROUTING: frozenset(
-        {RouteStatus.EVENT_TRACKING, RouteStatus.DATA_PREPARATION, RouteStatus.ANALYSIS, RouteStatus.BLOCKED}
+        {
+            RouteStatus.EVENT_TRACKING,
+            RouteStatus.DATA_PREPARATION,
+            RouteStatus.ANALYSIS,
+            # A native task may legitimately return a summary-only result.
+            # It has no named package phase to record, but Engineer still
+            # needs one bounded handoff-validation transition before synthesis.
+            RouteStatus.HANDOFF_VALIDATION,
+            RouteStatus.BLOCKED,
+        }
     ),
     RouteStatus.EVENT_TRACKING: frozenset({RouteStatus.HANDOFF_VALIDATION, RouteStatus.FAILED}),
     RouteStatus.DATA_PREPARATION: frozenset({RouteStatus.HANDOFF_VALIDATION, RouteStatus.FAILED}),

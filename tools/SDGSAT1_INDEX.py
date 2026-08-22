@@ -89,6 +89,142 @@ class IndexInput(BaseModel):
     )
 
 
+class JiaLightClassificationInput(BaseModel):
+    """Inputs for the fixed Jia et al. (2024) RGB-light classification."""
+
+    radiance_filename: str = Field(
+        ...,
+        description=(
+            "Filename of the calibrated three-band SDGSAT-1 RGB radiance GeoTIFF "
+            "in 'inputs/'. Bands must be ordered Red, Green, Blue."
+        ),
+    )
+    rrli_output_filename: str = Field(
+        ...,
+        description="Filename for the RRLI (Red/Green) GeoTIFF written under 'outputs/'.",
+    )
+    rbli_output_filename: str = Field(
+        ...,
+        description="Filename for the RBLI (Blue/Green) GeoTIFF written under 'outputs/'.",
+    )
+    classification_output_filename: str = Field(
+        ...,
+        description="Filename for the uint8 Jia et al. light-class GeoTIFF written under 'outputs/'.",
+    )
+
+
+def _source_valid_mask(arrays, nodata_values):
+    """Return a shared finite/non-NoData mask for R, G, B arrays."""
+
+    valid = np.ones_like(arrays[0], dtype=bool)
+    for array, nodata in zip(arrays, nodata_values):
+        valid &= np.isfinite(array)
+        if nodata is not None:
+            if np.isnan(nodata):
+                valid &= ~np.isnan(array)
+            else:
+                valid &= array != np.float32(nodata)
+    return valid
+
+
+def _write_light_class_tif(array, reference_tif, output_tif_path):
+    """Write a categorical uint8 raster with the source grid and 255 NoData."""
+
+    ds = gdal.Open(reference_tif)
+    if ds is None:
+        raise ValueError(f"Unable to open reference image: {reference_tif}")
+    driver = gdal.GetDriverByName("GTiff")
+    output = driver.Create(output_tif_path, ds.RasterXSize, ds.RasterYSize, 1, gdal.GDT_Byte)
+    if output is None:
+        raise ValueError(f"Unable to create output image: {output_tif_path}")
+    output.SetGeoTransform(ds.GetGeoTransform())
+    output.SetProjection(ds.GetProjection())
+    band = output.GetRasterBand(1)
+    band.WriteArray(np.asarray(array, dtype=np.uint8))
+    band.SetDescription("Jia et al. (2024) SDGSAT-1 light class")
+    band.SetNoDataValue(255)
+    output.FlushCache()
+    output = None
+    ds = None
+
+
+def classify_jia_light_from_rgb_tif(
+    radiance_filename: str,
+    rrli_output_filename: str,
+    rbli_output_filename: str,
+    classification_output_filename: str,
+) -> str:
+    """Compute RRLI/RBLI and the fixed Jia et al. (2024) three-class rule.
+
+    The threshold order is part of the method contract: first assign RLED when
+    RRLI > 9; among all remaining valid pixels assign WLED when RBLI > 0.57;
+    assign Other otherwise.  Codes are WLED=1, RLED=2, Other=3 and NoData=255.
+    """
+
+    try:
+        input_path = storage_manager.resolve_input_path(radiance_filename)
+        rrli_path = storage_manager.resolve_output_path(rrli_output_filename)
+        rbli_path = storage_manager.resolve_output_path(rbli_output_filename)
+        class_path = storage_manager.resolve_output_path(classification_output_filename)
+        if not os.path.exists(input_path):
+            return f"Error: input file not found in inputs/: {radiance_filename}"
+
+        dataset = gdal.Open(input_path)
+        if dataset is None or dataset.RasterCount < 3:
+            return f"Error: expected a readable three-band RGB GeoTIFF: {radiance_filename}"
+        bands = [dataset.GetRasterBand(index) for index in (1, 2, 3)]
+        red, green, blue = [band.ReadAsArray().astype(np.float32) for band in bands]
+        nodata_values = [band.GetNoDataValue() for band in bands]
+        dataset = None
+
+        valid = _source_valid_mask((red, green, blue), nodata_values)
+        # The Jia ratios are defined only for a positive green-channel
+        # radiance.  A non-positive denominator is not a valid dark-light
+        # observation: keep it as NoData rather than allowing a finite ratio
+        # from a negative denominator to enter the class thresholds.
+        valid &= np.isfinite(green) & (green > 0.0)
+        rrli_raw = compute_rrli(red, green)
+        rbli_raw = compute_rbli(blue, green)
+        valid &= np.isfinite(rrli_raw) & np.isfinite(rbli_raw)
+
+        rrli = np.full_like(red, -9999.0, dtype=np.float32)
+        rbli = np.full_like(red, -9999.0, dtype=np.float32)
+        rrli[valid] = rrli_raw[valid]
+        rbli[valid] = rbli_raw[valid]
+
+        # The order below is intentional and tested.  A pixel meeting both
+        # thresholds is RLED because the RLED rule is evaluated first.
+        light_class = np.full(red.shape, 255, dtype=np.uint8)
+        rled = valid & (rrli_raw > 9.0)
+        wled = valid & ~rled & (rbli_raw > 0.57)
+        other = valid & ~rled & ~wled
+        light_class[wled] = 1
+        light_class[rled] = 2
+        light_class[other] = 3
+
+        for path in (rrli_path, rbli_path, class_path):
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+        save_index_tif(rrli, input_path, rrli_path, "RRLI (Red / Green)")
+        save_index_tif(rbli, input_path, rbli_path, "RBLI (Blue / Green)")
+        _write_light_class_tif(light_class, input_path, class_path)
+
+        counts = {
+            "WLED": int(np.count_nonzero(light_class == 1)),
+            "RLED": int(np.count_nonzero(light_class == 2)),
+            "Other": int(np.count_nonzero(light_class == 3)),
+            "NoData": int(np.count_nonzero(light_class == 255)),
+        }
+        return (
+            "Jia et al. (2024) light classification completed. "
+            "RRLI=Red/Green; RBLI=Blue/Green; classification order is "
+            "RLED if RRLI>9, otherwise WLED if RBLI>0.57, otherwise Other. "
+            f"Outputs: outputs/{rrli_output_filename}, outputs/{rbli_output_filename}, "
+            f"outputs/{classification_output_filename}. Counts: {counts}."
+        )
+    except Exception as exc:
+        return f"Error during Jia light classification: {exc}"
+
+
 
 # ======================
 # 主计算函数
@@ -175,6 +311,7 @@ SDGSAT1_index_tool = StructuredTool.from_function(
     name="SDGSAT1_compute_index",
     description=(
         "Compute a spectral index (RBLI, RRLI, NDIBG, or NDIGR) from a calibrated SDGSAT-1 RGB radiance image in your 'inputs/' folder. "
+        "For named SDGSAT-1 light indices, use this tool rather than recreating a ratio in generic code: RRLI is Red/Green and RBLI is Blue/Green. "
         "Input NoData, non-finite values, and pixels with an undefined zero denominator are written as NoData (-9999). "
         "Result is saved to your 'outputs/' folder. "
         "\n\nExample:\n"
@@ -184,6 +321,22 @@ SDGSAT1_index_tool = StructuredTool.from_function(
     ),
     args_schema=IndexInput,
     return_direct=True
+)
+
+
+SDGSAT1_jia_light_classification_tool = StructuredTool.from_function(
+    func=classify_jia_light_from_rgb_tif,
+    name="SDGSAT1_jia_light_classification",
+    description=(
+        "Compute RRLI (Red/Green), RBLI (Blue/Green), and the fixed Jia et al. "
+        "(2024) SDGSAT-1 light-source classification from one calibrated RGB "
+        "radiance GeoTIFF. This is the dedicated method for a request that names "
+        "Jia et al. light classification: RLED if RRLI > 9; otherwise WLED if "
+        "RBLI > 0.57; otherwise Other. Class codes are WLED=1, RLED=2, Other=3, "
+        "NoData=255. Do not replace these thresholds or their order with generic code."
+    ),
+    args_schema=JiaLightClassificationInput,
+    return_direct=True,
 )
 
 

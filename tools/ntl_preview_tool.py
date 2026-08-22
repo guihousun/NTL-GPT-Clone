@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import urllib.request
 from dataclasses import dataclass
@@ -16,9 +15,9 @@ from pydantic import BaseModel, Field
 from PIL import Image
 
 from storage_manager import current_thread_id, storage_manager
+from gee_runtime import initialize_ee
 
 
-DEFAULT_GEE_PROJECT = str(os.getenv("GEE_DEFAULT_PROJECT_ID") or "").strip() or "empyrean-caster-430308-m2"
 DEFAULT_OUTPUT_ROOT = "ntl_preview_runs"
 PALETTE_PRESETS: dict[str, list[str]] = {
     "report_dark": ["000000", "1f3b73", "ffcc33", "ff5e3a", "ffffff"],
@@ -184,13 +183,7 @@ def _initialize_earth_engine():
     except Exception as exc:  # noqa: BLE001
         raise RuntimeError(f"earthengine-api import failed: {exc}") from exc
 
-    try:
-        ee.Initialize(project=DEFAULT_GEE_PROJECT)
-    except Exception:
-        try:
-            ee.Initialize()
-        except Exception as exc:  # noqa: BLE001
-            raise RuntimeError(f"ee.Initialize failed: {exc}") from exc
+    initialize_ee(ee_module=ee)
     return ee
 
 

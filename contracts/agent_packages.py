@@ -81,6 +81,10 @@ def _safe_artifact_path(value: str) -> str:
         relative = raw[len("/data/processed/") :]
     elif raw.startswith("/data/raw/"):
         relative = raw[len("/data/raw/") :]
+    elif raw.startswith("/outputs/"):
+        relative = raw[len("/outputs/") :]
+    elif raw.startswith("/inputs/"):
+        relative = raw[len("/inputs/") :]
     elif raw.startswith("outputs/"):
         relative = raw[len("outputs/") :]
     elif raw.startswith("inputs/"):

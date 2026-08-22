@@ -1,5 +1,5 @@
 ---
-name: ntl-event-tracker-source-conflict-and-timeline
+name: source-conflict-and-timeline
 description: Normalize event records, deduplicate reports, reconstruct an as-of timeline, and preserve unresolved source conflicts.
 ---
 

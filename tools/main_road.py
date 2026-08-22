@@ -272,6 +272,11 @@ import rasterio
 from skimage import filters, morphology
 from storage_manager import storage_manager
 
+try:
+    from .road_vectorization import resolve_road_input_path
+except ImportError:  # pragma: no cover - compatibility for direct module execution
+    from road_vectorization import resolve_road_input_path
+
 
 class OtsuRoadExtractionInput(BaseModel):
     input_tif: str = Field(
@@ -286,8 +291,10 @@ def extract_road_mask_by_otsu(input_tif: str, output_tif: str) -> str:
     """
     Extract road centerline mask using Otsu-based thresholding and post-processing.
     """
-    # Resolve paths using storage_manager
-    input_path = storage_manager.resolve_input_path(input_tif)
+    # Resolve a prior preprocessing artifact from either inputs/ or outputs/.
+    # The latter is the normal handoff location for same-thread intermediate
+    # rasters (for example calibrated brightness written by a prior tool).
+    input_path = resolve_road_input_path(input_tif)
     output_path = storage_manager.resolve_output_path(output_tif)
 
     # Load grayscale image
@@ -319,7 +326,8 @@ def extract_road_mask_by_otsu(input_tif: str, output_tif: str) -> str:
         dst.write(road_mask, 1)
 
     print(f"✅ Road mask extracted using Otsu thresholding and saved to: {output_path}")
-    return f"✅ Road mask extracted successfully and saved to: 'outputs/{output_tif}'"
+    output_name = str(output_path).replace("\\", "/").rsplit("/", 1)[-1]
+    return f"✅ Road mask extracted successfully and saved to: 'outputs/{output_name}'"
 
 
 # Register Tool
@@ -328,7 +336,9 @@ otsu_road_extraction_tool = StructuredTool.from_function(
     name="Extract_Road",
     description=(
         "Extracts binary road centerline masks from grayscale images using Otsu global thresholding "
-        "and morphological post-processing. The output is a GeoTIFF binary mask saved to your 'outputs/' folder."
+        "and morphological post-processing. The output is a GeoTIFF binary mask saved to your 'outputs/' folder. "
+        "When a PolyLine Shapefile is requested, pass the resulting outputs/ mask to "
+        "Vectorize_Road_Mask_to_PolyLine."
     ),
     args_schema=OtsuRoadExtractionInput
 )

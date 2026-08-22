@@ -25,6 +25,7 @@ except Exception:  # noqa: BLE001
     Window = None
 
 import storage_manager as sm_module
+from gee_runtime import initialize_ee
 from ntl_toolkit.adapters.langchain import raster_report as _core_raster_report
 from ntl_toolkit.adapters.langchain import vector_report as _core_vector_report
 from orchestration.observation_runtime import (
@@ -33,7 +34,6 @@ from orchestration.observation_runtime import (
 )
 
 sm = sm_module.storage_manager
-DEFAULT_GEE_PROJECT = "empyrean-caster-430308-m2"
 DedupeMode = Literal["none", "exact_path", "stem_no_digits"]
 
 
@@ -259,14 +259,10 @@ def _init_ee():
         return None, f"earthengine-api import failed: {exc}"
 
     try:
-        ee.Initialize(project=DEFAULT_GEE_PROJECT)
+        initialize_ee(ee_module=ee)
         return ee, None
-    except Exception:
-        try:
-            ee.Initialize()
-            return ee, None
-        except Exception as exc:  # noqa: BLE001
-            return None, f"ee.Initialize failed: {exc}"
+    except Exception as exc:  # noqa: BLE001
+        return None, f"Earth Engine initialization failed: {exc}"
 
 
 def _gee_asset_report(asset_id: str, mode: Literal["basic", "full"] = "basic") -> Dict[str, Any]:

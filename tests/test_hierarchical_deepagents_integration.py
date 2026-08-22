@@ -359,6 +359,8 @@ def test_real_full_graph_executes_engineer_specialist_engineer_chain(
     assert "provider-free-analyst" not in seen_prompts
     assert "provider-free-event-tracker" not in seen_prompts
     assert "STALE_AGENT_MEMORY_SENTINEL" not in seen_prompts
+    assert "NTL-GPT Runtime Memory" in seen_prompts
+    assert "/memories/AGENTS.md" in seen_prompts
 
 
 def test_real_single_agent_has_no_delegation_and_persists_task_plan(
@@ -435,6 +437,8 @@ def test_real_single_agent_has_no_delegation_and_persists_task_plan(
     for namespace in ("common", "engineer", "data_searcher", "analyst", "event_tracker"):
         assert f"provider-free-{namespace.replace('_', '-')}" in seen_prompts
     assert "STALE_AGENT_MEMORY_SENTINEL" not in seen_prompts
+    assert "NTL-GPT Runtime Memory" in seen_prompts
+    assert "/memories/AGENTS.md" in seen_prompts
     assert (
         manager.get_workspace(thread_id)
         / "outputs"

@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 
 COMMON_SKILL_SOURCE = "/skills/common/"
+GEE_NTL_DATE_BOUNDARY_SKILL_SOURCE = "/skills/gee-ntl-date-boundary-handling/"
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,8 +27,9 @@ class RoleSpec:
     can_delegate: bool = False
 
 
-def _role_skills(namespace: str) -> tuple[str, str]:
-    return (COMMON_SKILL_SOURCE, f"/skills/{namespace}/")
+def _role_skills(namespace: str, *shared_sources: str) -> tuple[str, ...]:
+    """Build an ordered role Skill surface with optional shared procedures."""
+    return (COMMON_SKILL_SOURCE, f"/skills/{namespace}/", *shared_sources)
 
 
 ROLE_SPECS: dict[str, RoleSpec] = {
@@ -35,11 +37,12 @@ ROLE_SPECS: dict[str, RoleSpec] = {
         name="NTL_Engineer",
         description=(
             "Supervisor and task-truth owner. Plans and conditionally routes work, "
-            "accepts typed specialist packages, uses only a bounded direct-execution "
-            "fast path, and synthesizes the final EvidenceReport."
+            "can execute bounded routine local code when inputs and semantics are "
+            "settled, routes task-specific NTL science to the appropriate specialist, "
+            "accepts typed specialist packages, and synthesizes the final EvidenceReport."
         ),
         tool_group="engineer_tools",
-        skill_sources=_role_skills("engineer"),
+        skill_sources=_role_skills("engineer", GEE_NTL_DATE_BOUNDARY_SKILL_SOURCE),
         expected_package_type="EvidenceReport",
         can_delegate=True,
     ),
@@ -48,10 +51,11 @@ ROLE_SPECS: dict[str, RoleSpec] = {
         description=(
             "Observation specialist for product availability, AOI and date resolution, "
             "acquisition, standard preprocessing, provenance, and analysis-ready "
-            "ObservationPackage production."
+            "ObservationPackage production when a typed handoff is requested; it may "
+            "return a bounded evidence summary for summary-only assignments."
         ),
         tool_group="data_searcher_tools",
-        skill_sources=_role_skills("data_searcher"),
+        skill_sources=_role_skills("data_searcher", GEE_NTL_DATE_BOUNDARY_SKILL_SOURCE),
         expected_package_type="ObservationPackage",
     ),
     "NTL_Analyst": RoleSpec(
@@ -59,7 +63,8 @@ ROLE_SPECS: dict[str, RoleSpec] = {
         description=(
             "Scientific-analysis specialist for task-specific nighttime-light methods, "
             "contract-bound code execution, artifacts, bounded technical repair, "
-            "internal validation, and AnalysisPackage production."
+            "internal validation, and AnalysisPackage production when a typed handoff "
+            "is requested; it may return a bounded summary-only result otherwise."
         ),
         tool_group="analyst_tools",
         skill_sources=_role_skills("analyst"),
@@ -70,7 +75,8 @@ ROLE_SPECS: dict[str, RoleSpec] = {
         description=(
             "Source-bounded event-context specialist for requested disaster, conflict, "
             "outage, accident, and recovery tasks; preserves time, provenance, source "
-            "conflicts, coverage limits, and produces an EventContext."
+            "conflicts, coverage limits, and produces an EventContext when a typed "
+            "handoff is requested; it may return a bounded source summary otherwise."
         ),
         tool_group="event_tracker_tools",
         skill_sources=_role_skills("event_tracker"),
@@ -118,6 +124,7 @@ SPECIALIST_ROLE_NAMES = (
 
 __all__ = [
     "COMMON_SKILL_SOURCE",
+    "GEE_NTL_DATE_BOUNDARY_SKILL_SOURCE",
     "ROLE_SKILL_SOURCES",
     "ROLE_SPECS",
     "SPECIALIST_ROLE_NAMES",

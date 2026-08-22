@@ -2,6 +2,7 @@ from typing import List, Optional
 import os
 import numpy as np
 import rasterio
+from gee_runtime import initialize_ee, resolve_gee_boundary_asset_project_id
 from pydantic.v1 import BaseModel, Field
 from langchain_core.tools import StructuredTool
 from storage_manager import storage_manager
@@ -82,15 +83,16 @@ def NTL_composite_GEE_tool(
 
     # Initialize Earth Engine (assumes credentials are pre-configured)
     try:
-        ee.Initialize(project='empyrean-caster-430308-m2')
+        initialize_ee(ee_module=ee)
     except Exception as e:
         return f"❌ Failed to initialize Earth Engine: {e}"
 
     # Admin boundaries
-    national_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/World_countries")
-    province_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/province")
-    city_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/city")
-    county_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/county")
+    boundary_assets = f"projects/{resolve_gee_boundary_asset_project_id()}/assets"
+    national_collection = ee.FeatureCollection(f"{boundary_assets}/World_countries")
+    province_collection = ee.FeatureCollection(f"{boundary_assets}/province")
+    city_collection = ee.FeatureCollection(f"{boundary_assets}/city")
+    county_collection = ee.FeatureCollection(f"{boundary_assets}/county")
 
     directly_governed_cities = ['北京市', '天津市', '上海市', '重庆市']
     if scale_level == 'province' or (scale_level == 'city' and study_area in directly_governed_cities):

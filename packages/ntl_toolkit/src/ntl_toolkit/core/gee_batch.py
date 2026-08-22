@@ -107,12 +107,12 @@ def _append_status_history(payload: dict, status: dict) -> None:
     payload["updated_at"] = current["checked_at"]
 
 
-def submit_gee_batch_export(request: GeeBatchExportRequest) -> ToolResult:
+def submit_gee_batch_export(request: GeeBatchExportRequest, *, ee_module=None) -> ToolResult:
     try:
         manifest = Path(request.manifest_path).expanduser().resolve()
         if manifest.exists():
             raise FileExistsError(f"Export manifest already exists: {manifest}")
-        ee = _initialize_ee(request.project)
+        ee = ee_module if ee_module is not None else _initialize_ee(request.project)
         materialization = GeeDownloadRequest(
             dataset_id=request.dataset_id,
             bands=request.bands,
@@ -213,10 +213,15 @@ def submit_gee_batch_export(request: GeeBatchExportRequest) -> ToolResult:
         )
 
 
-def inspect_gee_batch_export(manifest_path: str, *, project: str | None = None) -> ToolResult:
+def inspect_gee_batch_export(
+    manifest_path: str,
+    *,
+    project: str | None = None,
+    ee_module=None,
+) -> ToolResult:
     try:
         manifest, payload = _load_export_manifest(manifest_path)
-        ee = _initialize_ee(project)
+        ee = ee_module if ee_module is not None else _initialize_ee(project)
         statuses = ee.data.getTaskStatus(str(payload["task_id"]))
         status = statuses[0] if isinstance(statuses, list) and statuses else {}
         _append_status_history(payload, status)
@@ -252,10 +257,15 @@ def inspect_gee_batch_export(manifest_path: str, *, project: str | None = None) 
         )
 
 
-def cancel_gee_batch_export(manifest_path: str, *, project: str | None = None) -> ToolResult:
+def cancel_gee_batch_export(
+    manifest_path: str,
+    *,
+    project: str | None = None,
+    ee_module=None,
+) -> ToolResult:
     try:
         manifest, payload = _load_export_manifest(manifest_path)
-        ee = _initialize_ee(project)
+        ee = ee_module if ee_module is not None else _initialize_ee(project)
         task_id = str(payload["task_id"])
         current = ee.data.getTaskStatus(task_id)
         status = current[0] if isinstance(current, list) and current else {}

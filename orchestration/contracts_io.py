@@ -124,6 +124,8 @@ def _normalize_output_relative_path(path_value: str) -> PurePosixPath:
         raise ContractIOError("record path must be a workspace output path")
     if raw.startswith("/data/processed/"):
         raw = raw[len("/data/processed/") :]
+    elif raw.startswith("/outputs/"):
+        raw = raw[len("/outputs/") :]
     elif raw.startswith("outputs/"):
         raw = raw[len("outputs/") :]
     rel = PurePosixPath(raw)
@@ -167,12 +169,18 @@ def _resolve_workspace_artifact_path(path_value: str, *, thread_id: str) -> Path
     if raw.startswith("/data/raw/"):
         root = "inputs"
         raw = raw[len("/data/raw/") :]
+    elif raw.startswith("/inputs/"):
+        root = "inputs"
+        raw = raw[len("/inputs/") :]
     elif raw.startswith("inputs/"):
         root = "inputs"
         raw = raw[len("inputs/") :]
     elif raw.startswith("/data/processed/"):
         root = "outputs"
         raw = raw[len("/data/processed/") :]
+    elif raw.startswith("/outputs/"):
+        root = "outputs"
+        raw = raw[len("/outputs/") :]
     elif raw.startswith("outputs/"):
         root = "outputs"
         raw = raw[len("outputs/") :]

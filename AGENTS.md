@@ -20,6 +20,34 @@ NTL-GPT-Clone is a Streamlit application for nighttime light analysis. It combin
 - `RAG/`: local knowledge/code/literature indexes and reference assets.
 - `check_env.py`, `.env.example`, `environment.yml`: environment bootstrap and readiness checks.
 
+## Active Four-Role Runtime Contract
+
+The repository-root `AGENTS.md` is the maintainer-facing project contract. The
+separate `.ntl-gpt/AGENTS.md` is the small, versioned startup memory explicitly
+loaded by the tested Deep Agents graph through its MemoryMiddleware; it is
+read-only during benchmark runs. Runtime authority remains
+`graph_factory.py`, `agents/role_specs.py`, the active role prompts, typed
+contracts, and role-scoped `.ntl-gpt/skills/` namespaces. Keep both documents
+concise and keep detailed methods in the corresponding Skills or source-linked
+experiment documents.
+
+| Role | Primary responsibility | Direct-execution boundary |
+|---|---|---|
+| `NTL_Engineer` | Task truth, planning, conditional routing, package acceptance, final synthesis | May execute ordinary local code and general-purpose analysis when inputs and semantics are settled; do not route work merely because it is complex |
+| `NTL_Data_Searcher` | Product/date/AOI resolution, acquisition, standard preprocessing, QA and provenance | Owns observations and acquisition, not task-specific scientific interpretation |
+| `NTL_Analyst` | Nighttime-light-specific indices, thresholds, persistence, temporal/event analysis, models, classification, figures and scientific validation | Receives the scientific stage after observations are ready; may use the contract-bound script runner |
+| `NTL_Event_Tracker` | Source-bounded event facts, timelines, as-of semantics and source conflicts | Does not perform nighttime-light analysis or acquire imagery |
+
+Routing is domain-based rather than complexity-based: complex but general
+tabular, GIS, coding, plotting, and report tasks may remain with Engineer;
+nighttime-light-specific methods or interpretation route to Analyst; missing
+observations route to Data Searcher; event-source work routes to Event Tracker.
+Typed package handles and final evidence are authoritative; model prose is not
+a substitute for persisted artifacts. Ordinary local scripts still use
+`ntl.script.contract.v2`, one primary execution, and one final task-relevant
+validation. Do not add large background knowledge here merely to increase
+prompt context.
+
 ## Operating Principles
 
 ### Generalization First
@@ -51,9 +79,10 @@ This repository prefers robust, reusable capability upgrades over query-specific
   - `/data/processed/<file>` maps to thread `outputs`
   - `/memories/<file>` maps to thread `memory`
   - `/shared/<file>` maps to `base_data`
-- Treat thread `memory/` as runtime state only. Do not register mutable memory
-  Markdown as Deep Agents startup context; routing and role policy belong in
-  versioned system prompts and role-scoped Skills.
+- Treat thread `memory/` as runtime state. The seeded `memory/AGENTS.md` is a
+  read-only copy of the versioned `.ntl-gpt/AGENTS.md` startup reference;
+  other memory files remain ordinary runtime manifests and state, not routing
+  policy.
 - Preserve long-running Streamlit state contracts in `app_logic.py`; do not casually rename run, heartbeat, cancel, event, or terminal-state keys used across reruns.
 - Keep agent routing changes coherent across `graph_factory.py`, `agents/`, `.ntl-gpt/skills/`, and `tools/__init__.py`.
 

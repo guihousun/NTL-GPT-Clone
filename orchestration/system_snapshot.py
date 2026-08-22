@@ -17,14 +17,18 @@ import ast
 import hashlib
 from importlib import metadata
 import json
+import os
 from pathlib import Path
 from typing import Any, Mapping
 
 
-SYSTEM_SNAPSHOT_SCHEMA = "ntl.system-snapshot.v3"
+SYSTEM_SNAPSHOT_SCHEMA = "ntl.system-snapshot.v4"
 
 _CORE_CODE_FILES = (
     "graph_factory.py",
+    "gee_runtime.py",
+    "runtime_governance.py",
+    "storage_manager.py",
     "agents/role_specs.py",
     "agents/NTL_Data_Searcher.py",
     "agents/NTL_Analyst.py",
@@ -32,6 +36,9 @@ _CORE_CODE_FILES = (
     "tools/__init__.py",
     "tools/GaoDe_tool.py",
     "tools/NTL_Code_generation.py",
+    "tools/NTL_Knowledge_Base.py",
+    "tools/NTL_Knowledge_Base_Searcher.py",
+    "utils/ntl_embeddings.py",
     "contracts/agent_packages.py",
     "orchestration/artifact_runtime.py",
     "orchestration/contract_tools.py",
@@ -45,6 +52,7 @@ _RUNTIME_CODE_FILES = (
     "packages/ntl_toolkit/pyproject.toml",
     "benchmark_runtime/contracts.py",
     "benchmark_runtime/runner.py",
+    "benchmark_runtime/system_finalizer.py",
     "benchmark_runtime/telemetry.py",
     "orchestration/run_evidence.py",
     "orchestration/system_snapshot.py",
@@ -52,6 +60,7 @@ _RUNTIME_CODE_FILES = (
 )
 
 _NTL_TOOLKIT_SOURCE_ROOT = "packages/ntl_toolkit/src/ntl_toolkit"
+_OFFICIAL_H5_SOURCE_ROOT = "tools/vnp46a2_official_h5"
 
 _PACKAGE_MODEL_NAMES = (
     "TaskPlan",
@@ -83,6 +92,10 @@ _RUNTIME_DISTRIBUTIONS = (
     "langgraph-checkpoint",
     "langgraph-sdk",
     "langgraph-checkpoint-postgres",
+    "earthengine-api",
+    "geemap",
+    "google-auth",
+    "python-dotenv",
     "ntl-toolkit",
     "fiona",
     "geopandas",
@@ -209,7 +222,25 @@ def _snapshot_code_relative_paths(repo_root: Path) -> tuple[str, ...]:
     if not toolkit_files:
         raise ValueError("NTL toolkit source root contains no Python modules")
 
-    paths = set((*_CORE_CODE_FILES, *_RUNTIME_CODE_FILES, *exported_tools, *toolkit_files))
+    official_h5_root = repo_root / _OFFICIAL_H5_SOURCE_ROOT
+    if not official_h5_root.is_dir():
+        raise ValueError(f"official HDF5 source root is missing: {_OFFICIAL_H5_SOURCE_ROOT}")
+    official_h5_files = tuple(
+        path.relative_to(repo_root).as_posix()
+        for path in sorted(
+            official_h5_root.rglob("*.py"),
+            key=lambda item: (item.as_posix().casefold(), item.as_posix()),
+        )
+    )
+    paths = set(
+        (
+            *_CORE_CODE_FILES,
+            *_RUNTIME_CODE_FILES,
+            *exported_tools,
+            *toolkit_files,
+            *official_h5_files,
+        )
+    )
     return tuple(sorted(paths))
 
 
@@ -359,6 +390,7 @@ def build_system_snapshot(
     architecture_mode: str,
     model_name: str = "deepseek-v4-flash",
     run_limits: Mapping[str, int | float] | None = None,
+    resource_profile: str = "standard",
 ) -> dict[str, Any]:
     """Build one deterministic architecture snapshot for a batch.
 
@@ -385,11 +417,23 @@ def build_system_snapshot(
         SINGLE_AGENT_CONTRACT_TOOLS,
         DEEPAGENTS_HARNESS_MODEL_SPECS,
         NTL_TASK_DESCRIPTION,
+        RUNTIME_MEMORY_SOURCE,
+        RUNTIME_MEMORY_TEMPLATE,
         RUNTIME_BACKEND,
+        RESOURCE_PROFILES,
         _full_system_prompt,
+        _prompt_for_resource_profile,
         _single_agent_prompt,
         filesystem_runtime_descriptor,
     )
+    if resource_profile not in RESOURCE_PROFILES:
+        raise ValueError(
+            "resource_profile must be one of: " + ", ".join(RESOURCE_PROFILES)
+        )
+    tools_prompt_only = resource_profile == "tools_prompt_only"
+    skills_enabled = not tools_prompt_only
+    rag_enabled = not tools_prompt_only
+    memory_enabled = not tools_prompt_only
     from model_config import get_api_model_name
     from orchestration.route_state import RouteState
     from tools import (
@@ -428,7 +472,11 @@ def build_system_snapshot(
                 *middleware_tool_names,
                 *(() if role_name != "NTL_Engineer" else ("task",)),
             )
-            knowledge = ("NTL_Knowledge_Base",) if role_name == "NTL_Engineer" else ()
+            knowledge = (
+                ("NTL_Knowledge_Base",)
+                if role_name == "NTL_Engineer" and rag_enabled
+                else ()
+            )
             tool_allowlists[role_name] = {
                 "domain_tools": list(domain_names[role_name]),
                 "contract_tools": list(contract_names[role_name]),
@@ -446,12 +494,12 @@ def build_system_snapshot(
                 "domain_tools": list(single_agent_tools.export_names),
                 "contract_tools": list(single_contract_names),
                 "middleware_tools": list(middleware_tool_names),
-                "knowledge_tools": ["NTL_Knowledge_Base"],
+                "knowledge_tools": ["NTL_Knowledge_Base"] if rag_enabled else [],
                 "effective_declared_tools": _ordered_union(
                     tuple(single_agent_tools.export_names),
                     single_contract_names,
                     middleware_tool_names,
-                    ("NTL_Knowledge_Base",),
+                    ("NTL_Knowledge_Base",) if rag_enabled else (),
                 ),
             }
         }
@@ -467,9 +515,9 @@ def build_system_snapshot(
         "NTL_Engineer": {
             "surface": "system_prompt",
             "text": (
-                _full_system_prompt()
+                _prompt_for_resource_profile(_full_system_prompt(), resource_profile)
                 if architecture_mode == "full"
-                else _single_agent_prompt()
+                else _prompt_for_resource_profile(_single_agent_prompt(), resource_profile)
             ),
         },
     }
@@ -478,15 +526,21 @@ def build_system_snapshot(
             {
                 "NTL_Data_Searcher": {
                     "surface": "system_prompt",
-                    "text": prompt_text(hierarchical_system_prompt_data_searcher),
+                    "text": _prompt_for_resource_profile(
+                        prompt_text(hierarchical_system_prompt_data_searcher), resource_profile
+                    ),
                 },
                 "NTL_Analyst": {
                     "surface": "system_prompt",
-                    "text": prompt_text(system_prompt_analyst),
+                    "text": _prompt_for_resource_profile(
+                        prompt_text(system_prompt_analyst), resource_profile
+                    ),
                 },
                 "NTL_Event_Tracker": {
                     "surface": "system_prompt",
-                    "text": prompt_text(system_prompt_event_tracker),
+                    "text": _prompt_for_resource_profile(
+                        prompt_text(system_prompt_event_tracker), resource_profile
+                    ),
                 },
                 "NTL_Engineer.task": {
                     "surface": "tool_description",
@@ -495,7 +549,11 @@ def build_system_snapshot(
             }
         )
 
-    skill_by_role, unique_skills = _skill_manifest(repo_root=root, role_specs=ROLE_SPECS)
+    if skills_enabled:
+        skill_by_role, unique_skills = _skill_manifest(repo_root=root, role_specs=ROLE_SPECS)
+    else:
+        skill_by_role = {name: [] for name in ROLE_SPECS}
+        unique_skills = {}
     role_specs = {
         name: {
             **asdict(spec),
@@ -506,7 +564,8 @@ def build_system_snapshot(
     runtime_filesystems = {
         name: filesystem_runtime_descriptor(
             ROLE_SPECS[name].skill_sources,
-            memory_access=(name == "NTL_Engineer"),
+            memory_access=(name == "NTL_Engineer" and memory_enabled),
+            skills_enabled=skills_enabled,
         )
         for name in active_roles
     }
@@ -519,9 +578,20 @@ def build_system_snapshot(
                     for source in spec.skill_sources
                 )
             ),
-            memory_access=True,
+            memory_access=memory_enabled,
+            skills_enabled=skills_enabled,
         )
     code = _code_manifest(root)
+    startup_memory_sources = (
+        [
+            {
+                "source": RUNTIME_MEMORY_SOURCE,
+                **_file_identity(RUNTIME_MEMORY_TEMPLATE, repo_root=root),
+            }
+        ]
+        if memory_enabled
+        else []
+    )
     limits = {
         "specialist_max_revisions": int(RouteState.model_fields["max_revisions"].default),
         "model_request_max_retries": _chat_model_retry_limit(root / "graph_factory.py"),
@@ -530,6 +600,33 @@ def build_system_snapshot(
         if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
             raise ValueError(f"run limit {name} must be a positive number")
         limits[str(name)] = value
+
+    from gee_runtime import (
+        GEE_RUNTIME_DESCRIPTOR,
+        resolve_gee_boundary_asset_project_id,
+        resolve_gee_project_id,
+    )
+
+    def _config_fingerprint(kind: str, value: str) -> str:
+        return hashlib.sha256(f"ntl-gee-config-v1:{kind}:{value}".encode("utf-8")).hexdigest()
+
+    try:
+        runtime_project = resolve_gee_project_id()
+    except Exception:  # noqa: BLE001 - snapshot records unconfigured state without blocking local cases
+        runtime_project = ""
+    try:
+        boundary_project = resolve_gee_boundary_asset_project_id() if runtime_project else ""
+    except Exception:  # noqa: BLE001
+        boundary_project = ""
+    sa_email = str(os.getenv("EE_SERVICE_ACCOUNT") or "").strip()
+    sa_key = str(os.getenv("EE_PRIVATE_KEY_JSON") or "").strip()
+    credential_mode = (
+        "service_account"
+        if sa_email and sa_key
+        else "incomplete_service_account"
+        if sa_email or sa_key
+        else "ambient"
+    )
 
     snapshot = {
         "schema_version": SYSTEM_SNAPSHOT_SCHEMA,
@@ -545,6 +642,10 @@ def build_system_snapshot(
             "delegation_enabled": architecture_mode == "full",
             "general_purpose_subagent_enabled": False,
             "specialists_can_delegate": False,
+            "resource_profile": resource_profile,
+            "skills_enabled": skills_enabled,
+            "rag_enabled": rag_enabled,
+            "startup_memory_enabled": memory_enabled,
             "deepagents_harness_profile": selected_harness_spec,
             "deepagents_harness_profiles_supported": list(
                 DEEPAGENTS_HARNESS_MODEL_SPECS
@@ -561,9 +662,25 @@ def build_system_snapshot(
             }
             for name, prompt in prompts.items()
         },
-        # Deep Agents startup-memory injection is disabled for both treatments.
-        # Thread memory remains available only as a runtime filesystem route.
-        "startup_memory_sources": [],
+        "startup_memory_sources": startup_memory_sources,
+        "gee_runtime": {
+            "descriptor": dict(GEE_RUNTIME_DESCRIPTOR),
+            "project_configured": bool(runtime_project),
+            "project_fingerprint": (
+                _config_fingerprint("runtime_project", runtime_project)
+                if runtime_project
+                else None
+            ),
+            "boundary_owner_configured_separately": bool(
+                runtime_project and boundary_project and boundary_project != runtime_project
+            ),
+            "boundary_owner_fingerprint": (
+                _config_fingerprint("boundary_project", boundary_project)
+                if boundary_project
+                else None
+            ),
+            "credential_mode": credential_mode,
+        },
         "code_hashes": code,
         "filesystem_runtime": runtime_filesystems,
         "package_contracts": _schema_manifest(),
@@ -595,6 +712,7 @@ def validate_system_snapshot(
         "skill_files",
         "prompt_hashes",
         "startup_memory_sources",
+        "gee_runtime",
         "code_hashes",
         "filesystem_runtime",
         "package_contracts",
@@ -606,8 +724,46 @@ def validate_system_snapshot(
         raise ValueError("system snapshot is missing fields: " + ", ".join(missing))
     if snapshot["schema_version"] != SYSTEM_SNAPSHOT_SCHEMA:
         raise ValueError("system snapshot has the wrong schema_version")
-    if snapshot["startup_memory_sources"] != []:
-        raise ValueError("system snapshot must disable startup memory sources")
+    startup_memory = snapshot["startup_memory_sources"]
+    if not isinstance(startup_memory, list):
+        raise ValueError("system snapshot startup_memory_sources must be a list")
+    for row in startup_memory:
+        if not isinstance(row, Mapping):
+            raise ValueError("system snapshot startup_memory_sources contains a non-object")
+        source = row.get("source")
+        if not isinstance(source, str) or not source.startswith("/memories/"):
+            raise ValueError("system snapshot startup memory source must use /memories/")
+        relative_path = row.get("relative_path")
+        if (
+            not isinstance(relative_path, str)
+            or not relative_path
+            or "\\" in relative_path
+            or relative_path.startswith("/")
+            or Path(relative_path).drive
+            or any(part in {"", ".", ".."} for part in relative_path.split("/"))
+        ):
+            raise ValueError("system snapshot startup memory path is not relative")
+        digest = row.get("sha256")
+        if not isinstance(digest, str) or len(digest) != 64:
+            raise ValueError("system snapshot startup memory has an invalid sha256")
+        byte_count = row.get("bytes")
+        if isinstance(byte_count, bool) or not isinstance(byte_count, int) or byte_count < 0:
+            raise ValueError("system snapshot startup memory has an invalid byte count")
+    gee_runtime = snapshot["gee_runtime"]
+    if not isinstance(gee_runtime, Mapping):
+        raise ValueError("system snapshot gee_runtime must be an object")
+    if gee_runtime.get("credential_mode") not in {
+        "ambient",
+        "service_account",
+        "incomplete_service_account",
+    }:
+        raise ValueError("system snapshot gee_runtime has an invalid credential mode")
+    for fingerprint_name in ("project_fingerprint", "boundary_owner_fingerprint"):
+        fingerprint = gee_runtime.get(fingerprint_name)
+        if fingerprint is not None and (
+            not isinstance(fingerprint, str) or len(fingerprint) != 64
+        ):
+            raise ValueError("system snapshot gee_runtime has an invalid fingerprint")
     mode = snapshot["architecture_mode"]
     if mode not in {"full", "single_agent"}:
         raise ValueError("system snapshot has an invalid architecture_mode")
@@ -625,6 +781,19 @@ def validate_system_snapshot(
         raise ValueError("system snapshot active_roles do not match architecture_mode")
     if topology.get("general_purpose_subagent_enabled") is not False:
         raise ValueError("system snapshot must disable the implicit general-purpose subagent")
+    resource_profile = topology.get("resource_profile", "standard")
+    if resource_profile not in {"standard", "tools_prompt_only"}:
+        raise ValueError("system snapshot has an invalid resource_profile")
+    expected_resources = {
+        "skills_enabled": resource_profile == "standard",
+        "rag_enabled": resource_profile == "standard",
+        "startup_memory_enabled": resource_profile == "standard",
+    }
+    for field, expected in expected_resources.items():
+        if field in topology and topology[field] is not expected:
+            raise ValueError(f"system snapshot {field} does not match resource_profile")
+    if resource_profile == "tools_prompt_only" and startup_memory:
+        raise ValueError("tools_prompt_only snapshot must not load startup memory")
     if not isinstance(topology.get("deepagents_harness_profile"), str) or not topology[
         "deepagents_harness_profile"
     ].strip():
@@ -645,6 +814,12 @@ def validate_system_snapshot(
             raise ValueError("system snapshot harness profile does not match the tested model")
     if set(snapshot.get("tool_allowlists") or {}) != set(expected_roles):
         raise ValueError("system snapshot tool allowlists do not match active roles")
+    if resource_profile == "tools_prompt_only":
+        if snapshot["skill_files"]:
+            raise ValueError("tools_prompt_only snapshot must not load Skill files")
+        for record in snapshot["tool_allowlists"].values():
+            if record.get("knowledge_tools"):
+                raise ValueError("tools_prompt_only snapshot must not expose RAG tools")
     runtime_versions = snapshot.get("runtime_versions")
     if not isinstance(runtime_versions, Mapping) or set(runtime_versions) != set(
         _RUNTIME_DISTRIBUTIONS

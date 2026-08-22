@@ -12,17 +12,11 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.config import var_child_runnable_config
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
+from gee_runtime import initialize_ee, resolve_gee_boundary_asset_project_id
 from storage_manager import current_thread_id, storage_manager
 
-_PROJECT_ID = "empyrean-caster-430308-m2"
-
-
-def _ensure_ee_initialized() -> None:
-    try:
-        ee.Initialize(project=_PROJECT_ID)
-    except Exception:
-        ee.Authenticate()
-        ee.Initialize(project=_PROJECT_ID)
+def _ensure_ee_initialized() -> str:
+    return initialize_ee(ee_module=ee)
 
 
 def _resolve_thread_id_from_config(config: Optional[RunnableConfig] = None) -> str:
@@ -136,11 +130,20 @@ def _parse_year_range(time_range_input: str) -> tuple[int, int]:
     return start_year, end_year
 
 
-def _resolve_boundary(scale_level: str, study_area: str, is_in_china: bool, country_name: Optional[str] = None):
-    national_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/World_countries")
-    province_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/province")
-    city_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/city")
-    county_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/county")
+def _resolve_boundary(
+    scale_level: str,
+    study_area: str,
+    is_in_china: bool,
+    country_name: Optional[str] = None,
+    project_id: str = "",
+):
+    if not project_id:
+        raise ValueError("project_id is required to resolve project-owned boundary assets.")
+    boundary_assets = f"projects/{project_id}/assets"
+    national_collection = ee.FeatureCollection(f"{boundary_assets}/World_countries")
+    province_collection = ee.FeatureCollection(f"{boundary_assets}/province")
+    city_collection = ee.FeatureCollection(f"{boundary_assets}/city")
+    county_collection = ee.FeatureCollection(f"{boundary_assets}/county")
     intl_country_collection = ee.FeatureCollection("FAO/GAUL/2015/level0")
     intl_province_collection = ee.FeatureCollection("FAO/GAUL/2015/level1")
 
@@ -199,6 +202,7 @@ def NDVI_download_tool(
     try:
         thread_id = _resolve_thread_id_from_config(config)
         _ensure_ee_initialized()
+        boundary_project_id = resolve_gee_boundary_asset_project_id()
         scale_level = (scale_level or "").strip().lower()
         if is_in_China is None and "is_in_china" in kwargs:
             is_in_China = kwargs.get("is_in_china")
@@ -214,6 +218,7 @@ def NDVI_download_tool(
             study_area=study_area,
             is_in_china=is_in_China,
             country_name=country_name,
+            project_id=boundary_project_id,
         )
         if region_error:
             return _error_result(region_error)
@@ -273,6 +278,7 @@ def landscan_download_tool(
     try:
         thread_id = _resolve_thread_id_from_config(config)
         _ensure_ee_initialized()
+        boundary_project_id = resolve_gee_boundary_asset_project_id()
         scale_level = (scale_level or "").strip().lower()
         if is_in_China is None and "is_in_china" in kwargs:
             is_in_China = kwargs.get("is_in_china")
@@ -288,6 +294,7 @@ def landscan_download_tool(
             study_area=study_area,
             is_in_china=is_in_China,
             country_name=country_name,
+            project_id=boundary_project_id,
         )
         if region_error:
             return _error_result(region_error)
@@ -346,6 +353,7 @@ def worldpop_download_tool(
     try:
         thread_id = _resolve_thread_id_from_config(config)
         _ensure_ee_initialized()
+        boundary_project_id = resolve_gee_boundary_asset_project_id()
         scale_level = (scale_level or "").strip().lower()
         if is_in_China is None and "is_in_china" in kwargs:
             is_in_China = kwargs.get("is_in_china")
@@ -361,6 +369,7 @@ def worldpop_download_tool(
             study_area=study_area,
             is_in_china=is_in_China,
             country_name=country_name,
+            project_id=boundary_project_id,
         )
         if region_error:
             return _error_result(region_error)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from collections.abc import Mapping
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -67,6 +68,20 @@ _SCOPE_OR_NAME_METADATA_FIELDS = {
     "usagescope",
 }
 
+# Typed contract tools return a structured failure instead of raising so the
+# model can receive a bounded repair instruction. LangChain still emits an
+# ``on_tool_end`` callback in that case, which must not be mistaken for a
+# successful persistence operation by post-run transfer reconciliation.
+_TYPED_SAVE_TOOL_NAMES = frozenset(
+    {
+        "save_task_plan",
+        "save_event_context",
+        "save_observation_package",
+        "save_analysis_package",
+        "save_evidence_report",
+    }
+)
+
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -79,6 +94,53 @@ def _mapping(value: Any) -> dict[str, Any]:
         return dict(value or {})
     except (TypeError, ValueError):
         return {}
+
+
+def _structured_output_mapping(value: Any) -> dict[str, Any] | None:
+    """Recover a model-facing structured tool result without trusting prose."""
+
+    current = value
+    for _ in range(3):
+        if isinstance(current, Mapping):
+            return dict(current)
+        content = getattr(current, "content", None)
+        if content is not None and content is not current:
+            current = content
+            continue
+        if isinstance(current, str):
+            try:
+                parsed = json.loads(current)
+            except (TypeError, json.JSONDecodeError):
+                return None
+            if isinstance(parsed, Mapping):
+                return dict(parsed)
+        return None
+    return None
+
+
+def _typed_save_failure(output: Any, *, tool_name: str) -> dict[str, str] | None:
+    """Classify only an explicit failed ``save_*`` response as a tool error.
+
+    Domain tools may legitimately report a scientific ``failed`` or ``blocked``
+    outcome as data. Typed saves use this response shape only for persistence
+    failure, so the scope deliberately stays narrow.
+    """
+
+    if tool_name not in _TYPED_SAVE_TOOL_NAMES:
+        return None
+    payload = _structured_output_mapping(output)
+    if not payload or str(payload.get("status") or "").strip().casefold() not in {
+        "failed",
+        "error",
+    }:
+        return None
+    error = payload.get("error")
+    code = str(error.get("code") or "").strip() if isinstance(error, Mapping) else ""
+    message = str(error.get("message") or "").strip() if isinstance(error, Mapping) else ""
+    return {
+        "code": code or "STRUCTURED_TYPED_SAVE_FAILED",
+        "message": redact_text(message or "Typed contract save returned a structured failure."),
+    }
 
 
 def _jsonable(value: Any) -> Any:
@@ -598,13 +660,20 @@ class BenchmarkTelemetryCallback(BaseCallbackHandler):
             call = self._tool_calls.get(run_key)
             if call is None:
                 call = self._unmatched_tool_call_locked(run_key, parent_run_id)
+            structured_failure = _typed_save_failure(
+                output,
+                tool_name=str(call.get("tool_name") or ""),
+            )
             call.update(
                 {
-                    "status": "succeeded",
+                    # Keep the response hash for diagnosis, but never allow a
+                    # structured typed-save failure to bind a package.
+                    "status": "error" if structured_failure is not None else "succeeded",
                     "ended_at": _utc_now(),
                     "result_observed": True,
                     "result_sha256": hashlib.sha256(result_bytes).hexdigest(),
                     "result_bytes": len(result_bytes),
+                    "error": structured_failure,
                 }
             )
             self._write_journal_locked()

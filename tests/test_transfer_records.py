@@ -162,10 +162,42 @@ def _save_row(*, artifact_id: str = "observation-transfer") -> dict[str, object]
     }
 
 
+def _save_row_system_managed_identity() -> dict[str, object]:
+    """Model-facing typed saves omit identity; runtime binds it on persist."""
+    row = _save_row()
+    row["arguments"] = {"contract": {}}
+    return row
+
+
+def _structured_failed_save_row() -> dict[str, object]:
+    row = _save_row_system_managed_identity()
+    row["status"] = "error"
+    row["error"] = {"code": "CONTRACT_SCHEMA_INVALID", "message": "missing field"}
+    return row
+
+
+def _downstream_analysis_save_row() -> dict[str, object]:
+    """A later specialist save may still carry the supervisor task as an ancestor."""
+    return {
+        "sequence": 3,
+        "tool_call_id": "analysis-save-call-transfer",
+        "tool_name": "save_analysis_package",
+        "status": "succeeded",
+        "result_observed": True,
+        "arguments": {"contract": {"artifact_id": "analysis-transfer", "artifact_type": "AnalysisPackage"}},
+        "metadata": {
+            "task_run_id": RUN_ID,
+            "case_id": TASK_ID,
+            "lc_agent_name": "NTL_Analyst",
+        },
+        "ancestor_tool_call_ids": [CALL_ID],
+    }
+
+
 def test_plain_text_native_task_materializes_and_links_v2_records(tmp_path: Path) -> None:
     outputs = tmp_path / "outputs"
     _persist_observation_and_legacy_pair(outputs)
-    trace = [_task_row(), _save_row()]
+    trace = [_task_row(), _save_row(), _downstream_analysis_save_row()]
 
     first = reconcile_transfer_records(
         outputs,
@@ -214,6 +246,63 @@ def test_plain_text_native_task_materializes_and_links_v2_records(tmp_path: Path
     validate_internal_evidence(evidence)
     assert len(evidence["assignment_records"]) == 1
     assert len(evidence["handoff_records"]) == 1
+
+
+def test_downstream_specialist_save_does_not_break_parent_transfer_link(tmp_path: Path) -> None:
+    outputs = tmp_path / "outputs"
+    _persist_observation_and_legacy_pair(outputs)
+    reconciled = reconcile_transfer_records(
+        outputs,
+        tool_trace=[_task_row(), _save_row(), _downstream_analysis_save_row()],
+        expected_run_id=RUN_ID,
+        expected_task_id=TASK_ID,
+    )
+    assert reconciled["issues"] == []
+    assert len(reconciled["handoff_records"]) == 1
+
+
+def test_system_managed_package_identity_links_unique_ready_package(tmp_path: Path) -> None:
+    outputs = tmp_path / "outputs"
+    _persist_observation_and_legacy_pair(outputs)
+    reconciled = reconcile_transfer_records(
+        outputs,
+        tool_trace=[_task_row(), _save_row_system_managed_identity()],
+        expected_run_id=RUN_ID,
+        expected_task_id=TASK_ID,
+    )
+    assert reconciled["issues"] == []
+    handoff_path = (
+        outputs
+        / "runs"
+        / RUN_ID
+        / "handoff_records"
+        / f"handoff_record__{CALL_ID}.json"
+    )
+    handoff = HandoffRecordV2.model_validate_json(handoff_path.read_text(encoding="utf-8"))
+    assert handoff.package_association == "linked"
+
+
+def test_structured_failed_save_never_links_an_unrelated_ready_package(tmp_path: Path) -> None:
+    outputs = tmp_path / "outputs"
+    _persist_observation_and_legacy_pair(outputs)
+    # The ready package exists, but the current native save failed. The v2
+    # transfer must inventory the handoff without claiming that failed save
+    # persisted this package.
+    reconciled = reconcile_transfer_records(
+        outputs,
+        tool_trace=[_task_row(), _structured_failed_save_row()],
+        expected_run_id=RUN_ID,
+        expected_task_id=TASK_ID,
+    )
+    handoff_path = (
+        outputs / "runs" / RUN_ID / "handoff_records" / f"handoff_record__{CALL_ID}.json"
+    )
+    handoff = HandoffRecordV2.model_validate_json(handoff_path.read_text(encoding="utf-8"))
+    assert handoff.package_association == "none"
+    assert handoff.package is None
+    # The legacy compatibility pair is intentionally not re-linked; its
+    # existing audit issue is finalizer-recoverable rather than scientific.
+    assert reconciled["issues"] == [TRANSFER_PACKAGE_LINK_INVALID]
 
 
 def test_collector_inventories_unlinked_native_transfer(tmp_path: Path) -> None:

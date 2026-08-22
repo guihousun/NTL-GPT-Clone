@@ -36,7 +36,7 @@ Do not trigger this skill for ordinary annual/monthly province statistics unless
 2. For single-day query, always use `end = start + 1 day`.
 3. If event occurs after local VIIRS overpass/acquisition (often within ~00:30-02:30 local), `local_first_night_date = D+1`.
 4. For official daily products/files indexed by UTC acquisition or UTC file date, convert the selected local first-night acquisition time to UTC before choosing the file/date.
-5. If the UTC date decision is near midnight or otherwise ambiguous, verify using pixel-level `UTC_Time` only when the relevant source covers the target date. For recent dates beyond GEE VNP46A1 coverage, use LAADS/CMR granule timing or official product metadata before final date selection.
+5. If the UTC date decision is near midnight or otherwise ambiguous, verify using pixel-level `UTC_Time` only when the relevant source covers the target date. If GEE VNP46A1 does not cover the target date, an authenticated official VNP46A1 HDF5 `UTC_Time` field can supply that evidence. LAADS/CMR metadata establishes granule availability, not a pixel-level observation time.
 6. Prefer confirmed administrative boundary; avoid ad-hoc bbox for named regions.
 7. Always set `scale` and `maxPixels` in event reductions.
 8. For large event AOI, add `bestEffort=True` or `tileScale>1`.
@@ -48,7 +48,7 @@ Do not trigger this skill for ordinary annual/monthly province statistics unless
    - GEE daily `filterDate` over `ImageCollection` usually uses UTC `system:time_start`; use explicit one-day windows and inspect image dates when ambiguity matters.
    - Official VJ/DNB daily files may be indexed by UTC acquisition/file date, not local night date.
    - Convert local first-night acquisition time to UTC before selecting UTC-indexed files.
-   - Do not assume a fixed 02:00 local overpass. Use a candidate range such as 00:30-02:30 local, then narrow it with `UTC_Time`/official metadata when the date boundary matters.
+   - Do not assume a fixed 02:00 local overpass. Use a candidate range such as 00:30-02:30 local, then narrow it with actual `UTC_Time` values when the date boundary matters; metadata alone cannot establish the precise pixel time.
 4. Before committing to a recent event window, run the latest-availability gate:
    - GEE: confirm the collection has updated through the required UTC date.
    - LAADS/CMR: confirm the short_name has granules through the required date.
@@ -71,12 +71,43 @@ Use this when the local-night label and UTC-indexed file date might diverge:
 3. Convert that local window to UTC and check whether it crosses a UTC date boundary.
 4. If the UTC date choice affects which file/image will be queried, verify with one of:
    - pixel-level `UTC_Time` from `NOAA/VIIRS/001/VNP46A1`, only when GEE VNP46A1 covers the target UTC date,
-   - official product metadata / granule timestamps,
-   - official LAADS/CMR granule timing.
+   - an authenticated official VNP46A1 HDF5 `UTC_Time` field for the matching UTC day/tile.
+   CMR/LAADS metadata may confirm availability and identity, but does not substitute for a `UTC_Time` value.
 5. Record both:
    - `local_first_night_date`
    - `utc_file_date`
 6. If verification cannot disambiguate the date safely, stop and return `needs_verification` instead of inventing an exact time.
+
+## Source-backed UTC_Time Route
+
+Use this route only when the exact event-to-observation date boundary matters.
+
+1. Preserve the event timestamp in UTC, its IANA timezone conversion, and the
+   local first-night label as separate fields.
+2. Locate the matching official VNP46A1 Collection 2 granule by UTC product
+   date and tile/AOI. Record CMR/LAADS identity and download provenance.
+3. Validate the downloaded file before use: non-empty HDF5 signature, expected
+   `UTC_Time` path, `View Time (UTC)` meaning, decimal-hour unit, fill value,
+   scale/offset, and declared valid range.
+4. Decode only `UTC_Time` as `raw * scale_factor + add_offset`; exclude fill,
+   non-finite, and out-of-range values without imputation. Read the containing
+   event pixel and a declared AOI/support summary separately.
+5. Convert each accepted decimal UTC hour on the product UTC day into the
+   requested local timezone. A UTC-indexed file date and local-night label may
+   differ; never derive either by adding one calendar day.
+6. Call the product a first post-event local-night observation only when the
+   accepted relevant pixel/support time is after the event and maps to the
+   declared first local-night date. If no eligible value exists, report that
+   the first night is unverified rather than silently choosing a later product.
+7. Keep the timing source distinct from the radiance source. For example,
+   VNP46A1 `UTC_Time` may validate timing while VNP46A2 remains the radiance,
+   QA, and change-analysis product.
+
+Return `event_time_utc`, `event_time_local`, `local_first_night_date`,
+`utc_file_date`, `utc_time_source`, `observation_time_utc`,
+`observation_time_local`, valid-pixel count, AOI/support definition, and
+limitations. Do not represent CMR `time_start`, a nominal overpass hour, or
+the product date itself as an exact pixel observation time.
 
 ## Reusable Snippets
 
@@ -207,8 +238,9 @@ def local_night_acquisition_to_utc(first_night_date: str, timezone_str: str,
 # 2025-03-29 00:30-02:30 MMT, which maps to 2025-03-28 18:00-20:00 UTC.
 # Therefore, for UTC-indexed daily products/files, the first-night image/file
 # date is still 2025-03-28, not 2025-03-29; verify the exact time when needed.
-# For recent events beyond GEE VNP46A1 coverage, use LAADS/CMR or official
-# granule metadata instead of GEE VNP46A1.UTC_Time.
+# For recent events beyond GEE VNP46A1 coverage, CMR/LAADS can locate the
+# source, but exact timing still requires an authenticated official HDF5
+# `UTC_Time` field. Metadata alone is not a substitute.
 ```
 
 ### 5) Pixel-level UTC time verification
@@ -220,8 +252,9 @@ def utc_time_minmax_from_vnp46a1(date_utc: str, geom):
     In the public GEE catalog, NOAA/VIIRS/001/VNP46A1 exposes `UTC_Time`,
     but only use it when VNP46A1 covers the target date. NASA/VIIRS/002/VNP46A2
     does not expose this band, so VNP46A2 cannot be used directly for pixel-level
-    UTC min/max validation. For recent dates beyond GEE VNP46A1 coverage, use
-    LAADS/CMR granule timing or official metadata.
+    UTC min/max validation. For dates beyond GEE VNP46A1 coverage, locate the
+    matching official HDF5 through CMR/LAADS and read its `UTC_Time` field;
+    CMR availability metadata alone cannot provide a pixel time.
     """
     end_utc = to_exclusive_end(date_utc)
     img = (
@@ -293,17 +326,22 @@ Return at least:
 - `notes` (first-night rule, timezone decision, boundary source)
 
 ## Case-Derived Guidance
-From successful Myanmar impact runs in this workspace:
+From the source-backed Myanmar timing verification in this workspace:
 - First-night selection must be explicit and justified by local overpass timing.
 - The Myanmar 2025 earthquake case has two dates that must not be merged:
-  local first-night acquisition may fall within about 2025-03-29 00:30-02:30 MMT,
-  while the corresponding UTC acquisition/file date remains 2025-03-28.
-- If the product is UTC-indexed, query/select 2025-03-28 for that first-night
-  image. Record the local night date separately for interpretation.
+  the event was `2025-03-28T06:20:52Z` (`12:50:52 Asia/Yangon`), while the
+  matching A2025087 containing pixel's actual `UTC_Time` was 19.945845 UTC
+  hours, or `2025-03-29T02:26:45+06:30`.
+- The same official HDF5 check found all valid `UTC_Time` pixels in the stated
+  25 km and 50 km supports on 2025-03-29 local time. This is case evidence,
+  not a default acquisition hour for another date, tile, or product.
+- A2025087 is therefore the first post-event local-night evidence in the
+  stated Myanmar same-tile sequence; it was selected by actual `UTC_Time`, not
+  by mechanically changing the UTC-indexed product date.
 - When exact overpass timing affects the date decision, inspect pixel-level
-  `UTC_Time` from VNP46A1/source products only when coverage includes the target
-  date; otherwise use LAADS/CMR granule timing or official metadata. Do not
-  invent an exact 02:00 local acquisition time.
+  `UTC_Time` from VNP46A1 only when an eligible source covers the target date;
+  CMR/LAADS availability alone cannot replace it. Do not invent an exact 02:00
+  local acquisition time.
 - Buffer-based ANTL (25/50/100 km) is robust when admin boundaries are unavailable.
 - `scale=500 + maxPixels + tileScale` significantly reduces reduction failures.
 

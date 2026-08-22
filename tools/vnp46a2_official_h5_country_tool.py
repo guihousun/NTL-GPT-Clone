@@ -146,6 +146,12 @@ def _runtime_env() -> dict[str, str]:
             if key and value and not env.get(key):
                 env[key] = value
     env["PYTHONIOENCODING"] = "utf-8"
+    # The child scripts run from tools/vnp46a2_official_h5, while gee_runtime
+    # lives at the repository root. Keep the parent import surface available.
+    prior_pythonpath = str(env.get("PYTHONPATH") or "").strip()
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(REPO_ROOT), *([prior_pythonpath] if prior_pythonpath else [])]
+    )
     return env
 
 

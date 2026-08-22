@@ -339,8 +339,8 @@ def _validate_artifact(record: Any, index: int) -> Record:
     item = _mapping(record, label)
     _required(item, ("relative_path", "sha256", "bytes"), label)
     relative_path = safe_relative_path(item["relative_path"], f"{label}.relative_path")
-    if relative_path.split("/", 1)[0] != "outputs":
-        raise UnsafePathError(f"{label}.relative_path must be under outputs/")
+    if relative_path.split("/", 1)[0] not in {"inputs", "outputs"}:
+        raise UnsafePathError(f"{label}.relative_path must be under inputs/ or outputs/")
     sha256 = _nonempty_string(item["sha256"], f"{label}.sha256")
     if not _SHA256_RE.fullmatch(sha256):
         raise ContractError(f"{label}.sha256 must be a 64-character hexadecimal digest")
@@ -507,8 +507,16 @@ def validate_run_record(record: Any) -> Record:
         except ValueError as exc:
             raise ContractError(f"run_record.internal_evidence is invalid: {exc}") from exc
     _validate_model_usage(item["model_usage"])
-    if not isinstance(item["errors"], list):
-        raise ContractError("run_record.errors must be a list")
+    for field_name in ("errors", "audit_issues"):
+        if field_name not in item:
+            continue
+        if not isinstance(item[field_name], list):
+            raise ContractError(f"run_record.{field_name} must be a list")
+        for index, issue in enumerate(item[field_name]):
+            label = f"run_record.{field_name}[{index}]"
+            issue_item = _mapping(issue, label)
+            _required(issue_item, ("code", "message"), label)
+            _nonempty_string(issue_item["code"], f"{label}.code")
     environment = _mapping(item["environment"], "run_record.environment")
     _required(environment, ("workspace", "architecture_mode"), "run_record.environment")
     workspace = Path(_nonempty_string(environment["workspace"], "run_record.environment.workspace"))

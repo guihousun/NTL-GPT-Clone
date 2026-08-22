@@ -11,6 +11,7 @@ This skill governs Data_Searcher route planning. Use `/skills/gee-python-server-
 
 1. Skip GEE planning only for pure local-file analysis with explicit existing files.
 2. Call `GEE_request_plan_tool` with all known dataset, bands, dates, AOI, output kind, analysis kind, scale, destination, and provenance requirements.
+   The runtime injects the configured Earth Engine project; the agent must not request, guess, or override it and must not initiate interactive authentication.
 3. Preserve explicit dataset ids. Never replace an invalid or unavailable explicit id with a default NTL product.
 4. Execute only the returned `ntl.gee.plan.v1` mode:
    - `direct_local`: NTL uses `NTL_download_tool`; general GEE uses `GEE_raster_download_tool`.

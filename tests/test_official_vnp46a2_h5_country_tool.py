@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -64,6 +65,18 @@ def test_country_h5_run_requires_token_before_subprocess(
 
     assert result["status"] == "needs_configuration"
     assert "EARTHDATA_TOKEN" in result["error"]
+
+
+def test_country_h5_runtime_env_keeps_repository_imports_available(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PYTHONPATH", "legacy-path")
+
+    env = module._runtime_env()
+
+    entries = env["PYTHONPATH"].split(os.pathsep)
+    assert entries[0] == str(module.REPO_ROOT)
+    assert "legacy-path" in entries
 
 
 def test_country_h5_targets_must_match_requested_countries(isolated_workspace: Path) -> None:

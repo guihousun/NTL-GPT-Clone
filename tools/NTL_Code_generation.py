@@ -19,17 +19,15 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.config import var_child_runnable_config
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
-from dotenv import dotenv_values
+from gee_runtime import GEEProjectConfigurationError, resolve_gee_project_id
 
 from storage_manager import (
-    current_gee_encrypted_refresh_token,
-    current_gee_project_id,
-    current_gee_token_scopes,
+    current_gee_encrypted_refresh_token,  # compatibility surface; never injected into child execution
+    current_gee_token_scopes,  # compatibility surface; never injected into child execution
     current_thread_id,
     storage_manager,
 )
 
-DEFAULT_GEE_PROJECT = "empyrean-caster-430308-m2"
 SCRIPT_CONTRACT_SCHEMA = "ntl.script.contract.v2"
 SCRIPT_EXECUTION_MANIFEST_SCHEMA = "ntl.script.execution.manifest.v1"
 SCRIPT_CONTRACT_REQUIRED_FIELDS = (
@@ -66,58 +64,11 @@ def _live_storage_context_value(name: str, imported_context_var: Any) -> str:
 
 
 def _gee_project_id() -> str:
-    context_project_id = _live_storage_context_value("current_gee_project_id", current_gee_project_id)
-    if context_project_id:
-        return context_project_id
-    active_project_id = str(os.getenv("NTL_ACTIVE_GEE_PROJECT_ID", "") or "").strip()
-    if active_project_id:
-        return active_project_id
-    dotenv_path = Path(__file__).resolve().parents[1] / ".env"
-    project_id = ""
-    if dotenv_path.exists():
-        project_id = str(dotenv_values(dotenv_path).get("GEE_DEFAULT_PROJECT_ID") or "").strip()
-    if not project_id:
-        project_id = str(os.getenv("GEE_DEFAULT_PROJECT_ID") or "").strip()
-    return project_id or DEFAULT_GEE_PROJECT
+    try:
+        return resolve_gee_project_id()
+    except GEEProjectConfigurationError:
+        return "GEE_PROJECT_NOT_CONFIGURED"
 
-
-def _active_gee_credentials():
-    encrypted = (
-        _live_storage_context_value("current_gee_encrypted_refresh_token", current_gee_encrypted_refresh_token)
-        or str(os.getenv("NTL_ACTIVE_GEE_ENCRYPTED_REFRESH_TOKEN", "") or "").strip()
-    )
-    if not encrypted:
-        return None
-    import gee_auth
-
-    refresh_token = gee_auth.decrypt_refresh_token(encrypted)
-    scopes_text = (
-        _live_storage_context_value("current_gee_token_scopes", current_gee_token_scopes)
-        or str(os.getenv("NTL_ACTIVE_GEE_TOKEN_SCOPES", "") or "").strip()
-    )
-    scopes = scopes_text.split() if scopes_text else None
-    return gee_auth.credentials_from_refresh_token(refresh_token, scopes=scopes)
-
-
-def _patch_ee_initialize_for_active_credentials(code_block: str) -> str:
-    encrypted = (
-        _live_storage_context_value("current_gee_encrypted_refresh_token", current_gee_encrypted_refresh_token)
-        or str(os.getenv("NTL_ACTIVE_GEE_ENCRYPTED_REFRESH_TOKEN", "") or "").strip()
-    )
-    if not encrypted:
-        return code_block
-    code = str(code_block or "")
-    code = re.sub(
-        r"ee\.Initialize\(\s*project\s*=",
-        "ee.Initialize(credentials=ntl_ee_credentials, project=",
-        code,
-    )
-    code = re.sub(
-        r"ee\.Initialize\(\s*\)",
-        "ee.Initialize(credentials=ntl_ee_credentials, project=project_id)",
-        code,
-    )
-    return code
 
 GLOBAL_EXEC_CONTEXTS: Dict[str, Dict[str, Any]] = {}
 
@@ -134,7 +85,6 @@ KNOWN_GEE_DATASETS: Dict[str, List[str]] = {
 
 KNOWN_GEE_PREFIXES = (
     "projects/sat-io/open-datasets/",
-    "projects/empyrean-caster-430308-m2/assets/",
 )
 
 KNOWN_GEE_PUBLIC_COLLECTION_PREFIXES = (
@@ -1271,9 +1221,8 @@ def _preflight_checks(code: str, strict_mode: bool) -> Dict[str, Any]:
                 "WM/geoLab/geoBoundaries/600/ADM2",
                 "WM/geoLab/geoBoundaries/600/ADM3",
                 "WM/geoLab/geoBoundaries/600/ADM4",
-                "projects/empyrean-caster-430308-m2/assets/province",
-                "projects/empyrean-caster-430308-m2/assets/city",
-                "projects/empyrean-caster-430308-m2/assets/county",
+                "resolve_gee_boundary_asset_project_id",
+                "GEE_BOUNDARY_ASSET_PROJECT_ID",
             )
         )
         has_user_bbox_override = "AOI_CONFIRMED_BY_USER" in code
@@ -1286,12 +1235,16 @@ def _preflight_checks(code: str, strict_mode: bool) -> Dict[str, Any]:
             )
             warnings.append(msg)
 
-        if "ee.Initialize(" not in code:
-            warnings.append("GEE code found but no explicit ee.Initialize(...) call. Add initialization with project id.")
+        if "ee.Initialize(" not in code and "initialize_ee(" not in code:
+            warnings.append(
+                "GEE code found but no unified runtime initialization. "
+                "Use gee_runtime.initialize_ee(ee_module=ee) in a registered host execution path."
+            )
 
         if "ee.Initialize(" in code and "project=" not in code:
             warnings.append(
-                f"ee.Initialize() missing explicit project parameter. Recommended: ee.Initialize(project='{_gee_project_id()}')."
+                "ee.Initialize() is projectless. Prefer the system-managed "
+                "gee_runtime.initialize_ee(ee_module=ee) entry."
             )
 
         for asset in assets:
@@ -1375,7 +1328,10 @@ def _derive_fix_suggestions(error_type: Optional[str], error_message: Optional[s
         )
         fixes.append("Do not change datasets, bands, or analysis logic to work around this IAM/project error.")
     elif "eeexception" in et or "earth engine" in msg:
-        fixes.append(f"Ensure ee.Initialize(project='{_gee_project_id()}') is called before GEE operations.")
+        fixes.append(
+            "Use a registered host GEE tool that initializes through "
+            "gee_runtime.initialize_ee; do not add projectless or interactive initialization."
+        )
         fixes.append("Verify asset IDs and band names against Earth Engine catalog before execution.")
 
     if "permission" in msg or "access" in msg:
@@ -1578,12 +1534,6 @@ def _build_sandbox_env(thread_id: str, code_path: Path) -> Dict[str, str]:
         for key, value in os.environ.items()
         if value and any(fragment in key.upper() for fragment in secret_key_fragments)
     }
-    for context_value in (
-        current_gee_encrypted_refresh_token.get(),
-        current_gee_token_scopes.get(),
-    ):
-        if context_value:
-            secret_values.add(str(context_value))
     env = {
         key: value
         for key, value in os.environ.items()
@@ -2117,8 +2067,9 @@ def execute_geospatial_script(
                 "contract_validation": contract_validation,
                 "required_literal_assignment": (
                     'NTL_SCRIPT_CONTRACT = {"schema": "ntl.script.contract.v2", '
-                    '"objective": "...", "input_manifest": [], "method_steps": ["..."], '
-                    '"parameters": {}, "output_manifest": [{"path": "/outputs/result.ext"}], '
+                    '"objective": "...", "input_manifest": [{"path": "inputs/input.ext"}], '
+                    '"method_steps": ["..."], "parameters": {}, '
+                    '"output_manifest": [{"path": "outputs/result.ext"}], '
                     '"validation_checks": ["..."], "failure_gates": ["..."], '
                     '"execution": {"mode": "execute", "timeout_seconds": 1800, '
                     '"overwrite_policy": "version", "network_scope": [], '
@@ -2479,7 +2430,12 @@ execute_geospatial_script_tool = StructuredTool.from_function(
     execute_geospatial_script,
     name="execute_geospatial_script_tool",
     description=(
-        "Analyst-only local execution of a previously saved .py geospatial script under the thread workspace. "
+        "Bounded local execution for NTL_Engineer routine code and NTL_Analyst scientific scripts. "
+        "The Engineer may use it for ordinary deterministic file transforms, format conversion, "
+        "small aggregations, and report/figure assembly; NTL-specific methods, modeling, and "
+        "scientific interpretation remain Analyst-owned. Do not use this tool to recreate a named scientific method "
+        "when a registered dedicated tool implements it: invoke that tool first and use its output, then use code only "
+        "for an unmet post-processing, reporting, or validation gap. Runs a previously saved .py script under the thread workspace. "
         "Inputs must already be prepared by bounded Data Searcher tools; the child receives no GEE, LLM, "
         "tracing, proxy, or Google credential environment. Requires a literal "
         "ntl.script.contract.v2, always performs static preflight, validates declared outputs, writes a success "

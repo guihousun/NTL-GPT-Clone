@@ -20,12 +20,17 @@ import uuid
 
 from . import ARCHITECTURE_MODES, CASE_SCHEMA, RUN_SCHEMA
 from .contracts import path_is_linklike
+from .system_finalizer import apply_system_finalization
 from .telemetry import BenchmarkTelemetryCallback, incomplete_model_usage, redact_text
 from orchestration.artifact_runtime import bind_artifact_scope
 from orchestration.system_snapshot import build_system_snapshot, system_snapshot_sha256
 
 
 BATCH_MANIFEST_SCHEMA = "ntl-benchmark.batch-manifest.v1"
+# The exploratory READY_NOW batch is intentionally capped at eight workers.
+# This is still bounded concurrency (the CLI rejects larger values).  Four
+# fresh agent subprocesses already keep model, geospatial, and desktop-resource
+# contention within the approved evaluation envelope.
 MAX_BATCH_WORKERS = 4
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -206,25 +211,32 @@ def stage_case_inputs(case: dict[str, Any], *, workspace: Path, cases_base_dir: 
     return records
 
 
-def artifact_records(outputs_dir: Path) -> list[dict[str, Any]]:
-    if path_is_linklike(outputs_dir):
-        raise ValueError(f"output root must not be a symbolic link or junction: {outputs_dir}")
-    if not outputs_dir.is_dir():
+def artifact_records(
+    artifact_dir: Path, *, relative_prefix: str = "outputs"
+) -> list[dict[str, Any]]:
+    """Inventory safe workspace artifacts under either ``inputs`` or ``outputs``."""
+
+    if relative_prefix not in {"inputs", "outputs"}:
+        raise ValueError("relative_prefix must be inputs or outputs")
+    root_label = "input" if relative_prefix == "inputs" else "output"
+    if path_is_linklike(artifact_dir):
+        raise ValueError(f"{root_label} root must not be a symbolic link or junction: {artifact_dir}")
+    if not artifact_dir.is_dir():
         return []
-    resolved_root = outputs_dir.resolve(strict=True)
+    resolved_root = artifact_dir.resolve(strict=True)
     records: list[dict[str, Any]] = []
-    for path in sorted(outputs_dir.rglob("*"), key=lambda item: item.as_posix().casefold()):
+    for path in sorted(artifact_dir.rglob("*"), key=lambda item: item.as_posix().casefold()):
         if path_is_linklike(path):
-            raise ValueError(f"output artifacts must not be symbolic links or junctions: {path}")
+            raise ValueError(f"{root_label} artifacts must not be symbolic links or junctions: {path}")
         resolved = path.resolve(strict=True)
         if not _is_within(resolved, resolved_root):
-            raise ValueError(f"output artifact escapes the task workspace: {path}")
+            raise ValueError(f"{root_label} artifact escapes the task workspace: {path}")
         if path.is_file():
             if path.stat().st_nlink > 1:
-                raise ValueError(f"output artifacts must not be hard links: {path}")
+                raise ValueError(f"{root_label} artifacts must not be hard links: {path}")
             records.append(
                 {
-                    "relative_path": f"outputs/{path.relative_to(outputs_dir).as_posix()}",
+                    "relative_path": f"{relative_prefix}/{path.relative_to(artifact_dir).as_posix()}",
                     "sha256": sha256_file(path),
                     "bytes": path.stat().st_size,
                 }
@@ -284,6 +296,158 @@ def final_answer_from_result(result: Any) -> str | None:
     return fallback
 
 
+_AUDIT_ONLY_TOOL_NAMES = frozenset(
+    {
+        "save_task_plan",
+        "save_event_context",
+        "save_observation_package",
+        "save_analysis_package",
+        "save_evidence_report",
+        "validate_contract",
+        "record_route_transition",
+    }
+)
+
+
+def _has_substantive_execution(tool_trace: Iterable[Mapping[str, Any]]) -> bool:
+    """Return whether the graph did more than inspect instructions or close out.
+
+    This is deliberately a small task-quality guard rather than an architecture
+    gate: a final planning sentence must not be reported as a completed task,
+    but any registered domain tool, native delegation, or read of a staged input
+    is sufficient. Audit-only package and route tools do not make a task complete.
+    """
+
+    for call in tool_trace:
+        if str(call.get("status") or "") != "succeeded":
+            continue
+        tool_name = str(call.get("tool_name") or "").strip()
+        if not tool_name or tool_name in _AUDIT_ONLY_TOOL_NAMES or tool_name == "ls":
+            continue
+        if tool_name == "read_file":
+            arguments = call.get("arguments")
+            if not isinstance(arguments, Mapping):
+                continue
+            raw_path = str(arguments.get("file_path") or arguments.get("path") or "").replace("\\", "/")
+            if raw_path == "/inputs" or raw_path.startswith("/inputs/") or raw_path.startswith("inputs/"):
+                return True
+            continue
+        if tool_name in {"write_file", "edit_file"}:
+            # A bare prose/file write does not prove that the requested
+            # scientific operation was performed; bounded executors do.
+            continue
+        return True
+    return False
+
+
+_SCIENTIFICALLY_BLOCKED_PACKAGE_STATUSES = frozenset({"blocked", "failed", "error"})
+_SCIENTIFIC_READY_PACKAGE_TYPES = frozenset(
+    {"EventContext", "ObservationPackage", "AnalysisPackage", "EvidenceReport"}
+)
+
+
+def _scientific_execution_block_reason(internal_evidence: Mapping[str, Any]) -> str | None:
+    """Return a typed scientific failure reported by the completed graph, if any.
+
+    This is deliberately classification-only.  A blocked typed EvidenceReport is
+    an honest outcome (for example, unavailable live data or a failed scientific
+    tool), not an architecture-evidence violation.  It must nevertheless not be
+    converted into a successful benchmark task merely because it contains a
+    human-readable ``direct_answer``.
+    """
+
+    packages = internal_evidence.get("packages")
+    if not isinstance(packages, Iterable) or isinstance(packages, (str, bytes, Mapping)):
+        return None
+    for package in packages:
+        if not isinstance(package, Mapping):
+            continue
+        if str(package.get("artifact_type") or "") != "EvidenceReport":
+            continue
+        status = str(package.get("status") or "").rsplit(".", 1)[-1].casefold()
+        if status in _SCIENTIFICALLY_BLOCKED_PACKAGE_STATUSES:
+            return f"EvidenceReport status={status}"
+    return None
+
+
+def _declared_scientific_block_reason(
+    internal_evidence: Mapping[str, Any], final_answer: str | None
+) -> str | None:
+    """Recognize an explicit, result-level blocked outcome without a package.
+
+    Typed packages remain the preferred evidence.  This deliberately narrow
+    fallback prevents a model from turning an honest ``Task blocked`` closure
+    into success merely because it did some useful diagnostic tool calls.  It
+    does not infer failure from an incidental use of the word "blocked", and it
+    yields to any ready scientific package so a successful fallback is retained.
+    """
+
+    package_reason = _scientific_execution_block_reason(internal_evidence)
+    if package_reason:
+        return package_reason
+    packages = internal_evidence.get("packages")
+    if isinstance(packages, Iterable) and not isinstance(packages, (str, bytes, Mapping)):
+        for package in packages:
+            if not isinstance(package, Mapping):
+                continue
+            artifact_type = str(package.get("artifact_type") or "")
+            status = str(package.get("status") or "").rsplit(".", 1)[-1].casefold()
+            if artifact_type in _SCIENTIFIC_READY_PACKAGE_TYPES and status in {
+                "ready",
+                "passed",
+                "succeeded",
+            }:
+                return None
+
+    normalized = " ".join(str(final_answer or "").casefold().split())
+    explicit_blocked_result = (
+        "terminal `blocked` state" in normalized
+        or "requested deliverable (blocked)" in normalized
+        or "the task could not be executed" in normalized
+        or (normalized.startswith("## result:") and "blocked" in normalized[:220])
+    )
+    no_deliverable = any(
+        marker in normalized
+        for marker in (
+            "not produced",
+            "not retrieved",
+            "no data was acquired",
+            "could not be materialized",
+            "no qualified observation was available",
+        )
+    )
+    if explicit_blocked_result and no_deliverable:
+        return "model final answer explicitly declares the requested deliverable blocked"
+    return None
+
+
+_PREMATURE_PROCESS_MARKERS = (
+    "saving the final evidencereport",
+    "save the final evidencereport",
+    "then delivering the direct answer",
+    "i will now execute the task",
+    "i'll save the taskplan",
+    "let me save the taskplan",
+)
+
+
+def _is_premature_process_narration(answer: str) -> bool:
+    """Identify a short final turn that promises work instead of answering.
+
+    A real result may briefly mention closeout, so this is intentionally narrow:
+    only recognizable process-only phrases without an output/package reference
+    are rejected. It keeps the benchmark from counting an unfinished final
+    turn as a successful task while leaving audit persistence non-blocking.
+    """
+
+    normalized = " ".join(str(answer or "").casefold().split())
+    if not normalized or len(normalized) > 800:
+        return False
+    if not any(marker in normalized for marker in _PREMATURE_PROCESS_MARKERS):
+        return False
+    return not any(reference in normalized for reference in ("inputs/", "outputs/", "package/"))
+
+
 def human_message_state(prompt: str) -> dict[str, list[Any]]:
     from langchain_core.messages import HumanMessage
 
@@ -330,6 +494,7 @@ def _invoke_ntl_graph(
             request_timeout_s=int(payload["request_timeout_seconds"]),
             graph_name="NTL_Engineer",
             architecture_mode=str(payload["architecture_mode"]),
+            resource_profile=str(payload.get("resource_profile") or "standard"),
         )
         return graph.invoke(
             human_message_state(case["prompt"]),
@@ -346,6 +511,7 @@ def _invoke_ntl_graph(
                     "thread_id": payload["thread_id"],
                     "task_submitted_at": payload.get("submitted_at"),
                     "architecture_mode": payload["architecture_mode"],
+                    "resource_profile": payload.get("resource_profile", "standard"),
                     "system_snapshot_sha256": payload.get("system_snapshot_sha256"),
                 },
             },
@@ -357,6 +523,7 @@ def _environment_record(payload: dict[str, Any], workspace: Path) -> dict[str, A
         "workspace": str(workspace.resolve()),
         "model": str(payload.get("model") or ""),
         "architecture_mode": str(payload.get("architecture_mode") or ""),
+        "resource_profile": str(payload.get("resource_profile") or "standard"),
         "request_timeout_seconds": int(payload.get("request_timeout_seconds") or 0),
         "task_timeout_seconds": float(payload.get("task_timeout_seconds") or 0),
         "recursion_limit": int(payload.get("recursion_limit") or 0),
@@ -547,12 +714,18 @@ def execute_worker_payload(
     final_answer: str | None = None
     graph_completed = False
     errors: list[dict[str, str]] = []
+    audit_issues: list[dict[str, str]] = []
+    initial_input_artifacts: dict[str, tuple[str, int]] = {}
     try:
         staged_inputs = stage_case_inputs(
             case,
             workspace=workspace,
             cases_base_dir=Path(payload["cases_base_dir"]).resolve(),
         )
+        initial_input_artifacts = {
+            str(record["relative_path"]): (str(record["sha256"]), int(record["bytes"]))
+            for record in artifact_records(workspace / "inputs", relative_prefix="inputs")
+        }
         with bind_artifact_scope(
             thread_id=thread_id,
             run_id=str(payload["task_run_id"]),
@@ -581,21 +754,55 @@ def execute_worker_payload(
         evidence_checked_at=_utc_now(),
     )
     if graph_completed:
-        if canonical_answer:
+        substantive_execution = _has_substantive_execution(snapshot["tool_trace"])
+        scientific_block_reason = _declared_scientific_block_reason(
+            internal_evidence, final_answer
+        )
+        if not substantive_execution:
+            terminal_state = "failed"
+            errors.append(
+                {
+                    "code": "NO_SUBSTANTIVE_EXECUTION",
+                    "message": (
+                        "graph ended after planning, instruction reads, or audit-only tools "
+                        "without a substantive task operation"
+                    ),
+                }
+            )
+        elif scientific_block_reason:
+            terminal_state = "failed"
+            errors.append(
+                {
+                    "code": "SCIENTIFIC_EXECUTION_BLOCKED",
+                    "message": scientific_block_reason,
+                }
+            )
+        elif canonical_answer:
             # The validated typed system output is authoritative over a final
             # conversational process sentence from the graph.
             final_answer = canonical_answer
             terminal_state = "succeeded"
         elif final_answer:
-            terminal_state = "succeeded"
+            if _is_premature_process_narration(final_answer):
+                terminal_state = "no_final_answer"
+                errors.append(
+                    {
+                        "code": "PREMATURE_PROCESS_NARRATION",
+                        "message": (
+                            "graph ended with an unfinished process narration instead of "
+                            "a task result"
+                        ),
+                    }
+                )
+            else:
+                terminal_state = "succeeded"
         else:
             terminal_state = "no_final_answer"
             errors.append(
                 {"code": "NO_FINAL_ANSWER", "message": "graph returned no final AI answer"}
             )
     if evidence_issues:
-        terminal_state = "failed"
-        errors.append(
+        audit_issues.append(
             {
                 "code": "ARCHITECTURE_EVIDENCE_INCOMPLETE",
                 "message": (
@@ -605,8 +812,7 @@ def execute_worker_payload(
             }
         )
     if artifact_integrity_issues:
-        terminal_state = "failed"
-        errors.append(
+        audit_issues.append(
             {
                 "code": "PACKAGE_ARTIFACT_INTEGRITY_MISMATCH",
                 "message": (
@@ -617,7 +823,7 @@ def execute_worker_payload(
         )
     if terminal_state == "succeeded" and telemetry.model_usage_snapshot()["llm_call_count"] == 0:
         telemetry.mark_incomplete("succeeded run recorded no tested-model call")
-        errors.append(
+        audit_issues.append(
             {"code": "MISSING_MODEL_USAGE", "message": "succeeded run recorded no tested-model call"}
         )
     try:
@@ -631,6 +837,30 @@ def execute_worker_payload(
                 "message": redact_text(f"{type(exc).__name__}: {exc}"),
             }
         )
+    else:
+        # Remote-acquisition tools sometimes materialize their verified science
+        # files under inputs/.  Model package bookkeeping should not be required
+        # merely to make those files visible in the run record.  Record only
+        # new or changed files, never the case fixtures that were staged first.
+        try:
+            current_inputs = artifact_records(workspace / "inputs", relative_prefix="inputs")
+            generated_inputs = [
+                record
+                for record in current_inputs
+                if initial_input_artifacts.get(str(record["relative_path"]))
+                != (str(record["sha256"]), int(record["bytes"]))
+            ]
+            artifacts = sorted(
+                [*artifacts, *generated_inputs],
+                key=lambda record: str(record["relative_path"]).casefold(),
+            )
+        except BaseException as exc:  # noqa: BLE001 - inventory is an audit convenience
+            audit_issues.append(
+                {
+                    "code": "GENERATED_INPUT_ARTIFACT_INVENTORY_UNAVAILABLE",
+                    "message": redact_text(f"{type(exc).__name__}: {exc}"),
+                }
+            )
     ended_at = _utc_now()
     wall_clock_seconds = max(0.0, time.perf_counter() - start_clock)
     return {
@@ -649,6 +879,7 @@ def execute_worker_payload(
         "tool_trace": snapshot["tool_trace"],
         "model_usage": snapshot["model_usage"],
         "errors": errors,
+        "audit_issues": audit_issues,
         "environment": _environment_record(payload, workspace),
     }
 
@@ -826,6 +1057,9 @@ def _launch_worker(payload_path: Path, payload: dict[str, Any], repo_root: Path)
     environment["LANGCHAIN_TRACING"] = "false"
     environment["LANGCHAIN_TRACING_V2"] = "false"
     environment["LANGSMITH_TRACING"] = "false"
+    # Benchmarks save figures to disk; no interactive GUI backend is needed.
+    # Agg avoids thread-bound GUI warnings being mistaken for worker failures.
+    environment["MPLBACKEND"] = "Agg"
     popen_kwargs: dict[str, Any] = {}
     if os.name == "nt":
         popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
@@ -843,6 +1077,8 @@ def _launch_worker(payload_path: Path, payload: dict[str, Any], repo_root: Path)
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         **popen_kwargs,
     )
     try:
@@ -868,7 +1104,12 @@ def _launch_worker(payload_path: Path, payload: dict[str, Any], repo_root: Path)
     worker_elapsed = max(0.0, time.perf_counter() - started)
     result_path = Path(payload["result_path"])
     if process.returncode != 0 or not result_path.is_file():
-        detail = stderr or stdout or f"worker exited with code {process.returncode}"
+        fragments = [f"worker exited with code {process.returncode}"]
+        if stderr:
+            fragments.append("stderr:\n" + stderr)
+        if stdout:
+            fragments.append("stdout:\n" + stdout)
+        detail = "\n".join(fragments)
         return abnormal_run_record(
             abnormal_payload,
             terminal_state="failed",
@@ -1026,6 +1267,9 @@ def run_batch(
         raise ValueError(
             "architecture_mode must be one of: " + ", ".join(ARCHITECTURE_MODES)
         )
+    resource_profile = str(getattr(args, "resource_profile", "standard") or "").strip()
+    if resource_profile not in {"standard", "tools_prompt_only"}:
+        raise ValueError("resource_profile must be one of: standard, tools_prompt_only")
 
     repo_root = REPO_ROOT
     git_state = _git_state(repo_root)
@@ -1033,6 +1277,7 @@ def run_batch(
         repo_root,
         architecture_mode=architecture_mode,
         model_name=model,
+        resource_profile=resource_profile,
         run_limits={
             "request_timeout_seconds": request_timeout,
             "task_timeout_seconds": task_timeout,
@@ -1045,8 +1290,9 @@ def run_batch(
     output_dir.mkdir(parents=True, exist_ok=False)
     control_dir = output_dir / "control"
     task_records_dir = output_dir / "task-records"
+    system_evidence_dir = output_dir / "system-evidence"
     workspace_root = output_dir / "workspaces"
-    for directory in (control_dir, task_records_dir, workspace_root):
+    for directory in (control_dir, task_records_dir, system_evidence_dir, workspace_root):
         directory.mkdir()
 
     system_git_sha = str(git_state["system_git_sha"])
@@ -1064,6 +1310,7 @@ def run_batch(
         "task_count": len(cases),
         "model": model,
         "architecture_mode": architecture_mode,
+        "resource_profile": resource_profile,
         "system_snapshot": system_snapshot,
         "system_snapshot_sha256": snapshot_sha256,
         "configured_concurrency": max_workers,
@@ -1105,6 +1352,7 @@ def run_batch(
             "thread_id": thread_id,
             "model": model,
             "architecture_mode": architecture_mode,
+            "resource_profile": resource_profile,
             "system_snapshot": system_snapshot,
             "system_snapshot_sha256": snapshot_sha256,
             "request_timeout_seconds": request_timeout,
@@ -1152,7 +1400,9 @@ def run_batch(
             payload_path, payload = payloads[index]
             del payload_path
             record = future.result()
+            record, finalization = apply_system_finalization(record)
             write_json_atomic(payload["result_path"], record)
+            write_json_atomic(system_evidence_dir / Path(payload["result_path"]).name, finalization)
             records[index] = record
 
     run_jsonl = output_dir / "task-runs.jsonl"
@@ -1160,12 +1410,19 @@ def run_batch(
     for record in completed_records:
         append_jsonl(run_jsonl, record)
     counts = Counter(str(record.get("terminal_state") or "unknown") for record in completed_records)
+    finalization_counts = Counter(
+        str((record.get("system_finalization") or {}).get("status") or "unknown")
+        for record in completed_records
+    )
     manifest.update(
         {
             "ended_at": _utc_now(),
             "status": "completed",
             "terminal_counts": dict(sorted(counts.items())),
             "task_record_count": len(completed_records),
+            "system_evidence_dir": str(system_evidence_dir),
+            "system_finalization_counts": dict(sorted(finalization_counts.items())),
+            "system_finalizer_excluded_from_task_model_usage": True,
         }
     )
     write_json_atomic(manifest_path, manifest)

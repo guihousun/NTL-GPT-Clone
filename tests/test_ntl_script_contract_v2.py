@@ -92,6 +92,9 @@ def test_invalid_contract_returns_compact_exact_literal_repair_guidance(code_run
     assert result["code_sha256"]
     assert result["code_bytes"] == len(script.encode("utf-8"))
     assert '"schema": "ntl.script.contract.v2"' in result["required_literal_assignment"]
+    assert '"path": "inputs/input.ext"' in result["required_literal_assignment"]
+    assert '"path": "outputs/result.ext"' in result["required_literal_assignment"]
+    assert '"path": "/outputs/result.ext"' not in result["required_literal_assignment"]
     assert result["schema_key_warning"] == "Use 'schema'; 'schema_version' is invalid."
     assert result["required_contract_fields"] == [
         "schema",
@@ -113,6 +116,9 @@ def test_analyst_skill_contains_the_literal_v2_contract_shape() -> None:
     assert "NTL_SCRIPT_CONTRACT = {" in skill
     assert '"schema": "ntl.script.contract.v2"' in skill
     assert "The schema key is `schema`, not `schema_version`" in skill
+    assert '"path": "inputs/input.ext"' in skill
+    assert '"path": "outputs/result.ext"' in skill
+    assert '"reason": "workspace paths must be relative"' in skill
 
 
 def test_valid_v2_script_executes_and_writes_manifest(code_runtime) -> None:

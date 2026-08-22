@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import re
 from pathlib import Path
 
 from langchain_core.utils.function_calling import convert_to_openai_tool
@@ -42,10 +43,18 @@ def test_role_specs_are_exactly_the_four_contract_roles() -> None:
     assert all(not ROLE_SPECS[name].can_delegate for name in ROLE_SPECS if name != "NTL_Engineer")
 
 
-def test_each_role_loads_common_then_only_its_role_namespace() -> None:
+def test_each_role_loads_common_role_namespace_and_declared_shared_procedures() -> None:
     expected = {
-        "NTL_Engineer": ("/skills/common/", "/skills/engineer/"),
-        "NTL_Data_Searcher": ("/skills/common/", "/skills/data_searcher/"),
+        "NTL_Engineer": (
+            "/skills/common/",
+            "/skills/engineer/",
+            "/skills/gee-ntl-date-boundary-handling/",
+        ),
+        "NTL_Data_Searcher": (
+            "/skills/common/",
+            "/skills/data_searcher/",
+            "/skills/gee-ntl-date-boundary-handling/",
+        ),
         "NTL_Analyst": ("/skills/common/", "/skills/analyst/"),
         "NTL_Event_Tracker": ("/skills/common/", "/skills/event_tracker/"),
     }
@@ -56,7 +65,65 @@ def test_each_role_loads_common_then_only_its_role_namespace() -> None:
             relative = source.removeprefix("/skills/").strip("/")
             namespace = SKILLS_ROOT / relative
             assert namespace.is_dir(), source
-            assert any((child / "SKILL.md").is_file() for child in namespace.iterdir() if child.is_dir()), source
+            assert (namespace / "SKILL.md").is_file() or any(
+                (child / "SKILL.md").is_file() for child in namespace.iterdir() if child.is_dir()
+            ), source
+
+
+def test_active_skill_names_match_their_directories() -> None:
+    """Keep active role skills compatible with Deep Agents' skill loader."""
+    active_sources = {
+        source
+        for sources in ROLE_SKILL_SOURCES.values()
+        for source in sources
+    }
+    for source in sorted(active_sources):
+        relative = source.removeprefix("/skills/").strip("/")
+        source_root = SKILLS_ROOT / relative
+        files = [source_root / "SKILL.md"] if (source_root / "SKILL.md").is_file() else sorted(source_root.glob("*/SKILL.md"))
+        for path in files:
+            head = path.read_text(encoding="utf-8").split("---", 2)[1]
+            match = re.search(r"^name:\s*([^\s]+)\s*$", head, flags=re.MULTILINE)
+            assert match, f"missing name frontmatter: {path}"
+            assert match.group(1) == path.parent.name
+
+
+def test_disaster_event_observation_workflow_is_active_and_bounded() -> None:
+    """The shared disaster route must be discoverable by every active role."""
+    skill = (
+        SKILLS_ROOT / "common" / "disaster-event-observation-workflow" / "SKILL.md"
+    )
+    text = skill.read_text(encoding="utf-8")
+
+    assert "Event Tracker -> Data Searcher -> Analyst" in text
+    assert "summary_only" in text
+    assert "typed_package" in text
+    assert "never merge their dates" in text
+    assert "never encode a" in text
+    assert "frozen snapshot" in text
+    assert "Do not infer causality" in text
+    assert "Do not invent an event" in text
+    assert "only to obtain a checksum" in text
+    assert all("/skills/common/" in sources for sources in ROLE_SKILL_SOURCES.values())
+    for prompt in (_full_system_prompt(), _single_agent_prompt()):
+        assert "/skills/common/disaster-event-observation-workflow/SKILL.md" in prompt
+
+
+def test_source_backed_utc_time_route_is_active_for_engineer_and_data_searcher() -> None:
+    shared_source = "/skills/gee-ntl-date-boundary-handling/"
+    assert shared_source in ROLE_SKILL_SOURCES["NTL_Engineer"]
+    assert shared_source in ROLE_SKILL_SOURCES["NTL_Data_Searcher"]
+
+    skill = SKILLS_ROOT / "gee-ntl-date-boundary-handling" / "SKILL.md"
+    text = skill.read_text(encoding="utf-8")
+    data_prompt = str(hierarchical_system_prompt_data_searcher.content)
+
+    assert "Source-backed UTC_Time Route" in text
+    assert "metadata establishes granule availability" in text
+    assert "not a pixel-level observation time" in text
+    assert "VNP46A1 `UTC_Time` may validate timing while VNP46A2 remains the radiance" in text
+    assert "2025-03-28T06:20:52Z" in text
+    assert shared_source.rstrip("/") in data_prompt
 
 
 def test_active_prompts_and_skills_exclude_retired_startup_memory_policies() -> None:
@@ -94,11 +161,82 @@ def test_active_prompts_and_skills_exclude_retired_startup_memory_policies() -> 
     assert not leaked, f"retired startup-memory policies leaked into active surfaces: {leaked}"
 
 
-def test_engineer_allowlist_is_narrow_fast_path_surface() -> None:
+def test_active_contract_guidance_stops_duplicate_package_probes_and_uses_relative_script_paths() -> None:
+    full_prompt = _full_system_prompt()
+    single_prompt = _single_agent_prompt()
+    analyst_prompt = str(system_prompt_analyst.content)
+    planning_skill = (
+        SKILLS_ROOT / "engineer" / "task-planning-and-routing" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    execution_skill = (
+        SKILLS_ROOT / "analyst" / "code-execution-validation" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+
+    assert "do not save another TaskPlan" in full_prompt
+    assert "do not save the same package again" in single_prompt
+    assert "skeleton or single-field packages" in analyst_prompt
+    assert "Do not save the same plan again" in planning_skill
+    assert '"path": "inputs/input.ext"' in execution_skill
+    assert '"path": "outputs/result.ext"' in execution_skill
+    assert '"path": "/inputs/input.ext"' not in execution_skill
+    assert '"path": "/outputs/result.ext"' not in execution_skill
+
+
+def test_data_searcher_prompt_names_registered_location_tools() -> None:
+    prompt = str(hierarchical_system_prompt_data_searcher.content)
+    assert "get_administrative_division_data" in prompt
+    assert "poi_search_tool" in prompt
+    assert "geocode_tool" in prompt
+    assert "do not claim that Amap is" in prompt
+    assert "no input file is staged" in prompt
+    assert "inputs/<filename>" in prompt
+    assert "NTL_composite_local_tool" in prompt
+    assert "NTL_daily_antl_statistics" in prompt
+    assert "multiple dates do not imply that a composite" in prompt
+    assert "VNP46A2_angular_correction_tool" in prompt
+    assert "Do not run\n   catalog discovery" in prompt
+
+
+def test_engineer_prompt_distinguishes_daily_retrieval_and_angle_correction_routes() -> None:
+    prompt = _full_system_prompt()
+    assert "A request for separate daily layers is not a composite request" in prompt
+    assert "do not substitute the uncorrected daily-ANTL executor" in prompt
+    assert "persistent Earth Engine asset only when the user explicitly asks" in prompt
+
+
+def test_engineer_and_single_prompts_route_location_requests_to_registered_tools() -> None:
+    full_prompt = _full_system_prompt()
+    single_prompt = _single_agent_prompt()
+    for prompt in (full_prompt, single_prompt):
+        assert "get_administrative_division_data" in prompt
+        assert "poi_search_tool" in prompt
+        assert "geocode_tool" in prompt
+
+
+def test_engineer_prompt_does_not_block_live_acquisition_on_empty_inputs() -> None:
+    prompt = _full_system_prompt()
+    assert "empty `/inputs/` directory is expected" in prompt
+    assert "route the request to NTL_Data_Searcher" in prompt
+
+
+def test_latest_availability_prompt_distinguishes_gee_and_nasa_channels() -> None:
+    prompts = (_full_system_prompt(), str(hierarchical_system_prompt_data_searcher.content))
+    for prompt in prompts:
+        assert "gee_catalog" in prompt
+        assert "nasa_earthdata_cmr_laads" in prompt
+        assert "never merge" in prompt.lower()
+        assert "query_executed_at_utc" in prompt
+
+
+def test_engineer_allowlist_includes_bounded_routine_execution() -> None:
     names = _names("engineer_tools")
-    assert {"geodata_inspector_tool", "geodata_quick_check_tool"} <= names
     assert {
+        "geodata_inspector_tool",
+        "geodata_quick_check_tool",
         "execute_geospatial_script_tool",
+    } <= names
+    assert {
+        "GeoCode_Knowledge_Recipes_tool",
         "GeoCode_COT_Validation_tool",
         "NTL_download_tool",
         "GEE_request_plan_tool",
@@ -138,6 +276,8 @@ def test_analyst_owns_scientific_methods_not_acquisition() -> None:
         "VNP46A2_seasonal_adjustment_tool",
         "VNP46A2_persistence_classification_tool",
         "dmsp_viirs_harmonization_tool",
+        "SDGSAT1_index_tool",
+        "SDGSAT1_jia_light_classification_tool",
         "electrified_detection_tool",
     } <= names
     assert {
@@ -147,6 +287,33 @@ def test_analyst_owns_scientific_methods_not_acquisition() -> None:
         "dataset_latest_availability_tool",
         "conflict_ntl_fetch_isw_events_tool",
     }.isdisjoint(names)
+
+
+def test_analyst_prompt_prefers_named_svm_workflow_over_generic_code() -> None:
+    prompt = str(system_prompt_analyst.content)
+    assert "Detect_Urban_Area_by_SVM" in prompt
+    assert "environment probe" in prompt
+    assert "before writing code" in prompt
+    assert "explicitly names a callable registered tool" in prompt
+    assert "requested decision rule" in prompt
+    assert "SDGSAT1_jia_light_classification" in prompt
+    assert "RLED if RRLI>9" in prompt
+
+
+def test_full_prompt_routes_staged_named_methods_directly_to_analyst() -> None:
+    prompt = _full_system_prompt()
+    assert "treat those inputs as analysis-ready" in prompt
+    assert "Do not add a Data Searcher leg merely to re-inspect" in prompt
+    assert "Direct Analyst capability index for staged inputs" in prompt
+    assert "They are not Data Searcher jobs" in prompt
+    assert "explicitly requested model-selection criterion" in prompt
+    assert "stripe-noise removal request is standard preprocessing" in prompt
+    assert "SDGSAT-1_strip_removal_tool" in prompt
+    assert "SDGSAT1_jia_light_classification" in prompt
+    assert "RLED if RRLI>9" in prompt
+    data_prompt = str(hierarchical_system_prompt_data_searcher.content)
+    assert "SDGSAT-1_strip_removal_tool" in data_prompt
+    assert "Do not replace it with a generic script" in data_prompt
 
 
 def test_event_tracker_owns_sources_not_ntl_observations_or_analysis() -> None:
@@ -187,12 +354,12 @@ def test_matched_single_agent_is_the_strict_ordered_role_union() -> None:
     assert "GeoCode_COT_Validation_tool" not in expected
 
 
-def test_formal_four_role_surface_confines_custom_code_execution_to_analyst() -> None:
+def test_formal_four_role_surface_shares_bounded_code_execution_only() -> None:
     formal = {name: set(tools) for name, tools in _ROLE_GROUPS.items()}
     execute_owners = {
         role for role, tools in formal.items() if "execute_geospatial_script_tool" in tools
     }
-    assert execute_owners == {"analyst_tools"}
+    assert execute_owners == {"engineer_tools", "analyst_tools"}
     assert all("GeoCode_COT_Validation_tool" not in tools for tools in formal.values())
 
 
@@ -225,11 +392,18 @@ def test_migrated_benchmark_tool_exports_point_to_real_symbols() -> None:
 def test_specialist_prompts_save_typed_package_and_return_native_result() -> None:
     analyst = str(system_prompt_analyst.content)
     tracker = str(system_prompt_event_tracker.content)
+    data_searcher = str(hierarchical_system_prompt_data_searcher.content)
     tracker_flat = " ".join(tracker.split())
     assert "normal task result" in analyst
     assert "normal task result" in tracker
     assert "exact opaque package handle" in analyst
     assert "exact opaque package handle" in tracker
+    assert "typed_package" in analyst
+    assert "summary_only" in analyst
+    assert "typed_package" in tracker
+    assert "summary_only" in tracker
+    assert "typed_package" in data_searcher
+    assert "summary_only" in data_searcher
     assert "do not require an AssignmentEnvelope" in analyst
     assert "do not require an AssignmentEnvelope" in tracker
     assert "ntl.assignment.v1" not in analyst

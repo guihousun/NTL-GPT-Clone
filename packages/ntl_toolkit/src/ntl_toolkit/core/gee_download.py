@@ -77,6 +77,7 @@ def download_gee_raster(
     request: GeeDownloadRequest,
     *,
     progress: DownloadProgress | None = None,
+    ee_module=None,
 ) -> ToolResult:
     """Export one explicit GEE image or collection reduction without OAuth."""
     try:
@@ -86,7 +87,7 @@ def download_gee_raster(
 
     _report(progress, 0, 4, "initializing Earth Engine")
     try:
-        ee = _initialize_ee(request.project)
+        ee = ee_module if ee_module is not None else _initialize_ee(request.project)
     except Exception as exc:  # noqa: BLE001 - package the local setup failure
         return _failed(
             "GEE_NOT_INITIALIZED",
@@ -128,10 +129,13 @@ def download_gee_raster(
 def _initialize_ee(project: str | None):
     import ee
 
-    if project:
-        ee.Initialize(project=project)
-    else:
-        ee.Initialize()
+    project_id = str(project or "").strip()
+    if not project_id:
+        raise RuntimeError(
+            "GEE_PROJECT_NOT_CONFIGURED: an explicit Earth Engine project is required; "
+            "the caller must resolve the runtime project before entering ntl_toolkit."
+        )
+    ee.Initialize(project=project_id)
     return ee
 
 

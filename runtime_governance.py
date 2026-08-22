@@ -4,6 +4,12 @@ import os
 import re
 from typing import Any
 
+from gee_runtime import (
+    GEEProjectConfigurationError,
+    GEE_RUNTIME_DESCRIPTOR,
+    resolve_gee_project_id,
+)
+
 
 ASSISTANT_ID = "NTL_Engineer"
 POSTGRES_URL_ENV = "NTL_LANGGRAPH_POSTGRES_URL"
@@ -19,7 +25,9 @@ DEFAULT_MAX_ACTIVE_RUNS = 10
 DEFAULT_MAX_ACTIVE_RUNS_PER_USER = 2
 DEFAULT_THREAD_WORKSPACE_QUOTA_MB = 500
 DEFAULT_USER_WORKSPACE_QUOTA_MB = 1024
-DEFAULT_GEE_PROJECT_ID = "empyrean-caster-430308-m2"
+# Compatibility name only.  A real project must come from the unified resolver;
+# runtime governance no longer embeds a deployable project identifier.
+DEFAULT_GEE_PROJECT_ID = ""
 
 
 def _env_text(name: str) -> str:
@@ -76,7 +84,12 @@ def user_workspace_quota_bytes() -> int:
 
 
 def default_gee_project_id() -> str:
-    return _env_text(GEE_DEFAULT_PROJECT_ID_ENV) or DEFAULT_GEE_PROJECT_ID
+    try:
+        return resolve_gee_project_id()
+    except GEEProjectConfigurationError:
+        # Metadata/UI callers may render an unconfigured state.  Actual Earth
+        # Engine initialization remains fail-closed in gee_runtime.initialize_ee.
+        return ""
 
 
 def build_run_limit_snapshot(controls: list[dict[str, Any]], user_id: str) -> dict[str, int]:
@@ -115,13 +128,16 @@ def build_runtime_metadata(
     gee_project_id: str = "",
     gee_profile_source: str = "default",
 ) -> dict[str, str]:
+    resolved_project_id = str(gee_project_id or default_gee_project_id()).strip()
     return {
         "assistant_id": sanitize_namespace_part(assistant_id, ASSISTANT_ID),
         "user_id": sanitize_namespace_part(user_id, "guest"),
         "thread_id": sanitize_namespace_part(thread_id, "debug"),
         "gee_pipeline_mode": sanitize_namespace_part(gee_pipeline_mode, "default"),
-        "gee_project_id": sanitize_namespace_part(gee_project_id or default_gee_project_id(), default_gee_project_id()),
+        "gee_project_id": sanitize_namespace_part(resolved_project_id, "unconfigured"),
         "gee_profile_source": sanitize_namespace_part(gee_profile_source, "default"),
+        "gee_client_scope": str(GEE_RUNTIME_DESCRIPTOR["client_scope"]),
+        "gee_credential_isolation": str(GEE_RUNTIME_DESCRIPTOR["credential_isolation"]),
     }
 
 

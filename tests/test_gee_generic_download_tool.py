@@ -13,6 +13,8 @@ def test_generic_download_uses_thread_inputs_and_multiband_request(
     tmp_path: Path,
 ) -> None:
     captured = {}
+    monkeypatch.setattr(generic, "resolve_gee_project_id", lambda _project=None: "test-project")
+    monkeypatch.setattr(generic, "initialize_ee", lambda **_kwargs: "test-project")
     monkeypatch.setattr(generic, "_resolve_thread_id", lambda _config: "thread-1")
     monkeypatch.setattr(
         generic.storage_manager,
@@ -25,8 +27,9 @@ def test_generic_download_uses_thread_inputs_and_multiband_request(
         lambda *args, **kwargs: {"allowed": True, "limit_bytes": 1_000_000_000},
     )
 
-    def fake_download(request):
+    def fake_download(request, *, ee_module=None):
         captured["request"] = request
+        captured["ee_module"] = ee_module
         return ToolResult.succeeded(
             tool="download_gee_raster",
             summary="ok",
@@ -53,6 +56,8 @@ def test_generic_download_uses_thread_inputs_and_multiband_request(
     assert request.bands == ["B2", "B3", "B4"]
     assert request.processing_preset == "sentinel2_cloud_score_plus"
     assert request.output == str(tmp_path / "sentinel.tif")
+    assert request.project == "test-project"
+    assert captured["ee_module"] is not None
     assert result["metrics"]["thread_id"] == "thread-1"
 
 

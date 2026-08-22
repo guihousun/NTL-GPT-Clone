@@ -1,5 +1,5 @@
 ---
-name: ntl-event-tracker-disaster-event-context
+name: disaster-event-context
 description: Build source-bounded disaster, outage, accident, and recovery context as of an explicit cutoff for downstream observation planning.
 ---
 
@@ -11,4 +11,4 @@ description: Build source-bounded disaster, outage, accident, and recovery conte
 - Distinguish occurrence, updates, warnings, response, and recovery milestones instead of collapsing them into one timestamp.
 - Preserve inaccessible sources, coverage gaps, conflicting magnitudes/times/locations, and uncertainty.
 - Propose candidate event windows and AOI to NTL_Engineer; do not select imagery or infer radiance impact.
-- If the source-bounded work succeeds, write/inspect the requested artifact and save the ready EventContext in the same native task; do not block or request another task merely for checksum tooling.
+- If `typed_package` is requested, write/inspect the requested artifact and save the ready EventContext in the same native task; if `summary_only` is requested, return the bounded source-grounded context without a skeleton package. Do not block or request another task merely for checksum tooling.

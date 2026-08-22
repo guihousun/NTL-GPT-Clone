@@ -16,6 +16,7 @@ from ntl_toolkit.core.gee_batch import (
     inspect_gee_batch_export,
     submit_gee_batch_export,
 )
+from gee_runtime import initialize_ee, resolve_gee_project_id
 from storage_manager import current_thread_id, storage_manager
 
 
@@ -57,12 +58,10 @@ class GEEBatchExportInput(BaseModel):
         default=None,
         description="Optional relative JSON path under current thread memory/gee_exports.",
     )
-    project: Optional[str] = None
 
 
 class GEEExportStatusInput(BaseModel):
     manifest_name: str = Field(..., description="Manifest returned by GEE_batch_export_tool, e.g. /memories/gee_exports/x.json.")
-    project: Optional[str] = None
 
 
 def _resolve_thread_id(config: Optional[RunnableConfig]) -> str:
@@ -136,6 +135,7 @@ def gee_batch_export(
     try:
         thread_id = _resolve_thread_id(config)
         manifest = _manifest_path(thread_id, manifest_name or _default_manifest_name(description))
+        runtime_project = resolve_gee_project_id(project)
         request = GeeBatchExportRequest(
             dataset_id=dataset_id,
             bands=bands,
@@ -149,7 +149,7 @@ def gee_batch_export(
             reducer=reducer,
             scale=scale,
             crs=crs,
-            project=project,
+            project=runtime_project,
             processing_preset=processing_preset,
             quality_threshold=quality_threshold,
             index_bands=tuple(index_bands) if index_bands else None,
@@ -160,7 +160,14 @@ def gee_batch_export(
             bucket_prefix=bucket_prefix,
             asset_id=asset_id,
         )
-        return _agent_payload(submit_gee_batch_export(request), thread_id, manifest)
+        import ee
+
+        initialize_ee(explicit_project_id=runtime_project, ee_module=ee)
+        return _agent_payload(
+            submit_gee_batch_export(request, ee_module=ee),
+            thread_id,
+            manifest,
+        )
     except Exception as exc:  # noqa: BLE001
         return {
             "status": "failed",
@@ -182,7 +189,17 @@ def gee_export_status(
     try:
         thread_id = _resolve_thread_id(config)
         manifest = _manifest_path(thread_id, manifest_name)
-        return _agent_payload(inspect_gee_batch_export(str(manifest), project=project), thread_id, manifest)
+        runtime_project = resolve_gee_project_id(project)
+        import ee
+
+        initialize_ee(explicit_project_id=runtime_project, ee_module=ee)
+        return _agent_payload(
+            inspect_gee_batch_export(
+                str(manifest), project=runtime_project, ee_module=ee
+            ),
+            thread_id,
+            manifest,
+        )
     except Exception as exc:  # noqa: BLE001
         return {
             "status": "failed",
@@ -200,7 +217,17 @@ def gee_export_cancel(
     try:
         thread_id = _resolve_thread_id(config)
         manifest = _manifest_path(thread_id, manifest_name)
-        return _agent_payload(cancel_gee_batch_export(str(manifest), project=project), thread_id, manifest)
+        runtime_project = resolve_gee_project_id(project)
+        import ee
+
+        initialize_ee(explicit_project_id=runtime_project, ee_module=ee)
+        return _agent_payload(
+            cancel_gee_batch_export(
+                str(manifest), project=runtime_project, ee_module=ee
+            ),
+            thread_id,
+            manifest,
+        )
     except Exception as exc:  # noqa: BLE001
         return {
             "status": "failed",

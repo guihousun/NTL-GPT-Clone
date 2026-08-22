@@ -1,5 +1,5 @@
 ---
-name: ntl-data-searcher-temporal-and-aoi-resolution
+name: temporal-and-aoi-resolution
 description: Resolve AOI, timezone, local-night and UTC product dates, boundary provenance, and spatial support for observation preparation.
 ---
 

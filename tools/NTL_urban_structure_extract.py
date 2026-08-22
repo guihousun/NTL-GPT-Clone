@@ -90,7 +90,12 @@ from typing import Optional
 #     args_schema=UrbanExtractionInput
 # )
 
+import json
 import os
+from pathlib import Path
+from typing import Optional
+
+import geopandas as gpd
 import rasterio
 import numpy as np
 import cv2
@@ -98,7 +103,14 @@ from langchain_core.tools import StructuredTool
 from pydantic.v1 import BaseModel, Field
 from storage_manager import storage_manager, current_thread_id
 from langchain_core.runnables import RunnableConfig
-from typing import Optional
+from rasterio.features import geometry_mask
+from shapely.geometry import mapping
+from shapely.ops import unary_union
+
+# Keep thresholded-area reporting consistent with the public zonal-statistics
+# tool.  In particular, this is WGS84 geodesic area rather than a degree-grid
+# affine determinant for geographic NTL rasters.
+from tools.NTL_raster_stats import _pixel_area_grid_km2
 
 # --- Core Algorithm Functions ---
 def read_tif(path):
@@ -111,13 +123,26 @@ def calculate_perimeter(binary_image):
     perimeter = sum(cv2.arcLength(cnt, True) for cnt in contours)
     return perimeter
 
-def analyze_thresholds(image, num_thresholds=64):
-    min_val = np.nanmin(image)
-    max_val = np.nanmax(image)
+def analyze_thresholds(image, num_thresholds=64, valid_mask=None):
+    """Derive perimeter-change thresholds without treating NoData as signal."""
+
+    image = np.asarray(image, dtype=np.float64)
+    if valid_mask is None:
+        valid_mask = np.isfinite(image)
+    else:
+        valid_mask = np.asarray(valid_mask, dtype=bool) & np.isfinite(image)
+    if image.ndim != 2 or valid_mask.shape != image.shape:
+        raise ValueError("Threshold analysis requires matching two-dimensional image and validity mask.")
+    if not np.any(valid_mask):
+        raise ValueError("Input raster has no valid finite pixels for threshold analysis.")
+
+    min_val = float(np.min(image[valid_mask]))
+    max_val = float(np.max(image[valid_mask]))
     thresholds = np.linspace(min_val, max_val, num_thresholds)
     perimeters = []
     for t in thresholds:
-        binary = np.uint8((image > t) * 255)
+        binary = np.zeros(image.shape, dtype=np.uint8)
+        binary[valid_mask & (image > t)] = 255
         perimeter = calculate_perimeter(binary)
         perimeters.append(perimeter)
     return thresholds, perimeters
@@ -135,40 +160,243 @@ def find_optimal_threshold(thresholds, perimeters):
 class UrbanExtractionInput(BaseModel):
     tif_filename: str = Field(..., description="The filename of the input NTL GeoTIFF located in 'inputs/' (e.g., 'ntl_2020.tif').")
     output_filename: str = Field(..., description="The filename for the resulting urban mask to be saved in 'outputs/' (e.g., 'shanghai_urban_mask.tif').")
+    threshold: Optional[float] = Field(
+        default=None,
+        description=(
+            "Optional fixed NTL threshold. When supplied, valid pixels with NTL >= threshold "
+            "are classed as built-up. When omitted, the legacy perimeter change-point threshold "
+            "is estimated from valid source pixels."
+        ),
+    )
+    aoi_boundary: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional polygon boundary in inputs/. The mask uses pixel-centre inclusion "
+            "(all_touched=False); pixels outside it are output as NoData=255."
+        ),
+    )
+    statistics_filename: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional JSON filename in outputs/ for threshold, pixel-count, fraction, and "
+            "WGS84-geodesic built-up-area statistics. Defaults beside output_filename."
+        ),
+    )
+
+
+def _read_valid_ntl(source: rasterio.io.DatasetReader) -> np.ndarray:
+    """Read one NTL band, excluding declared NoData and every non-finite value.
+
+    Rasterio's masked read handles a declared finite or NaN NoData value.  The
+    explicit finite check also prevents ``+/-inf`` from being silently treated
+    as a thresholdable radiance.  Valid zeroes intentionally remain finite.
+    """
+
+    if source.count < 1:
+        raise ValueError("Raster contains no bands.")
+    masked = source.read(1, masked=True).astype(np.float64)
+    values = np.asarray(masked.filled(np.nan), dtype=np.float64)
+    values[~np.isfinite(values)] = np.nan
+    return values
+
+
+def _aoi_pixel_centre_mask(
+    source: rasterio.io.DatasetReader,
+    aoi_path: Optional[Path],
+) -> np.ndarray:
+    """Return the requested AOI mask using source-grid pixel centres."""
+
+    if aoi_path is None:
+        return np.ones((source.height, source.width), dtype=bool)
+    if source.crs is None:
+        raise ValueError("Raster has no CRS; cannot align an AOI boundary or calculate geodesic area.")
+
+    boundary = gpd.read_file(aoi_path)
+    if boundary.empty:
+        raise ValueError("AOI boundary contains no features.")
+    if boundary.crs is None:
+        raise ValueError("AOI boundary has no CRS.")
+    if boundary.geometry.isna().any() or boundary.geometry.is_empty.any():
+        raise ValueError("AOI boundary contains missing or empty geometry.")
+    if not bool(boundary.geometry.is_valid.all()):
+        raise ValueError("AOI boundary contains invalid geometry.")
+    if boundary.crs != source.crs:
+        boundary = boundary.to_crs(source.crs)
+
+    union_geometry = unary_union(boundary.geometry)
+    return geometry_mask(
+        [mapping(union_geometry)],
+        out_shape=(source.height, source.width),
+        transform=source.transform,
+        invert=True,
+        all_touched=False,
+    )
+
+
+def _default_statistics_filename(output_filename: str) -> str:
+    """Derive a sibling JSON without assuming an absolute host path."""
+
+    output = Path(str(output_filename).replace("\\", "/"))
+    return str(output.with_name(f"{output.stem}_statistics.json"))
+
+
+def _format_threshold(threshold: float) -> str:
+    return format(float(threshold), ".12g")
+
+
+def _write_threshold_statistics(
+    path: Path,
+    *,
+    tif_filename: str,
+    output_filename: str,
+    aoi_boundary: Optional[str],
+    threshold: float,
+    threshold_source: str,
+    valid: np.ndarray,
+    built: np.ndarray,
+    area_grid_km2: np.ndarray,
+    source_crs: Optional[str],
+) -> dict:
+    valid_count = int(np.count_nonzero(valid))
+    built_count = int(np.count_nonzero(built))
+    non_built_count = int(np.count_nonzero(valid & ~built))
+    if valid_count == 0:
+        raise ValueError("The requested AOI contains no valid finite NTL pixels.")
+    statistics = {
+        "schema": "ntl.thresholded_built_up.v1",
+        "input": {
+            "path": str(tif_filename),
+            "crs": source_crs,
+            "band": 1,
+        },
+        "aoi": {
+            "path": str(aoi_boundary) if aoi_boundary else None,
+            "inclusion": "raster pixel centre lies within the AOI geometry",
+            "all_touched": False,
+        },
+        "method": {
+            "threshold": float(threshold),
+            "threshold_source": threshold_source,
+            "comparison": f"NTL >= {_format_threshold(threshold)}",
+            "validity_rule": "exclude declared NoData and non-finite values; retain valid zero-valued pixels",
+            "built_up_rule": "valid NTL >= threshold",
+            "pixel_area": "WGS84 geodesic source-pixel area in km2",
+        },
+        "output": {
+            "mask_path": str(output_filename),
+            "classes": {"built_up": 1, "non_built": 0, "nodata": 255},
+            "outside_aoi": 255,
+        },
+        "result": {
+            "aoi_valid_pixel_count": valid_count,
+            "built_up_pixel_count": built_count,
+            "non_built_pixel_count": non_built_count,
+            "built_up_fraction": float(built_count / valid_count),
+            "built_up_area_km2": float(np.sum(area_grid_km2[built], dtype=np.float64)),
+        },
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(statistics, ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False) + "\n",
+        encoding="utf-8",
+    )
+    return statistics
 
 # --- Main Tool Function ---
-def extract_urban_area_by_thresholding(tif_filename: str, output_filename: str, config: RunnableConfig = None) -> str:
+def extract_urban_area_by_thresholding(
+    tif_filename: str,
+    output_filename: str,
+    threshold: Optional[float] = None,
+    aoi_boundary: Optional[str] = None,
+    statistics_filename: Optional[str] = None,
+    config: RunnableConfig = None,
+) -> str:
     """
-    Automatically extracts built-up areas from NTL imagery using a change-point detection method.
+    Extract built-up areas from NTL imagery with either a caller-supplied
+    threshold or the legacy perimeter change-point threshold.
     """
     thread_id = storage_manager.get_thread_id_from_config(config) if config else None
     abs_input_path = storage_manager.resolve_input_path(tif_filename, thread_id)
     abs_output_path = storage_manager.resolve_output_path(output_filename, thread_id)
+    abs_aoi_path = (
+        Path(storage_manager.resolve_input_path(aoi_boundary, thread_id))
+        if aoi_boundary
+        else None
+    )
+    statistics_filename = statistics_filename or _default_statistics_filename(output_filename)
+    abs_statistics_path = Path(
+        storage_manager.resolve_output_path(statistics_filename, thread_id)
+    )
 
     if not os.path.exists(abs_input_path):
         return f"Error: The file '{tif_filename}' was not found in the 'inputs/' folder."
+    if abs_aoi_path is not None and not abs_aoi_path.exists():
+        return f"Error: The AOI boundary '{aoi_boundary}' was not found in the 'inputs/' folder."
+    if threshold is not None and not np.isfinite(float(threshold)):
+        return "Error: threshold must be a finite number."
 
     try:
-        # Perform threshold analysis
-        image = read_tif(abs_input_path)
-        thresholds, perimeters = analyze_thresholds(image)
-        optimal_threshold = find_optimal_threshold(thresholds, perimeters)
-
-        # Generate mask
         with rasterio.open(abs_input_path) as src:
-            raw = src.read(1)
-            profile = src.profile
+            values = _read_valid_ntl(src)
+            profile = src.profile.copy()
+            source_crs = src.crs.to_string() if src.crs else None
+            aoi_mask = _aoi_pixel_centre_mask(src, abs_aoi_path)
+            valid = aoi_mask & np.isfinite(values)
+            if not np.any(valid):
+                raise ValueError("The requested AOI contains no valid finite NTL pixels.")
 
-        urban_mask = (raw >= optimal_threshold).astype(np.uint8)
-        profile.update(dtype=rasterio.uint8, count=1, nodata=0)
+            if threshold is None:
+                thresholds, perimeters = analyze_thresholds(values, valid_mask=valid)
+                applied_threshold = float(find_optimal_threshold(thresholds, perimeters))
+                threshold_source = "perimeter_change_point"
+            else:
+                applied_threshold = float(threshold)
+                threshold_source = "caller_supplied"
 
-        # Save result
+            built = valid & (values >= applied_threshold)
+            urban_mask = np.full(values.shape, 255, dtype=np.uint8)
+            urban_mask[valid] = 0
+            urban_mask[built] = 1
+            area_grid_km2 = _pixel_area_grid_km2(src)
+
+            profile.update(
+                dtype=rasterio.uint8,
+                count=1,
+                nodata=255,
+                compress="DEFLATE",
+                predictor=2,
+            )
+
         with rasterio.open(abs_output_path, "w", **profile) as dst:
             dst.write(urban_mask, 1)
+            dst.update_tags(
+                method="thresholded built-up mask: valid NTL >= threshold",
+                threshold=_format_threshold(applied_threshold),
+                threshold_source=threshold_source,
+                aoi_inclusion="pixel-centre",
+                nodata_semantics="declared source NoData and non-finite values excluded; output NoData=255",
+            )
 
-        return (f"✅ Success! Optimal Threshold detected: {optimal_threshold:.2f}\n"
+        statistics = _write_threshold_statistics(
+            abs_statistics_path,
+            tif_filename=tif_filename,
+            output_filename=output_filename,
+            aoi_boundary=aoi_boundary,
+            threshold=applied_threshold,
+            threshold_source=threshold_source,
+            valid=valid,
+            built=built,
+            area_grid_km2=area_grid_km2,
+            source_crs=source_crs,
+        )
+
+        return (f"✅ Success! Applied Threshold: {_format_threshold(applied_threshold)}\n"
                 f"- Input: {tif_filename}\n"
-                f"- Output Saved: outputs/{output_filename}")
+                f"- Built-up pixels: {statistics['result']['built_up_pixel_count']} of "
+                f"{statistics['result']['aoi_valid_pixel_count']} valid AOI pixels\n"
+                f"- Built-up area (WGS84 geodesic): {statistics['result']['built_up_area_km2']:.12g} km²\n"
+                f"- Output mask: {output_filename}\n"
+                f"- Statistics JSON: {statistics_filename}")
                 
     except Exception as e:
         return f"Error during urban extraction: {str(e)}"
@@ -178,9 +406,11 @@ urban_extraction_by_thresholding_tool = StructuredTool.from_function(
     func=extract_urban_area_by_thresholding,
     name="Extract_Urban_Area_by_Thresholding",
     description=(
-        "Automated built-up area extraction from Nighttime Light (NTL) imagery using a change-point detection algorithm. "
-        "It analyzes the relationship between the cumulative perimeter of lit patches and NTL thresholds to identify the optimal boundary of urban areas. "
-        "Inputs and outputs are managed through the workspace's 'inputs/' and 'outputs/' directories."
+        "Extracts a thresholded built-up-area mask from a nighttime-light GeoTIFF. Supply `threshold` for a "
+        "reproducible rule (valid NTL >= threshold); omit it only when the legacy perimeter change-point threshold "
+        "is intended. An optional polygon AOI uses pixel-centre containment. Declared NoData and non-finite values "
+        "are excluded while valid zeroes remain, and the tool writes a uint8 mask (1 built-up, 0 non-built, "
+        "255 NoData) plus JSON pixel-count/fraction/WGS84-geodesic area statistics in outputs/."
     ),
     args_schema=UrbanExtractionInput
 )

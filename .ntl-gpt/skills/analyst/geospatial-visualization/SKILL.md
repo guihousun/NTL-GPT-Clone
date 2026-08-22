@@ -1,5 +1,5 @@
 ---
-name: ntl-analyst-geospatial-visualization
+name: geospatial-visualization
 description: Generate evidence-linked nighttime-light maps and charts from validated analysis outputs without overstating visual patterns.
 ---
 

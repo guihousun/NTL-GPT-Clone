@@ -12,7 +12,15 @@ from uuid import uuid4
 from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.config import var_child_runnable_config
 from langchain_core.tools import StructuredTool
-from pydantic import BaseModel, ConfigDict, Field, create_model, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    create_model,
+    field_validator,
+    model_validator,
+)
 
 from contracts.agent_packages import (
     AnalysisPackage,
@@ -39,6 +47,7 @@ from orchestration.contracts_io import (
     validate_contract_payload,
 )
 from orchestration.artifact_runtime import (
+    ArtifactIdentityError,
     hydrate_local_artifact_identities,
     strip_model_facing_local_artifact_identity,
 )
@@ -448,6 +457,8 @@ def _normalize_nested_revision_identity(
 def _hydrate_contract_identity(
     contract: ContractEnvelope | dict[str, Any] | str,
     config: Optional[RunnableConfig],
+    *,
+    artifact_type: ArtifactType | None = None,
 ) -> dict[str, Any] | str:
     """Bind benchmark contracts to runtime identity and hydrate UI fallbacks.
 
@@ -474,17 +485,31 @@ def _hydrate_contract_identity(
         authoritative=authoritative,
     )
     thread_id = _resolve_thread_id(config)
+    effective_artifact_type = str(artifact_type or raw.get("artifact_type") or "").strip()
+    # TaskPlan.expected_outputs contains declarations of files that downstream
+    # work will create. They are not ArtifactRecords yet and therefore must not
+    # be measured at planning time. Other local references remain subject to
+    # the normal identity binding.
+    planned_outputs = (
+        raw.pop("expected_outputs", None)
+        if effective_artifact_type == "TaskPlan"
+        else None
+    )
     raw = hydrate_local_artifact_identities(
         raw,
         thread_id=thread_id,
         run_id=run_id,
         task_id=task_id,
-        fallback_workspace=(None if authoritative else storage_manager.get_workspace(thread_id)),
+        fallback_workspace=(
+            None if authoritative else storage_manager.get_workspace(thread_id)
+        ),
         # Full ContractEnvelope instances are trusted Python inputs.  Their
         # legacy identity fields are discarded and recomputed, while every
         # model-facing draft (including raw dictionaries) must omit them.
         reject_supplied_identity=not isinstance(contract, ContractEnvelope),
     )
+    if effective_artifact_type == "TaskPlan":
+        raw["expected_outputs"] = planned_outputs or []
     _expand_contract_package_handles(raw, thread_id=thread_id)
     return raw
 
@@ -567,7 +592,12 @@ def _effective_route_identity(
     )
 
 
-def _model_facing_result(result: dict[str, Any], *, thread_id: str) -> dict[str, Any]:
+def _model_facing_result(
+    result: dict[str, Any],
+    *,
+    thread_id: str,
+    allow_scientific_paths: bool = False,
+) -> dict[str, Any]:
     """Remove raw runtime identity and replace real package paths with handles."""
 
     if {"artifact_id", "artifact_type", "path", "sha256"}.issubset(result):
@@ -585,13 +615,27 @@ def _model_facing_result(result: dict[str, Any], *, thread_id: str) -> dict[str,
     for key, value in result.items():
         if key in {"run_id", "task_id"}:
             continue
-        if key == "path":
+        # System tool results may contain real audit paths. Scientific contract
+        # content may contain workspace-relative inputs/outputs paths needed by
+        # the next phase; validate_contract opts into those only below its
+        # already identity-stripped ``contract`` field.
+        if key == "path" and not allow_scientific_paths:
             continue
         if isinstance(value, dict):
-            public[key] = _model_facing_result(value, thread_id=thread_id)
+            public[key] = _model_facing_result(
+                value,
+                thread_id=thread_id,
+                allow_scientific_paths=(allow_scientific_paths or key == "contract"),
+            )
         elif isinstance(value, list):
             public[key] = [
-                _model_facing_result(item, thread_id=thread_id) if isinstance(item, dict) else item
+                _model_facing_result(
+                    item,
+                    thread_id=thread_id,
+                    allow_scientific_paths=allow_scientific_paths,
+                )
+                if isinstance(item, dict)
+                else item
                 for item in value
             ]
         else:
@@ -635,7 +679,81 @@ def _failure(tool: str, exc: Exception) -> dict[str, Any]:
     # Internal validators deliberately include exact paths and audit identity
     # in exceptions for runner-side diagnosis. Those details are not part of
     # the model contract: returning them would undo opaque identity isolation.
-    del exc
+    if isinstance(exc, ValidationError):
+        issues: list[dict[str, str]] = []
+        messages = {
+            "missing": "Required field is missing.",
+            "extra_forbidden": "Field is not accepted by this contract.",
+            "list_type": "Expected a list.",
+            "dict_type": "Expected an object.",
+            "string_type": "Expected text.",
+            "bool_type": "Expected true or false.",
+            "literal_error": "Value does not match the allowed contract value.",
+        }
+        for error in exc.errors(
+            include_url=False,
+            include_context=False,
+            include_input=False,
+        )[:6]:
+            location = ".".join(str(part) for part in error.get("loc", ())) or "contract"
+            error_type = str(error.get("type") or "value_error")
+            issues.append(
+                {
+                    "field": location,
+                    "type": error_type,
+                    "message": messages.get(error_type, "Field failed contract validation."),
+                }
+            )
+        return {
+            "status": "failed",
+            "tool": tool,
+            "error": {
+                "code": "CONTRACT_SCHEMA_INVALID",
+                "message": "The contract does not match the typed tool schema.",
+                "issues": issues,
+                "suggestion": (
+                    "Correct these fields in one complete draft and retry the same "
+                    "save once; do not create probe packages."
+                ),
+            },
+        }
+    if isinstance(exc, ArtifactIdentityError):
+        supplied_identity = "must be omitted" in str(exc)
+        return {
+            "status": "failed",
+            "tool": tool,
+            "error": {
+                "code": (
+                    "LOCAL_ARTIFACT_IDENTITY_IS_SYSTEM_MANAGED"
+                    if supplied_identity
+                    else "LOCAL_ARTIFACT_NOT_READY"
+                ),
+                "message": (
+                    "Local artifact checksums and byte counts are injected by the system."
+                    if supplied_identity
+                    else "A declared local artifact could not be bound to a ready workspace file."
+                ),
+                "suggestion": (
+                    "Remove sha256 and bytes from every inputs/outputs artifact "
+                    "record, keep only path, role, and media_type, then retry once."
+                    if supplied_identity
+                    else "Create and validate the declared workspace-relative file before saving the scientific package."
+                ),
+            },
+        }
+    if isinstance(exc, FileExistsError):
+        return {
+            "status": "failed",
+            "tool": tool,
+            "error": {
+                "code": "CONTRACT_IMMUTABLE_CONFLICT",
+                "message": "That contract identity was already persisted with different content.",
+                "suggestion": (
+                    "Reuse the earlier successful package handle; create a revision "
+                    "only for a genuine scientific change, not for schema probing."
+                ),
+            },
+        }
     return {
         "status": "failed",
         "tool": tool,
@@ -677,7 +795,11 @@ def _save_typed_contract(
             contract_to_hydrate = raw
         return _model_facing_result(
             save_contract(
-                _hydrate_contract_identity(contract_to_hydrate, config),
+                _hydrate_contract_identity(
+                    contract_to_hydrate,
+                    config,
+                    artifact_type=artifact_type,
+                ),
                 thread_id=thread_id,
                 expected_artifact_type=artifact_type,
             ),

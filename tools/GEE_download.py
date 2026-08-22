@@ -17,46 +17,14 @@ from langchain_core.runnables.config import var_child_runnable_config
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
+from gee_runtime import initialize_ee, resolve_gee_boundary_asset_project_id
 from storage_manager import current_thread_id, storage_manager
 
-_PROJECT_ID = (
-    os.getenv("GEE_DEFAULT_PROJECT_ID", "").strip()
-    or os.getenv("EE_PROJECT_ID", "").strip()
-    or "empyrean-caster-430308-m2"
-)
 BBoxLike = str | list[float] | tuple[float, float, float, float] | dict[str, float]
 
 
-def _get_streamlit_secret(name: str):
-    try:
-        st_obj = getattr(__import__("builtins"), "st", None)
-        if st_obj is not None and hasattr(st_obj, "secrets"):
-            return st_obj.secrets.get(name)
-    except Exception:
-        return None
-    return None
-
-
-def _ensure_ee_initialized() -> None:
-    sa_email = os.getenv("EE_SERVICE_ACCOUNT") or _get_streamlit_secret("EE_SERVICE_ACCOUNT")
-    sa_key_json = os.getenv("EE_PRIVATE_KEY_JSON") or _get_streamlit_secret("EE_PRIVATE_KEY_JSON")
-    if sa_email and sa_key_json:
-        creds = ee.ServiceAccountCredentials(sa_email, key_data=str(sa_key_json))
-        ee.Initialize(credentials=creds, project=_PROJECT_ID)
-        return
-
-    try:
-        if _PROJECT_ID:
-            ee.Initialize(project=_PROJECT_ID)
-        else:
-            ee.Initialize()
-    except Exception:
-        # For personal local use, fall back to interactive auth if no env-backed creds are available.
-        ee.Authenticate()
-        if _PROJECT_ID:
-            ee.Initialize(project=_PROJECT_ID)
-        else:
-            ee.Initialize()
+def _ensure_ee_initialized() -> str:
+    return initialize_ee(ee_module=ee)
 
 
 def _resolve_thread_id_from_config(config: Optional[RunnableConfig] = None) -> str:
@@ -405,11 +373,12 @@ def ntl_download_tool(
         bbox_values = _parse_bbox_input(bbox_input)
 
         _ensure_ee_initialized()
+        boundary_assets = f"projects/{resolve_gee_boundary_asset_project_id()}/assets"
 
-        national_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/World_countries")
-        province_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/province")
-        city_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/city")
-        county_collection = ee.FeatureCollection("projects/empyrean-caster-430308-m2/assets/county")
+        national_collection = ee.FeatureCollection(f"{boundary_assets}/World_countries")
+        province_collection = ee.FeatureCollection(f"{boundary_assets}/province")
+        city_collection = ee.FeatureCollection(f"{boundary_assets}/city")
+        county_collection = ee.FeatureCollection(f"{boundary_assets}/county")
         # Global administrative boundaries from geoBoundaries (GEE catalog).
         intl_country_collection = ee.FeatureCollection("WM/geoLab/geoBoundaries/600/ADM0")
         intl_province_collection = ee.FeatureCollection("WM/geoLab/geoBoundaries/600/ADM1")

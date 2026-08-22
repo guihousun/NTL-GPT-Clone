@@ -49,7 +49,7 @@ NTL_Trend_Analysis = StructuredTool.from_function(
     func=analyze_ntl_trend_masked_logic,
     name="Analyze_NTL_trend",
     description=(
-        "Advanced tool for pixel-level trend analysis (Mann-Kendall & Sen's Slope). "
+        "Advanced tool for pixel-level trend analysis using a Theil-Sen median pairwise slope and a two-sided Kendall tau-b p-value (not OLS). "
         "It uses a vector file (SHP/JSON) to mask the research area for higher accuracy and speed. "
         "Inputs: a chronological list of NTL rasters and a boundary vector file. "
         "Outputs: 1) A Slope TIF (change rate), 2) A P-value TIF (significance), 3) A PNG map preview. "

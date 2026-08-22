@@ -12,7 +12,8 @@ import app_agents
 import app_state
 import file_context_service
 import history_store
-from runtime_governance import build_run_limit_snapshot
+from gee_runtime import GEEProjectConfigurationError, bind_gee_runtime, resolve_gee_project_id
+from runtime_governance import build_run_limit_snapshot, build_runtime_metadata
 from storage_manager import current_thread_id, storage_manager
 
 
@@ -662,6 +663,23 @@ def _build_run_payload(user_question: str, run_thread_id: str) -> tuple[dict, di
     return state, config
 
 
+def _resolve_run_gee_profile(user_id: str) -> tuple[str, str, str]:
+    """Return the single deployment GEE profile used by this candidate.
+
+    The Earth Engine Python client is process-global. Until client isolation is
+    implemented, per-user rows must not switch projects inside a shared app.
+    """
+
+    del user_id
+
+    try:
+        return resolve_gee_project_id(), "default", "deployment_default"
+    except GEEProjectConfigurationError:
+        # Local-only tasks remain runnable.  A GEE tool invocation will fail
+        # closed with GEE_PROJECT_NOT_CONFIGURED instead of blocking the app.
+        return "", "default", "unconfigured"
+
+
 def start_user_run(user_question: str) -> dict[str, Any]:
     _ensure_runtime_state_defaults()
     question = str(user_question or "").strip()
@@ -691,6 +709,15 @@ def start_user_run(user_question: str) -> dict[str, Any]:
 
     run_id = uuid.uuid4().hex
     state, config = _build_run_payload(question, run_thread_id)
+    gee_project_id, gee_pipeline_mode, gee_profile_source = _resolve_run_gee_profile(run_user_id)
+    runtime_metadata = build_runtime_metadata(
+        user_id=run_user_id,
+        thread_id=run_thread_id,
+        gee_pipeline_mode=gee_pipeline_mode,
+        gee_project_id=gee_project_id,
+        gee_profile_source=gee_profile_source,
+    )
+    config["metadata"] = runtime_metadata
     now = time.time()
     control = {
         "run_id": run_id,
@@ -709,6 +736,10 @@ def start_user_run(user_question: str) -> dict[str, Any]:
         "end_ts": None,
         "ui_lang": str(st.session_state.get("ui_lang", "EN") or "EN"),
         "analysis_logs": [],
+        "gee_project_id": gee_project_id,
+        "gee_pipeline_mode": gee_pipeline_mode,
+        "gee_profile_source": gee_profile_source,
+        "runtime_metadata": runtime_metadata,
     }
     with _RUN_REGISTRY_LOCK:
         active_run_id = _THREAD_ACTIVE_RUN.get(run_thread_id)
@@ -777,55 +808,60 @@ def _worker_run_main(run_id: str) -> None:
     run_exception = None
     start_ts = float(control.get("start_ts") or time.time())
 
-    _emit_run_event(run_id, "status", {"state": "running"})
+    runtime_metadata = dict(control.get("runtime_metadata") or {})
+    _emit_run_event(run_id, "status", {"state": "running", "runtime_metadata": runtime_metadata})
     token = current_thread_id.set(run_thread_id)
     try:
-        seen_message_fingerprints: set[str] = set()
-        for existing_msg in _get_state_messages(conversation, config):
-            if isinstance(existing_msg, BaseMessage):
-                seen_message_fingerprints.add(_message_fingerprint(existing_msg))
+        with bind_gee_runtime(
+            str(control.get("gee_project_id") or ""),
+            str(control.get("gee_profile_source") or "deployment_default"),
+        ):
+            seen_message_fingerprints: set[str] = set()
+            for existing_msg in _get_state_messages(conversation, config):
+                if isinstance(existing_msg, BaseMessage):
+                    seen_message_fingerprints.add(_message_fingerprint(existing_msg))
 
-        for mode, payload, namespace in _iter_events(conversation, state, config):
-            now = time.time()
-            with _RUN_REGISTRY_LOCK:
-                inner = _RUN_REGISTRY.get(run_id)
-                if not inner:
-                    interrupted_reason = "run_lost"
-                    break
-                inner["heartbeat_ts"] = now
-                if bool(inner.get("stop_requested")):
-                    interrupted_reason = "user_cancel"
-                    break
+            for mode, payload, namespace in _iter_events(conversation, state, config):
+                now = time.time()
+                with _RUN_REGISTRY_LOCK:
+                    inner = _RUN_REGISTRY.get(run_id)
+                    if not inner:
+                        interrupted_reason = "run_lost"
+                        break
+                    inner["heartbeat_ts"] = now
+                    if bool(inner.get("stop_requested")):
+                        interrupted_reason = "user_cancel"
+                        break
 
-            if mode == "messages":
-                continue
+                if mode == "messages":
+                    continue
 
-            if mode == "custom":
-                if isinstance(payload, dict):
-                    if payload.get("event_type") == "kb_progress":
-                        log_event = {"kb_progress": [payload]}
-                    else:
-                        log_event = {"custom": [payload]}
-                    with _RUN_REGISTRY_LOCK:
-                        inner = _RUN_REGISTRY.get(run_id)
-                        if inner is not None:
-                            inner["analysis_logs"].append(log_event)
-                    _emit_run_event(run_id, "reasoning_custom", {"log_event": log_event})
-                continue
+                if mode == "custom":
+                    if isinstance(payload, dict):
+                        if payload.get("event_type") == "kb_progress":
+                            log_event = {"kb_progress": [payload]}
+                        else:
+                            log_event = {"custom": [payload]}
+                        with _RUN_REGISTRY_LOCK:
+                            inner = _RUN_REGISTRY.get(run_id)
+                            if inner is not None:
+                                inner["analysis_logs"].append(log_event)
+                        _emit_run_event(run_id, "reasoning_custom", {"log_event": log_event})
+                    continue
 
-            delta_messages = _collect_new_messages(payload, seen_message_fingerprints)
-            if not delta_messages:
-                continue
-            delta_event = {"messages": delta_messages}
-            with _RUN_REGISTRY_LOCK:
-                inner = _RUN_REGISTRY.get(run_id)
-                if inner is not None:
-                    inner["analysis_logs"].append(delta_event)
-            _emit_run_event(run_id, "reasoning_delta", {"log_event": delta_event})
-            last_event = delta_event
-            candidate = _extract_meaningful_ai_text(delta_messages)
-            if candidate:
-                final_answer = candidate
+                delta_messages = _collect_new_messages(payload, seen_message_fingerprints)
+                if not delta_messages:
+                    continue
+                delta_event = {"messages": delta_messages}
+                with _RUN_REGISTRY_LOCK:
+                    inner = _RUN_REGISTRY.get(run_id)
+                    if inner is not None:
+                        inner["analysis_logs"].append(delta_event)
+                _emit_run_event(run_id, "reasoning_delta", {"log_event": delta_event})
+                last_event = delta_event
+                candidate = _extract_meaningful_ai_text(delta_messages)
+                if candidate:
+                    final_answer = candidate
     except Exception as err:  # noqa: BLE001
         run_exception = err
     finally:
@@ -895,6 +931,7 @@ def _worker_run_main(run_id: str) -> None:
                 "tool_calls_by_name": counts,
                 "status": status,
                 "duration_s": round(elapsed_s, 3),
+                "runtime_metadata": runtime_metadata,
             },
         )
         history_store.touch_thread_activity(

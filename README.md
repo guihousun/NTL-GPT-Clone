@@ -35,7 +35,7 @@ The interface keeps conversation, agent reasoning, data inputs, generated output
 | Capability | Included workflows |
 |---|---|
 | NTL data retrieval | NPP-VIIRS, NPP-VIIRS-like, DMSP-OLS, VNP46A1, VNP46A2, SDGSAT-1 |
-| Cloud processing | GEE catalog planning, direct export, batch export, server-side reduction |
+| Cloud processing | GEE catalog planning, direct export, batch export, and server-side reduction planning (execution only through registered bounded host tools) |
 | Official acquisition | Earthdata/CMR HDF5 retrieval, country or BBox download, mosaicking, progress and audit manifests |
 | Local GIS | Validation, reprojection, clipping, mosaicking, zonal statistics, NTL metrics, trend and anomaly analysis |
 | Agent workflows | Data Searcher, optional Code Assistant review, and NTL Engineer orchestration |
@@ -102,14 +102,33 @@ For GEE and official Earthdata downloads, also configure:
 
 ```env
 GEE_DEFAULT_PROJECT_ID=your_gee_project
+GEE_BOUNDARY_ASSET_PROJECT_ID=your_boundary_asset_project  # optional
 EARTHDATA_TOKEN=your_earthdata_token
 ```
 
 Never commit `.env`, API keys, database passwords, Earthdata tokens, or Earth Engine credentials.
 
+Earth Engine runtime configuration is resolved once by `gee_runtime.py`: an explicit
+system override, the current run's bound deployment profile, then `GEE_DEFAULT_PROJECT_ID` from
+the process or repository `.env`. Formal tools never start interactive OAuth and never
+initialize Earth Engine without an explicit project. Use EasyGEE for local authorization
+and preflight checks; NTL-GPT does not import EasyGEE's plugin cache or silently read its
+settings while serving a run.
+The quota/runtime project and private Earth Engine asset ownership are separate.
+Set `GEE_BOUNDARY_ASSET_PROJECT_ID` when `World_countries`, `province`, `city`,
+and `county` live outside the runtime project; otherwise it defaults to the
+runtime project.
+The current candidate deliberately uses one deployment Earth Engine project and
+one credential source for every run. Credentials come from the paired
+`EE_SERVICE_ACCOUNT`/`EE_PRIVATE_KEY_JSON` environment variables when configured,
+otherwise from the host's ambient Earth Engine authorization. Per-user project and
+OAuth profile rows do not switch the shared Python client because it is process-global.
+
 ### 3. Validate and launch
 
 ```powershell
+python -m pip install --no-deps -e .\packages\ntl_toolkit
+python -c "import pathlib, ntl_toolkit; root=pathlib.Path.cwd().resolve(); origin=pathlib.Path(ntl_toolkit.__file__).resolve(); assert origin.is_relative_to((root/'packages'/'ntl_toolkit').resolve()), origin; print(origin)"
 python check_env.py
 python -m streamlit run Streamlit.py --server.address 127.0.0.1 --server.port 8501
 ```

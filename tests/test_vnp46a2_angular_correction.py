@@ -39,6 +39,10 @@ def test_fixed_contract_and_qa_rule_are_explicit():
     with pytest.raises(ValueError, match="on or before"):
         _validate_dates("2024-01-01", "2025-01-01", "2024-01-02")
 
+    schema = VNP46A2_angular_correction_tool.args_schema.model_json_schema()
+    assert "project" not in schema["properties"]
+    assert "output_asset_id" not in schema.get("required", [])
+
 
 def test_module_has_no_interactive_auth_or_local_raster_download():
     source = Path(__file__).parents[1].joinpath("tools", "VNP46A2_angular_correction.py").read_text(
@@ -74,10 +78,10 @@ def test_initialization_failure_writes_fail_closed_metadata(tmp_path, monkeypatc
         lambda _project: (_ for _ in ()).throw(RuntimeError("no Earth Engine credentials")),
     )
     result = run_vnp46a2_angular_correction(
-        output_asset_id="projects/example/assets/q19_output",
         wait_for_completion=False,
     )
     assert result["status"] == "error"
     assert result["error_type"] == "RuntimeError"
+    assert "output_asset_id is required" not in result["message"]
     assert result["local_raster_download_performed"] is False
     assert metadata_path.is_file()
