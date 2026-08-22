@@ -1,0 +1,87 @@
+{
+  "schema_version": "ntl-gpt.dei.runtime-deployment-validation.v1",
+  "validated_at": "2026-08-09",
+  "status": "pass-deployed-local-default",
+  "approval": "explicit user confirmation in active task; documented minor limitations accepted for project use",
+  "deployment": {
+    "candidate": {
+      "path": "D:\\NTL-GPT-main\\experiments\\dei_model_rebuild\\results\\yearly_dei_models_longntl_candidate.json",
+      "sha256": "B69BA93BC998A5AEE494F05E0C6E7BBEA4DF73497F26FE586364BD8FD0ABA328"
+    },
+    "deployed_record": {
+      "path": "D:\\NTL-GPT-main\\experiments\\dei_model_rebuild\\results\\yearly_dei_models_longntl_deployed.json",
+      "sha256": "85272B1E694ADE2CCBA44A8922AF51295FBA2C243AA6C003A582B4B3DE87FE82"
+    },
+    "runtime_target": {
+      "path": "D:\\NTL-GPT-main\\base_data\\Model\\yearly_dei_models.json",
+      "sha256": "85272B1E694ADE2CCBA44A8922AF51295FBA2C243AA6C003A582B4B3DE87FE82",
+      "byte_identical_to_deployed_record": true
+    },
+    "previous_default_backup": {
+      "path": "D:\\NTL-GPT-main\\experiments\\dei_model_rebuild\\results\\yearly_dei_models_default_before_longntl_20260809.json",
+      "sha256": "DA421D90180A555321C92AFE5494EEED0E9ADC82CC4316A2C62F0C2A225EFAAE",
+      "artifact_type": "reconstructed-from-paper"
+    },
+    "manifest": {
+      "path": "D:\\NTL-GPT-main\\experiments\\dei_model_rebuild\\results\\longntl_deployment_manifest.json",
+      "sha256": "7773444055F8375F2176DE5C6C25F42108B71322D133AB5D18A9E77266A9D6B5"
+    }
+  },
+  "default_runtime_checks": {
+    "valid_2020": {
+      "input": {"tntl": 208539.345319515, "year": 2020},
+      "predicted_dei": 77.75612542022702,
+      "model_provenance": "retrained",
+      "artifact_status": "deployed-local-default",
+      "formula_form": "quadratic",
+      "status": "pass"
+    },
+    "valid_2024": {
+      "input": {"tntl": 300000.0, "year": 2024},
+      "predicted_dei": 86.29225415187143,
+      "model_provenance": "retrained",
+      "artifact_status": "deployed-local-default",
+      "formula_form": "quadratic",
+      "status": "pass"
+    },
+    "antl": {"status": "expected-schema-failure-pass"},
+    "missing_year": {"status": "expected-schema-failure-pass"},
+    "unsupported_2025": {"status": "expected-failure-pass"},
+    "out_of_training_range": {"status": "expected-failure-pass"}
+  },
+  "tests": {
+    "experiment_unittest": {"passed": 32, "failed": 0},
+    "runtime_pytest": {"passed": 44, "failed": 0},
+    "total_targeted_tests": 76,
+    "deployment_check_mode": "pass",
+    "default_runtime_direct_invocation": "pass"
+  },
+  "regression_cases": [
+    {
+      "case_id": "dei_default_runtime_explicit_tntl_year",
+      "status": "pass",
+      "evidence": "Default model path returned retrained/deployed-local-default for explicit 2020 and 2024 TNTL inputs."
+    },
+    {
+      "case_id": "dei_antl_and_missing_year_rejected",
+      "status": "pass",
+      "evidence": "StructuredTool input schema rejected ANTL and an omitted model year."
+    },
+    {
+      "case_id": "dei_unavailable_year_and_range_gate",
+      "status": "pass",
+      "evidence": "Year 2025 and TNTL outside the observed 2020 range failed explicitly."
+    },
+    {
+      "case_id": "script_outputs_workspace_only",
+      "status": "not_run",
+      "evidence": "Checklist case is not applicable: this was an explicitly approved model deployment to the declared repository runtime path, not a generated thread-workspace analysis script."
+    }
+  ],
+  "remaining_non_blocking_limitations": [
+    "private boundary source, licence, and reference year remain unresolved",
+    "one static boundary layer is used across 2017-2024",
+    "same-key H3C IndexYear and LongNTL year pairing follows the user's accepted project convention",
+    "2020 Jiangsu values are in-sample fitted values"
+  ]
+}

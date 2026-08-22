@@ -148,217 +148,398 @@ NTL_estimate_indicator_provincial_tool = StructuredTool.from_function(
 
 import os
 import pickle
+import json
+import math
+from numbers import Integral
 import numpy as np
-from typing import Optional
 from langchain_core.tools import StructuredTool
-from pydantic.v1 import BaseModel, Field
+from pydantic.v1 import BaseModel, Field, StrictInt
 
 class DEI_Estimate_City_Input(BaseModel):
-    antl: float = Field(..., description="Annual Nighttime Light (ANTL) value for the city")
-    year: Optional[int] = Field(None, description="Year of estimation, must be between 2017 and 2024 inclusive")
+    tntl: float = Field(
+        ...,
+        description=(
+            "City total nighttime light (TNTL), not average nighttime light (ANTL). "
+            "TNTL must be finite and greater than zero."
+        ),
+    )
+    year: StrictInt = Field(..., description="Model year. Availability is defined by the deployed JSON artifact.")
 
-def DEI_estimate_city(antl: float, year: Optional[int] = None):
-    """
-    Estimate city-level DEI from ANTL (optionally for a given year).
-    Supports two saved formats:
-      1) a single saved model file (e.g. base_data/best_model_dei_city.pkl) containing either:
-         - a model/pipeline object, or
-         - a dict {'model': model, 'scaler': scaler, 'poly': poly (optional)}
-      2) a yearly models file (e.g. base_data/yearly_dei_models.pkl) containing a dict:
-         { year_int: {'model': model, 'scaler': scaler, ...}, ... }
-    If a yearly models dict is found and year is not provided, the function will choose the latest year available.
-    Returns a structured dict with prediction or an informative error message.
-    """
-    # Candidate paths (adjust if your files live elsewhere)
-    yearly_candidates = [
-        storage_manager.shared_dir / "Model" / "yearly_dei_models.pkl",
-        Path("base_data/Model/yearly_dei_models.pkl"),
+    class Config:
+        extra = "forbid"
+
+
+_DEI_SCHEMA_VERSION_V1 = "ntl-gpt.dei.yearly-formula.v1"
+_DEI_SCHEMA_VERSION_V2 = "ntl-gpt.dei.yearly-formula.v2"
+# Backward-compatible module constant used by the original transparent format.
+_DEI_SCHEMA_VERSION = _DEI_SCHEMA_VERSION_V1
+_DEI_ARTIFACT_TYPES = {
+    "reconstructed-from-paper",
+    "retrained",
+    "recovered-original-model",
+}
+_DEI_V2_PARAMETER_KEYS = {
+    "linear": frozenset({"a", "b"}),
+    "logarithmic": frozenset({"a", "b"}),
+    "quadratic": frozenset({"a", "b", "c"}),
+    "exponential": frozenset({"a", "b"}),
+}
+
+
+def _dei_model_candidates():
+    """Return deterministic locations for the transparent DEI formula artifact."""
+    candidates = [
+        storage_manager.shared_dir / "Model" / "yearly_dei_models.json",
+        Path(__file__).resolve().parent.parent / "base_data" / "Model" / "yearly_dei_models.json",
+        Path.cwd() / "base_data" / "Model" / "yearly_dei_models.json",
     ]
-    yearly_path = next((str(p) for p in yearly_candidates if Path(p).exists()), str(yearly_candidates[0]))
+    unique = []
+    seen = set()
+    for candidate in candidates:
+        resolved = str(Path(candidate).resolve())
+        if resolved not in seen:
+            seen.add(resolved)
+            unique.append(Path(candidate))
+    return unique
 
-    saved = None
-    used_path = None
 
-    # Prefer yearly models if exists
-    if os.path.exists(yearly_path):
-        used_path = yearly_path
-        try:
-            with open(yearly_path, 'rb') as f:
-                saved = pickle.load(f)
-        except Exception as e:
-            return {"error": True, "message": f"Error loading yearly models file '{yearly_path}': {e}"}
+def _dei_finite_number(value, context):
+    """Return a finite float while rejecting booleans and JSON strings."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{context} must be a JSON number")
+    numeric = float(value)
+    if not math.isfinite(numeric):
+        raise ValueError(f"{context} must be finite")
+    return numeric
+
+
+def _validate_dei_training_range(entry, context, *, required):
+    """Validate an inclusive positive TNTL applicability domain."""
+    raw_range = entry.get("training_tntl_range")
+    if raw_range is None:
+        if required:
+            raise ValueError(f"{context} is retrained but training_tntl_range is missing")
+        return None
+    if not isinstance(raw_range, dict):
+        raise ValueError(f"{context}.training_tntl_range must be an object")
+    if set(raw_range) != {"min", "max"}:
+        raise ValueError(
+            f"{context}.training_tntl_range must contain exactly 'min' and 'max'"
+        )
+    minimum = _dei_finite_number(raw_range["min"], f"{context}.training_tntl_range.min")
+    maximum = _dei_finite_number(raw_range["max"], f"{context}.training_tntl_range.max")
+    if minimum <= 0 or maximum <= 0:
+        raise ValueError(f"{context}.training_tntl_range bounds must be greater than zero")
+    if minimum > maximum:
+        raise ValueError(f"{context}.training_tntl_range.min must not exceed max")
+    return minimum, maximum
+
+
+def _validate_dei_year_key(raw_year, seen_years):
+    """Require canonical four-digit JSON year keys and prevent aliases."""
+    if not isinstance(raw_year, str) or len(raw_year) != 4 or not raw_year.isascii() or not raw_year.isdigit():
+        raise ValueError(f"model key {raw_year!r} must be a canonical four-digit year string")
+    year = int(raw_year)
+    if str(year) != raw_year:
+        raise ValueError(f"model key {raw_year!r} is not canonical")
+    if year in seen_years:
+        raise ValueError(f"duplicate model year {year}")
+    seen_years.add(year)
+    return year
+
+
+def _validate_dei_v1_model(entry, context, *, require_range):
+    if entry.get("form") != "a * ln(TNTL) + b":
+        raise ValueError(f"{context} has an unsupported v1 form")
+    for key in ("coefficient", "intercept"):
+        _dei_finite_number(entry.get(key), f"{context}.{key}")
+    _validate_dei_training_range(entry, context, required=require_range)
+
+
+def _validate_dei_v2_model(entry, context, *, require_range):
+    form = entry.get("form")
+    if form not in _DEI_V2_PARAMETER_KEYS:
+        raise ValueError(
+            f"{context}.form must be one of {sorted(_DEI_V2_PARAMETER_KEYS)}"
+        )
+    parameters = entry.get("parameters")
+    if not isinstance(parameters, dict):
+        raise ValueError(f"{context}.parameters must be an object")
+    expected_keys = _DEI_V2_PARAMETER_KEYS[form]
+    if set(parameters) != expected_keys:
+        raise ValueError(
+            f"{context}.parameters for {form!r} must contain exactly {sorted(expected_keys)}"
+        )
+    for key in sorted(expected_keys):
+        _dei_finite_number(parameters[key], f"{context}.parameters.{key}")
+    training_range = _validate_dei_training_range(entry, context, required=require_range)
+
+    if "model_type" in entry and entry["model_type"] != form:
+        raise ValueError(f"{context}.model_type must equal form")
+    expected_equations = {
+        "linear": "a * TNTL + b",
+        "logarithmic": "a * ln(TNTL) + b",
+        "quadratic": "a * TNTL^2 + b * TNTL + c",
+        "exponential": "b * exp(a * TNTL)",
+    }
+    if "equation" in entry and entry["equation"] != expected_equations[form]:
+        raise ValueError(f"{context}.equation is inconsistent with form {form!r}")
+
+    training = entry.get("training")
+    if training is not None:
+        if not isinstance(training, dict) or not isinstance(training.get("tntl_range"), dict):
+            raise ValueError(f"{context}.training.tntl_range must be an object")
+        audit_range = training["tntl_range"]
+        if not {"min", "max"}.issubset(audit_range):
+            raise ValueError(f"{context}.training.tntl_range must contain min and max")
+        audit_min = _dei_finite_number(audit_range["min"], f"{context}.training.tntl_range.min")
+        audit_max = _dei_finite_number(audit_range["max"], f"{context}.training.tntl_range.max")
+        if training_range is None or (audit_min, audit_max) != training_range:
+            raise ValueError(
+                f"{context}.training.tntl_range must match training_tntl_range"
+            )
+
+
+def _dei_unique_json_object(pairs):
+    """Reject duplicate JSON keys instead of silently keeping the last value."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON object key {key!r}")
+        result[key] = value
+    return result
+
+
+def _load_dei_formula_artifact(path):
+    """Load and strictly validate a non-executable JSON coefficient artifact."""
+    with Path(path).open("r", encoding="utf-8") as stream:
+        artifact = json.load(stream, object_pairs_hook=_dei_unique_json_object)
+
+    if not isinstance(artifact, dict):
+        raise ValueError("artifact root must be a JSON object")
+    schema_version = artifact.get("schema_version")
+    if schema_version not in {_DEI_SCHEMA_VERSION_V1, _DEI_SCHEMA_VERSION_V2}:
+        raise ValueError(
+            f"unsupported schema_version {schema_version!r}; expected one of "
+            f"{[_DEI_SCHEMA_VERSION_V1, _DEI_SCHEMA_VERSION_V2]}"
+        )
+    artifact_type = artifact.get("artifact_type")
+    if artifact_type not in _DEI_ARTIFACT_TYPES:
+        raise ValueError("artifact_type must state recovered, retrained, or reconstructed provenance")
+    if schema_version == _DEI_SCHEMA_VERSION_V1:
+        if not isinstance(artifact.get("source"), dict) or not artifact["source"]:
+            raise ValueError("source provenance metadata is missing")
     else:
-        return {"error": True, "message": f"Yearly models file '{yearly_path}' not found. Place your model file in 'base_data/Model/'."}
+        if "artifact_id" in artifact and (
+            not isinstance(artifact["artifact_id"], str) or not artifact["artifact_id"].strip()
+        ):
+            raise ValueError("v2 artifact_id, when present, must be a non-empty string")
+        has_source = isinstance(artifact.get("source"), dict) and bool(artifact["source"])
+        has_inputs = isinstance(artifact.get("inputs"), dict) and bool(artifact["inputs"])
+        if not has_source and not has_inputs:
+            raise ValueError("v2 source or inputs provenance metadata is missing")
 
-    # If saved appears to be a yearly dict (keys are years)
-    model = None
-    scaler = None
-    poly = None
+    feature = artifact.get("feature")
+    if not isinstance(feature, dict):
+        raise ValueError("feature metadata is missing")
+    if feature.get("name") != "TNTL":
+        raise ValueError("feature.name must be 'TNTL'; ANTL artifacts are incompatible")
+    if feature.get("antl_is_accepted") is True:
+        raise ValueError("feature.antl_is_accepted must not be true; ANTL is incompatible")
+    if schema_version == _DEI_SCHEMA_VERSION_V1:
+        if feature.get("transform") != "natural_log":
+            raise ValueError("v1 feature.transform must be 'natural_log'")
+    elif "transform" in feature and feature["transform"] not in {
+        "identity",
+        "model-specific",
+    }:
+        raise ValueError("v2 feature.transform, when present, must be 'identity' or 'model-specific'")
 
-    if isinstance(saved, dict):
-        # Check whether this dict looks like a yearly dictionary (keys are years mapping to model dicts)
-        keys = list(saved.keys())
-        year_like = False
-        if keys:
-            try:
-                int(keys[0])
-                year_like = True
-            except Exception:
-                year_like = False
-
-        if year_like:
-            # saved is a mapping year->model_info
-            yearly_models = {}
-            for k, v in saved.items():
-                try:
-                    ky = int(k)
-                except Exception:
-                    continue
-                yearly_models[ky] = v
-
-            if not yearly_models:
-                return {"error": True, "message": f"Yearly models file '{used_path}' contains no integer year keys."}
-
-            # choose year
-            if year is None:
-                selected_year = max(yearly_models.keys())
-            else:
-                selected_year = int(year)
-                if selected_year not in yearly_models:
-                    available = sorted(yearly_models.keys())
-                    return {
-                        "error": True,
-                        "message": f"Requested year {selected_year} not available in yearly models. Available years: {available}."
-                    }
-
-            entry = yearly_models[selected_year]
-            # entry may itself be a dict like {'model':..., 'scaler':...} or may be the model directly
-            if isinstance(entry, dict):
-                model = entry.get('model') or entry.get('pipeline') or entry.get('estimator')
-                scaler = entry.get('scaler')
-                poly = entry.get('poly') or entry.get('poly_transformer')
-                if model is None and len(entry) == 1:
-                    model = list(entry.values())[0]
-            else:
-                model = entry
+    models = artifact.get("models")
+    if not isinstance(models, dict) or not models:
+        raise ValueError("models must be a non-empty year-to-formula object")
+    seen_years = set()
+    require_range = artifact_type == "retrained"
+    for raw_year, entry in models.items():
+        _validate_dei_year_key(raw_year, seen_years)
+        if not isinstance(entry, dict):
+            raise ValueError(f"model entry {raw_year!r} must be an object")
+        context = f"model entry {raw_year!r}"
+        if schema_version == _DEI_SCHEMA_VERSION_V1:
+            _validate_dei_v1_model(entry, context, require_range=require_range)
         else:
-            # Not a yearly dict: assume a single model saved as dict with 'model' key
-            model = saved.get('model') or saved.get('pipeline') or saved.get('estimator')
-            scaler = saved.get('scaler')
-            poly = saved.get('poly') or saved.get('poly_transformer')
-            if model is None and hasattr(saved, 'predict'):
-                model = saved
-    else:
-        # saved is not a dict, assume it's a model/pipeline directly
-        if hasattr(saved, 'predict') or hasattr(saved, 'transform'):
-            model = saved
+            _validate_dei_v2_model(entry, context, require_range=require_range)
+    for field in ("warnings", "limitations"):
+        values = artifact.get(field, [])
+        if not isinstance(values, list) or not all(
+            isinstance(item, str) for item in values
+        ):
+            raise ValueError(f"{field} must be a list of strings")
+    status = artifact.get("status")
+    if status is not None and (
+        not isinstance(status, str) or not status.strip()
+    ):
+        raise ValueError("status, when present, must be a non-empty string")
+    return artifact
 
-    if model is None:
-        return {"error": True, "message": f"Loaded object from '{used_path}' does not contain a usable model."}
 
-    # Prepare inputs
-    X_antl = np.array([[float(antl)]], dtype=float)
-    X_antl_year = None
-    if year is not None:
-        X_antl_year = np.array([[float(antl), float(year)]], dtype=float)
+def _dei_normalized_model_spec(artifact, entry):
+    """Normalize v1 and v2 entries without executing serialized code."""
+    if artifact["schema_version"] == _DEI_SCHEMA_VERSION_V1:
+        return "logarithmic", {
+            "a": float(entry["coefficient"]),
+            "b": float(entry["intercept"]),
+        }
+    return entry["form"], {
+        key: float(value) for key, value in entry["parameters"].items()
+    }
 
-    # Helper to try prediction and capture errors
-    def try_predict(inp):
-        pred = model.predict(inp)
-        if hasattr(pred, '__len__'):
-            return float(pred[0])
-        else:
-            return float(pred)
 
-    debug_errors = []
-    predicted = None
+def _evaluate_dei_formula(form, parameters, tntl):
+    """Evaluate one of the four transparent, validated formula families."""
+    if form == "linear":
+        predicted = parameters["a"] * tntl + parameters["b"]
+        display = "DEI = {a:g} * TNTL {sign} {b_abs:g}"
+    elif form == "logarithmic":
+        predicted = parameters["a"] * math.log(tntl) + parameters["b"]
+        display = "DEI = {a:g} * ln(TNTL) {sign} {b_abs:g}"
+    elif form == "quadratic":
+        predicted = parameters["a"] * tntl**2 + parameters["b"] * tntl + parameters["c"]
+        display = "DEI = {a:g} * TNTL^2 {b_sign} {b_abs:g} * TNTL {c_sign} {c_abs:g}"
+    elif form == "exponential":
+        predicted = parameters["b"] * math.exp(parameters["a"] * tntl)
+        display = "DEI = {b:g} * exp({a:g} * TNTL)"
+    else:  # Defensive; the artifact validator rejects this before evaluation.
+        raise ValueError(f"unsupported DEI formula form {form!r}")
 
-    # 1) If model has n_features_in_ use it
+    if not math.isfinite(predicted):
+        raise ValueError("formula produced a non-finite result")
+    values = {
+        "a": parameters.get("a", 0.0),
+        "b": parameters.get("b", 0.0),
+        "b_abs": abs(parameters.get("b", 0.0)),
+        "sign": "+" if parameters.get("b", 0.0) >= 0 else "-",
+        "b_sign": "+" if parameters.get("b", 0.0) >= 0 else "-",
+        "c_abs": abs(parameters.get("c", 0.0)),
+        "c_sign": "+" if parameters.get("c", 0.0) >= 0 else "-",
+    }
+    return float(predicted), display.format(**values)
+
+
+def DEI_estimate_city(tntl: float, year: int):
+    """Estimate city DEI from positive TNTL using the explicitly selected yearly formula."""
     try:
-        if hasattr(model, 'n_features_in_'):
-            n_in = int(getattr(model, 'n_features_in_'))
-            if n_in == 1:
-                try:
-                    if scaler is not None:
-                        X_scaled = scaler.transform(X_antl)
-                        if poly is not None:
-                            X_scaled = poly.transform(X_scaled)
-                        predicted = try_predict(X_scaled)
-                    else:
-                        predicted = try_predict(X_antl)
-                except Exception as e:
-                    debug_errors.append(f"n_in==1 attempt failed: {e}")
-            elif n_in == 2:
-                if X_antl_year is None:
-                    return {"error": True, "message": "Model expects two features (likely ANTL and year). Please provide 'year'."}
-                try:
-                    if scaler is not None and not hasattr(model, 'named_steps'):
-                        try:
-                            scaled_antl = scaler.transform(np.array([[float(antl)]]))
-                            X_comb = np.hstack([scaled_antl, np.array([[float(year)]])])
-                            if poly is not None:
-                                X_comb = poly.transform(X_comb)
-                            predicted = try_predict(X_comb)
-                        except Exception as inner_e:
-                            debug_errors.append(f"n_in==2 scaler path failed: {inner_e}")
-                            predicted = try_predict(X_antl_year)
-                    else:
-                        predicted = try_predict(X_antl_year)
-                except Exception as e:
-                    debug_errors.append(f"n_in==2 attempt failed: {e}")
-            else:
-                debug_errors.append(f"Model expects {n_in} features, falling back to pipeline/DataFrame attempts.")
-    except Exception as e:
-        debug_errors.append(f"n_features_in_ check error: {e}")
+        if isinstance(tntl, bool):
+            raise ValueError("boolean values are not valid TNTL")
+        tntl_value = float(tntl)
+    except (TypeError, ValueError) as exc:
+        return {"error": True, "message": f"Invalid TNTL feature: {exc}."}
+    if not math.isfinite(tntl_value) or tntl_value <= 0:
+        return {
+            "error": True,
+            "message": "Invalid TNTL feature: 'tntl' must be finite and greater than zero.",
+        }
 
-    # 2) If model is a pipeline, try DataFrame approach
-    if predicted is None:
-        try:
-            if hasattr(model, 'named_steps') or 'pipeline' in str(type(model)).lower():
-                try:
-                    import pandas as pd
-                    df_try = pd.DataFrame({
-                        'ANTL': [float(antl)],
-                        'antl': [float(antl)],
-                        'year': [int(year)] if year is not None else [np.nan]
-                    })
-                    predicted = try_predict(df_try)
-                except Exception as e:
-                    debug_errors.append(f"pipeline DataFrame attempt failed: {e}")
-        except Exception as e:
-            debug_errors.append(f"pipeline check error: {e}")
+    if isinstance(year, bool) or not isinstance(year, Integral):
+        return {"error": True, "message": "Invalid model year: 'year' must be an integer."}
+    selected_year = int(year)
 
-    # 3) Fallback numeric attempts with scaler/poly
-    if predicted is None:
-        try:
-            if scaler is not None and poly is None:
-                X_scaled = scaler.transform(X_antl)
-                predicted = try_predict(X_scaled)
-            elif scaler is not None and poly is not None:
-                X_scaled = scaler.transform(X_antl)
-                X_poly = poly.transform(X_scaled)
-                predicted = try_predict(X_poly)
-            else:
-                predicted = try_predict(X_antl)
-        except Exception as e:
-            debug_errors.append(f"numeric fallback failed: {e}")
+    candidates = _dei_model_candidates()
+    model_path = next((path for path in candidates if path.is_file()), None)
+    if model_path is None:
+        return {
+            "error": True,
+            "message": (
+                "DEI model artifact is missing. Expected transparent JSON at one of: "
+                + ", ".join(str(path) for path in candidates)
+            ),
+        }
 
-    # 4) If year provided and still not predicted, try direct [antl, year]
-    if predicted is None and X_antl_year is not None:
-        try:
-            predicted = try_predict(X_antl_year)
-        except Exception as e:
-            debug_errors.append(f"antl+year direct attempt failed: {e}")
+    try:
+        artifact = _load_dei_formula_artifact(model_path)
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+        return {
+            "error": True,
+            "message": f"DEI model artifact '{model_path}' is invalid or unreadable: {exc}",
+        }
 
-    if predicted is None:
-        return {"error": True, "message": "All prediction attempts failed. Debug hints: " + "; ".join(debug_errors[:8])}
+    yearly_models = {int(key): value for key, value in artifact["models"].items()}
+    if selected_year not in yearly_models:
+        available = sorted(yearly_models)
+        return {
+            "error": True,
+            "message": f"Requested DEI model year {selected_year} is unavailable. Available years: {available}.",
+        }
+
+    entry = yearly_models[selected_year]
+    training_range = _validate_dei_training_range(
+        entry,
+        f"model entry {selected_year!r}",
+        required=artifact["artifact_type"] == "retrained",
+    )
+    if artifact["artifact_type"] == "retrained" and training_range is not None:
+        minimum, maximum = training_range
+        if tntl_value < minimum or tntl_value > maximum:
+            return {
+                "error": True,
+                "message": (
+                    f"TNTL {tntl_value:g} is outside the inclusive training TNTL range "
+                    f"[{minimum:g}, {maximum:g}] for retrained DEI model year {selected_year}; "
+                    "prediction refused."
+                ),
+                "year": selected_year,
+                "tntl": tntl_value,
+                "training_tntl_range": {"min": minimum, "max": maximum},
+            }
+
+    form, parameters = _dei_normalized_model_spec(artifact, entry)
+    try:
+        predicted, formula = _evaluate_dei_formula(form, parameters, tntl_value)
+    except (ArithmeticError, ValueError) as exc:
+        return {
+            "error": True,
+            "message": (
+                f"DEI formula evaluation failed for year {selected_year} ({form}): {exc}."
+            ),
+        }
+
+    warnings = list(artifact.get("warnings", []))
+    warnings.extend(artifact.get("limitations", []))
+    if artifact["artifact_type"] == "reconstructed-from-paper":
+        warnings.extend(
+            [
+                "This is a paper-formula reconstruction from rounded printed coefficients, not a retrained model.",
+                "Use only TNTL produced with a compatible product, year, city boundary, and preprocessing chain.",
+            ]
+        )
+    if predicted < 0 or predicted > 100:
+        warnings.append(
+            "The un-clipped formula produced a value outside the DEI scale [0, 100]; verify TNTL compatibility."
+        )
 
     return {
         "error": False,
-        "antl": float(antl),
-        "year": int(year) if year is not None else None,
+        "tntl": tntl_value,
+        "year": selected_year,
         "predicted_dei": float(predicted),
-        "message": f"Estimated DEI for ANTL {antl:.4f}" + (f", year {year}" if year is not None else "") + f": {predicted:.4f}"
+        "formula": formula,
+        "formula_form": form,
+        "model_provenance": artifact["artifact_type"],
+        "artifact_status": artifact.get("status"),
+        "model_schema_version": artifact["schema_version"],
+        "model_path": str(model_path),
+        "input_semantics": "city total nighttime light (TNTL); ANTL is incompatible",
+        "training_tntl_range": (
+            {"min": training_range[0], "max": training_range[1]}
+            if training_range is not None
+            else None
+        ),
+        "warnings": warnings,
+        "message": (
+            f"Estimated {selected_year} city DEI from TNTL {tntl_value:.4f}: {predicted:.4f}. "
+            f"Artifact provenance: {artifact['artifact_type']}; "
+            f"status: {artifact.get('status', 'unspecified')}."
+        ),
     }
 
 # Tool Definition
@@ -366,20 +547,12 @@ DEI_estimate_city_tool = StructuredTool.from_function(
     func=DEI_estimate_city,
     name="DEI_Estimate_City",
     description=(
-        "Estimate city-level Digital Economy Indicator (DEI) from ANTL. "
-        "The 'year' parameter is REQUIRED and MUST be an integer between 2017 and 2024 (inclusive). "
-        "Only years 2017–2024 are supported due to model availability."
+        "Estimate city-level Digital Economy Indicator (DEI) from positive city TNTL. "
+        "TNTL means total nighttime light; ANTL/mean radiance is not compatible. "
+        "Both 'tntl' and an explicitly available model 'year' are required."
     ),
     args_schema=DEI_Estimate_City_Input,
 )
-
-# Option A: call the underlying function directly (if function is in scope)
-# result = DEI_estimate_city(antl=0.1894242893764177, year=2023)
-# print(result)
-
-# Option B: call through the StructuredTool object (if tool object is in scope)
-# result2 = DEI_estimate_city_tool.func(antl=0.1894242893764177, year=2023)
-# print(result2)
 
 # CO2 usually requires province argument (depending on how the model was trained)
 # res_co2 = NTL_estimate_indicator_provincial(tntl=23456.78, indicator='CO2', province='上海市')

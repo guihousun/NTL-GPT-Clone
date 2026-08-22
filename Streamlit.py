@@ -76,6 +76,13 @@ def main():
             else "云端试用版，支持夜间灯光任务的端到端分析，覆盖数据检索、预处理、建模与地理空间结果生成。"
         )
         contact_label = "Contact" if st.session_state["ui_lang"] == "EN" else "联系方式"
+        source_label = "Source" if st.session_state["ui_lang"] == "EN" else "源代码"
+        license_label = "AGPL-3.0-only"
+        warranty_notice = (
+            "Provided without warranty"
+            if st.session_state["ui_lang"] == "EN"
+            else "本软件不提供担保"
+        )
 
         st.markdown(
             f"""
@@ -91,6 +98,14 @@ def main():
                     <a href="mailto:51273901095@stu.ecnu.edu.cn" style="color:#0f766e;text-decoration:none;">
                         51273901095@stu.ecnu.edu.cn
                     </a>
+                    <span style="margin:0 7px;color:#97a3aa;">&middot;</span>
+                    <a href="https://github.com/guihousun/NTL-GPT-Clone" target="_blank" rel="noopener noreferrer"
+                       style="color:#0f766e;text-decoration:none;">{source_label}</a>
+                    <span style="margin:0 7px;color:#97a3aa;">&middot;</span>
+                    <a href="https://github.com/guihousun/NTL-GPT-Clone/blob/main/LICENSE" target="_blank" rel="noopener noreferrer"
+                       style="color:#0f766e;text-decoration:none;">{license_label}</a>
+                    <span style="margin:0 7px;color:#97a3aa;">&middot;</span>
+                    <span>{warranty_notice}</span>
                 </div>
             </div>
             """,

@@ -1,0 +1,261 @@
+{
+  "schema_version": "ntl-gpt.dei.city-tntl-longntl-extraction.v1",
+  "status": "complete",
+  "classification": "retrained-input-candidate-not-paper-reproduction",
+  "gee_project": "sound-dream-441705-m7",
+  "dataset": {
+    "id": "projects/sat-io/open-datasets/npp-viirs-ntl",
+    "band": "b1",
+    "product_name": "annual NPP-VIIRS-like / LongNTL",
+    "edition": "Version 1",
+    "source_paper_doi": "10.5194/essd-13-889-2021",
+    "asset_hosting": "community-hosted Earth Engine asset",
+    "upstream": {
+      "repository": "Harvard Dataverse",
+      "doi": "10.7910/DVN/YGIVCD",
+      "dataverse_version": "6.0",
+      "release_date": "2025-06-04",
+      "coverage": "2000-2024",
+      "scientific_creators": "Zuoqi Chen et al.",
+      "gee_curator": "Samapriya Roy"
+    },
+    "raster_semantics": {
+      "dtype": "float32",
+      "crs": "EPSG:4326",
+      "nominal_resolution_degrees": 0.00449157642,
+      "nominal_resolution": "15 arcsec / approximately 500 m",
+      "unit": "nW cm-2 sr-1",
+      "unit_source": "ESSD paper; not embedded in GEE band metadata",
+      "nodata": "Earth Engine mask",
+      "numeric_nodata": null,
+      "zero_is_valid_background": true,
+      "native_grid_varies_by_year": true
+    },
+    "processing_provenance": {
+      "branch": "post-2013 VIIRS-composite branch",
+      "autoencoder_applied": false,
+      "verified_lineage": "corrected yearly VIIRS median multiplied by a fixed 2013 mask",
+      "exact_monthly_input_inventory_verified": false,
+      "full_update_code_public": false,
+      "correction_stage_3_parameters_verified": false
+    },
+    "license": {
+      "data": "CC0-1.0",
+      "article": "CC-BY-4.0"
+    },
+    "upstream_zip_md5": {
+      "2019": "402144c288c3a9663df6908590bdc34c",
+      "2020": "5f9b7db5520830edf7d99707691ec31d",
+      "2021": "030975fe0633c6b49239b90d43fc7b16",
+      "2022": "217e2b18c4e5a95e210ccb4b11938cef",
+      "2023": "2265b45991c6a1e25feec3d38c15f99b",
+      "2024": "8f3b22d43d373ef5b93c0474e8db26e5"
+    },
+    "provenance_status": "partially-reproducible"
+  },
+  "boundary": {
+    "asset": "projects/empyrean-caster-430308-m2/assets/city",
+    "feature_count": 375,
+    "name_field": "name",
+    "code_field": "gb",
+    "update_time": "2024-10-08T06:01:06.845098Z",
+    "create_time": null,
+    "size_bytes": "1624016",
+    "source_provenance_status": "unresolved_private_asset"
+  },
+  "preprocessing": {
+    "id": "longntl_annual_native500m_positive_pixel_sum_v1",
+    "steps": [
+      "select the single annual b1 image for the requested year",
+      "mask b1 <= 0 background pixels",
+      "preserve the native EPSG:4326 nominal 500 m grid",
+      "sum positive native-grid pixel values inside each boundary"
+    ]
+  },
+  "year_semantics": "LongNTL calendar year is paired to the same user-confirmed H3C IndexYear; this is a user-defined model-year mapping, not an independently verified natural-observation year",
+  "years": [
+    {
+      "year": 2017,
+      "image_count": 1,
+      "system_indexes": [
+        "LongNTL_2017"
+      ],
+      "projection": {
+        "type": "Projection",
+        "crs": "EPSG:4326",
+        "transform": [
+          0.004491576421,
+          0,
+          -179.99999999999997,
+          0,
+          -0.004491576421,
+          83.62768230635012
+        ]
+      },
+      "nominal_scale_m": 500.00000004479415,
+      "rows": 375
+    },
+    {
+      "year": 2018,
+      "image_count": 1,
+      "system_indexes": [
+        "LongNTL_2018"
+      ],
+      "projection": {
+        "type": "Projection",
+        "crs": "EPSG:4326",
+        "transform": [
+          0.004491576421,
+          0,
+          -179.99999999999997,
+          0,
+          -0.004491576421,
+          83.62768230635012
+        ]
+      },
+      "nominal_scale_m": 500.00000004479415,
+      "rows": 375
+    },
+    {
+      "year": 2019,
+      "image_count": 1,
+      "system_indexes": [
+        "LongNTL_2019"
+      ],
+      "projection": {
+        "type": "Projection",
+        "crs": "EPSG:4326",
+        "transform": [
+          0.004491576421,
+          0,
+          -179.99999999999997,
+          0,
+          -0.004491576421,
+          83.62768230635012
+        ]
+      },
+      "nominal_scale_m": 500.00000004479415,
+      "rows": 375
+    },
+    {
+      "year": 2020,
+      "image_count": 1,
+      "system_indexes": [
+        "LongNTL_2020"
+      ],
+      "projection": {
+        "type": "Projection",
+        "crs": "EPSG:4326",
+        "transform": [
+          0.004491576421,
+          0,
+          -179.99999999999997,
+          0,
+          -0.004491576421,
+          83.62768230635012
+        ]
+      },
+      "nominal_scale_m": 500.00000004479415,
+      "rows": 375
+    },
+    {
+      "year": 2021,
+      "image_count": 1,
+      "system_indexes": [
+        "LongNTL_2021"
+      ],
+      "projection": {
+        "type": "Projection",
+        "crs": "EPSG:4326",
+        "transform": [
+          0.004491576421,
+          0,
+          -179.99999999999997,
+          0,
+          -0.004491576421,
+          83.62768230635012
+        ]
+      },
+      "nominal_scale_m": 500.00000004479415,
+      "rows": 375
+    },
+    {
+      "year": 2022,
+      "image_count": 1,
+      "system_indexes": [
+        "LongNTL_2022"
+      ],
+      "projection": {
+        "type": "Projection",
+        "crs": "EPSG:4326",
+        "transform": [
+          0.00449157642059761,
+          0,
+          -180.00441663186973,
+          0,
+          -0.00449157642059761,
+          83.62866137510693
+        ]
+      },
+      "nominal_scale_m": 500.00000000000034,
+      "rows": 375
+    },
+    {
+      "year": 2023,
+      "image_count": 1,
+      "system_indexes": [
+        "LongNTL_2023"
+      ],
+      "projection": {
+        "type": "Projection",
+        "crs": "EPSG:4326",
+        "transform": [
+          0.00449157642059761,
+          0,
+          -180.00208333335,
+          0,
+          -0.00449157642059761,
+          75.0003525766774
+        ]
+      },
+      "nominal_scale_m": 500.00000000000034,
+      "rows": 375
+    },
+    {
+      "year": 2024,
+      "image_count": 1,
+      "system_indexes": [
+        "LongNTL_2024"
+      ],
+      "projection": {
+        "type": "Projection",
+        "crs": "EPSG:4326",
+        "transform": [
+          0.00449157642059761,
+          0,
+          -180.00441663186973,
+          0,
+          -0.00449157642059761,
+          83.66010241005114
+        ]
+      },
+      "nominal_scale_m": 500.00000000000034,
+      "rows": 375
+    }
+  ],
+  "output": {
+    "path": "D:\\NTL-GPT-main\\experiments\\dei_model_rebuild\\data\\city_tntl_longntl_2017_2024.csv",
+    "row_count": 3000,
+    "sha256": "91EE1CE6DA4919806D7CAD55888EC0E23A2DDFC3CF655269913F52CCF69C7D70",
+    "encoding": "UTF-8-SIG"
+  },
+  "limitations": [
+    "The annual LongNTL grid and preprocessing are not numerically interchangeable with the Chen paper TNTL input.",
+    "Author sidecars establish the high-level 2019-2024 lineage, but the exact monthly input inventory, correction-stage implementation, and update scripts are not public.",
+    "The GEE mirror has no content checksum proving byte identity with the Harvard Dataverse Version 6.0 files.",
+    "The b1 unit is sourced from the ESSD paper and is not embedded in the GEE band metadata.",
+    "The private boundary asset has no source, licence, or reference-year metadata.",
+    "One static boundary layer is used for every year, so historical administrative changes are not represented.",
+    "H3C IndexYear and natural observation year conflict in official materials; same-key pairing follows the user's explicit instruction."
+  ]
+}

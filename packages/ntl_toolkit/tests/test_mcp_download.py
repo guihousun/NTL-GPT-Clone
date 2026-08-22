@@ -16,6 +16,7 @@ from ntl_toolkit.schemas import ToolResult
 
 EXPECTED_TOOLS = [
     "validate_download_environment",
+    "download_geoboundary",
     "download_gee_raster",
     "submit_gee_batch_export",
     "inspect_gee_batch_export",

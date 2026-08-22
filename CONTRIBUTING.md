@@ -56,3 +56,27 @@ Describe:
 - screenshots for visible UI changes.
 
 Do not include generated caches, personal workspaces, credentials, or unrelated formatting churn.
+
+## Developer Certificate of Origin
+
+All commits contributed to NTL-GPT must be signed off under the [Developer Certificate of Origin 1.1](DCO). The sign-off certifies that you have the right to submit the contribution under the repository's applicable license; it is not a copyright assignment.
+
+Create signed-off commits with:
+
+```powershell
+git commit -s -m "Describe the change"
+```
+
+The resulting commit message must contain a line in this form:
+
+```text
+Signed-off-by: Your Name <your.email@example.com>
+```
+
+Use your own name and a valid email address. Pull requests containing unsigned commits may be asked to add the missing sign-offs before review.
+
+## Licensing Contributions
+
+Unless a file states otherwise, code contributions are submitted under `AGPL-3.0-only`. Do not contribute material copied from a dataset, model, publication, website, or another codebase unless its license permits inclusion and you preserve all required notices.
+
+Data, models, RAG content, generated indexes, and third-party materials are governed by [DATA_AND_MODEL_POLICY.md](DATA_AND_MODEL_POLICY.md) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), not automatically by the repository's program-code license.

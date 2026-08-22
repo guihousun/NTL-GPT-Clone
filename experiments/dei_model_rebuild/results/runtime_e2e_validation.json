@@ -1,0 +1,98 @@
+{
+  "schema_version": "ntl-gpt.dei.runtime-validation.v1",
+  "validated_at": "2026-08-09",
+  "status": "pass-candidate-not-deployed",
+  "annual_only_experiment": true,
+  "candidate": {
+    "path": "D:\\NTL-GPT-main\\experiments\\dei_model_rebuild\\results\\yearly_dei_models_longntl_candidate.json",
+    "sha256": "B69BA93BC998A5AEE494F05E0C6E7BBEA4DF73497F26FE586364BD8FD0ABA328",
+    "schema_version": "ntl-gpt.dei.yearly-formula.v2",
+    "artifact_type": "retrained",
+    "deployed": false
+  },
+  "default_runtime_artifact": {
+    "path": "D:\\NTL-GPT-main\\base_data\\Model\\yearly_dei_models.json",
+    "sha256": "DA421D90180A555321C92AFE5494EEED0E9ADC82CC4316A2C62F0C2A225EFAAE",
+    "artifact_type": "reconstructed-from-paper",
+    "note": "This pre-existing ignored v1 file was not created, modified, or deleted by the annual LongNTL pipeline."
+  },
+  "checks": {
+    "earth_engine_full_extraction": {
+      "status": "pass",
+      "years": [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024],
+      "rows": 3000,
+      "rows_per_year": 375
+    },
+    "strict_match_without_quarantine_acknowledgement": {
+      "status": "expected-failure-pass",
+      "exit_code": 1,
+      "message": "1 row(s) require quarantine"
+    },
+    "explicit_quarantine_match": {
+      "status": "pass",
+      "matched_rows": 1473,
+      "quarantined_rows": 1
+    },
+    "python_compile": {
+      "status": "pass"
+    },
+    "candidate_builder_check": {
+      "status": "pass",
+      "years": [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024]
+    },
+    "jiangsu_prediction_check": {
+      "status": "pass",
+      "rows": 13,
+      "evaluation_scope": "in-sample-fitted-values-only"
+    },
+    "experiment_unittest": {
+      "status": "pass",
+      "passed": 29,
+      "failed": 0
+    },
+    "runtime_pytest": {
+      "status": "pass",
+      "passed": 44,
+      "failed": 0
+    },
+    "default_runtime_smoke": {
+      "status": "pass",
+      "input": {"tntl": 100000.0, "year": 2020},
+      "predicted_dei": 63.59460644245932,
+      "artifact_type": "reconstructed-from-paper",
+      "artifact_status": "formula-reconstruction-only",
+      "annual_candidate_deployed": false
+    }
+  },
+  "structured_tool_e2e": {
+    "valid_2020": {
+      "input": {"tntl": 208539.345319515, "year": 2020},
+      "formula_form": "quadratic",
+      "predicted_dei": 77.75612542022702,
+      "artifact_status": "candidate-not-deployed",
+      "limitations_surfaced_as_warnings": true,
+      "status": "pass"
+    },
+    "valid_2024": {
+      "input": {"tntl": 300000.0, "year": 2024},
+      "formula_form": "quadratic",
+      "predicted_dei": 86.29225415187143,
+      "status": "pass"
+    },
+    "out_of_training_range": {
+      "input": {"tntl": 1.0, "year": 2020},
+      "status": "expected-failure-pass",
+      "message": "prediction refused outside inclusive training TNTL range"
+    },
+    "unsupported_year": {
+      "input": {"tntl": 100000.0, "year": 2025},
+      "status": "expected-failure-pass",
+      "available_years": [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024]
+    },
+    "antl_field": {
+      "input": {"antl": 208539.345319515, "year": 2020},
+      "status": "expected-schema-failure-pass",
+      "message": "tntl required; antl extra field not permitted"
+    }
+  }
+}

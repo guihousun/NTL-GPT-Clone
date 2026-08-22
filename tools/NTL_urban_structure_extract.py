@@ -365,55 +365,139 @@ electrified_detection_tool = StructuredTool.from_function(
     args_schema=ElectrifiedDetectionInput
 )
 
-from langchain_core.tools import StructuredTool
-from pydantic import BaseModel, Field
-from typing import Optional
+from pathlib import Path
 
-# 1. 定义工具的输入架构 (Input Schema)
+from ntl_toolkit.core.urban_structure import (
+    CHEN2017_SHANGHAI_2014_CONFIG,
+    detect_urban_centres,
+)
+
+
 class UrbanStructureInput(BaseModel):
     ntl_tif: str = Field(
-        ..., 
-        description="The filename of the input NTL radiance raster stored in the 'inputs/' folder (e.g., 'Shanghai_NTL_2014.tif')."
+        ...,
+        description="The single-band projected NTL radiance GeoTIFF in the workspace inputs/ folder.",
+    )
+    aoi_boundary: Optional[str] = Field(
+        None,
+        description="The polygon AOI boundary in inputs/. Required unless a default Shanghai boundary exists in inputs/.",
     )
     output_shp: str = Field(
-        ..., 
-        description="The target filename for the detected urban center boundaries (Shapefile) to be saved in 'outputs/'."
+        ...,
+        description="Vector output filename (.shp, .gpkg, or .geojson) saved in outputs/.",
     )
     output_csv: str = Field(
-        ..., 
-        description="The target filename for the center attributes and hierarchy classification CSV to be saved in 'outputs/'."
+        ...,
+        description="Center attributes and hierarchy CSV filename saved in outputs/.",
+    )
+    metadata_json: Optional[str] = Field(
+        None,
+        description="Optional run metadata JSON filename saved in outputs/. Defaults beside output_csv.",
+    )
+    base_threshold: float = Field(
+        34.0,
+        description="Base NTL contour value in nW/cm^2/sr; Chen 2017 Shanghai setting is 34.",
     )
     contour_interval: float = Field(
-        default=1.0, 
-        description="Optional: The radiance step used to generate contour lines for tree construction. Smaller intervals yield finer hierarchies."
+        1.0,
+        description="NTL contour interval in nW/cm^2/sr; Chen 2017 Shanghai setting is 1.",
     )
     min_area_km2: float = Field(
-        default=2.0, 
-        description="Optional: Minimum area threshold in sq km to filter out minor patches and noise. Default is 2.0."
+        5.0,
+        description="Minimum closed-contour area in km^2; Chen 2017 setting is 5.",
+    )
+    gaussian_sigma: float = Field(
+        1.0,
+        description="Sigma for the fixed 3x3 Gaussian filter.",
+    )
+    aoi_buffer_km: float = Field(
+        10.0,
+        description="Required raster coverage beyond the AOI boundary in kilometres.",
+    )
+    radiance_unit: Optional[str] = Field(
+        None,
+        description="Explicit unit override only when the raster metadata lacks a unit tag; expected nW/cm^2/sr.",
+    )
+    parameter_profile: Optional[str] = Field(
+        CHEN2017_SHANGHAI_2014_CONFIG["profile"],
+        description="Fixed reproducibility profile, chen2017_shanghai_2014, or null for generic tests.",
     )
 
-# 2. 定义工具执行的主函数 (核心逻辑占位)
+
+def _default_shanghai_boundary(thread_id: Optional[str]) -> Optional[Path]:
+    """Find an explicit default boundary without inventing an AOI."""
+
+    workspace = Path(storage_manager.get_workspace(thread_id))
+    candidates = (
+        workspace / "inputs" / "shanghai_boundary.geojson",
+        workspace / "inputs" / "shanghai_boundary.gpkg",
+        workspace / "inputs" / "shanghai_boundary.shp",
+    )
+    return next((candidate for candidate in candidates if candidate.exists()), None)
+
+
 def detect_urban_centres_logic(
-    ntl_tif: str, 
-    output_shp: str, 
-    output_csv: str, 
-    contour_interval: float = 1.0, 
-    min_area_km2: float = 2.0
+    ntl_tif: str,
+    output_shp: str,
+    output_csv: str,
+    aoi_boundary: Optional[str] = None,
+    metadata_json: Optional[str] = None,
+    base_threshold: float = 34.0,
+    contour_interval: float = 1.0,
+    min_area_km2: float = 5.0,
+    gaussian_sigma: float = 1.0,
+    aoi_buffer_km: float = 10.0,
+    radiance_unit: Optional[str] = None,
+    parameter_profile: Optional[str] = CHEN2017_SHANGHAI_2014_CONFIG["profile"],
+    config: RunnableConfig = None,
 ) -> str:
-    """
-    Identifies urban centers and hierarchy using the localized NTL contour tree method.
-    Processes a radiance TIFF and generates a shapefile of centers and a CSV of metrics.
-    """
-    # TODO: 后续在此处填充具体算法逻辑
-    # 1. 加载 inputs/{ntl_tif}
-    # 2. 构建等值线树与拓扑分析
-    # 3. 提取 Primary/Sub-centers
-    # 4. 计算形态学指标
-    # 5. 将结果保存至 outputs/
-    
-    return (f"Successfully processed {ntl_tif}. "
-            f"Detected urban centers saved to outputs/{output_shp}, "
-            f"and hierarchy report saved to outputs/{output_csv}.")
+    """Resolve workspace paths and run the deterministic core algorithm."""
+
+    thread_id = storage_manager.get_thread_id_from_config(config) if config else None
+    try:
+        input_path = Path(storage_manager.resolve_input_path(ntl_tif, thread_id))
+        if aoi_boundary:
+            aoi_path = Path(storage_manager.resolve_input_path(aoi_boundary, thread_id))
+        else:
+            aoi_path = _default_shanghai_boundary(thread_id)
+            if aoi_path is None:
+                return "Error [AOI_REQUIRED]: Provide a Shanghai polygon boundary in the inputs/ workspace."
+        vector_path = Path(storage_manager.resolve_output_path(output_shp, thread_id))
+        csv_path = Path(storage_manager.resolve_output_path(output_csv, thread_id))
+        metadata_path = (
+            Path(storage_manager.resolve_output_path(metadata_json, thread_id))
+            if metadata_json
+            else csv_path.with_name(f"{csv_path.stem}.metadata.json")
+        )
+    except (OSError, PermissionError, ValueError) as exc:
+        return f"Error [PATH_RESOLUTION_FAILED]: {exc}"
+
+    result = detect_urban_centres(
+        input_path,
+        aoi_path,
+        vector_path,
+        csv_path,
+        metadata_path,
+        base_threshold=base_threshold,
+        contour_interval=contour_interval,
+        min_area_km2=min_area_km2,
+        gaussian_kernel=3,
+        gaussian_sigma=gaussian_sigma,
+        aoi_buffer_km=aoi_buffer_km,
+        expected_unit=radiance_unit,
+        parameter_profile=parameter_profile,
+    )
+    if result.status != "succeeded":
+        error = result.error
+        code = error.code if error is not None else "PROCESSING_FAILED"
+        message = error.message if error is not None else result.summary
+        return f"Error [{code}]: {message}"
+
+    output_lines = [
+        f"Success: {result.summary}",
+        *[f"- {artifact.role}: {artifact.path}" for artifact in result.outputs],
+    ]
+    return "\n".join(output_lines)
 
 # 3. 封装为 StructuredTool
 detect_urban_centres_tool = StructuredTool.from_function(

@@ -18,6 +18,7 @@ dependencies = [
     "shapely>=2,<3",
     "pyproj>=3.6,<4",
     "scipy>=1.11,<2",
+    "scikit-image>=0.22,<1",
     "python-dotenv>=1,<2",
 ]
 

@@ -61,7 +61,10 @@ scripts/
 !.ntl-gpt/skills/**/scripts/
 !.ntl-gpt/skills/**/scripts/*.py
 ntl_paper_retrieval_app.py
-example/
+!example/
+example/*
+!example/Q70/
+!example/Q70/**
 .learnings/
 docs/superpowers/
 experiments/**/workspace_validation/**/outputs/

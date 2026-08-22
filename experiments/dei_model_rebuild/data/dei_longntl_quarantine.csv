@@ -1,0 +1,2 @@
+﻿Year,LabelCity,CityNormalized,DEI,Status,Reason
+2023,毫州,毫州,47.4,quarantined,unresolved_spelling_collision: 2023 also contains 亳州=42.7; the boundary asset has one 亳州市 geometry and no 毫州市 geometry

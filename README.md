@@ -13,6 +13,7 @@
   <img alt="Python 3.11" src="https://img.shields.io/badge/python-3.11-3776AB?style=flat-square&logo=python&logoColor=white">
   <img alt="Streamlit 1.55" src="https://img.shields.io/badge/streamlit-1.55-FF4B4B?style=flat-square&logo=streamlit&logoColor=white">
   <img alt="Google Earth Engine" src="https://img.shields.io/badge/Google_Earth_Engine-ready-4285F4?style=flat-square&logo=googleearthengine&logoColor=white">
+  <a href="LICENSE"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/license-AGPL--3.0--only-663399?style=flat-square"></a>
   <img alt="Status" src="https://img.shields.io/badge/status-research_preview-f59e0b?style=flat-square">
 </p>
 
@@ -21,7 +22,8 @@
   <a href="docs/README.md">Documentation</a> ·
   <a href="docs/mcp/ntl-gis-core.md">GIS MCP</a> ·
   <a href="docs/mcp/ntl-download.md">Download MCP</a> ·
-  <a href="CONTRIBUTING.md">Contributing</a>
+  <a href="CONTRIBUTING.md">Contributing</a> ·
+  <a href="LICENSE">License</a>
 </p>
 
 NTL-GPT is a local-first Streamlit application for nighttime-light analysis. It combines coordinated agents, deterministic GIS tools, Google Earth Engine workflows, official VIIRS/Earthdata acquisition, local RAG, and isolated per-thread workspaces in one reproducible research environment.
@@ -155,7 +157,7 @@ The repository includes two standalone stdio MCP servers. They do not require th
 | Service | Purpose | Guide |
 |---|---|---|
 | `ntl-gis-core` | Deterministic vector, raster, NTL metrics, zonal statistics, trend and anomaly operations | [Setup and tools](docs/mcp/ntl-gis-core.md) |
-| `ntl-download` | Explicit GEE exports, batch-task tracking, VNP46A1/VNP46A2 Earthdata downloads and recovery manifests | [Setup and tools](docs/mcp/ntl-download.md) |
+| `ntl-download` | geoBoundaries retrieval, explicit GEE exports, batch-task tracking, VNP46A1/VNP46A2 Earthdata downloads and recovery manifests | [Setup and tools](docs/mcp/ntl-download.md) |
 
 Install both through the editable `packages/ntl_toolkit` package included in `environment.yml`. External MCP clients should use a dedicated work directory rather than the Streamlit `user_data` tree.
 
@@ -217,5 +219,15 @@ Changes to routing or tools should test the target prompt and at least one neigh
 ## Contributing
 
 Issues and focused pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing changes, especially for agent routing, execution safety, storage paths, or dataset semantics.
+
+Contributions must include a Developer Certificate of Origin sign-off. Use `git commit -s` and read the repository [DCO](DCO) before submitting a pull request.
+
+## License
+
+Original NTL-GPT program source code is licensed under the [GNU Affero General Public License v3.0 only](LICENSE) (`AGPL-3.0-only`). Modified versions offered through a network service must provide their corresponding source code to users as required by the license.
+
+The AGPL grant does not automatically apply to third-party code, imported documents, literature corpora, datasets, model weights, generated vector indexes, user uploads, credentials, or service-provider content. See [Data and Model Policy](DATA_AND_MODEL_POLICY.md) and [Third-Party Notices](THIRD_PARTY_NOTICES.md) before reusing or redistributing those materials.
+
+Copyright remains with the applicable copyright holders. The software is provided without warranty under the terms of the AGPL-3.0-only license.
 
 For vulnerabilities or accidental credential exposure, follow [SECURITY.md](SECURITY.md) instead of opening a public issue.

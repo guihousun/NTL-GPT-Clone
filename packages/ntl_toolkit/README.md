@@ -15,8 +15,8 @@ The package exposes two local stdio entry points:
 - `ntl-gis-core` for deterministic local GIS and nighttime-light analysis;
   [`mcp_servers/gis_core_server.py`](../../mcp_servers/gis_core_server.py) is
   its checked-in launcher.
-- `ntl-download` for synchronous explicit GEE export and audited official
-  VNP46A2 Earthdata HDF5 country mosaics;
+- `ntl-download` for geoBoundaries retrieval, synchronous explicit GEE export,
+  and audited official VNP46A1/VNP46A2 Earthdata HDF5 mosaics;
   [`mcp_servers/download_server.py`](../../mcp_servers/download_server.py) is
   its checked-in launcher. See [`docs/mcp/ntl-download.md`](../../docs/mcp/ntl-download.md).
 

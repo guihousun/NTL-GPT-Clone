@@ -1,5 +1,11 @@
 [
   {
+    "name": "download_geoboundary",
+    "purpose": "Download one geoBoundaries gbOpen administrative layer (ADM0-ADM4) by ISO3, optionally filtering by shapeName.",
+    "side_effects": "creates or reuses one validated GeoJSON file below the requested output path",
+    "common_error_codes": ["INVALID_PARAMETER", "GEOBOUNDARY_DOWNLOAD_FAILED"]
+  },
+  {
     "name": "download_vnp46a1_official_h5",
     "purpose": "Run official NASA Earthdata VNP46A1 HDF5 download and clipped daily radiance mosaics for one ISO3 country or WGS84 bounding box, optionally with UTC_Time companion rasters.",
     "side_effects": "creates target geometry, run manifests, HDF5 files, radiance mosaics, optional UTC_Time mosaics, and audit files under output_root",

@@ -13,6 +13,7 @@ from typing import Any
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import TextContent, Tool, ToolAnnotations
 
+from ntl_toolkit.core.boundary import GeoBoundaryDownloadRequest, download_geoboundary
 from ntl_toolkit.core.gee_batch import (
     GeeBatchExportRequest,
     cancel_gee_batch_export,
@@ -356,6 +357,45 @@ def build_download_mcp() -> FastMCP:
             initialize_gee=initialize_gee,
             project=project,
         )
+
+    @mcp.tool(
+        name="download_geoboundary",
+        description=(
+            "Download one geoBoundaries gbOpen administrative layer (ADM0-ADM4) as GeoJSON, "
+            "optionally filtering features by shapeName."
+        ),
+        annotations=_WRITE_NEW,
+        structured_output=True,
+    )
+    def download_geoboundary_tool(
+        iso3: str,
+        adm_level: int,
+        output: str,
+        place_name: str | None = None,
+        reuse_existing: bool = True,
+        timeout: int = 90,
+    ) -> dict[str, Any]:
+        try:
+            resolved_output = resolve_local_path(output, captured_workdir)
+            request = GeoBoundaryDownloadRequest(
+                iso3=iso3,
+                adm_level=adm_level,
+                output=str(resolved_output),
+                place_name=place_name,
+                reuse_existing=reuse_existing,
+                timeout=timeout,
+            )
+        except ValueError as exc:
+            return _failed_payload(
+                tool="download_geoboundary",
+                code="INVALID_PARAMETER",
+                message=str(exc),
+                suggestion=(
+                    "Use a three-letter ISO3 code, ADM0-ADM4, and a .geojson output path "
+                    "that is relative to NTL_MCP_WORKDIR or fully qualified."
+                ),
+            )
+        return _payload(download_geoboundary(request))
 
     @mcp.tool(
         name="download_gee_raster",

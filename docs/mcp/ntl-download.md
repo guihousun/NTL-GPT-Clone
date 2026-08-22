@@ -1,8 +1,9 @@
 # `ntl-download` MCP
 
-`ntl-download` is a local, single-user stdio MCP service for direct Google
-Earth Engine raster downloads, tracked Earth Engine batch exports, and official
-NASA Earthdata VNP46A1/VNP46A2 daily mosaics.
+`ntl-download` is a local, single-user stdio MCP service for geoBoundaries
+administrative layers, direct Google Earth Engine raster downloads, tracked
+Earth Engine batch exports, and official NASA Earthdata VNP46A1/VNP46A2 daily
+mosaics.
 It is intentionally separate from `ntl-gis-core`: the latter remains a
 network-independent local GIS and nighttime-light analysis service.
 
@@ -37,6 +38,7 @@ configuration or tool arguments.
 | Tool | What it does |
 | --- | --- |
 | `validate_download_environment` | Checks local download dependencies, Earthdata token presence, and optional non-interactive GEE initialization. |
+| `download_geoboundary` | Downloads and validates one geoBoundaries gbOpen ADM0-ADM4 GeoJSON by ISO3, optionally filters by `shapeName`, and reuses an existing valid file by default. |
 | `download_gee_raster` | Downloads a validated GEE Image or ImageCollection reduction with one or more bands, controlled QA/scaling/index presets, dates where applicable, WGS84 bounding box, scale, CRS, and output path. |
 | `submit_gee_batch_export` | Submits a validated large raster export to Drive, Cloud Storage, or an Earth Engine asset and writes an `ntl.gee.export.v1` manifest. |
 | `inspect_gee_batch_export` | Refreshes live task state, progress, destination, and exact Earth Engine failure details in the export manifest. |
@@ -58,6 +60,9 @@ The service also publishes `ntl://download/capabilities` and the shared
   and tool results.
 - Relative paths resolve below `NTL_MCP_WORKDIR`; absolute Windows paths are
   accepted. Partially-qualified paths such as `D:output.tif` are rejected.
+- `download_geoboundary` accepts ISO3 codes and writes GeoJSON. Convert or
+  analyze the result with `ntl-gis-core`; use QGIS MCP only when QGIS project
+  or cartographic state is required.
 - Direct GEE output names are reserved with a numeric suffix instead of
   overwriting an existing GeoTIFF. GEE batch and VNP runs retain their manifests
   to support status recovery.

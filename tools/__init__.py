@@ -9,13 +9,25 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "NTL_composite_local_tool": (".NTL_Composite", "NTL_composite_local_tool"),
     "SDGSAT1_strip_removal_tool": (".NTL_preprocess", "SDGSAT1_strip_removal_tool"),
     "SDGSAT1_radiometric_calibration_tool": (".NTL_preprocess", "SDGSAT1_radiometric_calibration_tool"),
-    "VNP46A2_angular_correction_tool": (".NTL_preprocess", "VNP46A2_angular_correction_tool"),
+    "VNP46A2_angular_correction_tool": (".VNP46A2_angular_correction", "VNP46A2_angular_correction_tool"),
+    "VNP46A2_seasonal_adjustment_tool": (
+        ".NTL_seasonal_adjustment",
+        "VNP46A2_seasonal_adjustment_tool",
+    ),
+    "VNP46A2_persistence_classification_tool": (
+        ".VNP46A2_persistence",
+        "VNP46A2_persistence_classification_tool",
+    ),
+    "dmsp_viirs_harmonization_tool": (
+        ".NTL_cross_sensor_harmonization",
+        "dmsp_viirs_harmonization_tool",
+    ),
     "dmsp_evi_preprocess_tool": (".NTL_preprocess", "dmsp_evi_preprocess_tool"),
     "SDGSAT1_index_tool": (".SDGSAT1_INDEX", "SDGSAT1_index_tool"),
     "vnci_index_tool": (".NPP_viirs_index_tool", "vnci_index_tool"),
     "urban_extraction_by_thresholding_tool": (".NTL_urban_structure_extract", "urban_extraction_by_thresholding_tool"),
     "svm_urban_extraction_tool": (".NTL_urban_structure_extract", "svm_urban_extraction_tool"),
-    "electrified_detection_tool": (".NTL_urban_structure_extract", "electrified_detection_tool"),
+    "electrified_detection_tool": (".electrified_detection", "electrified_detection_tool"),
     "detect_urban_centres_tool": (".NTL_urban_structure_extract", "detect_urban_centres_tool"),
     "NTL_raster_statistics_tool": (".NTL_raster_stats", "NTL_raster_statistics_tool"),
     "NTL_Daily_ANTL_Statistics": (".NTL_raster_stats_GEE", "NTL_Daily_ANTL_Statistics"),
@@ -77,6 +89,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "wrap_tool_json_safe": (".tool_json_safety", "wrap_tool_json_safe"),
     "conflict_ntl_agent_system_tool": (".conflict_ntl", "conflict_ntl_agent_system_tool"),
     "conflict_ntl_fetch_isw_events_tool": (".conflict_ntl", "conflict_ntl_fetch_isw_events_tool"),
+    "conflict_city_event_ranking_tool": (".conflict_city_events", "conflict_city_event_ranking_tool"),
 }
 
 _GROUPS: dict[str, list[str]] = {
@@ -112,6 +125,7 @@ _GROUPS: dict[str, list[str]] = {
         "dataset_latest_availability_tool",
         "conflict_ntl_agent_system_tool",
         "conflict_ntl_fetch_isw_events_tool",
+        "conflict_city_event_ranking_tool",
     ],
     "Code_tools": [
         "GeoCode_Knowledge_Recipes_tool",
@@ -126,6 +140,9 @@ _GROUPS: dict[str, list[str]] = {
         "SDGSAT1_strip_removal_tool",
         "SDGSAT1_radiometric_calibration_tool",
         "VNP46A2_angular_correction_tool",
+        "VNP46A2_seasonal_adjustment_tool",
+        "VNP46A2_persistence_classification_tool",
+        "dmsp_viirs_harmonization_tool",
         "dmsp_evi_preprocess_tool",
         "urban_extraction_by_thresholding_tool",
         "svm_urban_extraction_tool",
@@ -153,6 +170,9 @@ _GROUPS: dict[str, list[str]] = {
         "SDGSAT1_strip_removal_tool",
         "SDGSAT1_radiometric_calibration_tool",
         "VNP46A2_angular_correction_tool",
+        "VNP46A2_seasonal_adjustment_tool",
+        "VNP46A2_persistence_classification_tool",
+        "dmsp_viirs_harmonization_tool",
         "dmsp_evi_preprocess_tool",
         "urban_extraction_by_thresholding_tool",
         "svm_urban_extraction_tool",
@@ -173,6 +193,7 @@ _GROUPS: dict[str, list[str]] = {
         "vnci_index_tool",
         "conflict_ntl_agent_system_tool",
         "conflict_ntl_fetch_isw_events_tool",
+        "conflict_city_event_ranking_tool",
     ],
 }
 

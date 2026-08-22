@@ -1,0 +1,65 @@
+{
+  "schema_version": "ntl-gpt.dei.longntl-matching.v1",
+  "status": "matched_subset_complete_with_quarantine",
+  "training_classification": "eligible_matched_subset",
+  "year_semantics": "H3C IndexYear is treated as the DEI model year and paired to the same LongNTL calendar year by explicit user instruction; official H3C publication semantics often describe the preceding natural year",
+  "inputs": {
+    "labels": {
+      "path": "D:\\NTL-GPT-main\\experiments\\dei_model_rebuild\\data\\dei_labels_2017_2024.csv",
+      "sha256": "E526D145E651F65C35C7B8D70146E2B85164D9FC2BC3CF3CEFFD1E2C43BDC7FC"
+    },
+    "tntl": {
+      "path": "D:\\NTL-GPT-main\\experiments\\dei_model_rebuild\\data\\city_tntl_longntl_2017_2024.csv",
+      "sha256": "91EE1CE6DA4919806D7CAD55888EC0E23A2DDFC3CF655269913F52CCF69C7D70"
+    },
+    "tntl_manifest": {
+      "path": "D:\\NTL-GPT-main\\experiments\\dei_model_rebuild\\data\\city_tntl_longntl_2017_2024_manifest.json",
+      "sha256": "6B52C62A80F6B988748687759B2D6F11D7C02DD084C79EF4B68CDE69251543D5"
+    }
+  },
+  "matching": {
+    "input_label_rows": 1474,
+    "matched_training_rows": 1473,
+    "quarantined_rows": 1,
+    "status_counts": {
+      "matched": 1473,
+      "quarantined": 1
+    },
+    "annual_training_counts": {
+      "2017": 40,
+      "2018": 100,
+      "2019": 113,
+      "2020": 220,
+      "2021": 242,
+      "2022": 242,
+      "2023": 256,
+      "2024": 260
+    },
+    "alias_overrides": {
+      "黔西南州": "黔西南布依族苗族自治州"
+    },
+    "quarantine_policy": "never merge, average, or silently typo-correct conflicting city labels"
+  },
+  "outputs": {
+    "training": {
+      "path": "D:\\NTL-GPT-main\\experiments\\dei_model_rebuild\\data\\dei_longntl_matched_2017_2024.csv",
+      "row_count": 1473,
+      "sha256": "6A69143988DB9B7C28A49B3E280227FFBCF4E043A1693B3494135028E00F8673"
+    },
+    "city_match": {
+      "path": "D:\\NTL-GPT-main\\experiments\\dei_model_rebuild\\data\\dei_longntl_city_match.csv",
+      "row_count": 1474,
+      "sha256": "FFDD043614698FE8C24E60CF349BE891C67E88EACCD30B60BD2D750626F222AD"
+    },
+    "quarantine": {
+      "path": "D:\\NTL-GPT-main\\experiments\\dei_model_rebuild\\data\\dei_longntl_quarantine.csv",
+      "row_count": 1,
+      "sha256": "4B315C846240CA37A379923074B129BBA305C924F0C6B6F5BA4B68E96092766E"
+    }
+  },
+  "limitations": [
+    "The 2023 model uses 256 eligible matched rows, not all 257 source labels, because 毫州 is quarantined.",
+    "The boundary asset provenance and reference year are unresolved.",
+    "Same-key H3C IndexYear/LongNTL pairing is user-defined and conflicts with common H3C publication-year semantics."
+  ]
+}

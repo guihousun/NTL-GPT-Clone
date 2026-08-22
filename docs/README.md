@@ -9,7 +9,7 @@ This directory contains public operator and integration documentation. Start wit
 ## MCP Services
 
 - [`ntl-gis-core`](mcp/ntl-gis-core.md): local deterministic GIS and nighttime-light tools.
-- [`ntl-download`](mcp/ntl-download.md): GEE export and official VNP46A1/VNP46A2 Earthdata download tools.
+- [`ntl-download`](mcp/ntl-download.md): geoBoundaries, GEE export, and official VNP46A1/VNP46A2 Earthdata download tools.
 
 ## Development Records
 

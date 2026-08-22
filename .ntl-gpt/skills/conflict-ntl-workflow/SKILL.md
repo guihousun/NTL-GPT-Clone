@@ -27,12 +27,18 @@ Do not use this skill as the primary route for natural-disaster chains such as e
 1. Read `/skills/conflict-ntl-workflow/references/data_source_inventory.md`.
 2. Read `/skills/conflict-ntl-workflow/references/event_screening_criteria.md`.
 3. Read `/skills/conflict-ntl-workflow/references/output_contracts.json`.
-4. For generic local vector/raster inspection and processing, prefer the
-   `ntl-gis-core` stdio MCP service. It is the shared implementation target;
-   use the compatibility `conflictntl-gis-tools` service for existing calls
-   until its parity checks are complete.
-5. If the user has not supplied an event CSV/JSON, call `conflict_ntl_fetch_isw_events_tool` to pull ISW/CTP StoryMap points first.
-6. If tools are available, call `conflict_ntl_agent_system_tool` for end-to-end staging; use lower-level screening/AOI tools for partial or debugging runs.
+4. Use `ntl-download` `download_geoboundary` for geoBoundaries ADM0-ADM4
+   retrieval. Reuse the saved GeoJSON across later filtering, labeling, and
+   statistics steps instead of downloading it again.
+5. Use `ntl-gis-core` for deterministic headless vector/raster work, including
+   inspection, point-in-polygon filtering, admin joins, AEQD buffers,
+   connected-component dissolve, clipping, and zonal statistics.
+6. Use QGIS MCP only when the task needs QGIS project state, Processing,
+   interactive review, styling, or publication layout/export.
+7. The old `conflictntl-gis-tools` server is a compatibility snapshot. Do not
+   select it for new runs when `ntl-download` and `ntl-gis-core` are available.
+8. If the user has not supplied an event CSV/JSON, call `conflict_ntl_fetch_isw_events_tool` to pull ISW/CTP StoryMap points first.
+9. If tools are available, call `conflict_ntl_agent_system_tool` for end-to-end staging; use lower-level screening/AOI tools for partial or debugging runs.
 
 ## Agent System Chain
 
