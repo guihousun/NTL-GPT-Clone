@@ -1,0 +1,217 @@
+{
+  "schema": "ntl.paper-case.formal-reference-comparison.v1",
+  "case_id": "Q17-sdgsat-light-classification",
+  "status": "success",
+  "comparison_stage": "post-result-lock",
+  "lock_verified": {
+    "path": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q17-sdgsat-light-classification/formal-pre-comparison-lock.json",
+    "locked_new_result_sha256": "2a086016653569b5f6c73a40f2f9a6b64a0cc0f6568bce230383f9d49c327e7d",
+    "current_new_result_sha256": "2a086016653569b5f6c73a40f2f9a6b64a0cc0f6568bce230383f9d49c327e7d",
+    "match": true
+  },
+  "reference_hashes": {
+    "rbli": "ee939cb4fb2cbbde1936065da66b56f9e1d290de8bfddf9ce45458848bc7bb62",
+    "classification": "2eb124b7488a8356203ab224e8ac0b5fb424a54b6b60bab99b7ac190fd0fec19"
+  },
+  "rbli": {
+    "status": "compared",
+    "metadata": {
+      "new": {
+        "shape": [
+          9250,
+          5674
+        ],
+        "crs": "EPSG:32651",
+        "transform": [
+          40.0,
+          0.0,
+          194936.55426564877,
+          0.0,
+          -40.0,
+          3669270.754403386
+        ],
+        "dtype": "float32",
+        "nodata": -9999.0,
+        "description": "RBLI (Blue / Green)"
+      },
+      "reference": {
+        "shape": [
+          9250,
+          5674
+        ],
+        "crs": "EPSG:32651",
+        "transform": [
+          40.0,
+          0.0,
+          194936.55426564877,
+          0.0,
+          -40.0,
+          3669270.754403386
+        ],
+        "dtype": "float32",
+        "nodata": -9999.0,
+        "description": "RBLI (Blue / Green)"
+      },
+      "grid_match": true
+    },
+    "metrics": {
+      "common_valid_pixels": 2200100,
+      "new_valid_reference_invalid": 7584036,
+      "new_invalid_reference_valid": 0,
+      "both_invalid": 42700364,
+      "mae": 0.0,
+      "rmse": 0.0,
+      "maximum_absolute_difference": 0.0,
+      "exact_equality_fraction": 1.0,
+      "absolute_tolerance_1e-6_fraction": 1.0,
+      "isclose_rtol_1e-5_atol_1e-6_fraction": 1.0
+    }
+  },
+  "classification": {
+    "status": "compared",
+    "metadata": {
+      "new": {
+        "shape": [
+          9250,
+          5674
+        ],
+        "crs": "EPSG:32651",
+        "transform": [
+          40.0,
+          0.0,
+          194936.55426564877,
+          0.0,
+          -40.0,
+          3669270.754403386
+        ],
+        "dtype": "uint8",
+        "nodata": 255.0,
+        "description": "Jia 2024 ordered-threshold light type",
+        "tags": {
+          "CLASS_1": "WLED",
+          "CLASS_2": "RLED",
+          "CLASS_3": "Other",
+          "METHOD": "Jia et al. (2024) fixed ordered thresholds",
+          "NODATA_VALUE": "255",
+          "ORDER": "RRLI>9 => RLED; else RBLI>0.57 => WLED; else Other",
+          "AREA_OR_POINT": "Area"
+        }
+      },
+      "reference": {
+        "shape": [
+          9250,
+          5674
+        ],
+        "crs": "EPSG:32651",
+        "transform": [
+          40.0,
+          0.0,
+          194936.55426564877,
+          0.0,
+          -40.0,
+          3669270.754403386
+        ],
+        "dtype": "uint8",
+        "nodata": 0.0,
+        "description": "Light Classification (0=Dark, 1=WLED, 2=RLED, 3=Other)",
+        "tags": {
+          "AREA_OR_POINT": "Area"
+        }
+      },
+      "grid_match": true
+    },
+    "normalization": {
+      "semantic_codes_compared": {
+        "1": "WLED",
+        "2": "RLED",
+        "3": "Other"
+      },
+      "reference_code_0_treatment": "Excluded from semantic comparison because the reference GeoTIFF declares nodata=0, even though its band description labels code 0 as Dark. No code-0 pixel was mapped to Other.",
+      "new_nodata_255_treatment": "Excluded from semantic comparison.",
+      "comparison_mask": "Intersection of new and reference codes 1, 2, or 3."
+    },
+    "reference_code_counts": {
+      "0": 42702225,
+      "1": 3775254,
+      "2": 1197138,
+      "3": 4809883
+    },
+    "common_valid_pixels": 9782275,
+    "new_valid_pixels": 9784136,
+    "reference_valid_pixels": 9782275,
+    "new_valid_reference_excluded": 1861,
+    "new_excluded_reference_valid": 0,
+    "confusion_matrix": {
+      "row_order_new": [
+        "WLED",
+        "RLED",
+        "Other"
+      ],
+      "column_order_reference": [
+        "WLED",
+        "RLED",
+        "Other"
+      ],
+      "counts": [
+        [
+          3775254,
+          291534,
+          144708
+        ],
+        [
+          0,
+          244523,
+          0
+        ],
+        [
+          0,
+          661081,
+          4665175
+        ]
+      ]
+    },
+    "overall_agreement": 0.8878253780434511,
+    "per_class": {
+      "1": {
+        "name": "WLED",
+        "precision_new_vs_reference": 0.8964163803076152,
+        "recall_new_vs_reference": 1.0,
+        "iou_new_vs_reference": 0.8964163803076152,
+        "new_count_in_common_mask": 4211496,
+        "reference_count_in_common_mask": 3775254
+      },
+      "2": {
+        "name": "RLED",
+        "precision_new_vs_reference": 1.0,
+        "recall_new_vs_reference": 0.20425631798506103,
+        "iou_new_vs_reference": 0.20425631798506103,
+        "new_count_in_common_mask": 244523,
+        "reference_count_in_common_mask": 1197138
+      },
+      "3": {
+        "name": "Other",
+        "precision_new_vs_reference": 0.8758826087217738,
+        "recall_new_vs_reference": 0.9699144449043771,
+        "iou_new_vs_reference": 0.8527153532722935,
+        "new_count_in_common_mask": 5326256,
+        "reference_count_in_common_mask": 4809883
+      }
+    },
+    "interpretation_boundary": "Agreement with the user's earlier file measures implementation consistency, not accuracy against independent ground truth."
+  },
+  "analysis_changed_after_comparison": false,
+  "access_record": {
+    "user_reference_outputs_opened_pre_lock": false,
+    "user_reference_outputs_opened_post_lock": true,
+    "gold_output_opened": false
+  },
+  "reproducibility": {
+    "script": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q17-sdgsat-light-classification/run_formal_q17_analysis.py",
+    "script_sha256": "e6ee2710f4dc6763306034867e05b7fe64297e6a15228ca443157abf6840f962"
+  },
+  "limitations": [
+    "The earlier RBLI/classification files are implementation references, not ground truth.",
+    "The earlier classification declares code 0 as raster NoData while its description calls code 0 Dark; code 0 is therefore excluded, not remapped.",
+    "No field-validated luminaire labels were available for accuracy assessment."
+  ]
+}

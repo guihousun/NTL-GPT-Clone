@@ -1,0 +1,86 @@
+{
+  "schema": "ntl.case201.skill-usage-evidence.v1",
+  "case_id": "CASE-201",
+  "role": "NTL Event Tracker",
+  "status": "manually_read_hash_bound_not_runtime_loaded",
+  "generated_at_utc": "2026-08-18T07:22:39.241Z",
+  "inputs": [
+    {
+      "path": "runtime/.ntl-gpt/skills/gee-ntl-date-boundary-handling/SKILL.md",
+      "sha256": "7f43d02a5db7b9cb3aa0381c26c0a96dfe5fd180fcf894384bf21e431ba0c8d9",
+      "role": "runtime Skill manually read in full"
+    },
+    {
+      "path": "experiments/paper-case-201-myanmar-first-local-night-2026-08-18/skill/gee-ntl-date-boundary-handling.version.json",
+      "sha256": "3095599211bf1637dc27765f430803b1c9b3207fba4e7f6ffda53d22830916b6",
+      "role": "Case version and expected hash binding"
+    },
+    {
+      "path": "experiments/paper-case-201-myanmar-first-local-night-2026-08-18/skill/implementation-diff.md",
+      "sha256": "f13f32c5b9533a909a3687af630a060c2a17a623d8bfd51d40fb131c71f06ce2",
+      "role": "Case/runtime scope distinction"
+    },
+    {
+      "path": "runtime/agents/NTL_Engineer.py",
+      "sha256": "4362ac649f4ac8707a519a898b06f1c5b4f0ff030137344d3e7b2577d106acd7",
+      "role": "runtime prompt reference evidence"
+    },
+    {
+      "path": "experiments/paper-case-201-myanmar-first-local-night-2026-08-18/implementation/gee_ntl_date_boundary_handling.py",
+      "sha256": "72a23d6cb0cf358d0548003fe423de4df62b3e325cd63d700ed6395788216b11",
+      "role": "local companion implementation executed"
+    }
+  ],
+  "hash_binding": {
+    "expected_sha256_from_case_version": "7f43d02a5db7b9cb3aa0381c26c0a96dfe5fd180fcf894384bf21e431ba0c8d9",
+    "observed_sha256_at_read_time": "7f43d02a5db7b9cb3aa0381c26c0a96dfe5fd180fcf894384bf21e431ba0c8d9",
+    "match": true,
+    "version_record_runtime_loaded_for_case201": false
+  },
+  "usage": {
+    "manual_skill_read": true,
+    "manual_rules_applied": [
+      {
+        "rule": "Keep local_first_night_date distinct from UTC-indexed file/product date.",
+        "skill_lines": "16-23, 34-39"
+      },
+      {
+        "rule": "Use the documented 00:30-02:30 local candidate window and do not invent an exact acquisition time.",
+        "skill_lines": "21-23, 47-51, 66-79"
+      },
+      {
+        "rule": "Use an end-exclusive one-day query after adding one day.",
+        "skill_lines": "34-39, 83-92"
+      },
+      {
+        "rule": "Do not silently fall back to a later date after an exact-date eligibility failure.",
+        "skill_lines": "66-79"
+      }
+    ],
+    "companion_implementation_execution": true,
+    "deployed_runtime_graph_invoked": false,
+    "runtime_skill_loaded_by_deployment": false,
+    "runtime_telemetry_available": false,
+    "model_calls": 0,
+    "benchmark_execution": false
+  },
+  "runtime_reference": {
+    "path": "runtime/agents/NTL_Engineer.py",
+    "lines": "28-39",
+    "meaning": "The historical Engineer prompt references the Skill for daily/event/first-night/timezone AOI issues; this is reference evidence only and does not prove it was loaded by this Case run."
+  },
+  "validation": {
+    "status": "passed",
+    "checks": [
+      "Runtime Skill observed hash equals Case version record hash.",
+      "Skill was read manually before the supplied implementation was executed.",
+      "Applied date-boundary rules agree with the implementation outputs.",
+      "No deployment/runtime loading or telemetry claim is made."
+    ]
+  },
+  "limitations": [
+    "This is a Codex-subagent workflow simulation, not a deployed NTL-GPT or Deep Agents trace.",
+    "The runtime Skill was not imported or dynamically loaded by a deployed graph.",
+    "Hash binding proves the file content inspected, not execution through the runtime loader."
+  ]
+}

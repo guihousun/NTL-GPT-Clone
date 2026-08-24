@@ -1,0 +1,18 @@
+{
+  "schema_version": "ntl.case201.skill-version.v1",
+  "skill_name": "gee-ntl-date-boundary-handling",
+  "runtime_source_path": "runtime/.ntl-gpt/skills/gee-ntl-date-boundary-handling/SKILL.md",
+  "runtime_source_sha256": "7f43d02a5db7b9cb3aa0381c26c0a96dfe5fd180fcf894384bf21e431ba0c8d9",
+  "case_contract_version": "case201-date-boundary-contract.v1",
+  "reviewed_rules": [
+    "event source time to UTC normalization",
+    "local timezone context",
+    "first post-event local-night selection",
+    "local-night to UTC-indexed product date mapping",
+    "end-exclusive single-day query rule",
+    "exact-date eligibility gate with no silent later-date fallback"
+  ],
+  "runtime_reference_evidence": "runtime/agents/NTL_Engineer.py:38 references /skills/gee-ntl-date-boundary-handling/.",
+  "runtime_loaded_for_case201": false,
+  "usage_mode": "Codex-subagent workflow simulation reads and applies a frozen contract derived from the runtime Skill; it is not a runtime loading assertion."
+}

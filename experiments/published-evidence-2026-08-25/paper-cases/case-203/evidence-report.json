@@ -1,0 +1,23 @@
+{
+  "schema": "ntl.paper-case.evidence-report.v1",
+  "case_id": "Q17-sdgsat-light-classification",
+  "status": "success",
+  "paper_role": "main_workflow_case",
+  "route": ["NTL Engineer", "NTL Data Specialist", "NTL Engineer", "NTL Analyst", "NTL Engineer"],
+  "valid_pixel_count": 9784136,
+  "classes": {
+    "WLED": {"count": 4211496, "fraction": 0.4304412776},
+    "RLED": {"count": 244523, "fraction": 0.0249917826},
+    "Other": {"count": 5328117, "fraction": 0.5445669398}
+  },
+  "post_lock_reference_comparison": {
+    "new_result_hash_unchanged": true,
+    "rbli_common_valid_pixels": 2200100,
+    "rbli_rmse": 0.0,
+    "classification_common_semantic_pixels": 9782275,
+    "overall_agreement": 0.8878253780,
+    "is_ground_truth_accuracy": false
+  },
+  "gold_output_opened": false
+}
+

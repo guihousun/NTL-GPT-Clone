@@ -1,0 +1,15 @@
+{
+  "schema_version": "ntl.case202.analysis-qa.v1",
+  "passed": true,
+  "checks": {
+    "daily_rows": 462,
+    "daily_unique_keys": true,
+    "unqualified_rows_have_no_radiance": true,
+    "strict_window_rows": 4,
+    "fixed_window_definitions_unchanged": true,
+    "no_imputation": true
+  },
+  "source_daily_csv_sha256": "d3ffaced57456e69b08f644d4f326281302e723fe2d13502b6370e9a7be6b78e",
+  "result_sha256": "a5381a20134e99c347e411df185544b5e8ec9baeafddd0a2e05f7e80ec8e4af5",
+  "timestamp_utc": "2026-08-21T09:32:51Z"
+}

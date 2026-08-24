@@ -1,0 +1,5 @@
+event_date_utc,label,precision,display_role,note
+2026-04-08,Initial two-week ceasefire announced,date-only,background_marker,Not a precise UTC instant.
+2026-04-21,Ceasefire extension announced,date-only,formal_marker,"2026-04-22 is an institutional reporting date, not a ceasefire-end date."
+2026-06-17,Islamabad MoU signed,date-only,formal_marker,No precise UTC signing time asserted.
+2026-07-07,Renewed hostilities (U.S. notice),date-only,formal_marker,"Date marks source-reported notice semantics, not causal attribution."

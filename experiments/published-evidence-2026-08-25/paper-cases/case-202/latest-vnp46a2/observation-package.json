@@ -1,0 +1,249 @@
+{
+  "aoi": {
+    "artifact": {
+      "bytes": 382894,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/tehran-boundary.geojson",
+      "sha256": "66b65ad355fe607229f4e16dfce366e54d16ce81a2c208e63edbb0d838d7e02d"
+    },
+    "canonical_level": "Shahrestan",
+    "crs": "EPSG:4326",
+    "metadata_artifact": {
+      "bytes": 2993,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/tehran-boundary-metadata.json",
+      "sha256": "6353276850230e2d658343a8215a36da75a9e2d683c2c2d17a42391817c085b4"
+    },
+    "no_event_buffer": true,
+    "semantics": "geoBoundaries ADM2 / canonical Shahrestan / source-named unit 'City of Tehran'; not asserted to be a municipality",
+    "shape_id": "26516999B29761828880922",
+    "source_feature_name": "City of Tehran",
+    "source_level": "geoBoundaries ADM2"
+  },
+  "artifacts": {
+    "daily-vnp46a2-raw.jsonl": {
+      "bytes": 176527,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/daily-vnp46a2-raw.jsonl",
+      "sha256": "f4dca756721930c7336626026938571031569793e5c41dbb706d242fe5f176dd"
+    },
+    "daily-vnp46a2.csv": {
+      "bytes": 79168,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/daily-vnp46a2.csv",
+      "sha256": "d3ffaced57456e69b08f644d4f326281302e723fe2d13502b6370e9a7be6b78e"
+    },
+    "extract_tehran_daily_vnp46a2.py": {
+      "bytes": 46844,
+      "path": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q19-tehran-city-longseries/extract_tehran_daily_vnp46a2.py",
+      "sha256": "8917ee99bea6405a96841bd8022dd18b25c90b2a471cb9d99d20d38253c465ee"
+    },
+    "gee-checkpoint.json": {
+      "bytes": 1846,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/gee-checkpoint.json",
+      "sha256": "51b3e90fb9445117cad0265036bd2ea4a1a6dcb76fa4af0dde1aa780107eacbc"
+    },
+    "gee-chunk-2026-01.json": {
+      "bytes": 27693,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/gee-chunk-2026-01.json",
+      "sha256": "007fa62fc7fe78dfc6e164381c64c0bead1eb8df6fb65ae5d0360ac73951602b"
+    },
+    "gee-chunk-2026-02.json": {
+      "bytes": 23672,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/gee-chunk-2026-02.json",
+      "sha256": "eb3b2113028ee74cae3bf8792628a0a8e6268c35f9923f3b830881422dea9827"
+    },
+    "gee-chunk-2026-03.json": {
+      "bytes": 18409,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/gee-chunk-2026-03.json",
+      "sha256": "99224a14dfe6746957728b5f20b0ad2d4e32337ab7ef441d4424a4dead12ccfa"
+    },
+    "gee-chunk-2026-04.json": {
+      "bytes": 22979,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/gee-chunk-2026-04.json",
+      "sha256": "d119d7ee7af1cb16f91240e0f9e430e59dd991d44d29895840c483f1f3d8aaf4"
+    },
+    "gee-chunk-2026-05.json": {
+      "bytes": 29738,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/gee-chunk-2026-05.json",
+      "sha256": "117b77bd6ad5d83fe3e200f9043653f441240c30601fe496046c9335441f9049"
+    },
+    "gee-chunk-2026-06.json": {
+      "bytes": 26785,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/gee-chunk-2026-06.json",
+      "sha256": "214ee0cb0325b184525ad9c83a4679e93ab9331ccafd12c2deb1320a090abeac"
+    },
+    "gee-chunk-2026-07.json": {
+      "bytes": 23080,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/gee-chunk-2026-07.json",
+      "sha256": "8809c13843ab4cc81c3b3cdc40c994da8f83e395d6acfa436c1139deddc89455"
+    },
+    "gee-chunk-2026-08.json": {
+      "bytes": 10752,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/gee-chunk-2026-08.json",
+      "sha256": "0d58926d08a87fcd5416cba3c4f0ae90c983994bf7fa3065a421c686eba68482"
+    },
+    "gee-code-review.json": {
+      "bytes": 1477,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/gee-code-review.json",
+      "sha256": "d30ba655d0866aefb0ae027e606e8fd335ad441c023e9edfb1723e27399176de"
+    },
+    "tehran-boundary-metadata.json": {
+      "bytes": 2993,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/tehran-boundary-metadata.json",
+      "sha256": "6353276850230e2d658343a8215a36da75a9e2d683c2c2d17a42391817c085b4"
+    },
+    "tehran-boundary.geojson": {
+      "bytes": 382894,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/tehran-boundary.geojson",
+      "sha256": "66b65ad355fe607229f4e16dfce366e54d16ce81a2c208e63edbb0d838d7e02d"
+    }
+  },
+  "availability": {
+    "available_image_date_count": 215,
+    "collection_size_all_time": 5272,
+    "collection_size_since_2026_01_01": 215,
+    "duplicate_source_dates": {},
+    "expected_calendar_day_count": 231,
+    "latest_strict_qualified_date_utc": "2026-08-12",
+    "live_latest_image_date_utc": "2026-08-19",
+    "missing_image_date_count": 16,
+    "missing_image_dates": [
+      "2026-03-10",
+      "2026-03-11",
+      "2026-03-12",
+      "2026-04-28",
+      "2026-04-29",
+      "2026-04-30",
+      "2026-06-01",
+      "2026-06-02",
+      "2026-07-11",
+      "2026-07-12",
+      "2026-07-13",
+      "2026-07-14",
+      "2026-07-15",
+      "2026-07-16",
+      "2026-08-04",
+      "2026-08-05"
+    ],
+    "permissive_qualified_date_count": 172,
+    "queried_at_utc": "2026-08-21T09:10:22Z",
+    "query_duration_seconds": 3.907,
+    "strict_qualified_date_count": 168
+  },
+  "case_id": "Case202-tehran-latest-vnp46a2",
+  "code_review": {
+    "artifact": {
+      "bytes": 1477,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/gee-code-review.json",
+      "sha256": "d30ba655d0866aefb0ae027e606e8fd335ad441c023e9edfb1723e27399176de"
+    },
+    "error_count": 0,
+    "gate_status": "passed_with_warnings",
+    "return_code": 1,
+    "review_script": "local-user/.codex/plugins/cache/xujingchen1996-local/easygee/0.3.1/skills/easygee/scripts/review_ee_code.py",
+    "reviewed_at_utc": "2026-08-21T09:10:26Z",
+    "reviewer_errors": 0,
+    "reviewer_warnings": 3,
+    "stderr": "",
+    "stdout": "Earth Engine review: vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q19-tehran-city-longseries/extract_tehran_daily_vnp46a2.py/n[WARN] getinfo (line 339): Keep getInfo() calls tiny and diagnostic; export large results instead./n  ee.FeatureCollection(feature_expressions).getInfo()/n[WARN] getinfo (line 436): Keep getInfo() calls tiny and diagnostic; export large results instead./n  ee.Dictionary( { /"times_ms\": collection.aggregate_array(\"system:time_start\"), \"indices\": collection.aggregate_array(\"system:index\"), \"size\": collection.size(), } ).getInfo()\n[WARN] getinfo (line 688): Keep getInfo() calls tiny and diagnostic; export large results instead.\n  ee.Dictionary( { \"global_collection_size\": global_collection.size(), \"since_start_size\": since_start.size(), \"latest_time_ms\": latest_image.get(\"system:time_start\"), \"latest_index\"\n",
+    "strict": true,
+    "warning_count": 3
+  },
+  "event_handoff": {
+    "accepted_before_data_stage": true,
+    "event_context_path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/event-context.json",
+    "event_context_sha256": "604e717bbfd22bd5b5c957092f7455b6cd98481f9f7f2f6f0f7033b29a6357c9"
+  },
+  "execution_context": "codex_four_role_simulation",
+  "limitations": [
+    "The geoBoundaries ADM2 unit is canonical Shahrestan and is not a municipality or functional urban footprint.",
+    "The boundary represents 2017 geography and was built in 2023.",
+    "Strict-qualified means at least one valid pixel; coverage fraction must be inspected before interpretation.",
+    "Daily radiance can vary with residual atmosphere, viewing geometry, ephemeral lights, and data coverage.",
+    "Missing or unqualified days are null and were not interpolated or gap-filled.",
+    "Nighttime-light variation is observational and does not establish conflict causation, outage, damage, or recovery."
+  ],
+  "produced_by": "NTL_Data_Searcher",
+  "product": {
+    "analysis_scale_m": 500,
+    "band": "DNB_BRDF_Corrected_NTL",
+    "cadence": "daily",
+    "catalog_url": "httplocal-path/NASA_VIIRS_002_VNP46A2",
+    "collection_id": "NASA/VIIRS/002/VNP46A2",
+    "doi": "httplocal-path/VNP46A2.002",
+    "earthengine_api_version": "1.7.28",
+    "gap_filled_band_used": false,
+    "native_crs": "EPSG:4326",
+    "native_nominal_scale_m": 463.83121089650996,
+    "source": "Official Google Earth Engine catalog; producer NASA LAADS DAAC",
+    "units": "nW cm^-2 sr^-1",
+    "version": "002"
+  },
+  "qa_contract": {
+    "authority": "httplocal-path/NASA_VIIRS_002_VNP46A2",
+    "common": [
+      "DNB_BRDF_Corrected_NTL >= 0",
+      "QF_Cloud_Mask bit 0 = 0 (night)",
+      "QF_Cloud_Mask bits 6-7 <= 1 (confident/probably clear)",
+      "QF_Cloud_Mask bit 8 = 0 (no shadow)",
+      "QF_Cloud_Mask bit 9 = 0 (no cirrus cloud)",
+      "QF_Cloud_Mask bit 10 = 0 (no snow/ice surface)",
+      "Snow_Flag = 0"
+    ],
+    "permissive": [
+      "common",
+      "Mandatory_Quality_Flag in {0,1} (persistent or ephemeral high quality)",
+      "QF_Cloud_Mask bits 4-5 >= 1 (low/medium/high cloud-mask quality)"
+    ],
+    "qualified_definition": "At least one QA-qualified pixel; no minimum coverage threshold.",
+    "reasonable_source_base": "Unmasked DNB_BRDF_Corrected_NTL pixels with radiance >= 0 in the exact AOI at 500 m; evaluated before night/cloud/quality/snow QA.",
+    "strict": [
+      "common",
+      "Mandatory_Quality_Flag = 0 (high-quality persistent nighttime lights)",
+      "QF_Cloud_Mask bits 4-5 >= 2 (medium/high cloud-mask quality)"
+    ],
+    "valid_fraction_definition": "valid_count / total_count for the same product day and AOI."
+  },
+  "reducer": {
+    "execution": "One server-side FeatureCollection materialization per UTC month chunk, with each chunk persisted and re-opened; no per-day getInfo loop.",
+    "geometry": "exact City of Tehran source polygon",
+    "max_pixels": 10000000,
+    "scale_m": 500,
+    "statistics": [
+      "mean",
+      "median",
+      "std",
+      "p25",
+      "p75",
+      "count"
+    ],
+    "tile_scale": 2
+  },
+  "runtime_environment": {
+    "cloud_project_id_persisted": false,
+    "earthengine_api_version": "1.7.28",
+    "easygee_project_resolution_source": "easygee-settings",
+    "python_executable": "local-user/miniconda3/python.exe",
+    "python_version": "3.11.14"
+  },
+  "schema_version": "ntl.observation-package.v1",
+  "status": "complete",
+  "time_contract": {
+    "display_latest_semantics": "latest strict-qualified UTC product date",
+    "filter_interval_utc": "[2026-01-01T00:00:00Z, 2026-08-20T00:00:00Z)",
+    "latest_strict_qualified_product_date_inclusive": "2026-08-12",
+    "live_latest_collection_image_date_inclusive": "2026-08-19",
+    "no_imputation": true,
+    "primary_basis": "UTC product day",
+    "start_date_inclusive": "2026-01-01"
+  },
+  "validation": {
+    "actual_row_count": 462,
+    "artifact_hashes_recomputed": true,
+    "boundary_reopened_and_hashed": true,
+    "csv_reopened": true,
+    "errors": [],
+    "expected_row_count": 462,
+    "jsonl_reopened": true,
+    "no_imputation_or_interpolation": true,
+    "status": "passed",
+    "unique_key_count": 462
+  }
+}

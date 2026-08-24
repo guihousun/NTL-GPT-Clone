@@ -1,0 +1,56 @@
+{
+  "schema_version": "ntl.case202.engineer-validation.v1",
+  "case_id": "Case202-tehran-latest-vnp46a2",
+  "validated_at_utc": "2026-08-21T09:35:14Z",
+  "status": "PASS",
+  "checks": {
+    "daily_has_exactly_two_qa_rows_per_utc_day": true,
+    "unqualified_rows_have_no_numeric_radiance": true,
+    "latest_global_collection_image_matches_checkpoint": true,
+    "latest_strict_city_observation_matches_checkpoint": true,
+    "cmr_latest_tehran_tile_is_recorded": true,
+    "result_distinguishes_global_and_strict_endpoints": true,
+    "post_strict_collection_dates_remain_explicit_non_numeric_gaps": true,
+    "august_live_refresh_passed": true,
+    "pre_conflict_baseline_matches_saved_result": true,
+    "conflict_evaluation_matches_saved_result": true,
+    "ceasefire_evaluation_matches_saved_result": true,
+    "extended_monitoring_matches_saved_result": true,
+    "all_four_figure_exports_exist_and_are_nonempty": true
+  },
+  "recomputed_strict_window_summary": {
+    "pre_conflict_baseline": {
+      "start_date_utc": "2026-01-01",
+      "end_date_utc": "2026-02-27",
+      "strict_qualified_days": 47,
+      "mean_of_daily_means": 67.23183490694599,
+      "relative_change_vs_baseline_percent": 0.0
+    },
+    "conflict_evaluation": {
+      "start_date_utc": "2026-02-28",
+      "end_date_utc": "2026-04-07",
+      "strict_qualified_days": 20,
+      "mean_of_daily_means": 55.61991566160809,
+      "relative_change_vs_baseline_percent": -17.271459661051473
+    },
+    "ceasefire_evaluation": {
+      "start_date_utc": "2026-04-08",
+      "end_date_utc": "2026-04-21",
+      "strict_qualified_days": 11,
+      "mean_of_daily_means": 61.3582627055188,
+      "relative_change_vs_baseline_percent": -8.736296145355348
+    },
+    "extended_monitoring": {
+      "start_date_utc": "2026-04-22",
+      "end_date_utc": "2026-08-19",
+      "strict_qualified_days": 90,
+      "mean_of_daily_means": 59.254862665306256,
+      "relative_change_vs_baseline_percent": -11.86487361631655
+    }
+  },
+  "inputs": {
+    "daily_vnp46a2_csv_sha256": "d3ffaced57456e69b08f644d4f326281302e723fe2d13502b6370e9a7be6b78e",
+    "analysis_results_json_sha256": "a5381a20134e99c347e411df185544b5e8ec9baeafddd0a2e05f7e80ec8e4af5",
+    "cmr_availability_json_sha256": "bf59c0cfa4c25ed3f6cdfbd674311775f13d063aaa14ec2fd6a423796694a783"
+  }
+}

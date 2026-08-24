@@ -1,0 +1,23 @@
+{
+  "schema": "ntl.paper-case.pre-comparison-lock.v1",
+  "locked_at_utc": "2026-08-13T08:58:16+00:00",
+  "new_result": {
+    "path": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q17-sdgsat-light-classification/formal-SDGSAT1-shanghai-light-classification.tif",
+    "sha256": "2a086016653569b5f6c73a40f2f9a6b64a0cc0f6568bce230383f9d49c327e7d"
+  },
+  "new_statistics": {
+    "path": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q17-sdgsat-light-classification/formal-class-statistics.json",
+    "sha256": "ad9a47fc4d2a6fd5a307c881c241aecf8547965d982c6bb131eebbbfc526d875"
+  },
+  "new_preview": {
+    "path": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q17-sdgsat-light-classification/formal-classification-preview.png",
+    "sha256": "c81592329b94f52242adb4f4617efa125297c9464e386882417c0ba5b8dabed1"
+  },
+  "thresholds": {
+    "RRLI_RLED": 9.0,
+    "RBLI_WLED": 0.57
+  },
+  "nodata": 255,
+  "reference_files_opened_before_lock": false,
+  "immutable_analysis_decisions_after_lock": true
+}

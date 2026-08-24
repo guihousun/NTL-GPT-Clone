@@ -1,0 +1,168 @@
+{
+  "schema": "ntl.event-context.v1",
+  "task_id": "Q18-myanmar-earthquake",
+  "role": "NTL Event Tracker",
+  "status": "complete_with_unresolved_source_conflict",
+  "event_scope": "2025-03-28 central Myanmar mainshock and source-bounded humanitarian context",
+  "as_of": {
+    "usgs_snapshot_checked_at_utc": "2026-08-10T17:56:57.654857Z",
+    "reliefweb_snapshot_checked_at_utc": "2026-08-10T17:56:59.220409Z",
+    "live_refresh_performed": false,
+    "semantics": "Mainshock identity is fixed from the supplied official-domain snapshots, with the supplied verified project reference used only to corroborate fields not exposed in the USGS search excerpt. Humanitarian figures retain the reporting date and attribution of each underlying ReliefWeb item; they are not current as of the snapshot-check date.",
+    "limitation": "The supplied official-domain files are search-result snapshots rather than downloaded source records. The magnitude type and origin review status are stated in the derived verified-reference file but are not visible in the supplied USGS search excerpt."
+  },
+  "primary_event": {
+    "event_id_usgs": "us7000pn9s",
+    "official_name": "2025 Mandalay, Burma (Myanmar) Earthquake",
+    "origin_time_utc": "2025-03-28T06:20:52Z",
+    "origin_time_local": "2025-03-28T12:50:52+06:30",
+    "local_timezone": "Asia/Yangon",
+    "local_time_derivation": "UTC plus 06:30; ReliefWeb independently rounds the event time to 06:20 UTC and 12:50 local.",
+    "epicenter": {
+      "crs": "EPSG:4326",
+      "datum": "WGS 84",
+      "latitude": 22.011,
+      "longitude": 95.936,
+      "coordinate_order_lon_lat": [
+        95.936,
+        22.011
+      ],
+      "context": "Near Sagaing and Mandalay in central Myanmar; ReliefWeb describes the epicentre as about 16 km north-north-west of Sagaing city and 19 km north-west of Mandalay city."
+    },
+    "magnitude": {
+      "value": 7.7,
+      "type_code": "mww",
+      "display": "Mww 7.7"
+    },
+    "depth_km": 10.0,
+    "usgs_review_status": "reviewed",
+    "field_provenance": {
+      "event_id": "Visible in the supplied USGS event-page URLs and corroborated by the verified project reference.",
+      "origin_time_coordinates_depth_and_value": "Supplied USGS official-domain snapshot; ReliefWeb independently corroborates the rounded time, magnitude value, depth, and regional location.",
+      "magnitude_type_and_review_status": "Supplied verified project reference; these two fields are not exposed in the supplied USGS search-result excerpt."
+    }
+  },
+  "subsequent_earthquake_reporting_conflict": {
+    "status": "unresolved_and_preserved",
+    "relationship_to_primary_event": "A strong subsequent earthquake occurred within minutes of the mainshock, but the supplied ReliefWeb materials do not use a single consistent magnitude.",
+    "reports": [
+      {
+        "reported_magnitude": 6.4,
+        "reported_time_utc": "2025-03-28T06:32:00Z",
+        "reported_time_precision": "minute",
+        "reported_depth_km": 10.0,
+        "labels_used": [
+          "aftershock",
+          "second earthquake"
+        ],
+        "source_urls": [
+          "httplocal-path/eq-2025-000043-mmr",
+          "httplocal-path/myanmar-m77-28-march-2025-sagaing-earthquake-satellite-based-comprehensive-damage-assessment-report-sagaing-mandalay-shan-north-magway-nay-pyi-taw-shan-south-and-bago-east-regions",
+          "httplocal-path/situation-update-no-4-m77-earthquake-myanmar-and-thailand-friday-4-april-2025-2000-hrs-utc7"
+        ]
+      },
+      {
+        "reported_magnitude": 6.7,
+        "reported_time_utc": null,
+        "reported_time_precision": "described only as minutes later",
+        "reported_depth_km": null,
+        "labels_used": [
+          "second earthquake"
+        ],
+        "source_urls": [
+          "httplocal-path/myanmar-earthquake-hnrp-flash-addendum-issued-april-2025"
+        ]
+      }
+    ],
+    "safe_handling": "Do not normalize the subsequent event to M6.4 or M6.7 without a separate event-level verification. Anchor any downstream temporal design to the Mww 7.7 mainshock at 2025-03-28T06:20:52Z and disclose the potentially confounding subsequent earthquake."
+  },
+  "humanitarian_reporting": [
+    {
+      "report_as_of": "2025-03-29",
+      "source_title": "Myanmar Earthquake Flash Update #1",
+      "publisher_as_presented_on_reliefweb": "UN and humanitarian partners / OCHA update",
+      "source_url": "httplocal-path/myanmar-earthquake-flash-update-1-29-march-2025",
+      "figures": {
+        "deaths": "upwards of 1,000",
+        "injured": "over 2,200",
+        "missing": "approximately 200"
+      },
+      "qualification": "Initial field reports; evolving figures."
+    },
+    {
+      "report_as_of": "2025-04-11",
+      "source_title": "Myanmar: Earthquake - Mar 2025 disaster page excerpt",
+      "publisher_as_presented_on_reliefweb": "ECHO, citing AHA Centre",
+      "source_url": "httplocal-path/eq-2025-000043-mmr",
+      "figures": {
+        "myanmar_deaths": 3603,
+        "myanmar_missing": 141,
+        "myanmar_injured": 4817,
+        "people_displaced": "nearly 200,000",
+        "people_in_temporary_shelters": 40896,
+        "temporary_shelters": 127,
+        "thailand_deaths": 30,
+        "thailand_injured": 38
+      },
+      "qualification": "The disaster-page search excerpt explicitly attributes these values to ECHO on 11 April 2025 and, for Myanmar, to the AHA Centre."
+    },
+    {
+      "report_as_of": "2025-04-25",
+      "source_title": "UNOSAT satellite-based comprehensive damage assessment report excerpt",
+      "publisher_as_presented_on_reliefweb": "UNOSAT, citing UN OCHA Situation Report No. 4",
+      "source_url": "httplocal-path/myanmar-m77-28-march-2025-sagaing-earthquake-satellite-based-comprehensive-damage-assessment-report-sagaing-mandalay-shan-north-magway-nay-pyi-taw-shan-south-and-bago-east-regions",
+      "figures": {
+        "deaths": "approximately 3,800 confirmed",
+        "injured": "over 5,100",
+        "missing": "at least 116",
+        "people_in_need_of_humanitarian_assistance": "more than 1.1 million",
+        "people_reached": "nearly 600,000"
+      },
+      "qualification": "Values appear in the supplied search excerpt and are attributed there to UN OCHA Situation Report No. 4 dated 25 April 2025."
+    },
+    {
+      "report_as_of": "2025-04 (day not stated in supplied excerpt)",
+      "source_title": "Myanmar Earthquake: HNRP Flash Addendum",
+      "publisher_as_presented_on_reliefweb": "Humanitarian Needs and Response Plan Flash Addendum",
+      "source_url": "httplocal-path/myanmar-earthquake-hnrp-flash-addendum-issued-april-2025",
+      "figures": {
+        "people_living_in_affected_areas": "over 17 million",
+        "people_in_hardest_hit_areas": "more than 9.1 million",
+        "people_in_urgent_need": "6.3 million",
+        "already_in_need_before_earthquake": "4.3 million",
+        "additional_people_requiring_urgent_assistance": "2 million"
+      },
+      "qualification": "Planning estimates with a different denominator and purpose from casualty or displacement reports; do not combine them into a single toll."
+    }
+  ],
+  "source_scope": {
+    "authoritative_event_source": "USGS Earthquake Hazards Program event page for us7000pn9s, as captured in the supplied official-domain search snapshot.",
+    "humanitarian_context_sources": "ReliefWeb-hosted disaster, OCHA, ECHO/AHA Centre, UNOSAT, and HNRP excerpts in the supplied official-domain search snapshot.",
+    "corroborative_project_source": "BV1-015 verified-reference output; derived and not treated as an independent external authority.",
+    "excluded": [
+      "reference-manifest gold_answer",
+      "live web refresh",
+      "nighttime-light observations",
+      "damage, outage, recovery, or causal inference"
+    ]
+  },
+  "downstream_anchor": {
+    "event_time_utc": "2025-03-28T06:20:52Z",
+    "event_time_local": "2025-03-28T12:50:52+06:30",
+    "event_point_wgs84_lon_lat": [
+      95.936,
+      22.011
+    ],
+    "safe_wording": "We anchor the temporal analysis to the USGS-reviewed Mww 7.7 mainshock near Mandalay and Sagaing at 06:20:52 UTC (12:50:52 Asia/Yangon) on 28 March 2025. ReliefWeb materials also report a strong subsequent earthquake within minutes, but disagree on whether its magnitude was 6.4 or 6.7; this discrepancy is preserved as a source limitation.",
+    "interpretation_limit": "This context fixes when and where the event occurred. It does not establish that any observed nighttime-light change represents outage, damage, recovery, or earthquake causation."
+  },
+  "validation": {
+    "mainshock_fixed": true,
+    "utc_local_conversion_checked": true,
+    "wgs84_coordinate_order_explicit": true,
+    "source_conflict_preserved": true,
+    "humanitarian_figures_source_and_date_separated": true,
+    "nighttime_light_analysis_performed": false,
+    "causal_claim_made": false
+  }
+}

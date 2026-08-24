@@ -1,0 +1,29 @@
+{
+  "schema": "ntl.q18.evidence-report.v2",
+  "task_id": "Q18-myanmar-earthquake",
+  "status": "accepted_descriptive_noncausal",
+  "formal_spatial_support_km": [25, 50],
+  "results": {
+    "25": {
+      "pre_event_valid_daily_mean_n": 6,
+      "pre_event_mean_nw_cm2_sr": 1.4825387715,
+      "first_post_event_mean_nw_cm2_sr": 1.043512512,
+      "percent_difference": -29.613138485
+    },
+    "50": {
+      "pre_event_valid_daily_mean_n": 7,
+      "pre_event_mean_nw_cm2_sr": 0.8338199965,
+      "first_post_event_mean_nw_cm2_sr": 0.874851274,
+      "percent_difference": 4.9208795269
+    }
+  },
+  "interpretation": "The 25 km and 50 km first-night contrasts are retained as separate, support-specific descriptive results.",
+  "not_supported": [
+    "earthquake causation",
+    "power outage inference",
+    "physical damage inference",
+    "recovery trajectory or recovery rate",
+    "statistical significance from the small pre-event sample"
+  ],
+  "source_analysis_result": "formal-analysis-results.json"
+}

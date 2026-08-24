@@ -1,0 +1,97 @@
+{
+  "schema": "ntl.case201.data-searcher.product-eligibility.v1",
+  "case_id": "CASE-201",
+  "role": "NTL Data Searcher",
+  "execution_context": "Codex-subagent simulation",
+  "runtime_disclosure": {
+    "deployed_ntl_gpt_runtime_used": false,
+    "deep_agents_graph_used": false,
+    "model_calls_performed": false,
+    "runtime_telemetry_claimed": false,
+    "external_service_calls": [],
+    "source_assets_downloaded": false
+  },
+  "objective": "Check whether the exact UTC-indexed first-post-event VNP46A2 product date is present and eligible for both formal Q18 supports.",
+  "verdict": "qualified_both_supports",
+  "decision": {
+    "status": "eligible_exact_first_night_observation",
+    "exact_date_gate": "pass",
+    "utc_product_date": "2025-03-28",
+    "interpreted_local_first_night_date_asia_yangon": "2025-03-29",
+    "date_mapping": {
+      "candidate_local_acquisition_window": "2025-03-29T00:30:00+06:30 to 2025-03-29T02:30:00+06:30",
+      "corresponding_utc_window": "2025-03-28T18:00:00Z to 2025-03-28T20:00:00Z",
+      "utc_indexed_product_date": "2025-03-28",
+      "exact_pixel_acquisition_time_exposed": false
+    },
+    "support_status": {
+      "25_km": "qualified",
+      "50_km": "qualified"
+    },
+    "terminal_failure_rule": "If either support had failed the exact-date gate, this result would be no_eligible_first_night_observation; no later product date may be silently substituted.",
+    "later_date_fallback_used": false
+  },
+  "product_identity": {
+    "short_name": "VNP46A2",
+    "collection": "002",
+    "band": "DNB_BRDF-Corrected_NTL",
+    "band_path": "HDFEOS/GRIDS/VIIRS_Grid_DNB_2d/Data Fields/DNB_BRDF-Corrected_NTL",
+    "units": "nW cm^-2 sr^-1",
+    "tile": "h27v06",
+    "filename": "VNP46A2.A2025087.h27v06.002.2025095151403.h5",
+    "producer_granule_id": "VNP46A2.A2025087.h27v06.002.2025095151403.h5",
+    "sha256": "d5b56523344d2407eefe0180b9399c14fe7f56400b0e32c0869ee8f3812e17de",
+    "sha256_verified_against_local_file": true,
+    "sha256_note": "Independently recomputed from the local target HDF5 and matched the Q18 inventory and target CSV row."
+  },
+  "qa_contract": {
+    "source": "formal Q18 strict QA contract",
+    "physical_radiance": "finite, not fill, and >= 0 after scale/offset",
+    "mandatory_quality": "Mandatory_Quality_Flag == 0",
+    "cloud_mask": [
+      "QF_Cloud_Mask not fill",
+      "bit 0 == 0",
+      "bits 4-5 >= 2",
+      "bits 6-7 <= 1",
+      "bits 8, 9, 10, 12, 13 == 0"
+    ],
+    "snow": "Snow_Flag == 0 and not fill",
+    "primary_valid_mask": "logical AND of all listed conditions"
+  },
+  "support_results": [
+    {
+      "aoi_radius_km": 25,
+      "aoi_pixel_count": 9895,
+      "qa_valid_pixel_count": 9802,
+      "qa_valid_fraction": 0.9906013137948458,
+      "radiance_mean_nw_cm2_sr": 1.0435125119745428,
+      "radiance_mean_nonempty": true,
+      "radiance_min_nw_cm2_sr": 0.0005896869115531445,
+      "radiance_max_nw_cm2_sr": 8.898031234741211,
+      "row_qualification": "pass",
+      "independent_recompute": "pass"
+    },
+    {
+      "aoi_radius_km": 50,
+      "aoi_pixel_count": 39575,
+      "qa_valid_pixel_count": 39330,
+      "qa_valid_fraction": 0.9938092229943146,
+      "radiance_mean_nw_cm2_sr": 0.8748512739786589,
+      "radiance_mean_nonempty": true,
+      "radiance_min_nw_cm2_sr": 0.0005896869115531445,
+      "radiance_max_nw_cm2_sr": 11.919617652893066,
+      "row_qualification": "pass",
+      "independent_recompute": "pass"
+    }
+  ],
+  "evidence_inputs": {
+    "formal_observation_package": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-observation-package.json",
+    "analysis_ready_csv": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-q18-analysis-ready.csv",
+    "formal_validation": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-q18-validation.json",
+    "target_hdf": "experiments/benchmark-v1/temporal-freeze/2026-08-11/q96-q99/q96/source_snapshots/official_hdf5/VNP46A2.A2025087.h27v06.002.2025095151403.h5"
+  },
+  "limitations": [
+    "The local-night date is an interpretation from the documented 00:30-02:30 candidate window; VNP46A2 HDF metadata does not expose exact pixel acquisition time.",
+    "This is observational eligibility evidence only and does not establish outage, damage, recovery, causation, or a deployed-runtime execution result."
+  ]
+}

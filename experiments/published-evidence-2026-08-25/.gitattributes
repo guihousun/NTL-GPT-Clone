@@ -1,0 +1,8 @@
+# Keep manifest-covered evidence text byte-stable across Windows and Unix checkouts.
+* text=auto eol=lf
+
+*.xlsx -text
+*.png -text
+*.pdf -text
+*.tif -text
+*.tiff -text

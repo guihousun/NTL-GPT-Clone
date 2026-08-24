@@ -1,0 +1,8 @@
+﻿item,value,validation_or_boundary
+Analysis input,"User-approved analysis-ready RGB; 5674×9250 pixels, 40 m, EPSG:32651, float32, band order R/G/B.",The preceding destriping and radiometric-calibration chain was not rerun in this experiment.
+Indices,RRLI = R/G; RBLI = B/G; green=0 and source-invalid pixels retained as NoData.,"Both derived rasters contained 9,784,136 valid index pixels."
+Ordered classification,RRLI > 9 → RLED; otherwise RBLI > 0.57 → WLED; otherwise Other; NoData = 255.,Fixed Jia et al. method; no threshold tuning.
+Class WLED,"4,211,496 pixels (43.04% of valid index pixels)","Raster implementation result, not field-validated class accuracy."
+Class RLED,"244,523 pixels (2.50% of valid index pixels)","Raster implementation result, not field-validated class accuracy."
+Class Other,"5,328,117 pixels (54.46% of valid index pixels)","Raster implementation result, not field-validated class accuracy."
+Post-lock implementation comparison,Overall semantic agreement = 88.78%.,Agreement with an earlier implementation file; not accuracy against independent ground truth.

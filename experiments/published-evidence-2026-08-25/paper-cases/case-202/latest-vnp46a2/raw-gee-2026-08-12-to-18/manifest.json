@@ -1,0 +1,67 @@
+{
+  "case_id": "Case202-tehran-latest-vnp46a2",
+  "created_at_utc": "2026-08-21T09:01:00Z",
+  "query_record": {
+    "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/raw-gee-2026-08-12-to-18/gee-raw-aug12-18.json",
+    "sha256": "c386ba7b60aa6936dd966c3f0eb4c2e8e9cdf816bd1d9f19f682be2d2263cb02"
+  },
+  "rasters": {
+    "2026-08-12": {
+      "bytes": 35916,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/raw-gee-2026-08-12-to-18/rasters/VNP46A2_2026-08-12_raw_qa.tif",
+      "server_mask_note": "server-side raw count is authoritative because the GeoTIFF export has no explicit nodata mask",
+      "server_raw_band_count": 2644,
+      "sha256": "bd4ddc33ec23d3e59c92464a089169859ed3ebbe9a795763646630e19a6cfc81",
+      "status": "downloaded"
+    },
+    "2026-08-13": {
+      "bytes": 2971,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/raw-gee-2026-08-12-to-18/rasters/VNP46A2_2026-08-13_raw_qa.tif",
+      "server_mask_note": "server-side raw count is zero; numeric zero pixels in this GeoTIFF are export fill values, not observations",
+      "server_raw_band_count": 0,
+      "sha256": "067300ebf974cf579dcf35338c1e707dab64f26f0776492240b1705c0720d0bb",
+      "status": "downloaded_all_masked"
+    },
+    "2026-08-14": {
+      "bytes": 2971,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/raw-gee-2026-08-12-to-18/rasters/VNP46A2_2026-08-14_raw_qa.tif",
+      "server_mask_note": "server-side raw count is zero; numeric zero pixels in this GeoTIFF are export fill values, not observations",
+      "server_raw_band_count": 0,
+      "sha256": "067300ebf974cf579dcf35338c1e707dab64f26f0776492240b1705c0720d0bb",
+      "status": "downloaded_all_masked"
+    },
+    "2026-08-15": {
+      "bytes": 2971,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/raw-gee-2026-08-12-to-18/rasters/VNP46A2_2026-08-15_raw_qa.tif",
+      "server_mask_note": "server-side raw count is zero; numeric zero pixels in this GeoTIFF are export fill values, not observations",
+      "server_raw_band_count": 0,
+      "sha256": "067300ebf974cf579dcf35338c1e707dab64f26f0776492240b1705c0720d0bb",
+      "status": "downloaded_all_masked"
+    },
+    "2026-08-16": {
+      "bytes": 2971,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/raw-gee-2026-08-12-to-18/rasters/VNP46A2_2026-08-16_raw_qa.tif",
+      "server_mask_note": "server-side raw count is zero; numeric zero pixels in this GeoTIFF are export fill values, not observations",
+      "server_raw_band_count": 0,
+      "sha256": "067300ebf974cf579dcf35338c1e707dab64f26f0776492240b1705c0720d0bb",
+      "status": "downloaded_all_masked"
+    },
+    "2026-08-17": {
+      "bytes": 2971,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/raw-gee-2026-08-12-to-18/rasters/VNP46A2_2026-08-17_raw_qa.tif",
+      "server_mask_note": "server-side raw count is zero; numeric zero pixels in this GeoTIFF are export fill values, not observations",
+      "server_raw_band_count": 0,
+      "sha256": "067300ebf974cf579dcf35338c1e707dab64f26f0776492240b1705c0720d0bb",
+      "status": "downloaded_all_masked"
+    },
+    "2026-08-18": {
+      "bytes": 2971,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/raw-gee-2026-08-12-to-18/rasters/VNP46A2_2026-08-18_raw_qa.tif",
+      "server_mask_note": "server-side raw count is zero; numeric zero pixels in this GeoTIFF are export fill values, not observations",
+      "server_raw_band_count": 0,
+      "sha256": "067300ebf974cf579dcf35338c1e707dab64f26f0776492240b1705c0720d0bb",
+      "status": "downloaded_all_masked"
+    }
+  },
+  "schema_version": "ntl.case202.gee-raw-supplement-manifest.v1"
+}

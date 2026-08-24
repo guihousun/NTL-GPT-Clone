@@ -1,0 +1,598 @@
+{
+  "available_product_dates": [
+    "2026-03-01",
+    "2026-03-02",
+    "2026-03-03",
+    "2026-03-04",
+    "2026-03-05",
+    "2026-03-06",
+    "2026-03-07",
+    "2026-03-08",
+    "2026-03-09",
+    "2026-03-13",
+    "2026-03-14",
+    "2026-03-15",
+    "2026-03-16",
+    "2026-03-17",
+    "2026-03-18",
+    "2026-03-19",
+    "2026-03-20",
+    "2026-03-21",
+    "2026-03-22",
+    "2026-03-23",
+    "2026-03-24",
+    "2026-03-25",
+    "2026-03-26",
+    "2026-03-27",
+    "2026-03-28",
+    "2026-03-29",
+    "2026-03-30",
+    "2026-03-31"
+  ],
+  "case_id": "Case202-tehran-latest-vnp46a2",
+  "completed_at_utc": "2026-08-20T17:52:31Z",
+  "feature_count": 28,
+  "features": [
+    {
+      "geometry": null,
+      "id": "0",
+      "properties": {
+        "base_count": 3028,
+        "base_mean": 54.31627984909544,
+        "base_median": 54.535907219800826,
+        "base_p25": 42.400108909016424,
+        "base_p75": 65.46027787389134,
+        "base_stdDev": 22.754406966575463,
+        "date_utc": "2026-03-01",
+        "permissive_count": 602,
+        "permissive_mean": 53.74998520160216,
+        "permissive_median": 52.54548977876901,
+        "permissive_p25": 44.558569651383614,
+        "permissive_p75": 61.576847314834595,
+        "permissive_stdDev": 22.903027346112694,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_01",
+        "strict_count": 593,
+        "strict_mean": 54.33894968717183,
+        "strict_median": 52.54548977876901,
+        "strict_p25": 44.558569651383614,
+        "strict_p75": 61.576847314834595,
+        "strict_stdDev": 22.41910119156574
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "1",
+      "properties": {
+        "base_count": 2904,
+        "base_mean": 54.55332022183579,
+        "base_median": 52.94151889885578,
+        "base_p25": 39.00693023660475,
+        "base_p75": 64.83774178246705,
+        "base_stdDev": 28.15686331315569,
+        "date_utc": "2026-03-02",
+        "permissive_count": 576,
+        "permissive_mean": 50.5433491565126,
+        "permissive_median": 51.461401995490576,
+        "permissive_p25": 39.50998712041575,
+        "permissive_p75": 58.49133010591138,
+        "permissive_stdDev": 21.290491632430015,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_02",
+        "strict_count": 559,
+        "strict_mean": 51.560103123865154,
+        "strict_median": 51.461401995490576,
+        "strict_p25": 40.15058721965524,
+        "strict_p75": 58.49133010591138,
+        "strict_stdDev": 20.495948812528866
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "2",
+      "properties": {
+        "base_count": 3273,
+        "base_mean": 56.0583707800233,
+        "base_median": 57.01453580945867,
+        "base_p25": 45.28907389536813,
+        "base_p75": 67.06904128560654,
+        "base_stdDev": 24.097478040600635,
+        "date_utc": "2026-03-03",
+        "permissive_count": 605,
+        "permissive_mean": 56.91872111001649,
+        "permissive_median": 56.36291750253812,
+        "permissive_p25": 47.53162654033259,
+        "permissive_p75": 65.47045663988033,
+        "permissive_stdDev": 22.839850340958968,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_03",
+        "strict_count": 586,
+        "strict_mean": 57.9388369686092,
+        "strict_median": 56.36291750253812,
+        "strict_p25": 48.4288160039523,
+        "strict_p75": 65.47045663988033,
+        "strict_stdDev": 21.619857941672958
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "3",
+      "properties": {
+        "base_count": 3324,
+        "base_mean": 73.36719687106012,
+        "base_median": 75.02351620263262,
+        "base_p25": 58.889915142415234,
+        "base_p75": 88.9763434329509,
+        "base_stdDev": 28.71321784090038,
+        "date_utc": "2026-03-04",
+        "permissive_count": 658,
+        "permissive_mean": 70.46831913643297,
+        "permissive_median": 71.63754081726074,
+        "permissive_p25": 60.59145565800533,
+        "permissive_p75": 84.22459039512589,
+        "permissive_stdDev": 27.525264668806347,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_04",
+        "strict_count": 648,
+        "strict_mean": 71.02320952835355,
+        "strict_median": 71.63754081726074,
+        "strict_p25": 60.59145565800533,
+        "strict_p75": 84.22459039512589,
+        "strict_stdDev": 26.848076774510556
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "4",
+      "properties": {
+        "base_count": 3324,
+        "base_mean": 63.51015185586858,
+        "base_median": 64.40500048350223,
+        "base_p25": 51.439195922025185,
+        "base_p75": 75.49852832461904,
+        "base_stdDev": 24.619987182399324,
+        "date_utc": "2026-03-05",
+        "permissive_count": 658,
+        "permissive_mean": 62.461216911863254,
+        "permissive_median": 61.59633373833824,
+        "permissive_p25": 52.64244831062957,
+        "permissive_p75": 73.43185215523326,
+        "permissive_stdDev": 25.519850768426075,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_05",
+        "strict_count": 650,
+        "strict_mean": 62.78423384429892,
+        "strict_median": 61.59633373833824,
+        "strict_p25": 53.48254431257219,
+        "strict_p75": 73.43185215523326,
+        "strict_stdDev": 25.16253887011344
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "5",
+      "properties": {
+        "base_count": 1,
+        "base_mean": 9.249513626098633,
+        "base_median": 9.249513626098633,
+        "base_p25": 9.249513626098633,
+        "base_p75": 9.249513626098633,
+        "base_stdDev": 0,
+        "date_utc": "2026-03-06",
+        "permissive_count": 0,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_06",
+        "strict_count": 0
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "6",
+      "properties": {
+        "base_count": 0,
+        "date_utc": "2026-03-07",
+        "permissive_count": 0,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_07",
+        "strict_count": 0
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "7",
+      "properties": {
+        "base_count": 28,
+        "base_mean": 16.24664155257517,
+        "base_median": 16.56002426147461,
+        "base_p25": 12.414863586425781,
+        "base_p75": 19.661361694335938,
+        "base_stdDev": 6.939717299061163,
+        "date_utc": "2026-03-08",
+        "permissive_count": 0,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_08",
+        "strict_count": 0
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "8",
+      "properties": {
+        "base_count": 0,
+        "date_utc": "2026-03-09",
+        "permissive_count": 0,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_09",
+        "strict_count": 0
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "9",
+      "properties": {
+        "base_count": 0,
+        "date_utc": "2026-03-13",
+        "permissive_count": 0,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_13",
+        "strict_count": 0
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "10",
+      "properties": {
+        "base_count": 100,
+        "base_mean": 25.15252753616635,
+        "base_median": 25.774155616760254,
+        "base_p25": 19.0802950262536,
+        "base_p75": 29.62948989868164,
+        "base_stdDev": 8.14462957734294,
+        "date_utc": "2026-03-14",
+        "permissive_count": 0,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_14",
+        "strict_count": 0
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "11",
+      "properties": {
+        "base_count": 0,
+        "date_utc": "2026-03-15",
+        "permissive_count": 0,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_15",
+        "strict_count": 0
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "12",
+      "properties": {
+        "base_count": 913,
+        "base_mean": 38.16964784803212,
+        "base_median": 37.73440824610241,
+        "base_p25": 27.70130491256714,
+        "base_p75": 47.71907011667887,
+        "base_stdDev": 13.11354716969988,
+        "date_utc": "2026-03-16",
+        "permissive_count": 92,
+        "permissive_mean": 35.619271418398185,
+        "permissive_median": 38.28915214538574,
+        "permissive_p25": 31.579763915187627,
+        "permissive_p75": 41.29511547088623,
+        "permissive_stdDev": 11.979676034124482,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_16",
+        "strict_count": 28,
+        "strict_mean": 31.771739025808895,
+        "strict_median": 32.07270050048828,
+        "strict_p25": 9.207137107849121,
+        "strict_p75": 48.096290588378906,
+        "strict_stdDev": 15.807899823959382
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "13",
+      "properties": {
+        "base_count": 2952,
+        "base_mean": 43.02155689156204,
+        "base_median": 43.499369212559294,
+        "base_p25": 33.434481840595865,
+        "base_p75": 51.391645509902744,
+        "base_stdDev": 17.65095426389832,
+        "date_utc": "2026-03-17",
+        "permissive_count": 654,
+        "permissive_mean": 43.975017115891,
+        "permissive_median": 43.68927764892578,
+        "permissive_p25": 37.7344352722168,
+        "permissive_p75": 50.26558272043864,
+        "permissive_stdDev": 18.8194254031886,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_17",
+        "strict_count": 652,
+        "strict_mean": 44.041594652129476,
+        "strict_median": 43.68927764892578,
+        "strict_p25": 37.7344352722168,
+        "strict_p75": 50.26558272043864,
+        "strict_stdDev": 18.779542262488338
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "14",
+      "properties": {
+        "base_count": 1346,
+        "base_mean": 47.18463718466055,
+        "base_median": 46.44738477334127,
+        "base_p25": 34.542840828140854,
+        "base_p75": 56.58434664477347,
+        "base_stdDev": 22.37313007939027,
+        "date_utc": "2026-03-18",
+        "permissive_count": 493,
+        "permissive_mean": 45.22564293047541,
+        "permissive_median": 45.65950711745295,
+        "permissive_p25": 35.267185540543394,
+        "permissive_p75": 53.578575134277344,
+        "permissive_stdDev": 18.014542913806427,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_18",
+        "strict_count": 486,
+        "strict_mean": 45.25819656060431,
+        "strict_median": 45.65950711745295,
+        "strict_p25": 34.81407234885476,
+        "strict_p75": 54.29260064533207,
+        "strict_stdDev": 18.05748688774233
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "15",
+      "properties": {
+        "base_count": 0,
+        "date_utc": "2026-03-19",
+        "permissive_count": 0,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_19",
+        "strict_count": 0
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "16",
+      "properties": {
+        "base_count": 3324,
+        "base_mean": 55.16085573281597,
+        "base_median": 57.55822370515506,
+        "base_p25": 44.48511380316799,
+        "base_p75": 66.35788330250541,
+        "base_stdDev": 20.073572529555967,
+        "date_utc": "2026-03-20",
+        "permissive_count": 655,
+        "permissive_mean": 55.21350958387623,
+        "permissive_median": 55.416288204072444,
+        "permissive_p25": 44.56420232577774,
+        "permissive_p75": 65.55706860071004,
+        "permissive_stdDev": 22.17377989345314,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_20",
+        "strict_count": 654,
+        "strict_mean": 55.21651394599171,
+        "strict_median": 55.416288204072444,
+        "strict_p25": 44.56420232577774,
+        "strict_p75": 65.55706860071004,
+        "strict_stdDev": 22.145170441662028
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "17",
+      "properties": {
+        "base_count": 3324,
+        "base_mean": 54.39433964861728,
+        "base_median": 54.442119040410134,
+        "base_p25": 44.571837048646564,
+        "base_p75": 64.58052900127372,
+        "base_stdDev": 19.67823039661118,
+        "date_utc": "2026-03-21",
+        "permissive_count": 646,
+        "permissive_mean": 53.83066852376644,
+        "permissive_median": 53.703102513992214,
+        "permissive_p25": 45.85611266198743,
+        "permissive_p75": 62.773153767059924,
+        "permissive_stdDev": 19.492630208821325,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_21",
+        "strict_count": 646,
+        "strict_mean": 53.83066852376644,
+        "strict_median": 53.703102513992214,
+        "strict_p25": 45.85611266198743,
+        "strict_p75": 62.773153767059924,
+        "strict_stdDev": 19.492630208821325
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "18",
+      "properties": {
+        "base_count": 8,
+        "base_mean": 7.590496411415443,
+        "base_median": 7.310512065887451,
+        "base_p25": 5.308480739593506,
+        "base_p75": 7.454721450805664,
+        "base_stdDev": 6.687778587807188,
+        "date_utc": "2026-03-22",
+        "permissive_count": 0,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_22",
+        "strict_count": 0
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "19",
+      "properties": {
+        "base_count": 0,
+        "date_utc": "2026-03-23",
+        "permissive_count": 0,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_23",
+        "strict_count": 0
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "20",
+      "properties": {
+        "base_count": 0,
+        "date_utc": "2026-03-24",
+        "permissive_count": 0,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_24",
+        "strict_count": 0
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "21",
+      "properties": {
+        "base_count": 2381,
+        "base_mean": 68.60695125392733,
+        "base_median": 66.86042314322424,
+        "base_p25": 50.60642927447551,
+        "base_p75": 82.96467246063968,
+        "base_stdDev": 30.03580690481169,
+        "date_utc": "2026-03-25",
+        "permissive_count": 518,
+        "permissive_mean": 71.3458586235048,
+        "permissive_median": 70.17086029052734,
+        "permissive_p25": 52.55290558440775,
+        "permissive_p75": 83.48070441351996,
+        "permissive_stdDev": 30.69275469551018,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_25",
+        "strict_count": 199,
+        "strict_mean": 84.05760460592982,
+        "strict_median": 79.42244490633834,
+        "strict_p25": 61.78005746467827,
+        "strict_p75": 101.07475407918294,
+        "strict_stdDev": 35.83897191076825
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "22",
+      "properties": {
+        "base_count": 0,
+        "date_utc": "2026-03-26",
+        "permissive_count": 0,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_26",
+        "strict_count": 0
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "23",
+      "properties": {
+        "base_count": 0,
+        "date_utc": "2026-03-27",
+        "permissive_count": 0,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_27",
+        "strict_count": 0
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "24",
+      "properties": {
+        "base_count": 0,
+        "date_utc": "2026-03-28",
+        "permissive_count": 0,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_28",
+        "strict_count": 0
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "25",
+      "properties": {
+        "base_count": 0,
+        "date_utc": "2026-03-29",
+        "permissive_count": 0,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_29",
+        "strict_count": 0
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "26",
+      "properties": {
+        "base_count": 750,
+        "base_mean": 49.80789262085807,
+        "base_median": 49.57741084243312,
+        "base_p25": 42.461530262172474,
+        "base_p75": 58.492913818359376,
+        "base_stdDev": 14.733935622830428,
+        "date_utc": "2026-03-30",
+        "permissive_count": 401,
+        "permissive_mean": 44.279211402499705,
+        "permissive_median": 44.68127955186918,
+        "permissive_p25": 36.70692489738751,
+        "permissive_p75": 51.597564697265625,
+        "permissive_stdDev": 15.678994450059115,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_30",
+        "strict_count": 397,
+        "strict_mean": 44.48428473614815,
+        "strict_median": 44.68127955186918,
+        "strict_p25": 37.362616856892906,
+        "strict_p75": 51.597564697265625,
+        "strict_stdDev": 15.51054250966559
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": null,
+      "id": "27",
+      "properties": {
+        "base_count": 440,
+        "base_mean": 66.3742349032968,
+        "base_median": 62.290228486061096,
+        "base_p25": 38.63578414916992,
+        "base_p75": 89.42948978505235,
+        "base_stdDev": 37.163320219235395,
+        "date_utc": "2026-03-31",
+        "permissive_count": 79,
+        "permissive_mean": 53.55104010937379,
+        "permissive_median": 46.524575353782865,
+        "permissive_p25": 31.487834808381105,
+        "permissive_p75": 74.3779067993164,
+        "permissive_stdDev": 34.977681863609305,
+        "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_03_31",
+        "strict_count": 69,
+        "strict_mean": 55.76311496676285,
+        "strict_median": 54.60733985900879,
+        "strict_p25": 31.452206854726757,
+        "strict_p75": 75.3388671875,
+        "strict_stdDev": 36.02714783102463
+      },
+      "type": "Feature"
+    }
+  ],
+  "month_utc": "2026-03",
+  "schema_version": "ntl.gee-month-chunk.v1",
+  "status": "complete",
+  "validation": {
+    "date_set_matches": true,
+    "feature_count_matches": true,
+    "identity_fields_present": true,
+    "numeric_reducer_statistic_present": true,
+    "output_reopened": true
+  }
+}

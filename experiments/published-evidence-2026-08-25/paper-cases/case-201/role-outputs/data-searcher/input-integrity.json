@@ -1,0 +1,155 @@
+{
+  "schema": "ntl.case201.data-searcher.input-integrity.v1",
+  "case_id": "CASE-201",
+  "role": "NTL Data Searcher",
+  "execution_context": "Codex-subagent simulation",
+  "read_only_scope": true,
+  "external_services": {
+    "gee_called": false,
+    "laads_called": false,
+    "cmr_called": false,
+    "downloads_performed": false
+  },
+  "case_contract_inputs": [
+    {
+      "path": "experiments/paper-case-201-myanmar-first-local-night-2026-08-18/README.md",
+      "bytes": 2207,
+      "sha256": "75cdde0b3eee04379e02e44a880e51733889b60f596bb3c3cd37185aaf965f36",
+      "reopened": true
+    },
+    {
+      "path": "experiments/paper-case-201-myanmar-first-local-night-2026-08-18/case-201.contract.md",
+      "bytes": 1969,
+      "sha256": "8e97e4a86a80e9fddd9d621686203020f9d2376408302b25a50551e08856c1b6",
+      "reopened": true
+    }
+  ],
+  "formal_q18_inputs": [
+    {
+      "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-observation-package.json",
+      "bytes": 20872,
+      "sha256": "7d9379dd8f066a37ac876a05ea346de797d2dfd40bc891a21592aa684255a804",
+      "reopened": true
+    },
+    {
+      "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-q18-analysis-ready.csv",
+      "bytes": 14241,
+      "sha256": "3c6777a41aa074a1357d25938120b026ab9cd7afa86bea3f419fbde64ce9d554",
+      "reopened": true,
+      "rows": 32
+    },
+    {
+      "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-q18-validation.json",
+      "bytes": 1312,
+      "sha256": "6dcd7afadcca92c80f5851777c6735c8f8f20d5fcad7e491d4dfd1b6d1c3fc0c",
+      "reopened": true
+    },
+    {
+      "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/artifact-manifest.json",
+      "bytes": 2885,
+      "sha256": "353c71f0c2501479b50f1964e7267ecdbef885056485d185981dad2b41c3cf9b",
+      "reopened": true
+    }
+  ],
+  "target_hdf_identity": {
+    "path": "experiments/benchmark-v1/temporal-freeze/2026-08-11/q96-q99/q96/source_snapshots/official_hdf5/VNP46A2.A2025087.h27v06.002.2025095151403.h5",
+    "exists": true,
+    "bytes": 34468952,
+    "sha256_actual": "d5b56523344d2407eefe0180b9399c14fe7f56400b0e32c0869ee8f3812e17de",
+    "sha256_declared_by_q18_inventory": "d5b56523344d2407eefe0180b9399c14fe7f56400b0e32c0869ee8f3812e17de",
+    "sha256_declared_by_target_csv": "d5b56523344d2407eefe0180b9399c14fe7f56400b0e32c0869ee8f3812e17de",
+    "sha256_match": true,
+    "filename": "VNP46A2.A2025087.h27v06.002.2025095151403.h5",
+    "filename_doy": "A2025087",
+    "filename_date_decoded": "2025-03-28",
+    "filename_collection": "002",
+    "filename_tile": "h27v06"
+  },
+  "target_hdf_metadata": {
+    "hdf5_root_keys": ["HDFEOS", "HDFEOS INFORMATION"],
+    "ShortName": "VNP46A2",
+    "VersionID": "002",
+    "LocalGranuleID": "VNP46A2.A2025087.h27v06.002.2025095151403.h5",
+    "RangeBeginningDate": "2025-03-28",
+    "RangeBeginningTime": "00:00:00.000",
+    "RangeEndingDate": "2025-03-28",
+    "RangeEndingTime": "23:59:59.000",
+    "StartTime": "2025-03-28 00:00:00.000",
+    "EndTime": "2025-03-28 23:59:59.000",
+    "TileID": "61027006",
+    "HorizontalTileNumber": "27",
+    "VerticalTileNumber": "06",
+    "grid_shape": [2400, 2400],
+    "band_path_exists": true,
+    "band_path": "HDFEOS/GRIDS/VIIRS_Grid_DNB_2d/Data Fields/DNB_BRDF-Corrected_NTL",
+    "qa_band_paths_exist": {
+      "Mandatory_Quality_Flag": true,
+      "QF_Cloud_Mask": true,
+      "Snow_Flag": true
+    },
+    "band_attributes": {
+      "_FillValue": -999.9000244140625,
+      "scale_factor": 1.0,
+      "offset": 0.0,
+      "units": "nWatts/(cm^2 sr)",
+      "valid_range": ">=0.0"
+    },
+    "algorithm_version": "NPP_PR46A2 1.0.3",
+    "identifier_product_doi": "10.5067/VIIRS/VNP46A2.002"
+  },
+  "target_csv_rows": {
+    "utc_product_date": "2025-03-28",
+    "row_count": 2,
+    "radii_km": [25, 50],
+    "both_rows_have_same_hdf_filename": true,
+    "both_rows_have_same_hdf_sha256": true,
+    "both_rows_have_collection_002": true,
+    "both_rows_have_tile_h27v06": true,
+    "both_rows_have_interpreted_local_night_date": "2025-03-29"
+  },
+  "independent_readback_and_recompute": {
+    "method": "Read target HDF5 with h5py; derive pixel-centre masks from HDF-EOS bounds; use pyproj.Geod(ellps='WGS84'); apply the formal Q18 strict QA mask with numpy; compute unweighted radiance means.",
+    "source_arrays": [
+      "DNB_BRDF-Corrected_NTL",
+      "Mandatory_Quality_Flag",
+      "QF_Cloud_Mask",
+      "Snow_Flag"
+    ],
+    "aoi_pixel_counts": {
+      "25": 9895,
+      "50": 39575
+    },
+    "recomputed_results": {
+      "25": {
+        "qa_valid_pixel_count": 9802,
+        "qa_valid_fraction": 0.9906013137948458,
+        "radiance_mean_nw_cm2_sr": 1.0435125119745428
+      },
+      "50": {
+        "qa_valid_pixel_count": 39330,
+        "qa_valid_fraction": 0.9938092229943146,
+        "radiance_mean_nw_cm2_sr": 0.8748512739786589
+      }
+    },
+    "matches_target_csv_exactly": true
+  },
+  "integrity_checks": {
+    "exact_date_present_in_q18_temporal_coverage": true,
+    "target_inventory_record_present": true,
+    "target_csv_rows_present_for_25_and_50_km": true,
+    "product_collection_band_consistent": true,
+    "filename_hash_and_date_consistent": true,
+    "qa_counts_positive_for_both_supports": true,
+    "radiance_means_finite_and_nonempty_for_both_supports": true,
+    "qa_fractions_in_unit_interval_for_both_supports": true,
+    "formal_q18_validation_checks_reopened": true,
+    "historical_outputs_read": false
+  },
+  "write_disclosure": {
+    "only_output_directory_written": "experiments/paper-case-201-myanmar-first-local-night-2026-08-18/role-outputs/data-searcher/",
+    "source_files_modified": false,
+    "raw_assets_modified": false,
+    "manuscript_modified": false,
+    "runtime_modified": false
+  }
+}

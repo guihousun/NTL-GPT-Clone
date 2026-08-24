@@ -1,0 +1,17 @@
+{
+  "schema_version": "ntl.q18.vnp46a1-utc-time-validation.v1",
+  "checks": {
+    "cmr_target_identity": true,
+    "cmr_selected_target": true,
+    "official_hdf5_identity": true,
+    "hdf5_signature_valid": true,
+    "event_timezone_conversion": true,
+    "official_utc_time_metadata": true,
+    "event_pixel_post_event_local_night": true,
+    "buffer_supports_local_2025_03_29": true,
+    "vnp46a2_csv_unchanged": true,
+    "vnp46a2_package_unchanged": true,
+    "no_system_time_inference": true
+  },
+  "passed": true
+}

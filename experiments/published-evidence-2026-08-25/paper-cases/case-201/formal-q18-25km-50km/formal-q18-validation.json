@@ -1,0 +1,29 @@
+{
+  "schema": "ntl.q18.validation.v2",
+  "task_id": "Q18-myanmar-earthquake",
+  "created_at_utc": "2026-08-17T11:54:30.774155+00:00",
+  "checks": {
+    "formal_event_anchor_matched": true,
+    "official_hdf5_count_is_16": true,
+    "product_dates_unique_and_sorted": true,
+    "all_granules_same_collection_tile_grid": true,
+    "both_25km_and_50km_aoi_supported": true,
+    "csv_has_expected_rows": true,
+    "critical_pre_event_and_first_post_event_support_available": true,
+    "zero_valid_rows_preserved_as_explicit_missing_observations": true,
+    "valid_counts_do_not_exceed_aoi_counts": true,
+    "valid_radiance_values_nonnegative_where_available": true,
+    "qa_valid_fractions_within_unit_interval": true,
+    "historical_outputs_not_read": true,
+    "csv_reopened": true,
+    "package_reopened": true,
+    "csv_hash_recomputed_after_reopen": true,
+    "package_schema_validated": true
+  },
+  "artifact_hashes": {
+    "formal-q18-analysis-ready.csv": "3c6777a41aa074a1357d25938120b026ab9cd7afa86bea3f419fbde64ce9d554",
+    "formal-observation-package.json": "7d9379dd8f066a37ac876a05ea346de797d2dfd40bc891a21592aa684255a804",
+    "build_formal_q18_timeseries.py": "f43b600d1e76ec4f2056287c9f4fd1c55fe7bbfccf883a66c5c2837ae0ca353e"
+  },
+  "historical_outputs_read": false
+}

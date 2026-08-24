@@ -1,0 +1,171 @@
+{
+  "schema": "ntl.codex-subagent.event-tracker-review.v1",
+  "simulation": true,
+  "simulation_label": "Codex-subagent simulation",
+  "review_date": "2026-08-17",
+  "role": "NTL Event Tracker review",
+  "scope": {
+    "q18": "Review existing formal Myanmar earthquake event and observation evidence; no download, live search, rerun, manuscript edit, or benchmark execution.",
+    "q17": "Decide whether the current SDGSAT-1 sensor/classification request needs Event Tracker routing; do not fabricate a call."
+  },
+  "q18_verdicts": [
+    {
+      "id": "q18-mainshock-anchor",
+      "claim": "USGS us7000pn9s, Mww 7.7, 10.0 km, WGS84 (95.936, 22.011), origin 2025-03-28T06:20:52Z",
+      "verdict": "supported_with_source_boundary",
+      "evidence": [
+        {
+          "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-event-context.json",
+          "sha256": "d71a3bc8e5032a0be54dd827a491b741cc77029287f12beceed180feb9563364"
+        },
+        {
+          "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-event-tracker-log.md",
+          "sha256": "0b35da79aeeabde22ff0b9fc3f0e8f47b220265f8880d341e239c0706cca3cd2"
+        }
+      ],
+      "note": "Official-domain search snapshots and the disclosed derived-reference supplementation support the anchor; they are not treated as full downloaded source records."
+    },
+    {
+      "id": "q18-utc-local-date",
+      "claim": "UTC/local timestamp and product-date semantics are internally usable",
+      "verdict": "supported",
+      "evidence": [
+        {
+          "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-event-context.json",
+          "sha256": "d71a3bc8e5032a0be54dd827a491b741cc77029287f12beceed180feb9563364"
+        },
+        {
+          "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-observation-package.json",
+          "sha256": "7d9379dd8f066a37ac876a05ea346de797d2dfd40bc891a21592aa684255a804"
+        },
+        {
+          "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-analysis-results.json",
+          "sha256": "1d45e8d8c6bb03a4ac3aef03f5ee317419f79a2333bc949302fc81add5629cde"
+        }
+      ],
+      "note": "The raw assets record 12:50:52+06:30 Asia/Yangon and interpret the 2025-03-28 UTC product as the 2025-03-29 local night; exact pixel acquisition time is unavailable."
+    },
+    {
+      "id": "q18-formal-supports",
+      "claim": "25 km and 50 km supports are formal and separately supported",
+      "verdict": "supported",
+      "evidence": [
+        {
+          "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-observation-package.json",
+          "sha256": "7d9379dd8f066a37ac876a05ea346de797d2dfd40bc891a21592aa684255a804"
+        },
+        {
+          "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-q18-validation.json",
+          "sha256": "6dcd7afadcca92c80f5851777c6735c8f8f20d5fcad7e491d4dfd1b6d1c3fc0c"
+        },
+        {
+          "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/evidence-report.json",
+          "sha256": "e6e76424c946579522acf5edc895e780f60358a9cf86b66561beda5ed0164318"
+        }
+      ],
+      "note": "25 km and 50 km are not pooled; their first-night changes are -29.61% and +4.92%, respectively."
+    },
+    {
+      "id": "q18-sixteen-hdf-inputs",
+      "claim": "The formal package uses 16 official VNP46A2 Collection 2 HDF5 inputs",
+      "verdict": "independently_verified",
+      "evidence": [
+        {
+          "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-observation-package.json",
+          "sha256": "7d9379dd8f066a37ac876a05ea346de797d2dfd40bc891a21592aa684255a804"
+        },
+        {
+          "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-q18-validation.json",
+          "sha256": "6dcd7afadcca92c80f5851777c6735c8f8f20d5fcad7e491d4dfd1b6d1c3fc0c"
+        }
+      ],
+      "verification": "All 16 inventory paths existed; listed byte counts and SHA-256 values matched independent local checks."
+    },
+    {
+      "id": "q18-no-continuous-post-event-series",
+      "claim": "No continuous immediate post-event sequence is available",
+      "verdict": "supported",
+      "evidence": [
+        {
+          "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-data-searcher-log.md",
+          "sha256": "69f6168deedb636828d62472b865723a402d9be1bc29b3efd236522b45f68579"
+        },
+        {
+          "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-observation-package.json",
+          "sha256": "7d9379dd8f066a37ac876a05ea346de797d2dfd40bc891a21592aa684255a804"
+        }
+      ],
+      "note": "The supplied set jumps from 2025-03-28 to 2026-07-24; late observations are not a recovery series."
+    },
+    {
+      "id": "q18-recovery-and-causality-boundary",
+      "claim": "Recovery, outage, damage, causation, and significance must not be asserted",
+      "verdict": "required_boundary",
+      "evidence": [
+        {
+          "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/README.md",
+          "sha256": "6bd9c426a907b17c34029ab720d47e0157bfb4f5e26464becc63758e9b5e0f3b"
+        },
+        {
+          "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/evidence-report.md",
+          "sha256": "9005af6a7514f8d59b8825da02d9896567dcc83fe792537b524561a1653fb29e"
+        }
+      ]
+    },
+    {
+      "id": "q18-followup-conflict",
+      "claim": "The subsequent-earthquake source conflict remains unresolved",
+      "verdict": "preserved",
+      "evidence": [
+        {
+          "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-event-context.json",
+          "sha256": "d71a3bc8e5032a0be54dd827a491b741cc77029287f12beceed180feb9563364"
+        }
+      ],
+      "note": "Do not normalize the later event to M6.4 or M6.7 without a separate event-level verification."
+    }
+  ],
+  "q17_verdicts": [
+    {
+      "id": "q17-event-tracker-routing",
+      "claim": "The current Q17 SDGSAT-1 sensor/classification request needs Event Tracker",
+      "verdict": "conditional_skip_supported",
+      "evidence": [
+        {
+          "path": "experiments/paper-case-multiagent-2026-08-13/Q17-sdgsat-light-classification/formal-observation-package.json",
+          "sha256": "ae36cc77d17dcb99900596c1ebd54dc10cb8685388bb8b949b39b3e5c51def09"
+        },
+        {
+          "path": "experiments/paper-case-multiagent-2026-08-13/Q17-sdgsat-light-classification/formal-data-specialist-log.md",
+          "sha256": "851cdf92d55114f2894a3ceddb87e735470d636296c8119aad59ff3e666df136"
+        },
+        {
+          "path": "experiments/paper-case-multiagent-2026-08-13/Q17-sdgsat-light-classification/evidence-report.md",
+          "sha256": "662d5085cebe1142b19c1855811f45ad7f0bcfb6d70a345d6fc4a06b8a7ff41c"
+        }
+      ],
+      "note": "The request is RRLI/RBLI construction and fixed-threshold classification; it has no event source, event time, temporal window, or event-linked interpretation."
+    },
+    {
+      "id": "q17-no-fabricated-event-call",
+      "claim": "An Event Tracker invocation can be reported for Q17",
+      "verdict": "must_not_fabricate",
+      "evidence": [
+        {
+          "path": "experiments/paper-case-multiagent-2026-08-13/Q17-sdgsat-light-classification/formal-analyst-log.md",
+          "sha256": "34b834c0cdda46fbb1fab3df1f56bf8f639dd9979910b0d0c140b80decfc492d"
+        },
+        {
+          "path": "experiments/paper-case-multiagent-2026-08-13/Q17-sdgsat-light-classification/evidence-report.json",
+          "sha256": "0fd4261070a44f4f973d0c0e6de1fecac21b6aceb1a2c32ad45cbfc2a712e6c2"
+        }
+      ],
+      "note": "The Q17 evidence route is Data Specialist/Analyst with Engineer checks; if the task later becomes event-linked, route a new bounded Event Tracker task."
+    }
+  ],
+  "overall": {
+    "q18": "usable_for_source_anchored_descriptive_25km_50km_handoff_with_noncausal_limits",
+    "q17": "event_tracker_conditionally_skipped_for_current_sensor_classification_scope",
+    "deployment_or_benchmark_claim": "unsupported_and_out_of_scope"
+  }
+}

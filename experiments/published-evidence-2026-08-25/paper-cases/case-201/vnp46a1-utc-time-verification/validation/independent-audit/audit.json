@@ -1,0 +1,130 @@
+{
+  "schema": "ntl.q18.vnp46a1-independent-audit.v2",
+  "status": "source_backed_timing_verified_non_radiance_audit",
+  "scope": "Read-only independent validation of VNP46A1 UTC_Time timing evidence; no HDF5 datasets other than file signature were opened and no VNP46A2 radiance values were read or computed.",
+  "package_file_identity": {
+    "source_manifest": {
+      "path": "vault/ntl-gpt/experiments/q18-vnp46a1-utc-time-verification-2026-08-20/source/source-manifest.json",
+      "bytes": 1516,
+      "sha256": "e579e18a605bd005d31a6a5bb03efa441259146edf599111408a9654da4cb0d2"
+    },
+    "utc_time_result": {
+      "path": "vault/ntl-gpt/experiments/q18-vnp46a1-utc-time-verification-2026-08-20/results/utc-time-analysis.json",
+      "bytes": 3512,
+      "sha256": "d2bb9e985c57f072ae552a506fd088f048a39157a332e1d448a3bc2874d95bf6"
+    },
+    "engineer_validation": {
+      "path": "vault/ntl-gpt/experiments/q18-vnp46a1-utc-time-verification-2026-08-20/validation/engineer-validation.json",
+      "bytes": 539,
+      "sha256": "d161fea90a941b5641207530362a95b0117fd71d1123fab03021f00da84b11bf"
+    }
+  },
+  "source_identity": {
+    "path": "vault/ntl-gpt/experiments/q18-vnp46a1-utc-time-verification-2026-08-20/source/VNP46A1.A2025087.h27v06.002.2025088113623.h5",
+    "manifest_filename": "VNP46A1.A2025087.h27v06.002.2025088113623.h5",
+    "actual_filename": "VNP46A1.A2025087.h27v06.002.2025088113623.h5",
+    "manifest_bytes": 50906798,
+    "actual_bytes": 50906798,
+    "manifest_sha256": "2e069d830228f76dff936ef6dddefd76bd5b21779fa03cb1cca4d0c59670e7ba",
+    "actual_sha256": "2e069d830228f76dff936ef6dddefd76bd5b21779fa03cb1cca4d0c59670e7ba",
+    "manifest_hdf5_signature_valid": true,
+    "actual_hdf5_signature": "894844460d0a1a0a",
+    "hash_match": true,
+    "bytes_match": true,
+    "signature_match": true
+  },
+  "metadata_check": {
+    "dataset_path": "HDFEOS/GRIDS/VIIRS_Grid_DNB_2d/Data Fields/UTC_Time",
+    "shape": [
+      2400,
+      2400
+    ],
+    "long_name": "View Time (UTC)",
+    "units": "decimal hours",
+    "valid_min": 0,
+    "valid_max": 24,
+    "scale_factor": 1.0,
+    "add_offset": 0.0,
+    "passed": true
+  },
+  "event_local_check": {
+    "reported": "2025-03-28T12:50:52+06:30",
+    "independent": "2025-03-28T12:50:52+06:30",
+    "passed": true
+  },
+  "event_pixel_check": {
+    "valid": true,
+    "decimal_hour": 19.945844650268555,
+    "reported_utc": "2025-03-28T19:56:45.040741Z",
+    "independent_utc": "2025-03-28T19:56:45.040741Z",
+    "reported_local": "2025-03-29T02:26:45.040741+06:30",
+    "independent_local": "2025-03-29T02:26:45.040741+06:30",
+    "post_event": true,
+    "local_date_is_2025_03_29": true,
+    "passed": true
+  },
+  "buffer_checks": [
+    {
+      "radius_km": 25,
+      "n": 9895,
+      "min_utc_hour": 19.944793701171875,
+      "median_utc_hour": 19.945844650268555,
+      "mean_utc_hour": 19.94584870398677,
+      "max_utc_hour": 19.9468936920166,
+      "local_date_counts": {
+        "2025-03-29": 9895
+      },
+      "passed": true
+    },
+    {
+      "radius_km": 50,
+      "n": 39575,
+      "min_utc_hour": 18.270952224731445,
+      "median_utc_hour": 19.945844650268555,
+      "mean_utc_hour": 19.94428182205518,
+      "max_utc_hour": 19.94794464111328,
+      "local_date_counts": {
+        "2025-03-29": 39575
+      },
+      "passed": true
+    }
+  ],
+  "engineer_validation_recheck": {
+    "checks": {
+      "cmr_target_identity": true,
+      "cmr_selected_target": true,
+      "official_hdf5_identity": true,
+      "hdf5_signature_valid": true,
+      "event_timezone_conversion": true,
+      "official_utc_time_metadata": true,
+      "event_pixel_post_event_local_night": true,
+      "buffer_supports_local_2025_03_29": true,
+      "vnp46a2_csv_unchanged": true,
+      "vnp46a2_package_unchanged": true,
+      "no_system_time_inference": true
+    },
+    "all_true": true
+  },
+  "formal_q18_immutability": {
+    "formal_q18_csv_sha256": "3c6777a41aa074a1357d25938120b026ab9cd7afa86bea3f419fbde64ce9d554",
+    "formal_q18_observation_package_sha256": "7d9379dd8f066a37ac876a05ea346de797d2dfd40bc891a21592aa684255a804",
+    "expected_formal_q18_csv_sha256": "3c6777a41aa074a1357d25938120b026ab9cd7afa86bea3f419fbde64ce9d554",
+    "expected_formal_q18_observation_package_sha256": "7d9379dd8f066a37ac876a05ea346de797d2dfd40bc891a21592aa684255a804",
+    "passed": true
+  },
+  "no_system_time_inference": {
+    "result_contains_system_time_start": false,
+    "engineer_contains_system_time_start": false,
+    "passed": true
+  },
+  "safe_conclusion": {
+    "supports_first_post_event_local_night": true,
+    "statement": "A2025087 is source-backed as the first post-event local-night observation for this event area: the containing event pixel and all valid UTC_Time pixels in the 25 km and 50 km supports map to 29 March 2025 local time and occur after the 06:20:52 UTC mainshock.",
+    "limits": [
+      "This supports the temporal correspondence, not earthquake causality, damage, outage, recovery, or significance.",
+      "UTC_Time is a per-pixel view-time field; it does not convert the product date mechanically and does not establish a single acquisition instant for the whole tile.",
+      "The VNP46A1 UTC_Time layer is timing evidence only; VNP46A2 remains the radiance product for Q18.",
+      "The word 'first' is bounded to the analyzed Q18 same-tile temporal sequence and its stated pre-event context; this audit does not establish exhaustive global observation coverage."
+    ]
+  }
+}

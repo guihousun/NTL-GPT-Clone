@@ -1,0 +1,99 @@
+{
+  "schema": "ntl.paper-case.observation-package.v1",
+  "case_id": "Q17-sdgsat-light-classification",
+  "producer_role": "NTL Data Specialist",
+  "handoff_to": "NTL Analyst",
+  "status": "success",
+  "blindness": {
+    "read_user_existing_RBLI": false,
+    "read_user_existing_classification": false,
+    "comparison_authorized": false
+  },
+  "objective": "Provide independently computed RRLI and RBLI from the user's real preprocessed SDGSAT-1 RGB raster for downstream Jia et al. (2024) classification.",
+  "source_scene": {
+    "original_path": "user-provided-local-data/SGDSAT-1/KX10_GIU_20220304_E121.82_N31.56_202200100146_L4A_A_RGB.tif",
+    "original_sha256": "8b78a2bc10b6d836ffa49e0595b07ed6f79b36f66e764b47caccd28cfea98ec0",
+    "original_dtype": "uint16",
+    "original_nodata": 0,
+    "analysis_path": "user-provided-local-data/NTL-GPT/SDGSAT_1/SDGSAT1_GLI_shanghai_radiance_rgb.tif",
+    "analysis_sha256": "a69a3a4f778031e6adf12aef83e4429cd9a44c04b68f7442ab9f50f8e9b7ef9f",
+    "analysis_dtype": "float32",
+    "analysis_nodata": -9999,
+    "band_order": ["R", "G", "B"],
+    "band_order_evidence": "Active NTL-GPT runtime SDGSAT1_compute_index reads bands 1, 2 and 3 as R, G and B.",
+    "crs": "EPSG:32651",
+    "width": 5674,
+    "height": 9250,
+    "resolution_m": [40, 40],
+    "transform": [40.0, 0.0, 194936.55426564877, 0.0, -40.0, 3669270.754403386],
+    "bounds": [194936.55426564877, 3299270.754403386, 421896.55426564877, 3669270.754403386],
+    "grid_matches_original": true,
+    "calibration_contract": {
+      "runtime_path": "runtime/tools/NTL_preprocess.py",
+      "runtime_sha256": "49df430f7bb0b5e7399451b02f7074e255b750b29adb726aa2e4dda7effd6502",
+      "gain_RGB": [0.00001354, 0.00000507, 0.0000099253],
+      "bias_RGB": [0.0000136754, 0.000006084, 0.0000099253],
+      "note": "The user supplied the calibrated raster; this run did not recreate the preceding destriping/calibration chain."
+    }
+  },
+  "method_contract": {
+    "path": "data/benchmark-v1/fixtures/verified-reference/BV1-069/inputs/jia_2024_classification_contract.json",
+    "primary_source": "Jia et al. (2024), Remote Sensing of Environment 305, 114104, doi:10.1016/j.rse.2024.114104",
+    "formulae": {"RRLI": "BandR / BandG", "RBLI": "BandB / BandG"},
+    "runtime_evidence_path": "runtime/tools/SDGSAT1_INDEX.py",
+    "runtime_evidence_sha256": "ecc8ffd187efbefebc2088d0924108ac0bba2b211262ab9284cefc2896fece9d",
+    "source_invalid_rule": "Any non-finite/source-NoData RGB sample is invalid.",
+    "zero_denominator_rule": "Green equals zero produces output NoData.",
+    "output_nodata": -9999
+  },
+  "analysis_ready_outputs": [
+    {
+      "role": "RRLI",
+      "path": "experiments/paper-case-multiagent-2026-08-13/Q17-sdgsat-light-classification/formal-SDGSAT1-shanghai-RRLI.tif",
+      "sha256": "dccd7c22988cb0d0b71debe952a06f3c466cf8446aa9662b34966c0a302d4423",
+      "bytes": 38241616,
+      "valid_pixel_count": 9784136,
+      "valid_fraction": 0.1864195333860473,
+      "minimum": 0.0006669595022685826,
+      "maximum": 6218.095703125,
+      "mean": 3.8383982373153143
+    },
+    {
+      "role": "RBLI",
+      "path": "experiments/paper-case-multiagent-2026-08-13/Q17-sdgsat-light-classification/formal-SDGSAT1-shanghai-RBLI.tif",
+      "sha256": "50fb93f7bedd9fc1ff74722a852354f28618790f1092f47a0ed8c4bc8f2080b1",
+      "bytes": 38227063,
+      "valid_pixel_count": 9784136,
+      "valid_fraction": 0.1864195333860473,
+      "minimum": 0.0009931274689733982,
+      "maximum": 2864.698974609375,
+      "mean": 1.1222894586502687
+    },
+    {
+      "role": "statistics",
+      "path": "experiments/paper-case-multiagent-2026-08-13/Q17-sdgsat-light-classification/formal-index-statistics.json",
+      "sha256": "79ef6d8929c974fe333cb462cae71de16717607aec816db99ba2b34425481f9b"
+    }
+  ],
+  "reproducibility": {
+    "script": "experiments/paper-case-multiagent-2026-08-13/Q17-sdgsat-light-classification/compute_formal_indices.py",
+    "script_sha256": "6c824bd4321d3e3fe5b39111c7d9c9c847d1deb3686767e5a58f106e8e65d338",
+    "processing": "Windowed rasterio float32 division; tiled DEFLATE GeoTIFF; no resampling or reprojection."
+  },
+  "acceptance_checks": {
+    "source_exists_and_hash_recorded": true,
+    "three_float32_bands": true,
+    "band_semantics_resolved_from_runtime_contract": true,
+    "source_and_outputs_share_crs_transform_shape": true,
+    "nodata_and_zero_denominator_propagated": true,
+    "outputs_are_single_band_float32": true,
+    "finite_valid_statistics": true,
+    "classification_not_performed_by_data_specialist": true
+  },
+  "limitations": [
+    "The preprocessed RGB has no embedded band descriptions or physical units; band semantics rely on the active runtime contract and user designation as radiance RGB.",
+    "The preceding destriping/calibration process was not rerun here, so the calibrated file is treated as the user-approved analysis input.",
+    "Large ratios occur where the green denominator is close to zero. The Analyst must apply the paper's ordered thresholds and discuss mixed-light and spectral-purity uncertainty.",
+    "No user reference RBLI or classification file was inspected; post-result comparison remains an Engineer/Reviewer action."
+  ]
+}

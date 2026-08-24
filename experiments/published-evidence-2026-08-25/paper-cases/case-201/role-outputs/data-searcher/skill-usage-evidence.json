@@ -1,0 +1,87 @@
+{
+  "schema": "ntl.case201.data-searcher.skill-usage-evidence.v1",
+  "case_id": "CASE-201",
+  "role": "NTL Data Searcher",
+  "execution_context": "Codex-subagent simulation",
+  "usage_mode": "Read and apply a frozen contract derived from the runtime Skill; this is not a runtime-loading assertion.",
+  "runtime_loaded_for_case201": false,
+  "deployed_graph_invoked": false,
+  "runtime_telemetry_generated": false,
+  "skill": {
+    "name": "gee-ntl-date-boundary-handling",
+    "runtime_source_path": "runtime/.ntl-gpt/skills/gee-ntl-date-boundary-handling/SKILL.md",
+    "runtime_source_sha256": "7f43d02a5db7b9cb3aa0381c26c0a96dfe5fd180fcf894384bf21e431ba0c8d9",
+    "case_version_record": "experiments/paper-case-201-myanmar-first-local-night-2026-08-18/skill/gee-ntl-date-boundary-handling.version.json",
+    "case_version_record_sha256": "3095599211bf1637dc27765f430803b1c9b3207fba4e7f6ffda53d22830916b6",
+    "implementation_diff_record": "experiments/paper-case-201-myanmar-first-local-night-2026-08-18/skill/implementation-diff.md",
+    "implementation_diff_sha256": "f13f32c5b9533a909a3687af630a060c2a17a623d8bfd51d40fb131c71f06ce2"
+  },
+  "source_rule_evidence": [
+    {
+      "rule": "An event after the local candidate acquisition window maps to the next local-night label.",
+      "source_lines": "SKILL.md:34-38",
+      "case_application": "The 2025-03-28 06:20:52Z event is 2025-03-28 12:50:52 Asia/Yangon, after the documented 00:30-02:30 local candidate window; local first-night label is 2025-03-29."
+    },
+    {
+      "rule": "Convert local first-night acquisition time to UTC before choosing a UTC-indexed official file/date.",
+      "source_lines": "SKILL.md:37-38 and SKILL.md:203-209",
+      "case_application": "2025-03-29 00:30-02:30 MMT maps to 2025-03-28 18:00-20:00Z; selected UTC product date is 2025-03-28, not 2025-03-29."
+    },
+    {
+      "rule": "Record both local first-night date and UTC file date; do not invent exact acquisition time.",
+      "source_lines": "SKILL.md:66-79 and SKILL.md:303-306",
+      "case_application": "Outputs retain both dates and explicitly state that VNP46A2 HDF metadata exposes no exact pixel acquisition time."
+    },
+    {
+      "rule": "Exact-date eligibility failure is terminal; later dates cannot be substituted silently.",
+      "source_lines": "Case 201 contract decision rule 4 and skill implementation-diff.md rule 2",
+      "case_application": "The 2025-03-28 product was checked directly for both supports. No later date was consulted or substituted because both supports passed."
+    }
+  ],
+  "applied_contract_steps": [
+    {
+      "step": "event_utc_and_local_context",
+      "status": "pass",
+      "evidence": "2025-03-28T06:20:52Z -> 2025-03-28T12:50:52+06:30 Asia/Yangon"
+    },
+    {
+      "step": "first_post_event_local_night_selection",
+      "status": "pass",
+      "evidence": "2025-03-29 local-night label after the event-day overpass"
+    },
+    {
+      "step": "utc_product_date_resolution",
+      "status": "pass",
+      "evidence": "Candidate window maps to UTC date 2025-03-28; filename A2025087 and HDF RangeBeginningDate agree"
+    },
+    {
+      "step": "exact_date_product_presence_and_metadata",
+      "status": "pass",
+      "evidence": "Target VNP46A2.A2025087.h27v06.002.2025095151403.h5 exists; product, collection, band, tile, hash and date verified"
+    },
+    {
+      "step": "formal_q18_25_50_km_qa_gate",
+      "status": "pass",
+      "evidence": "25 km: 9802 valid pixels, fraction 0.9906013137948458, mean 1.0435125119745428; 50 km: 39330, 0.9938092229943146, 0.8748512739786589"
+    },
+    {
+      "step": "no_silent_later_date_fallback",
+      "status": "pass",
+      "evidence": "later_date_fallback_used=false"
+    }
+  ],
+  "prohibited_actions_not_performed": [
+    "No GEE call",
+    "No LAADS call",
+    "No CMR call",
+    "No product download",
+    "No runtime graph invocation",
+    "No model or benchmark execution",
+    "No source asset, manuscript, Zotero, benchmark, or runtime mutation"
+  ],
+  "evidence_outputs": [
+    "product-eligibility.json",
+    "input-integrity.json",
+    "data-searcher-report.md"
+  ]
+}

@@ -1,0 +1,536 @@
+{
+  "schema": "ntl.q18.formal-analysis.v2",
+  "task_id": "Q18-myanmar-earthquake",
+  "role": "NTL Analyst",
+  "status": "complete_descriptive_noncausal",
+  "generated_at_utc": "2026-08-17T11:54:32.704305+00:00",
+  "formal_inputs_only": true,
+  "event_anchor": {
+    "usgs_event_id": "us7000pn9s",
+    "origin_time_utc": "2025-03-28T06:20:52Z",
+    "origin_time_local": "2025-03-28T12:50:52+06:30",
+    "timezone": "Asia/Yangon",
+    "magnitude": "Mww 7.7",
+    "epicenter_wgs84_lon_lat": [
+      95.936,
+      22.011
+    ],
+    "subsequent_earthquake_source_conflict_preserved": true
+  },
+  "date_semantics": {
+    "pre_event_utc_product_dates": [
+      "2025-03-21",
+      "2025-03-27"
+    ],
+    "first_post_event_utc_product_date": "2025-03-28",
+    "first_post_event_interpreted_local_night_asia_yangon": "2025-03-29",
+    "statement": "The 2025-03-28 UTC product is interpreted as the first post-event local night, 2025-03-29 in Asia/Yangon; this is a product-date convention rather than an instantaneous measurement at the mainshock time."
+  },
+  "analysis_contract": {
+    "baseline": "Equal-weighted valid daily AOI radiance means for 2025-03-21 through 2025-03-27 UTC; missing days are excluded, never assigned zero.",
+    "comparison": "First post-event local-night mean minus the pre-event mean of daily means.",
+    "diagnostics": "Sample-standard-deviation z-like location, empirical rank, and leave-one-day-out ranges; descriptive only.",
+    "late_followup": "Listed separately; no line is drawn across the approximately 16-month gap and no recovery rate is estimated."
+  },
+  "aoi_results": {
+    "25": {
+      "aoi_radius_km": 25,
+      "baseline": {
+        "utc_product_window": [
+          "2025-03-21",
+          "2025-03-27"
+        ],
+        "aggregation_unit": "equal-weighted daily AOI radiance means after strict QA",
+        "calendar_days_in_window": 7,
+        "valid_daily_mean_n": 6,
+        "missing_daily_mean_n": 1,
+        "mean_of_daily_means_nw_cm2_sr": 1.4825387715,
+        "median_of_daily_means_nw_cm2_sr": 1.4653361733,
+        "sample_std_of_daily_means_nw_cm2_sr": 0.2715162615,
+        "daily_observations": [
+          {
+            "utc_product_date": "2025-03-21",
+            "local_night_date_asia_yangon": "2025-03-22",
+            "qa_valid_pixel_count": 7747,
+            "aoi_pixel_count": 9895,
+            "qa_valid_fraction": 0.782920667,
+            "radiance_mean_nw_cm2_sr": 1.4809058074,
+            "radiance_median_nw_cm2_sr": 0.712315321,
+            "radiance_within_day_std_nw_cm2_sr": 2.4479968809
+          },
+          {
+            "utc_product_date": "2025-03-22",
+            "local_night_date_asia_yangon": "2025-03-23",
+            "qa_valid_pixel_count": 9811,
+            "aoi_pixel_count": 9895,
+            "qa_valid_fraction": 0.9915108641,
+            "radiance_mean_nw_cm2_sr": 1.9020090729,
+            "radiance_median_nw_cm2_sr": 1.0693557262,
+            "radiance_within_day_std_nw_cm2_sr": 2.5079669317
+          },
+          {
+            "utc_product_date": "2025-03-23",
+            "local_night_date_asia_yangon": "2025-03-24",
+            "qa_valid_pixel_count": 0,
+            "aoi_pixel_count": 9895,
+            "qa_valid_fraction": 0.0,
+            "radiance_mean_nw_cm2_sr": null,
+            "radiance_median_nw_cm2_sr": null,
+            "radiance_within_day_std_nw_cm2_sr": null
+          },
+          {
+            "utc_product_date": "2025-03-24",
+            "local_night_date_asia_yangon": "2025-03-25",
+            "qa_valid_pixel_count": 8282,
+            "aoi_pixel_count": 9895,
+            "qa_valid_fraction": 0.836988378,
+            "radiance_mean_nw_cm2_sr": 1.0916849007,
+            "radiance_median_nw_cm2_sr": 0.4920056611,
+            "radiance_within_day_std_nw_cm2_sr": 1.9373741154
+          },
+          {
+            "utc_product_date": "2025-03-25",
+            "local_night_date_asia_yangon": "2025-03-26",
+            "qa_valid_pixel_count": 9714,
+            "aoi_pixel_count": 9895,
+            "qa_valid_fraction": 0.9817079333,
+            "radiance_mean_nw_cm2_sr": 1.3461674395,
+            "radiance_median_nw_cm2_sr": 0.3905079663,
+            "radiance_within_day_std_nw_cm2_sr": 3.2843560062
+          },
+          {
+            "utc_product_date": "2025-03-26",
+            "local_night_date_asia_yangon": "2025-03-27",
+            "qa_valid_pixel_count": 9680,
+            "aoi_pixel_count": 9895,
+            "qa_valid_fraction": 0.9782718545,
+            "radiance_mean_nw_cm2_sr": 1.4497665392,
+            "radiance_median_nw_cm2_sr": 0.5800252855,
+            "radiance_within_day_std_nw_cm2_sr": 2.7803692897
+          },
+          {
+            "utc_product_date": "2025-03-27",
+            "local_night_date_asia_yangon": "2025-03-28",
+            "qa_valid_pixel_count": 9879,
+            "aoi_pixel_count": 9895,
+            "qa_valid_fraction": 0.9983830217,
+            "radiance_mean_nw_cm2_sr": 1.624698869,
+            "radiance_median_nw_cm2_sr": 0.8237463236,
+            "radiance_within_day_std_nw_cm2_sr": 2.3459849343
+          }
+        ]
+      },
+      "first_post_event_local_night": {
+        "utc_product_date": "2025-03-28",
+        "interpreted_local_night_date_asia_yangon": "2025-03-29",
+        "mean_nw_cm2_sr": 1.043512512,
+        "median_nw_cm2_sr": 0.8317196667,
+        "qa_valid_pixel_count": 9802,
+        "aoi_pixel_count": 9895,
+        "qa_valid_fraction": 0.9906013138
+      },
+      "first_night_relative_to_baseline": {
+        "absolute_mean_difference_nw_cm2_sr": -0.4390262595,
+        "percent_mean_difference": -29.613138485,
+        "z_like_location_using_pre_daily_sample_std": -1.6169427829,
+        "empirical_percentile_among_pre_daily_means": 0.0,
+        "ascending_rank_if_inserted_among_pre_values": 1,
+        "combined_rank_denominator": 7,
+        "leave_one_day_out_baseline_mean_range_nw_cm2_sr": [
+          1.3986447112,
+          1.5607095456
+        ],
+        "leave_one_day_out_absolute_difference_range_nw_cm2_sr": [
+          -0.5171970336,
+          -0.3551321992
+        ],
+        "leave_one_day_out_percent_difference_range": [
+          -33.1385833505,
+          -25.3911659167
+        ],
+        "diagnostic_limit": "Small-n descriptive location diagnostics only; neither the z-like value nor the rank is a significance test or causal estimate."
+      },
+      "late_followup_observations": {
+        "label": "late follow-up observations",
+        "calendar_days": 8,
+        "days_with_valid_mean": 4,
+        "days_without_valid_mean": 4,
+        "qa_valid_fraction_range": [
+          0.0,
+          0.6959070237
+        ],
+        "qa_valid_fraction_mean": 0.1037897928,
+        "available_radiance_mean_range_nw_cm2_sr": [
+          0.1321177743,
+          4.3185016109
+        ],
+        "daily_observations": [
+          {
+            "utc_product_date": "2026-07-24",
+            "local_night_date_asia_yangon": "2026-07-25",
+            "qa_valid_pixel_count": 0,
+            "aoi_pixel_count": 9895,
+            "qa_valid_fraction": 0.0,
+            "radiance_mean_nw_cm2_sr": null,
+            "radiance_median_nw_cm2_sr": null,
+            "radiance_within_day_std_nw_cm2_sr": null
+          },
+          {
+            "utc_product_date": "2026-07-25",
+            "local_night_date_asia_yangon": "2026-07-26",
+            "qa_valid_pixel_count": 211,
+            "aoi_pixel_count": 9895,
+            "qa_valid_fraction": 0.021323901,
+            "radiance_mean_nw_cm2_sr": 4.3185016109,
+            "radiance_median_nw_cm2_sr": 2.5857923031,
+            "radiance_within_day_std_nw_cm2_sr": 5.5869200873
+          },
+          {
+            "utc_product_date": "2026-07-26",
+            "local_night_date_asia_yangon": "2026-07-27",
+            "qa_valid_pixel_count": 1094,
+            "aoi_pixel_count": 9895,
+            "qa_valid_fraction": 0.1105608893,
+            "radiance_mean_nw_cm2_sr": 0.1321177743,
+            "radiance_median_nw_cm2_sr": 0.0099999998,
+            "radiance_within_day_std_nw_cm2_sr": 0.5561036665
+          },
+          {
+            "utc_product_date": "2026-07-27",
+            "local_night_date_asia_yangon": "2026-07-28",
+            "qa_valid_pixel_count": 0,
+            "aoi_pixel_count": 9895,
+            "qa_valid_fraction": 0.0,
+            "radiance_mean_nw_cm2_sr": null,
+            "radiance_median_nw_cm2_sr": null,
+            "radiance_within_day_std_nw_cm2_sr": null
+          },
+          {
+            "utc_product_date": "2026-07-28",
+            "local_night_date_asia_yangon": "2026-07-29",
+            "qa_valid_pixel_count": 6886,
+            "aoi_pixel_count": 9895,
+            "qa_valid_fraction": 0.6959070237,
+            "radiance_mean_nw_cm2_sr": 3.1115459415,
+            "radiance_median_nw_cm2_sr": 0.0099999998,
+            "radiance_within_day_std_nw_cm2_sr": 9.1468550272
+          },
+          {
+            "utc_product_date": "2026-07-29",
+            "local_night_date_asia_yangon": "2026-07-30",
+            "qa_valid_pixel_count": 0,
+            "aoi_pixel_count": 9895,
+            "qa_valid_fraction": 0.0,
+            "radiance_mean_nw_cm2_sr": null,
+            "radiance_median_nw_cm2_sr": null,
+            "radiance_within_day_std_nw_cm2_sr": null
+          },
+          {
+            "utc_product_date": "2026-07-30",
+            "local_night_date_asia_yangon": "2026-07-31",
+            "qa_valid_pixel_count": 0,
+            "aoi_pixel_count": 9895,
+            "qa_valid_fraction": 0.0,
+            "radiance_mean_nw_cm2_sr": null,
+            "radiance_median_nw_cm2_sr": null,
+            "radiance_within_day_std_nw_cm2_sr": null
+          },
+          {
+            "utc_product_date": "2026-07-31",
+            "local_night_date_asia_yangon": "2026-08-01",
+            "qa_valid_pixel_count": 25,
+            "aoi_pixel_count": 9895,
+            "qa_valid_fraction": 0.0025265285,
+            "radiance_mean_nw_cm2_sr": 0.8223932709,
+            "radiance_median_nw_cm2_sr": 0.8055918217,
+            "radiance_within_day_std_nw_cm2_sr": 0.4889798058
+          }
+        ],
+        "interpretation_limit": "These isolated observations occur about 16 months later and have unstable strict-QA coverage. Season, lunar illumination, weather, land-cover/development change, and the long interval are confounded; they are not a recovery trajectory or recovery rate."
+      }
+    },
+    "50": {
+      "aoi_radius_km": 50,
+      "baseline": {
+        "utc_product_window": [
+          "2025-03-21",
+          "2025-03-27"
+        ],
+        "aggregation_unit": "equal-weighted daily AOI radiance means after strict QA",
+        "calendar_days_in_window": 7,
+        "valid_daily_mean_n": 7,
+        "missing_daily_mean_n": 0,
+        "mean_of_daily_means_nw_cm2_sr": 0.8338199965,
+        "median_of_daily_means_nw_cm2_sr": 0.8133710744,
+        "sample_std_of_daily_means_nw_cm2_sr": 0.2077232716,
+        "daily_observations": [
+          {
+            "utc_product_date": "2025-03-21",
+            "local_night_date_asia_yangon": "2025-03-22",
+            "qa_valid_pixel_count": 29785,
+            "aoi_pixel_count": 39575,
+            "qa_valid_fraction": 0.7526216045,
+            "radiance_mean_nw_cm2_sr": 0.8630309633,
+            "radiance_median_nw_cm2_sr": 0.6220144629,
+            "radiance_within_day_std_nw_cm2_sr": 1.3452536808
+          },
+          {
+            "utc_product_date": "2025-03-22",
+            "local_night_date_asia_yangon": "2025-03-23",
+            "qa_valid_pixel_count": 37217,
+            "aoi_pixel_count": 39575,
+            "qa_valid_fraction": 0.9404169299,
+            "radiance_mean_nw_cm2_sr": 1.1978076302,
+            "radiance_median_nw_cm2_sr": 0.915214479,
+            "radiance_within_day_std_nw_cm2_sr": 1.4624122513
+          },
+          {
+            "utc_product_date": "2025-03-23",
+            "local_night_date_asia_yangon": "2025-03-24",
+            "qa_valid_pixel_count": 2307,
+            "aoi_pixel_count": 39575,
+            "qa_valid_fraction": 0.0582943778,
+            "radiance_mean_nw_cm2_sr": 0.5706632864,
+            "radiance_median_nw_cm2_sr": 0.5518851876,
+            "radiance_within_day_std_nw_cm2_sr": 0.2742109767
+          },
+          {
+            "utc_product_date": "2025-03-24",
+            "local_night_date_asia_yangon": "2025-03-25",
+            "qa_valid_pixel_count": 29439,
+            "aoi_pixel_count": 39575,
+            "qa_valid_fraction": 0.7438787113,
+            "radiance_mean_nw_cm2_sr": 0.7369566927,
+            "radiance_median_nw_cm2_sr": 0.4610076249,
+            "radiance_within_day_std_nw_cm2_sr": 1.2330401894
+          },
+          {
+            "utc_product_date": "2025-03-25",
+            "local_night_date_asia_yangon": "2025-03-26",
+            "qa_valid_pixel_count": 38438,
+            "aoi_pixel_count": 39575,
+            "qa_valid_fraction": 0.971269741,
+            "radiance_mean_nw_cm2_sr": 0.6751063323,
+            "radiance_median_nw_cm2_sr": 0.3407382369,
+            "radiance_within_day_std_nw_cm2_sr": 1.8222495515
+          },
+          {
+            "utc_product_date": "2025-03-26",
+            "local_night_date_asia_yangon": "2025-03-27",
+            "qa_valid_pixel_count": 38916,
+            "aoi_pixel_count": 39575,
+            "qa_valid_fraction": 0.9833480733,
+            "radiance_mean_nw_cm2_sr": 0.8133710744,
+            "radiance_median_nw_cm2_sr": 0.5143302381,
+            "radiance_within_day_std_nw_cm2_sr": 1.5823952865
+          },
+          {
+            "utc_product_date": "2025-03-27",
+            "local_night_date_asia_yangon": "2025-03-28",
+            "qa_valid_pixel_count": 39505,
+            "aoi_pixel_count": 39575,
+            "qa_valid_fraction": 0.9982312066,
+            "radiance_mean_nw_cm2_sr": 0.9798039961,
+            "radiance_median_nw_cm2_sr": 0.6899275184,
+            "radiance_within_day_std_nw_cm2_sr": 1.3599660942
+          }
+        ]
+      },
+      "first_post_event_local_night": {
+        "utc_product_date": "2025-03-28",
+        "interpreted_local_night_date_asia_yangon": "2025-03-29",
+        "mean_nw_cm2_sr": 0.874851274,
+        "median_nw_cm2_sr": 0.8007637262,
+        "qa_valid_pixel_count": 39330,
+        "aoi_pixel_count": 39575,
+        "qa_valid_fraction": 0.993809223
+      },
+      "first_night_relative_to_baseline": {
+        "absolute_mean_difference_nw_cm2_sr": 0.0410312775,
+        "percent_mean_difference": 4.9208795269,
+        "z_like_location_using_pre_daily_sample_std": 0.1975285541,
+        "empirical_percentile_among_pre_daily_means": 71.4285714286,
+        "ascending_rank_if_inserted_among_pre_values": 6,
+        "combined_rank_denominator": 8,
+        "leave_one_day_out_baseline_mean_range_nw_cm2_sr": [
+          0.7731553909,
+          0.8776794482
+        ],
+        "leave_one_day_out_absolute_difference_range_nw_cm2_sr": [
+          -0.0028281742,
+          0.1016958831
+        ],
+        "leave_one_day_out_percent_difference_range": [
+          -0.3222331547,
+          13.1533562739
+        ],
+        "diagnostic_limit": "Small-n descriptive location diagnostics only; neither the z-like value nor the rank is a significance test or causal estimate."
+      },
+      "late_followup_observations": {
+        "label": "late follow-up observations",
+        "calendar_days": 8,
+        "days_with_valid_mean": 7,
+        "days_without_valid_mean": 1,
+        "qa_valid_fraction_range": [
+          0.0,
+          0.3925710676
+        ],
+        "qa_valid_fraction_mean": 0.0990840177,
+        "available_radiance_mean_range_nw_cm2_sr": [
+          0.0645502247,
+          1.483236225
+        ],
+        "daily_observations": [
+          {
+            "utc_product_date": "2026-07-24",
+            "local_night_date_asia_yangon": "2026-07-25",
+            "qa_valid_pixel_count": 338,
+            "aoi_pixel_count": 39575,
+            "qa_valid_fraction": 0.0085407454,
+            "radiance_mean_nw_cm2_sr": 0.6311981209,
+            "radiance_median_nw_cm2_sr": 0.6488636434,
+            "radiance_within_day_std_nw_cm2_sr": 0.202496298
+          },
+          {
+            "utc_product_date": "2026-07-25",
+            "local_night_date_asia_yangon": "2026-07-26",
+            "qa_valid_pixel_count": 1927,
+            "aoi_pixel_count": 39575,
+            "qa_valid_fraction": 0.0486923563,
+            "radiance_mean_nw_cm2_sr": 0.7802380854,
+            "radiance_median_nw_cm2_sr": 0.1797276586,
+            "radiance_within_day_std_nw_cm2_sr": 2.2671696376
+          },
+          {
+            "utc_product_date": "2026-07-26",
+            "local_night_date_asia_yangon": "2026-07-27",
+            "qa_valid_pixel_count": 9432,
+            "aoi_pixel_count": 39575,
+            "qa_valid_fraction": 0.2383322805,
+            "radiance_mean_nw_cm2_sr": 0.2111666055,
+            "radiance_median_nw_cm2_sr": 0.0099999998,
+            "radiance_within_day_std_nw_cm2_sr": 1.0075676812
+          },
+          {
+            "utc_product_date": "2026-07-27",
+            "local_night_date_asia_yangon": "2026-07-28",
+            "qa_valid_pixel_count": 2808,
+            "aoi_pixel_count": 39575,
+            "qa_valid_fraction": 0.070953885,
+            "radiance_mean_nw_cm2_sr": 0.0645502247,
+            "radiance_median_nw_cm2_sr": 0.0099999998,
+            "radiance_within_day_std_nw_cm2_sr": 0.1770866575
+          },
+          {
+            "utc_product_date": "2026-07-28",
+            "local_night_date_asia_yangon": "2026-07-29",
+            "qa_valid_pixel_count": 15536,
+            "aoi_pixel_count": 39575,
+            "qa_valid_fraction": 0.3925710676,
+            "radiance_mean_nw_cm2_sr": 1.483236225,
+            "radiance_median_nw_cm2_sr": 0.0099999998,
+            "radiance_within_day_std_nw_cm2_sr": 6.2787874639
+          },
+          {
+            "utc_product_date": "2026-07-29",
+            "local_night_date_asia_yangon": "2026-07-30",
+            "qa_valid_pixel_count": 778,
+            "aoi_pixel_count": 39575,
+            "qa_valid_fraction": 0.0196588756,
+            "radiance_mean_nw_cm2_sr": 0.2199028435,
+            "radiance_median_nw_cm2_sr": 0.0099999998,
+            "radiance_within_day_std_nw_cm2_sr": 0.79261973
+          },
+          {
+            "utc_product_date": "2026-07-30",
+            "local_night_date_asia_yangon": "2026-07-31",
+            "qa_valid_pixel_count": 0,
+            "aoi_pixel_count": 39575,
+            "qa_valid_fraction": 0.0,
+            "radiance_mean_nw_cm2_sr": null,
+            "radiance_median_nw_cm2_sr": null,
+            "radiance_within_day_std_nw_cm2_sr": null
+          },
+          {
+            "utc_product_date": "2026-07-31",
+            "local_night_date_asia_yangon": "2026-08-01",
+            "qa_valid_pixel_count": 551,
+            "aoi_pixel_count": 39575,
+            "qa_valid_fraction": 0.0139229311,
+            "radiance_mean_nw_cm2_sr": 0.3537984149,
+            "radiance_median_nw_cm2_sr": 0.0099999998,
+            "radiance_within_day_std_nw_cm2_sr": 0.5370213532
+          }
+        ],
+        "interpretation_limit": "These isolated observations occur about 16 months later and have unstable strict-QA coverage. Season, lunar illumination, weather, land-cover/development change, and the long interval are confounded; they are not a recovery trajectory or recovery rate."
+      }
+    }
+  },
+  "spatial_sensitivity": {
+    "first_night_direction_by_aoi": {
+      "25": "decrease",
+      "50": "increase"
+    },
+    "direction_consistent_between_25km_and_50km": false,
+    "interpretation": "The 25 km and 50 km AOIs show opposite first-night directions relative to their own pre-event baselines. Therefore the result is spatial-scale sensitive and does not support a scale-robust change claim."
+  },
+  "claim_boundary": {
+    "supported": "A transparent descriptive comparison of strict-QA nighttime-light observations for two AOI radii.",
+    "not_supported": [
+      "earthquake causation",
+      "power outage inference",
+      "physical damage inference",
+      "recovery trajectory or recovery rate",
+      "statistical significance from the small pre-event sample"
+    ],
+    "confounders": [
+      "cloud and QA coverage",
+      "season and weather",
+      "lunar illumination",
+      "land-cover and development change",
+      "the approximately 16-month interval to late follow-up observations",
+      "the source-conflicted strong subsequent earthquake reported within minutes"
+    ]
+  },
+  "validation": {
+    "input_validation_checks_inherited_and_rechecked": {
+      "formal_event_anchor_matched": true,
+      "official_hdf5_count_is_16": true,
+      "product_dates_unique_and_sorted": true,
+      "all_granules_same_collection_tile_grid": true,
+      "both_25km_and_50km_aoi_supported": true,
+      "csv_has_expected_rows": true,
+      "critical_pre_event_and_first_post_event_support_available": true,
+      "zero_valid_rows_preserved_as_explicit_missing_observations": true,
+      "valid_counts_do_not_exceed_aoi_counts": true,
+      "valid_radiance_values_nonnegative_where_available": true,
+      "qa_valid_fractions_within_unit_interval": true,
+      "historical_outputs_not_read": true,
+      "csv_reopened": true,
+      "package_reopened": true,
+      "csv_hash_recomputed_after_reopen": true,
+      "package_schema_validated": true
+    },
+    "event_and_local_date_semantics_rechecked": true,
+    "core_differences_independently_recomputed": true,
+    "missing_values_serialized_as_json_null_and_csv_blank": true,
+    "nan_or_inf_emitted": false,
+    "outputs_reopened": true,
+    "input_hashes_sha256": {
+      "formal-event-context.json": "d71a3bc8e5032a0be54dd827a491b741cc77029287f12beceed180feb9563364",
+      "formal-observation-package.json": "7d9379dd8f066a37ac876a05ea346de797d2dfd40bc891a21592aa684255a804",
+      "formal-q18-analysis-ready.csv": "3c6777a41aa074a1357d25938120b026ab9cd7afa86bea3f419fbde64ce9d554",
+      "formal-q18-validation.json": "6dcd7afadcca92c80f5851777c6735c8f8f20d5fcad7e491d4dfd1b6d1c3fc0c"
+    },
+    "output_hashes_sha256_excluding_results_json": {
+      "formal-analysis-table.csv": "6f51dff49017a286c380bc3489446639574924301b540cc9ca0970f103a07cff",
+      "formal-analysis-preview.png": "2f4c5fd207ead081b6da645bcc2a1e5d140ae05af5d33812f6b08e603df76b86"
+    }
+  },
+  "provenance": {
+    "observation_package_schema": "ntl.observation-package.v2",
+    "historical_outputs_read": false,
+    "gold_or_benchmark_outputs_read": false,
+    "legacy_script_read": false
+  }
+}

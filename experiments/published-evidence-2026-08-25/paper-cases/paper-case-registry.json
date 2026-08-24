@@ -1,0 +1,54 @@
+{
+  "schema_version": "ntl.paper-case-registry.v1",
+  "registry_scope": "Paper-case and supplementary workflow evidence only; entries are not members of the formal 200-task benchmark.",
+  "entries": [
+    {
+      "case_id": "CASE-201",
+      "title": "Myanmar earthquake: first post-event local night and UTC-indexed VNP46A2 product date",
+      "status": "in_progress",
+      "evidence_class": "paper_case_supplementary_workflow",
+      "formal_benchmark_member": false,
+      "formal_benchmark_denominator": null,
+      "experiment_directory": "work/projects/ntl-gpt/experiments/paper-case-201-myanmar-first-local-night-2026-08-18",
+      "query_file": "case-201.query.md",
+      "created_utc": "2026-08-18T00:00:00Z"
+    },
+    {
+      "case_id": "CASE-202",
+      "title": "City of Tehran: near-real-time NTL analysis across the 2026 United States-Israel-Iran conflict timeline",
+      "status": "completed",
+      "evidence_class": "paper_case_workflow",
+      "formal_benchmark_member": false,
+      "formal_benchmark_denominator": null,
+      "experiment_directory": "work/projects/ntl-gpt/experiments/paper-case-codex-subagent-rerun-2026-08-17",
+      "evidence_file": "engineer/paper-facing-evidence-q19.md",
+      "source_experiment_id": "Q19",
+      "manuscript_section": "3.1.2",
+      "registered_utc": "2026-08-20T09:13:35Z",
+      "latest_observation_extension": {
+        "experiment_directory": "work/projects/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21",
+        "evidence_file": "paper-facing-handoff.md",
+        "analysis_collection_endpoint_utc": "2026-08-19",
+        "latest_strict_qualified_city_observation_utc": "2026-08-12",
+        "gee_collection_latest_image_utc": "2026-08-19",
+        "nasa_cmr_tehran_tile_latest_product_utc": "2026-08-12",
+        "live_refresh_queried_at_utc": "2026-08-21T09:10:22Z",
+        "registered_utc": "2026-08-21T09:10:26Z",
+        "scope": "An extension of Case 202 paper-case evidence only. GEE product dates 2026-08-13 through 2026-08-19 were present but had no valid raw City of Tehran pixels under the fixed product/band/AOI contract and remain explicit gaps. The terminal dashed lines are visual gap connectors, not observations or imputation. This entry does not alter the formal 200-task benchmark, deployed-runtime claim, active manuscript, or Draw.io source."
+      }
+    },
+    {
+      "case_id": "CASE-203",
+      "title": "Shanghai SDGSAT-1 nighttime light-source classification",
+      "status": "completed",
+      "evidence_class": "paper_case_workflow",
+      "formal_benchmark_member": false,
+      "formal_benchmark_denominator": null,
+      "experiment_directory": "work/projects/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q17-sdgsat-light-classification",
+      "evidence_file": "evidence-report.md",
+      "source_experiment_id": "Q17",
+      "manuscript_section": "3.2",
+      "registered_utc": "2026-08-20T09:13:35Z"
+    }
+  ]
+}

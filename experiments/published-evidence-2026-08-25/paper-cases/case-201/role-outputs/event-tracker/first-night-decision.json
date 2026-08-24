@@ -1,0 +1,141 @@
+{
+  "schema": "ntl.case201.first-night-decision.v1",
+  "case_id": "CASE-201",
+  "role": "NTL Event Tracker",
+  "status": "eligible_exact_first_night_observation",
+  "generated_at_utc": "2026-08-18T07:22:39.241Z",
+  "inputs": [
+    {
+      "path": "experiments/paper-case-201-myanmar-first-local-night-2026-08-18/implementation/gee_ntl_date_boundary_handling.py",
+      "sha256": "72a23d6cb0cf358d0548003fe423de4df62b3e325cd63d700ed6395788216b11",
+      "role": "supplied generic implementation actually executed"
+    },
+    {
+      "path": "experiments/paper-case-201-myanmar-first-local-night-2026-08-18/tests/test_gee_ntl_date_boundary_handling.py",
+      "sha256": "069e770a173e801dadf0ab76855139778a57b488da46d454cf479bd2018df357",
+      "role": "implementation contract tests"
+    },
+    {
+      "path": "experiments/paper-case-201-myanmar-first-local-night-2026-08-18/case-201.contract.md",
+      "sha256": "8e97e4a86a80e9fddd9d621686203020f9d2376408302b25a50551e08856c1b6",
+      "role": "decision rule and candidate window"
+    },
+    {
+      "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-analysis-table.csv",
+      "sha256": "6f51dff49017a286c380bc3489446639574924301b540cc9ca0970f103a07cff",
+      "role": "formal Q18 exact-date QA rows"
+    },
+    {
+      "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-q18-validation.json",
+      "sha256": "6dcd7afadcca92c80f5851777c6735c8f8f20d5fcad7e491d4dfd1b6d1c3fc0c",
+      "role": "formal package validation gate"
+    },
+    {
+      "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-observation-package.json",
+      "sha256": "7d9379dd8f066a37ac876a05ea346de797d2dfd40bc891a21592aa684255a804",
+      "role": "formal Q18 product/date and QA contract"
+    },
+    {
+      "path": "runtime/.ntl-gpt/skills/gee-ntl-date-boundary-handling/SKILL.md",
+      "sha256": "7f43d02a5db7b9cb3aa0381c26c0a96dfe5fd180fcf894384bf21e431ba0c8d9",
+      "role": "manually read date-boundary rules"
+    }
+  ],
+  "execution": {
+    "event_time_utc": "2025-03-28T06:20:52Z",
+    "timezone": "Asia/Yangon",
+    "candidate_acquisition_window_local": [
+      "00:30",
+      "02:30"
+    ],
+    "product_convention": "UTC-indexed VNP46A2 Collection 002 product date",
+    "implementation_functions_executed": [
+      "determine_first_post_event_local_night",
+      "utc_product_date_for_local_night",
+      "exact_date_eligibility",
+      "inclusive_end_to_exclusive"
+    ],
+    "local_time_context": {
+      "event_time_local": "2025-03-28T12:50:52+06:30",
+      "candidate_window_on_event_date": [
+        "2025-03-28T00:30:00+06:30",
+        "2025-03-28T02:30:00+06:30"
+      ],
+      "status": "resolved_after_candidate_window"
+    },
+    "local_first_night": {
+      "date": "2025-03-29",
+      "rule": "The event occurs after the 00:30-02:30 candidate acquisition window on 2025-03-28, so the first post-event local-night label is the next local date.",
+      "status": "resolved_after_candidate_window"
+    },
+    "utc_product_mapping": {
+      "local_window": [
+        "2025-03-29T00:30:00+06:30",
+        "2025-03-29T02:30:00+06:30"
+      ],
+      "utc_window": [
+        "2025-03-28T18:00:00Z",
+        "2025-03-28T20:00:00Z"
+      ],
+      "utc_product_date": "2025-03-28",
+      "status": "resolved_utc_indexed_product_date"
+    },
+    "single_day_query": {
+      "requested_utc_product_date": "2025-03-28",
+      "end_exclusive": "2025-03-29",
+      "rule": "inclusive_end_to_exclusive('2025-03-28')"
+    },
+    "formal_q18_eligibility_source": {
+      "available_and_eligible_dates": {
+        "2025-03-28": true
+      },
+      "derivation": "Both formal first_post_event_local_night rows for the exact UTC product date have non-null radiance and positive strict-QA valid-pixel counts.",
+      "support_rows": [
+        {
+          "aoi_radius_km": 25,
+          "utc_product_date": "2025-03-28",
+          "local_night_date_asia_yangon": "2025-03-29",
+          "qa_valid_pixel_count": 9802,
+          "aoi_pixel_count": 9895,
+          "qa_valid_fraction": 0.9906013138,
+          "radiance_mean_nw_cm2_sr": 1.043512512,
+          "eligible": true
+        },
+        {
+          "aoi_radius_km": 50,
+          "utc_product_date": "2025-03-28",
+          "local_night_date_asia_yangon": "2025-03-29",
+          "qa_valid_pixel_count": 39330,
+          "aoi_pixel_count": 39575,
+          "qa_valid_fraction": 0.993809223,
+          "radiance_mean_nw_cm2_sr": 0.874851274,
+          "eligible": true
+        }
+      ]
+    },
+    "exact_date_gate": {
+      "utc_product_date": "2025-03-28",
+      "status": "eligible_first_night_observation",
+      "eligible": true,
+      "later_date_fallback_used": false
+    }
+  },
+  "validation": {
+    "status": "passed",
+    "checks": [
+      "Executed supplied implementation with the frozen UTC event timestamp.",
+      "Observed local conversion 2025-03-28T12:50:52+06:30.",
+      "Observed local first-night date 2025-03-29.",
+      "Observed UTC candidate window 2025-03-28T18:00:00Z-20:00:00Z.",
+      "Observed UTC-indexed product date 2025-03-28.",
+      "Exact-date gate returned eligible_first_night_observation from the formal Q18 QA rows.",
+      "Single-day end-exclusive boundary returned 2025-03-29."
+    ]
+  },
+  "limitations": [
+    "00:30-02:30 is a candidate acquisition interval, not an exact pixel acquisition time.",
+    "The generic implementation does not call GEE, download HDF granules, inspect VNP46A1 UTC_Time, or recompute Q18 radiance.",
+    "Eligibility is reused from the supplied formal Q18 package; it is not a new observation run.",
+    "No later product date may be substituted while retaining the first-night label."
+  ]
+}

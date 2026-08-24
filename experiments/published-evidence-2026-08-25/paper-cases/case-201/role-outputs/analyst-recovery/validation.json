@@ -1,0 +1,74 @@
+{
+  "calculation_scope": {
+    "event_product_date": "2025-03-28",
+    "pre_event_dates_from_observation_json": [
+      "2025-03-21",
+      "2025-03-22",
+      "2025-03-23",
+      "2025-03-24",
+      "2025-03-25",
+      "2025-03-26",
+      "2025-03-27"
+    ],
+    "radii_km": [
+      25,
+      50
+    ]
+  },
+  "checks": {
+    "baseline_has_qualified_rows_per_radius": true,
+    "descriptive_only_no_causal_recovery_significance": true,
+    "event_anchor_matches_both_json_inputs": true,
+    "exact_event_row_present_once_per_radius": true,
+    "formula_reproduces_requested_25km_value": true,
+    "formula_reproduces_requested_50km_value": true,
+    "later_dates_not_used": true,
+    "source_contains_exactly_25_and_50_km": true,
+    "source_csv_row_count_is_32": true,
+    "support_ranges_remain_separate": true,
+    "used_dates_stop_at_2025_03_28": true
+  },
+  "expected_value_checks": {
+    "25": {
+      "absolute_difference_from_expected_percent_points": 0.0,
+      "expected_percent_rounded_2dp": -29.61,
+      "observed_percent_rounded_2dp": -29.61,
+      "pass": true
+    },
+    "50": {
+      "absolute_difference_from_expected_percent_points": 0.0,
+      "expected_percent_rounded_2dp": 4.92,
+      "observed_percent_rounded_2dp": 4.92,
+      "pass": true
+    }
+  },
+  "later_utc_product_dates_present_but_excluded": [
+    "2026-07-24",
+    "2026-07-25",
+    "2026-07-26",
+    "2026-07-27",
+    "2026-07-28",
+    "2026-07-29",
+    "2026-07-30",
+    "2026-07-31"
+  ],
+  "limitations": [
+    "Only the exact 2025-03-28 product row is compared with the pre-event baseline.",
+    "The result is observational and descriptive; no causal or recovery inference is supported.",
+    "No significance test or uncertainty model is performed."
+  ],
+  "schema": "ntl.analyst-recovery.validation.v1",
+  "source_rows": 32,
+  "status": "passed",
+  "task_id": "Case-201-myanmar-first-local-night-2026-08-18",
+  "used_utc_product_dates": [
+    "2025-03-21",
+    "2025-03-22",
+    "2025-03-23",
+    "2025-03-24",
+    "2025-03-25",
+    "2025-03-26",
+    "2025-03-27",
+    "2025-03-28"
+  ]
+}

@@ -1,0 +1,236 @@
+{
+  "schema_version": "ntl.case202.tehran-latest-analysis.v1",
+  "case_id": "Case202-tehran-latest-vnp46a2",
+  "status": "complete",
+  "created_at_utc": "2026-08-21T09:32:51Z",
+  "time_basis": "UTC product day",
+  "product": {
+    "collection_id": "NASA/VIIRS/002/VNP46A2",
+    "band": "DNB_BRDF_Corrected_NTL",
+    "gap_filled_band_used": false
+  },
+  "aoi": "Existing geoBoundaries City of Tehran ADM2 / canonical Shahrestan polygon; no event-point buffer.",
+  "availability": {
+    "live_latest_collection_image_date_utc": "2026-08-19",
+    "latest_strict_qualified_date_utc": "2026-08-12",
+    "calendar_days_through_latest_collection_image": 231,
+    "calendar_days_through_latest_strict_qualified_observation": 224,
+    "strict_qualified_days": 168,
+    "permissive_qualified_days": 172
+  },
+  "strict_primary_window_summary": [
+    {
+      "qa_mode": "strict",
+      "window_id": "pre_conflict_baseline",
+      "label": "Pre-conflict baseline",
+      "start_date_utc": "2026-01-01",
+      "end_date_utc": "2026-02-27",
+      "inclusive_calendar_days": 58,
+      "image_available_days": 58,
+      "qualified_days": 47,
+      "mean_of_daily_means": 67.23183490694599,
+      "relative_change_vs_baseline_percent": 0.0,
+      "valid_fraction_mean": 0.1915195863150982,
+      "valid_fraction_median": 0.187725631768953,
+      "analysis_collection_endpoint_utc": "2026-08-19",
+      "analysis_uses_latest_strict_qualified_date": "2026-08-12",
+      "no_imputation": true
+    },
+    {
+      "qa_mode": "strict",
+      "window_id": "conflict_evaluation",
+      "label": "Conflict evaluation",
+      "start_date_utc": "2026-02-28",
+      "end_date_utc": "2026-04-07",
+      "inclusive_calendar_days": 39,
+      "image_available_days": 36,
+      "qualified_days": 20,
+      "mean_of_daily_means": 55.61991566160809,
+      "relative_change_vs_baseline_percent": -17.271459661051473,
+      "valid_fraction_mean": 0.26940879670730894,
+      "valid_fraction_median": 0.19629487002179413,
+      "analysis_collection_endpoint_utc": "2026-08-19",
+      "analysis_uses_latest_strict_qualified_date": "2026-08-12",
+      "no_imputation": true
+    },
+    {
+      "qa_mode": "strict",
+      "window_id": "ceasefire_evaluation",
+      "label": "Ceasefire evaluation",
+      "start_date_utc": "2026-04-08",
+      "end_date_utc": "2026-04-21",
+      "inclusive_calendar_days": 14,
+      "image_available_days": 14,
+      "qualified_days": 11,
+      "mean_of_daily_means": 61.3582627055188,
+      "relative_change_vs_baseline_percent": -8.736296145355348,
+      "valid_fraction_mean": 0.19776451762914335,
+      "valid_fraction_median": 0.1993365500603136,
+      "analysis_collection_endpoint_utc": "2026-08-19",
+      "analysis_uses_latest_strict_qualified_date": "2026-08-12",
+      "no_imputation": true
+    },
+    {
+      "qa_mode": "strict",
+      "window_id": "extended_monitoring",
+      "label": "Extended monitoring",
+      "start_date_utc": "2026-04-22",
+      "end_date_utc": "2026-08-19",
+      "inclusive_calendar_days": 120,
+      "image_available_days": 107,
+      "qualified_days": 90,
+      "mean_of_daily_means": 59.254862665306256,
+      "relative_change_vs_baseline_percent": -11.86487361631655,
+      "valid_fraction_mean": 0.6912919553998399,
+      "valid_fraction_median": 0.7925691937424789,
+      "analysis_collection_endpoint_utc": "2026-08-19",
+      "analysis_uses_latest_strict_qualified_date": "2026-08-12",
+      "no_imputation": true
+    }
+  ],
+  "permissive_sensitivity_window_summary": [
+    {
+      "qa_mode": "permissive",
+      "window_id": "pre_conflict_baseline",
+      "label": "Pre-conflict baseline",
+      "start_date_utc": "2026-01-01",
+      "end_date_utc": "2026-02-27",
+      "inclusive_calendar_days": 58,
+      "image_available_days": 58,
+      "qualified_days": 48,
+      "mean_of_daily_means": 65.20254141144407,
+      "relative_change_vs_baseline_percent": 0.0,
+      "valid_fraction_mean": 0.21357387618292256,
+      "valid_fraction_median": 0.1928414471055735,
+      "analysis_collection_endpoint_utc": "2026-08-19",
+      "analysis_uses_latest_strict_qualified_date": "2026-08-12",
+      "no_imputation": true
+    },
+    {
+      "qa_mode": "permissive",
+      "window_id": "conflict_evaluation",
+      "label": "Conflict evaluation",
+      "start_date_utc": "2026-02-28",
+      "end_date_utc": "2026-04-07",
+      "inclusive_calendar_days": 39,
+      "image_available_days": 36,
+      "qualified_days": 20,
+      "mean_of_daily_means": 54.72279183826343,
+      "relative_change_vs_baseline_percent": -16.07260905223133,
+      "valid_fraction_mean": 0.28450124093770895,
+      "valid_fraction_median": 0.2005870083802314,
+      "analysis_collection_endpoint_utc": "2026-08-19",
+      "analysis_uses_latest_strict_qualified_date": "2026-08-12",
+      "no_imputation": true
+    },
+    {
+      "qa_mode": "permissive",
+      "window_id": "ceasefire_evaluation",
+      "label": "Ceasefire evaluation",
+      "start_date_utc": "2026-04-08",
+      "end_date_utc": "2026-04-21",
+      "inclusive_calendar_days": 14,
+      "image_available_days": 14,
+      "qualified_days": 12,
+      "mean_of_daily_means": 58.5741617953612,
+      "relative_change_vs_baseline_percent": -10.165830154159435,
+      "valid_fraction_mean": 0.21679950631170355,
+      "valid_fraction_median": 0.2039101223110136,
+      "analysis_collection_endpoint_utc": "2026-08-19",
+      "analysis_uses_latest_strict_qualified_date": "2026-08-12",
+      "no_imputation": true
+    },
+    {
+      "qa_mode": "permissive",
+      "window_id": "extended_monitoring",
+      "label": "Extended monitoring",
+      "start_date_utc": "2026-04-22",
+      "end_date_utc": "2026-08-19",
+      "inclusive_calendar_days": 120,
+      "image_available_days": 107,
+      "qualified_days": 92,
+      "mean_of_daily_means": 59.80048567567532,
+      "relative_change_vs_baseline_percent": -8.285038617866833,
+      "valid_fraction_mean": 0.7637944953124333,
+      "valid_fraction_median": 0.8844996779189452,
+      "analysis_collection_endpoint_utc": "2026-08-19",
+      "analysis_uses_latest_strict_qualified_date": "2026-08-12",
+      "no_imputation": true
+    }
+  ],
+  "comparison_with_2026_08_17": {
+    "pre_conflict_baseline": {
+      "prior_mean_of_daily_means": 67.231834906946,
+      "current_mean_of_daily_means": 67.23183490694599,
+      "mean_difference": -1.4210854715202004e-14,
+      "prior_relative_change_vs_baseline_percent": 0.0,
+      "current_relative_change_vs_baseline_percent": 0.0
+    },
+    "conflict_evaluation": {
+      "prior_mean_of_daily_means": 55.61991566160809,
+      "current_mean_of_daily_means": 55.61991566160809,
+      "mean_difference": 0.0,
+      "prior_relative_change_vs_baseline_percent": -17.27145966105149,
+      "current_relative_change_vs_baseline_percent": -17.271459661051473
+    },
+    "ceasefire_evaluation": {
+      "prior_mean_of_daily_means": 61.3582627055188,
+      "current_mean_of_daily_means": 61.3582627055188,
+      "mean_difference": 0.0,
+      "prior_relative_change_vs_baseline_percent": -8.736296145355368,
+      "current_relative_change_vs_baseline_percent": -8.736296145355348
+    },
+    "extended_monitoring": {
+      "prior_mean_of_daily_means": 59.752430113881054,
+      "current_mean_of_daily_means": 59.254862665306256,
+      "mean_difference": -0.49756744857479873,
+      "prior_relative_change_vs_baseline_percent": -11.1247964649738,
+      "current_relative_change_vs_baseline_percent": -11.86487361631655
+    }
+  },
+  "figure": {
+    "artifacts": [
+      {
+        "name": "case202-tehran-latest-timeseries.svg",
+        "bytes": 74330,
+        "sha256": "1effd533031bbdcf44d1a8fd137cc436a1d9770129314870fd9ed65d81f16cad"
+      },
+      {
+        "name": "case202-tehran-latest-timeseries.pdf",
+        "bytes": 37508,
+        "sha256": "116dcd7633ca4c242f6134ce3bd8efcc0109f4c2c1f16d1e3ec4252430d2e9a2"
+      },
+      {
+        "name": "case202-tehran-latest-timeseries.png",
+        "bytes": 447921,
+        "sha256": "0a30a32eaadffba43bac12ac6793949570eb2dc8cec9f83d65453cf76ee27c3c"
+      },
+      {
+        "name": "case202-tehran-latest-timeseries.tiff",
+        "bytes": 32657272,
+        "sha256": "3ef3716e086a167cfb8f1623870e8c0939793a9b6280bb48f7a0cc066571cb76"
+      }
+    ],
+    "style_reuse": "Style-only inheritance from the prior Tehran line-chart family; statistical inputs and endpoint were recomputed.",
+    "annotation_policy": "No in-plot legend, event label, or event marker is rendered at the author's request; those explanatory elements belong to the surrounding Draw.io composition.",
+    "rolling_display": "Trailing 14-calendar-day mean of actual strict-QA daily means, with min_periods=3. No daily value interpolation is performed.",
+    "post_qualification_gap_connector": "Grey and blue horizontal dashed continuations extend the final actual daily observation and final supported 14-day mean, respectively, to the live GEE collection endpoint. They are visual missing-data connectors only, not observed or imputed ANTL values, and are excluded from all statistics.",
+    "gap_connector": "Thin dashed grey segments connect consecutive observed daily means separated by more than one UTC day, including a terminal horizontal segment to the live collection endpoint; they are visual continuity only.",
+    "display_endpoint_collection_image_date_utc": "2026-08-19",
+    "latest_strict_qualified_date_utc": "2026-08-12"
+  },
+  "validation": {
+    "daily_rows": 462,
+    "daily_unique_keys": true,
+    "unqualified_rows_have_no_radiance": true,
+    "strict_window_rows": 4,
+    "fixed_window_definitions_unchanged": true,
+    "no_imputation": true
+  },
+  "limitations": [
+    "The post-2026-04-21 span is a neutral extended-monitoring period, not a uniform ceasefire, recovery, or peace phase.",
+    "Nighttime-light observations do not establish conflict causation, damage, outage, recovery, or a statistically significant effect.",
+    "The AOI is a geoBoundaries ADM2 canonical Shahrestan reporting unit, not a municipality or functional urban footprint.",
+    "Event-timeline context remains in the evidence record and is intentionally not rendered in the standalone line chart."
+  ]
+}

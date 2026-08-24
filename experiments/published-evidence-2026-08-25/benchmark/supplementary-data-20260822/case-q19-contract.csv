@@ -1,0 +1,5 @@
+﻿item,value,boundary
+Event-record selection,City of Tehran ranked first within the retained exact-coordinate subset: 142 of 248 records assigned among 20 candidate Iranian ADM2 polygons.,"The source contained 2,702 retained attack records, of which 958 had valid exact coordinates; record counts are not a complete census of attacks."
+AOI,geoBoundaries ADM2 / canonical Shahrestan / source-named unit 'City of Tehran'; not asserted to be a municipality,Administrative reporting unit; not an event-point buffer or functional urban footprint.
+NTL product,"NASA/VIIRS/002/VNP46A2, DNB_BRDF_Corrected_NTL, daily UTC product dates",Non-gap-filled band under the frozen strict-QA contract.
+Latest availability,GEE collection images through 2026-08-19; latest strict-qualified City of Tehran value 2026-08-12.,"Product dates after the strict-qualified endpoint are retained as gaps, not imputed observations."

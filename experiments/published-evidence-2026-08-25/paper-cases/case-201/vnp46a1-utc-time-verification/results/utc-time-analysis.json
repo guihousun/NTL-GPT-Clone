@@ -1,0 +1,99 @@
+{
+  "schema_version": "ntl.q18.vnp46a1-utc-time-analysis.v1",
+  "source": {
+    "filename": "VNP46A1.A2025087.h27v06.002.2025088113623.h5",
+    "sha256": "2e069d830228f76dff936ef6dddefd76bd5b21779fa03cb1cca4d0c59670e7ba",
+    "bytes": 50906798
+  },
+  "product": {
+    "short_name": "VNP46A1",
+    "collection": "002",
+    "utc_product_date": "2025-03-28",
+    "tile": "h27v06"
+  },
+  "event": {
+    "lon": 95.936,
+    "lat": 22.011,
+    "event_time_utc": "2025-03-28T06:20:52Z",
+    "event_time_local": "2025-03-28T12:50:52+06:30",
+    "timezone": "Asia/Yangon"
+  },
+  "utc_time_metadata": {
+    "dataset_path": "HDFEOS/GRIDS/VIIRS_Grid_DNB_2d/Data Fields/UTC_Time",
+    "dataset_shape": [
+      2400,
+      2400
+    ],
+    "dataset_attributes": {
+      "_FillValue": -999.9000244140625,
+      "add_offset": 0.0,
+      "long_name": "View Time (UTC)",
+      "scale_factor": 1.0,
+      "units": "decimal hours",
+      "valid_max": 24,
+      "valid_min": 0
+    },
+    "tile_bounds_wgs84": {
+      "west": 90.0,
+      "south": 20.0,
+      "east": 100.0,
+      "north": 29.999999999999996
+    },
+    "decode_rule": "raw * scale_factor + add_offset; invalid fill, declared valid-range failures, non-finite values, and decoded values outside [0,24] are excluded without imputation."
+  },
+  "event_pixel": {
+    "row": 1917,
+    "column": 1424,
+    "pixel_center_wgs84": {
+      "lon": 95.93541666666667,
+      "lat": 22.010416666666668
+    },
+    "valid": true,
+    "utc_time_decimal_hour": 19.945844650268555,
+    "observation_time_utc": "2025-03-28T19:56:45.040741Z",
+    "observation_time_local": "2025-03-29T02:26:45.040741+06:30"
+  },
+  "buffer_summaries": [
+    {
+      "support": "25 km",
+      "radius_km": 25,
+      "n": 9895,
+      "min_utc_hour": 19.944793701171875,
+      "median_utc_hour": 19.945844650268555,
+      "mean_utc_hour": 19.94584870398677,
+      "max_utc_hour": 19.9468936920166,
+      "local_date_counts": {
+        "2025-03-29": 9895
+      },
+      "min_local_time": "2025-03-29T02:26:41.257324+06:30",
+      "median_local_time": "2025-03-29T02:26:45.040741+06:30",
+      "mean_local_time": "2025-03-29T02:26:45.055334+06:30",
+      "max_local_time": "2025-03-29T02:26:48.817291+06:30"
+    },
+    {
+      "support": "50 km",
+      "radius_km": 50,
+      "n": 39575,
+      "min_utc_hour": 18.270952224731445,
+      "median_utc_hour": 19.945844650268555,
+      "mean_utc_hour": 19.94428182205518,
+      "max_utc_hour": 19.94794464111328,
+      "local_date_counts": {
+        "2025-03-29": 39575
+      },
+      "min_local_time": "2025-03-29T00:46:15.428009+06:30",
+      "median_local_time": "2025-03-29T02:26:45.040741+06:30",
+      "mean_local_time": "2025-03-29T02:26:39.414559+06:30",
+      "max_local_time": "2025-03-29T02:26:52.600708+06:30"
+    }
+  ],
+  "interpretation": {
+    "event_pixel_is_post_event": true,
+    "event_pixel_local_date_is_2025_03_29": true,
+    "conclusion": "The UTC_Time at the containing event pixel falls after the mainshock and maps to 29 March 2025 in Asia/Yangon; therefore the A2025087 UTC-indexed product supports interpretation as the first post-event local night.",
+    "limits": [
+      "UTC_Time is a per-pixel view-time field; a tile product date is not mechanically converted to a local calendar day.",
+      "This timing-only VNP46A1 check does not replace the VNP46A2 radiance product or make causal, damage, outage, or recovery claims."
+    ]
+  }
+}

@@ -1,0 +1,421 @@
+{
+  "schema": "ntl.observation-package.v2",
+  "task_id": "Q18-myanmar-earthquake",
+  "role": "NTL Data Searcher",
+  "status": "analysis_ready_with_missing_quality_observations_and_temporal_coverage_limitation",
+  "created_at_utc": "2026-08-17T11:54:30.771066+00:00",
+  "objective": "Construct an independently decoded, QA-filtered VNP46A2 series for the formal Myanmar earthquake anchor without event-impact inference.",
+  "event_anchor": {
+    "usgs_id": "us7000pn9s",
+    "event_time_utc": "2025-03-28T06:20:52Z",
+    "event_time_local_asia_yangon": "2025-03-28T12:50:52+06:30",
+    "event_point_wgs84_lon_lat": [
+      95.936,
+      22.011
+    ]
+  },
+  "product": {
+    "short_name": "VNP46A2",
+    "long_name": "VIIRS/NPP Gap-Filled Lunar BRDF-Adjusted Nighttime Lights Daily L3 Global 15 arc-second Linear Lat Lon Grid",
+    "collection": "002",
+    "doi": "10.5067/VIIRS/VNP46A2.002",
+    "platform": "SUOMI-NPP",
+    "sensor": "VIIRS",
+    "algorithm_version": "NPP_PR46A2 1.0.3",
+    "band": "DNB_BRDF-Corrected_NTL",
+    "band_path": "HDFEOS/GRIDS/VIIRS_Grid_DNB_2d/Data Fields/DNB_BRDF-Corrected_NTL",
+    "units": "nW cm^-2 sr^-1",
+    "scale_factor": 1.0,
+    "offset": 0.0,
+    "fill_value": -999.9000244140625
+  },
+  "grid": {
+    "crs": "EPSG:4326",
+    "projection_from_struct_metadata": "HE5_GCTP_GEO",
+    "resolution": "15 arc-second",
+    "shape_rows_cols": [
+      2400,
+      2400
+    ],
+    "bounds_wgs84_wsen": [
+      90.0,
+      20.0,
+      100.0,
+      30.0
+    ],
+    "pixel_size_degrees": [
+      0.004166666666666667,
+      0.004166666666666667
+    ],
+    "tile": "h27v06",
+    "aoi_pixel_counts": {
+      "25": 9895,
+      "50": 39575
+    },
+    "spatial_support": "pixel centres derived from HDF-EOS upper-left grid bounds",
+    "reducer": "unweighted pixel mean/median/population standard deviation and percentiles"
+  },
+  "aoi": {
+    "centre_wgs84_lon_lat": [
+      95.936,
+      22.011
+    ],
+    "radii_km": [
+      25,
+      50
+    ],
+    "geometry": "WGS84 ellipsoidal geodesic distance using pyproj.Geod(ellps='WGS84')",
+    "inclusion_rule": "pixel centre distance <= radius"
+  },
+  "qa_contract": {
+    "physical_radiance": "finite, not fill, and >= 0 after scale/offset",
+    "mandatory_quality": "Mandatory_Quality_Flag == 0 (high-quality main algorithm)",
+    "cloud_mask": [
+      "QF_Cloud_Mask not fill",
+      "bit 0 == 0 (night)",
+      "bits 4-5 >= 2 (medium/high cloud-mask quality)",
+      "bits 6-7 <= 1 (confident/probably clear)",
+      "bits 8, 9, 10, 12, 13 == 0 (no shadow, cirrus, snow/ice, aurora, lunar eclipse)"
+    ],
+    "snow": "Snow_Flag == 0 and not fill",
+    "primary_valid_mask": "logical AND of all conditions above",
+    "qa_band_paths": {
+      "mandatory_quality": "HDFEOS/GRIDS/VIIRS_Grid_DNB_2d/Data Fields/Mandatory_Quality_Flag",
+      "cloud_mask": "HDFEOS/GRIDS/VIIRS_Grid_DNB_2d/Data Fields/QF_Cloud_Mask",
+      "snow_flag": "HDFEOS/GRIDS/VIIRS_Grid_DNB_2d/Data Fields/Snow_Flag"
+    },
+    "dataset_attributes_from_first_hdf": {
+      "radiance": {
+        "_FillValue": [
+          -999.9000244140625
+        ],
+        "long_name": "BRDF Corrected DNB Radiance",
+        "offset": [
+          0.0
+        ],
+        "scale_factor": [
+          1.0
+        ],
+        "units": "nWatts/(cm^2 sr)",
+        "valid_range": ">=0.0"
+      },
+      "mandatory_quality": {
+        "Description": "00\tHigh-Quality\tMain Algorithm \n01\tPoor-Quality\tMain Algorithm (Outlier, Potential cloud contamination or other issues)\n02\tPoor-Quality\tMain Algorithm (high solar zenith angle 102-108 degrees)\n03\tPoor-Quality\tMain Algorithm (Lunar eclipse)\n04\tPoor-Quality\tMain Algorithm (Aurora)\n05\tPoor-Quality\tMain Algorithm (glint)\n255\tNo Retrieval\tFill Value",
+        "_FillValue": [
+          255
+        ],
+        "long_name": "Mandatory Quality Flag of BRDF Corrected DNB Radiance",
+        "units": "Flag, no units",
+        "valid_range": "0 - 5"
+      },
+      "cloud_mask": {
+        "Description": "bit     Flag description key: \n0\t    Day/Night \n       0=Night  1=Day \n1-3\t    Land/Water Background \n\t\t000=Land & Desert \n\t\t001=Land no Desert \n\t\t010=Inland Water \n\t\t011=Sea Water \n\t\t101=Coastal \n4-5\t    Cloud Mask Quality \n\t\t00=Poor\n\t\t01=Low \n\t\t10=Medium \n\t\t11=High \n6-7\t    Cloud Detection Results & Confidence Indicator \n\t\t00=Confident Clear \n\t\t01=Probably Clear \n\t\t10=Probably Cloudy \n\t\t11=Confident Cloudy \n8\t    Shadow Detected \n\t\t1=Yes   0=No \n9\t    Cirrus Detection (IR) (BTM15-BTM16) \n\t\t1=Cloud  0=No Cloud \n10        Snow/Ice \n         1=Snow/Ice, 0=No Snow/Ice \n11        VI used \n  1=Yes   0=No \n12       Aurora detected \n  1=Yes   0=No \n13       Lunar eclipse detected \n  1=Yes   0=No",
+        "_FillValue": [
+          65535
+        ],
+        "long_name": "Cloud Mask Status",
+        "units": "Flag, no units",
+        "valid_range": "0 - 65534"
+      },
+      "snow_flag": {
+        "Description": "0 = No snow/ice \n  1 = snow/ice",
+        "_FillValue": [
+          255
+        ],
+        "long_name": "Snow/Ice Status",
+        "units": "Flag, no units",
+        "valid_range": "0 - 1"
+      }
+    }
+  },
+  "date_semantics": {
+    "utc_product_date": "RangeBeginningDate and YYYY+DOY in the official granule filename",
+    "interpreted_local_night_date_asia_yangon": "UTC product date + 1 day, reflecting the nominal after-midnight local night-time overpass; exact pixel acquisition time is not exposed in these HDF files",
+    "event_day_product": "2025-03-28",
+    "first_post_event_local_night_interpreted": "2025-03-29",
+    "qualification": "The mainshock occurred at 12:50:52 Asia/Yangon, after the pre-event local night-time overpass. The 2025-03-28 UTC-indexed product is treated as the first post-event local night, without claiming an exact pixel time."
+  },
+  "temporal_coverage": {
+    "utc_product_dates": [
+      "2025-03-21",
+      "2025-03-22",
+      "2025-03-23",
+      "2025-03-24",
+      "2025-03-25",
+      "2025-03-26",
+      "2025-03-27",
+      "2025-03-28",
+      "2026-07-24",
+      "2026-07-25",
+      "2026-07-26",
+      "2026-07-27",
+      "2026-07-28",
+      "2026-07-29",
+      "2026-07-30",
+      "2026-07-31"
+    ],
+    "pre_event_contiguous_dates": [
+      "2025-03-21",
+      "2025-03-22",
+      "2025-03-23",
+      "2025-03-24",
+      "2025-03-25",
+      "2025-03-26",
+      "2025-03-27"
+    ],
+    "event_day_product_date": "2025-03-28",
+    "late_followup_dates": [
+      "2026-07-24",
+      "2026-07-25",
+      "2026-07-26",
+      "2026-07-27",
+      "2026-07-28",
+      "2026-07-29",
+      "2026-07-30",
+      "2026-07-31"
+    ],
+    "immediate_post_event_gap": "No raw products after 2025-03-28 and before 2026-07-24 are present in the supplied official-HDF set."
+  },
+  "input_inventory": [
+    {
+      "filename": "VNP46A2.A2025080.h27v06.002.2025088141020.h5",
+      "path": "vault/ntl-gpt/experiments/benchmark-v1/temporal-freeze/2026-08-11/q96-q99/q96/source_snapshots/official_hdf5/VNP46A2.A2025080.h27v06.002.2025088141020.h5",
+      "bytes": 27956904,
+      "sha256": "49c316921703e75866ff430de4d291413ece27a60646294a86650ec4941ea8d4",
+      "utc_product_date": "2025-03-21",
+      "producer_granule_id": "VNP46A2.A2025080.h27v06.002.2025088141020.h5",
+      "range_beginning": "2025-03-21T00:00:00.000Z",
+      "range_ending": "2025-03-21T23:59:59.000Z",
+      "production_time": "2025-03-29 14:10:20.000"
+    },
+    {
+      "filename": "VNP46A2.A2025081.h27v06.002.2025089183112.h5",
+      "path": "vault/ntl-gpt/experiments/benchmark-v1/temporal-freeze/2026-08-11/q96-q99/q96/source_snapshots/official_hdf5/VNP46A2.A2025081.h27v06.002.2025089183112.h5",
+      "bytes": 30391341,
+      "sha256": "b816c261e89c8d80c8d16e5793102a2ec9679338604fd3077657f1b7e08f0701",
+      "utc_product_date": "2025-03-22",
+      "producer_granule_id": "VNP46A2.A2025081.h27v06.002.2025089183112.h5",
+      "range_beginning": "2025-03-22T00:00:00.000Z",
+      "range_ending": "2025-03-22T23:59:59.000Z",
+      "production_time": "2025-03-30 18:31:12.000"
+    },
+    {
+      "filename": "VNP46A2.A2025082.h27v06.002.2025090150927.h5",
+      "path": "vault/ntl-gpt/experiments/benchmark-v1/temporal-freeze/2026-08-11/q96-q99/q96/source_snapshots/official_hdf5/VNP46A2.A2025082.h27v06.002.2025090150927.h5",
+      "bytes": 34572999,
+      "sha256": "e17eb70c211d4f1c73f7fa89d50e78ab81edc6427855149e2e11406b18891fee",
+      "utc_product_date": "2025-03-23",
+      "producer_granule_id": "VNP46A2.A2025082.h27v06.002.2025090150927.h5",
+      "range_beginning": "2025-03-23T00:00:00.000Z",
+      "range_ending": "2025-03-23T23:59:59.000Z",
+      "production_time": "2025-03-31 15:09:27.000"
+    },
+    {
+      "filename": "VNP46A2.A2025083.h27v06.002.2025091170221.h5",
+      "path": "vault/ntl-gpt/experiments/benchmark-v1/temporal-freeze/2026-08-11/q96-q99/q96/source_snapshots/official_hdf5/VNP46A2.A2025083.h27v06.002.2025091170221.h5",
+      "bytes": 39397355,
+      "sha256": "9a220357e479d4ca4cef783d1f9c9b29d82f807101a5b6b71653bb7d40805738",
+      "utc_product_date": "2025-03-24",
+      "producer_granule_id": "VNP46A2.A2025083.h27v06.002.2025091170221.h5",
+      "range_beginning": "2025-03-24T00:00:00.000Z",
+      "range_ending": "2025-03-24T23:59:59.000Z",
+      "production_time": "2025-04-01 17:02:21.000"
+    },
+    {
+      "filename": "VNP46A2.A2025084.h27v06.002.2025093222547.h5",
+      "path": "vault/ntl-gpt/experiments/benchmark-v1/temporal-freeze/2026-08-11/q96-q99/q96/source_snapshots/official_hdf5/VNP46A2.A2025084.h27v06.002.2025093222547.h5",
+      "bytes": 39205718,
+      "sha256": "d53192430cf96372d6728f23847c3dd732ec72ce141f631224c44cbfdc4460c1",
+      "utc_product_date": "2025-03-25",
+      "producer_granule_id": "VNP46A2.A2025084.h27v06.002.2025093222547.h5",
+      "range_beginning": "2025-03-25T00:00:00.000Z",
+      "range_ending": "2025-03-25T23:59:59.000Z",
+      "production_time": "2025-04-03 22:25:47.000"
+    },
+    {
+      "filename": "VNP46A2.A2025085.h27v06.002.2025094030326.h5",
+      "path": "vault/ntl-gpt/experiments/benchmark-v1/temporal-freeze/2026-08-11/q96-q99/q96/source_snapshots/official_hdf5/VNP46A2.A2025085.h27v06.002.2025094030326.h5",
+      "bytes": 38761636,
+      "sha256": "51bb1a536c258d1d17e63e453a93586be32f270682d4eee7465aea802433245c",
+      "utc_product_date": "2025-03-26",
+      "producer_granule_id": "VNP46A2.A2025085.h27v06.002.2025094030326.h5",
+      "range_beginning": "2025-03-26T00:00:00.000Z",
+      "range_ending": "2025-03-26T23:59:59.000Z",
+      "production_time": "2025-04-04 03:03:26.000"
+    },
+    {
+      "filename": "VNP46A2.A2025086.h27v06.002.2025094155835.h5",
+      "path": "vault/ntl-gpt/experiments/benchmark-v1/temporal-freeze/2026-08-11/q96-q99/q96/source_snapshots/official_hdf5/VNP46A2.A2025086.h27v06.002.2025094155835.h5",
+      "bytes": 36497842,
+      "sha256": "50e298c96e1113b42ce14f908da102631894aa4985db97e4564ff4a705f851f5",
+      "utc_product_date": "2025-03-27",
+      "producer_granule_id": "VNP46A2.A2025086.h27v06.002.2025094155835.h5",
+      "range_beginning": "2025-03-27T00:00:00.000Z",
+      "range_ending": "2025-03-27T23:59:59.000Z",
+      "production_time": "2025-04-04 15:58:35.000"
+    },
+    {
+      "filename": "VNP46A2.A2025087.h27v06.002.2025095151403.h5",
+      "path": "vault/ntl-gpt/experiments/benchmark-v1/temporal-freeze/2026-08-11/q96-q99/q96/source_snapshots/official_hdf5/VNP46A2.A2025087.h27v06.002.2025095151403.h5",
+      "bytes": 34468952,
+      "sha256": "d5b56523344d2407eefe0180b9399c14fe7f56400b0e32c0869ee8f3812e17de",
+      "utc_product_date": "2025-03-28",
+      "producer_granule_id": "VNP46A2.A2025087.h27v06.002.2025095151403.h5",
+      "range_beginning": "2025-03-28T00:00:00.000Z",
+      "range_ending": "2025-03-28T23:59:59.000Z",
+      "production_time": "2025-04-05 15:14:03.000"
+    },
+    {
+      "filename": "VNP46A2.A2026205.h27v06.002.2026213101025.h5",
+      "path": "vault/ntl-gpt/experiments/benchmark-v1/temporal-freeze/2026-08-11/q96-q99/q96/source_snapshots/official_hdf5/VNP46A2.A2026205.h27v06.002.2026213101025.h5",
+      "bytes": 30678881,
+      "sha256": "dc947bb0c97ef4704562a560c3b115e049d285d01c8455d1aa523c27e3e1dd74",
+      "utc_product_date": "2026-07-24",
+      "producer_granule_id": "VNP46A2.A2026205.h27v06.002.2026213101025.h5",
+      "range_beginning": "2026-07-24T00:00:00.000Z",
+      "range_ending": "2026-07-24T23:59:59.000Z",
+      "production_time": "2026-08-01 10:10:25.000"
+    },
+    {
+      "filename": "VNP46A2.A2026206.h27v06.002.2026214100414.h5",
+      "path": "vault/ntl-gpt/experiments/benchmark-v1/temporal-freeze/2026-08-11/q96-q99/q96/source_snapshots/official_hdf5/VNP46A2.A2026206.h27v06.002.2026214100414.h5",
+      "bytes": 25568419,
+      "sha256": "530ce42c0cd22a6f29893d69b12b03e22e3f6912105319efdd66443ed5929700",
+      "utc_product_date": "2026-07-25",
+      "producer_granule_id": "VNP46A2.A2026206.h27v06.002.2026214100414.h5",
+      "range_beginning": "2026-07-25T00:00:00.000Z",
+      "range_ending": "2026-07-25T23:59:59.000Z",
+      "production_time": "2026-08-02 10:04:14.000"
+    },
+    {
+      "filename": "VNP46A2.A2026207.h27v06.002.2026222185254.h5",
+      "path": "vault/ntl-gpt/experiments/benchmark-v1/temporal-freeze/2026-08-11/q96-q99/q96/source_snapshots/official_hdf5/VNP46A2.A2026207.h27v06.002.2026222185254.h5",
+      "bytes": 23420226,
+      "sha256": "f3684a25a6d8b181ae7eb20300d793d9bfb8fb9a16c1ae972e4784dd14793234",
+      "utc_product_date": "2026-07-26",
+      "producer_granule_id": "VNP46A2.A2026207.h27v06.002.2026222185254.h5",
+      "range_beginning": "2026-07-26T00:00:00.000Z",
+      "range_ending": "2026-07-26T23:59:59.000Z",
+      "production_time": "2026-08-10 18:52:54.000"
+    },
+    {
+      "filename": "VNP46A2.A2026208.h27v06.002.2026222194533.h5",
+      "path": "vault/ntl-gpt/experiments/benchmark-v1/temporal-freeze/2026-08-11/q96-q99/q96/source_snapshots/official_hdf5/VNP46A2.A2026208.h27v06.002.2026222194533.h5",
+      "bytes": 22280829,
+      "sha256": "89ea509343aa1e8981a110f48541b300f4f690a7ee4830054db7508219a0bca1",
+      "utc_product_date": "2026-07-27",
+      "producer_granule_id": "VNP46A2.A2026208.h27v06.002.2026222194533.h5",
+      "range_beginning": "2026-07-27T00:00:00.000Z",
+      "range_ending": "2026-07-27T23:59:59.000Z",
+      "production_time": "2026-08-10 19:45:33.000"
+    },
+    {
+      "filename": "VNP46A2.A2026209.h27v06.002.2026222202528.h5",
+      "path": "vault/ntl-gpt/experiments/benchmark-v1/temporal-freeze/2026-08-11/q96-q99/q96/source_snapshots/official_hdf5/VNP46A2.A2026209.h27v06.002.2026222202528.h5",
+      "bytes": 22930021,
+      "sha256": "b7921b6f615d846b3085a38e7e0e201a3a96d007101f9bf86d6afd5ae5814f5a",
+      "utc_product_date": "2026-07-28",
+      "producer_granule_id": "VNP46A2.A2026209.h27v06.002.2026222202528.h5",
+      "range_beginning": "2026-07-28T00:00:00.000Z",
+      "range_ending": "2026-07-28T23:59:59.000Z",
+      "production_time": "2026-08-10 20:25:28.000"
+    },
+    {
+      "filename": "VNP46A2.A2026210.h27v06.002.2026222211217.h5",
+      "path": "vault/ntl-gpt/experiments/benchmark-v1/temporal-freeze/2026-08-11/q96-q99/q96/source_snapshots/official_hdf5/VNP46A2.A2026210.h27v06.002.2026222211217.h5",
+      "bytes": 22922359,
+      "sha256": "4ac46347d99d5048b39066d87283f1aab6fc4b0139dcfb4c8fc03259ea83f3e0",
+      "utc_product_date": "2026-07-29",
+      "producer_granule_id": "VNP46A2.A2026210.h27v06.002.2026222211217.h5",
+      "range_beginning": "2026-07-29T00:00:00.000Z",
+      "range_ending": "2026-07-29T23:59:59.000Z",
+      "production_time": "2026-08-10 21:12:17.000"
+    },
+    {
+      "filename": "VNP46A2.A2026211.h27v06.002.2026222215018.h5",
+      "path": "vault/ntl-gpt/experiments/benchmark-v1/temporal-freeze/2026-08-11/q96-q99/q96/source_snapshots/official_hdf5/VNP46A2.A2026211.h27v06.002.2026222215018.h5",
+      "bytes": 22318747,
+      "sha256": "ac1e31f862620496e93dca877de1f5af0f0e07aa738f5d9cfa8fd35b9ee771dc",
+      "utc_product_date": "2026-07-30",
+      "producer_granule_id": "VNP46A2.A2026211.h27v06.002.2026222215018.h5",
+      "range_beginning": "2026-07-30T00:00:00.000Z",
+      "range_ending": "2026-07-30T23:59:59.000Z",
+      "production_time": "2026-08-10 21:50:18.000"
+    },
+    {
+      "filename": "VNP46A2.A2026212.h27v06.002.2026222230556.h5",
+      "path": "vault/ntl-gpt/experiments/benchmark-v1/temporal-freeze/2026-08-11/q96-q99/q96/source_snapshots/official_hdf5/VNP46A2.A2026212.h27v06.002.2026222230556.h5",
+      "bytes": 22015446,
+      "sha256": "913c34f7d8208dbc663b10ff2f5bf6109a7588f17721383d1900ab3d9e6ba8c2",
+      "utc_product_date": "2026-07-31",
+      "producer_granule_id": "VNP46A2.A2026212.h27v06.002.2026222230556.h5",
+      "range_beginning": "2026-07-31T00:00:00.000Z",
+      "range_ending": "2026-07-31T23:59:59.000Z",
+      "production_time": "2026-08-10 23:05:56.000"
+    }
+  ],
+  "coverage_diagnostics": {
+    "25": {
+      "record_count": 16,
+      "aoi_pixel_count": 9895,
+      "qa_valid_fraction_min": 0.0,
+      "qa_valid_fraction_max": 0.9983830217281455,
+      "all_records_have_valid_pixels": false,
+      "records_with_valid_pixels": 11,
+      "dates_without_valid_pixels": [
+        "2025-03-23",
+        "2026-07-24",
+        "2026-07-27",
+        "2026-07-29",
+        "2026-07-30"
+      ]
+    },
+    "50": {
+      "record_count": 16,
+      "aoi_pixel_count": 39575,
+      "qa_valid_fraction_min": 0.0,
+      "qa_valid_fraction_max": 0.9982312065698041,
+      "all_records_have_valid_pixels": false,
+      "records_with_valid_pixels": 15,
+      "dates_without_valid_pixels": [
+        "2026-07-30"
+      ]
+    }
+  },
+  "artifacts": {
+    "analysis_ready_csv": {
+      "path": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-q18-analysis-ready.csv",
+      "sha256": "3c6777a41aa074a1357d25938120b026ab9cd7afa86bea3f419fbde64ce9d554",
+      "rows": 32
+    },
+    "reproducible_script": {
+      "path": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/build_formal_q18_timeseries.py",
+      "sha256": "f43b600d1e76ec4f2056287c9f4fd1c55fe7bbfccf883a66c5c2837ae0ca353e"
+    }
+  },
+  "acceptance_checks": {
+    "formal_event_anchor_matched": true,
+    "official_hdf5_count_is_16": true,
+    "product_dates_unique_and_sorted": true,
+    "all_granules_same_collection_tile_grid": true,
+    "both_25km_and_50km_aoi_supported": true,
+    "csv_has_expected_rows": true,
+    "critical_pre_event_and_first_post_event_support_available": true,
+    "zero_valid_rows_preserved_as_explicit_missing_observations": true,
+    "valid_counts_do_not_exceed_aoi_counts": true,
+    "valid_radiance_values_nonnegative_where_available": true,
+    "qa_valid_fractions_within_unit_interval": true,
+    "historical_outputs_not_read": true
+  },
+  "limitations": [
+    "Only one interpreted first-post-event local night is present near the event.",
+    "The next available observations are in July 2026, so this package cannot establish a recovery trajectory.",
+    "Strict QA leaves zero valid pixels for some AOI-date combinations; these dates are retained as explicit missing observations rather than imputed or dropped silently.",
+    "VNP46A2 does not expose exact pixel acquisition time in the inspected HDF metadata.",
+    "AOI summaries use unweighted pixel-centre inclusion; they are not building-level or population-weighted measures.",
+    "Nighttime-light variation is observational and does not prove outage, damage, recovery, or earthquake causation.",
+    "A strong subsequent earthquake is source-conflicted and may confound interpretation."
+  ],
+  "historical_outputs_read": false,
+  "inference_performed": false
+}

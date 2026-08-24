@@ -1,0 +1,316 @@
+{
+  "schema_version": "ntl.event-context.v1",
+  "case_id": "Case202-tehran-latest-vnp46a2",
+  "status": "complete_with_temporal_uncertainty",
+  "as_of_utc": "2026-08-20T17:52:47Z",
+  "as_of_local": "2026-08-14T00:39:54+08:00",
+  "timezone": {
+    "execution": "Asia/Shanghai (UTC+08:00)",
+    "event_location": "Asia/Tehran (UTC+03:30 in 2026)",
+    "primary_time_basis": "UTC",
+    "date_semantics": "UTC is the sole primary time basis for the experiment. Formal figure markers use the calendar date stated by the cited source. When a political source provides a date but no exact time, the value remains source-reported date-only and is not represented as 00:00Z. Asia/Tehran is reported in parallel only when a source supplies a precise time; no such conversion was needed for the retained markers."
+  },
+  "city": "Tehran",
+  "analysis_windows": [
+    {
+      "window_id": "pre_conflict_baseline",
+      "start_date_inclusive": "2026-01-01",
+      "end_date_inclusive": "2026-02-27",
+      "filter_interval_utc": "[2026-01-01T00:00:00Z, 2026-02-28T00:00:00Z)",
+      "label": "Pre-conflict baseline",
+      "interpretation": "Fixed descriptive comparison window."
+    },
+    {
+      "window_id": "conflict_evaluation",
+      "start_date_inclusive": "2026-02-28",
+      "end_date_inclusive": "2026-04-07",
+      "filter_interval_utc": "[2026-02-28T00:00:00Z, 2026-04-08T00:00:00Z)",
+      "label": "Conflict evaluation",
+      "interpretation": "Fixed descriptive comparison window."
+    },
+    {
+      "window_id": "ceasefire_evaluation",
+      "start_date_inclusive": "2026-04-08",
+      "end_date_inclusive": "2026-04-21",
+      "filter_interval_utc": "[2026-04-08T00:00:00Z, 2026-04-22T00:00:00Z)",
+      "label": "Ceasefire evaluation",
+      "interpretation": "Fixed evaluation window; 22 April is not interpreted as a ceasefire-end date."
+    },
+    {
+      "window_id": "extended_monitoring",
+      "start_date_inclusive": "2026-04-22",
+      "end_date_inclusive": null,
+      "filter_interval_utc": "[2026-04-22T00:00:00Z, latest strict-qualified product date plus one day)",
+      "label": "Extended monitoring",
+      "interpretation": "Neutral later span; not a homogeneous ceasefire, recovery, or peace period."
+    }
+  ],
+  "timeline_events": [
+    {
+      "event_id": "initial_ceasefire",
+      "event_date": "2026-04-08",
+      "date_precision": "date-only",
+      "event_type": "ceasefire_announcement_background",
+      "figure_label": "Initial two-week ceasefire announced",
+      "supporting_source_ids": [
+        "S01"
+      ],
+      "confidence": "high",
+      "date_semantics": "UN noon briefing dated April 8 says the announcement was issued late the previous night; use April 8 as the public UN reporting/background date, not a precisely timed local-date onset."
+    },
+    {
+      "event_id": "ceasefire_extension_decision",
+      "event_date": "2026-04-21",
+      "date_precision": "date-only",
+      "event_type": "ceasefire_extension_announcement",
+      "figure_label": "U.S. announces ceasefire extension",
+      "supporting_source_ids": [
+        "S02",
+        "S03"
+      ],
+      "confidence": "high",
+      "date_semantics": "AP reports the U.S. announcement on April 21, one day before the prior ceasefire was due to expire. The UN note welcoming the extension was published April 22. April 22 is not a ceasefire-end date."
+    },
+    {
+      "event_id": "ceasefire_extension_un_report",
+      "event_date": "2026-04-22",
+      "date_precision": "date-only",
+      "event_type": "institutional_reporting_date",
+      "figure_label": "UN welcomes ceasefire extension",
+      "supporting_source_ids": [
+        "S03"
+      ],
+      "confidence": "high",
+      "date_semantics": "Publication/reporting date of the UN note, distinct from the April 21 announcement date."
+    },
+    {
+      "event_id": "islamabad_mou",
+      "event_date": "2026-06-17",
+      "date_precision": "date-only",
+      "event_type": "memorandum_of_understanding_signed",
+      "figure_label": "Islamabad MoU signed",
+      "supporting_source_ids": [
+        "S04",
+        "S05"
+      ],
+      "confidence": "high",
+      "date_semantics": "White House page is dated June 17 and states the President signed; Pakistan Foreign Ministry later identifies June 17 as the signing date."
+    },
+    {
+      "event_id": "renewed_hostilities",
+      "event_date": "2026-07-07",
+      "date_precision": "date-only",
+      "event_type": "renewed_military_action",
+      "figure_label": "Hostilities resume (U.S. notice date)",
+      "supporting_source_ids": [
+        "S06",
+        "S07"
+      ],
+      "confidence": "high_for_date_moderate_for_legal_characterization",
+      "date_semantics": "Reuters reports that a U.S. letter characterized hostilities as resumed on July 7. A UN page dated July 8 reports renewed attacks during the preceding two days. Use July 7 as the event marker and July 8 only as the UN reporting date."
+    },
+    {
+      "event_id": "latest_status_anchor",
+      "event_date": "2026-08-11",
+      "date_precision": "date-only",
+      "event_type": "latest_high_quality_status_check",
+      "figure_label": null,
+      "supporting_source_ids": [
+        "S09"
+      ],
+      "confidence": "moderate",
+      "date_semantics": "AP publication date. Used only to bound the as-of narrative, not as a formal figure marker."
+    }
+  ],
+  "source_records": [
+    {
+      "source_id": "S01",
+      "title": "Noon briefing of 8 April 2026",
+      "publisher": "United Nations Secretary-General",
+      "source_type": "official_intergovernmental",
+      "url": "httplocal-path/2026-04-08.html",
+      "publication_or_update_date": "2026-04-08",
+      "event_date_supported": "2026-04-08",
+      "accessed_utc": "2026-08-13T16:39:54Z"
+    },
+    {
+      "source_id": "S02",
+      "title": "Trump says the US extends its ceasefire with Iran at Pakistan's request",
+      "publisher": "Associated Press",
+      "source_type": "international_news_wire",
+      "url": "httplocal-path/us-iran-war-pakistan-april-21-2026-177a2d0701ef172c3e51686bc1f18f30",
+      "publication_or_update_date": "2026-04-21",
+      "event_date_supported": "2026-04-21",
+      "accessed_utc": "2026-08-13T16:39:54Z"
+    },
+    {
+      "source_id": "S03",
+      "title": "Note to Correspondents: In answer to questions on the Ceasefire Extension",
+      "publisher": "United Nations",
+      "source_type": "official_intergovernmental",
+      "url": "httplocal-path/315327-note-correspondents-answer-questions-ceasefire-extension",
+      "publication_or_update_date": "2026-04-22",
+      "event_date_supported": "2026-04-22",
+      "accessed_utc": "2026-08-13T16:39:54Z"
+    },
+    {
+      "source_id": "S04",
+      "title": "President Donald J. Trump has SIGNED the Iran Memorandum of Understanding at Versailles in France",
+      "publisher": "The White House",
+      "source_type": "official_government",
+      "url": "httplocal-path/",
+      "publication_or_update_date": "2026-06-17",
+      "event_date_supported": "2026-06-17",
+      "accessed_utc": "2026-08-13T16:39:54Z"
+    },
+    {
+      "source_id": "S05",
+      "title": "Curtain Raiser: High-Level Talks on the Implementation of Islamabad Memorandum of Understanding",
+      "publisher": "Ministry of Foreign Affairs, Government of Pakistan",
+      "source_type": "official_government",
+      "url": "httplocal-path/curtain-raiserhigh-level-talks-on-the-implementation-of-islamabad-memorandum-of-understanding-burgenstock-switzerland-21-june-2026",
+      "publication_or_update_date": "2026-06-21",
+      "event_date_supported": "2026-06-17",
+      "accessed_utc": "2026-08-13T16:39:54Z"
+    },
+    {
+      "source_id": "S06",
+      "title": "Trump sends Congress formal notice that Iran conflict has resumed",
+      "publisher": "Reuters via Investing.com",
+      "source_type": "international_news_wire",
+      "url": "httplocal-path/trump-sends-congress-formal-notice-that-iran-conflict-has-resumed-4789577",
+      "publication_or_update_date": "2026-07-13",
+      "event_date_supported": "2026-07-07",
+      "accessed_utc": "2026-08-13T16:39:54Z"
+    },
+    {
+      "source_id": "S07",
+      "title": "US-Iran war: Renewed attacks in Strait of Hormuz prompt another global energy alert",
+      "publisher": "United Nations",
+      "source_type": "official_intergovernmental",
+      "url": "httplocal-path/245508",
+      "publication_or_update_date": "2026-07-08",
+      "event_date_supported": "2026-07-07/2026-07-08",
+      "accessed_utc": "2026-08-13T16:39:54Z"
+    },
+    {
+      "source_id": "S08",
+      "title": "Middle East: UN warns against wider escalation after Houthi attacks in the Red Sea",
+      "publisher": "United Nations",
+      "source_type": "official_intergovernmental",
+      "url": "httplocal-path/middle-east-un-warns-against-wider-escalation-after-houthi-attacks-red-sea",
+      "publication_or_update_date": "2026-07-24",
+      "event_date_supported": "2026-07-24",
+      "accessed_utc": "2026-08-13T16:39:54Z"
+    },
+    {
+      "source_id": "S09",
+      "title": "Trump pivots back to sanctions for Iran as other strategies to end his war fizzle",
+      "publisher": "Associated Press",
+      "source_type": "international_news_wire",
+      "url": "httplocal-path/trump-iran-sanctions-d96e3bf53eb4050097e6cab128db82cb",
+      "publication_or_update_date": "2026-08-11",
+      "event_date_supported": "2026-08-11",
+      "accessed_utc": "2026-08-13T16:39:54Z"
+    }
+  ],
+  "source_conflicts": [
+    {
+      "conflict_id": "C01",
+      "issue": "Ceasefire extension marker date",
+      "records": [
+        "AP dates the U.S. extension announcement to April 21.",
+        "The UN note welcoming the announcement is dated April 22."
+      ],
+      "resolution": "Use April 21 for the decision/announcement marker. Retain April 22 as an institutional reporting date in provenance. Do not label either date as the ceasefire ending."
+    },
+    {
+      "conflict_id": "C02",
+      "issue": "Whether April 22 onward is one ceasefire phase",
+      "records": [
+        "The ceasefire was extended, but high-quality sources report intermittent fire and later escalations.",
+        "The June 17 MoU and July 7 renewed military action are separate anchors."
+      ],
+      "resolution": "Treat April 22 onward as an extended monitoring span with event markers, not a homogeneous ceasefire/recovery/peace period."
+    },
+    {
+      "conflict_id": "C03",
+      "issue": "Renewed-hostilities date versus reporting date",
+      "records": [
+        "The U.S. notice characterizes July 7 as the resumption date.",
+        "The UN report is dated July 8 and describes renewed attacks in the preceding two days."
+      ],
+      "resolution": "Use July 7 as the conservative event marker and describe July 8 as the UN reporting date. This does not resolve contested legal characterizations of responsibility."
+    }
+  ],
+  "figure_marker_recommendation": {
+    "formal_markers": [
+      {
+        "date": "2026-04-21",
+        "date_precision": "date-only",
+        "label": "Ceasefire extension announced",
+        "sources": [
+          "S02",
+          "S03"
+        ]
+      },
+      {
+        "date": "2026-06-17",
+        "date_precision": "date-only",
+        "label": "Islamabad MoU signed",
+        "sources": [
+          "S04",
+          "S05"
+        ]
+      },
+      {
+        "date": "2026-07-07",
+        "date_precision": "date-only",
+        "label": "Renewed hostilities (U.S. notice)",
+        "sources": [
+          "S06",
+          "S07"
+        ]
+      }
+    ],
+    "background_marker": {
+      "date": "2026-04-08",
+      "date_precision": "date-only",
+      "label": "Initial two-week ceasefire announced",
+      "sources": [
+        "S01"
+      ]
+    },
+    "caption_note": "April 8–21 is the fixed ConflictNTL ceasefire evaluation window. April 21 marks the U.S. extension announcement; the UN welcomed it on April 22. The post-April 21 span contains intermittent hostilities and later renewed military action and is not represented as a uniform ceasefire, recovery, or peace phase."
+  },
+  "latest_status": {
+    "verified_through_source_date": "2026-08-11",
+    "summary": "The latest high-quality source located during this bounded search continued to describe an Iran war and stalled stop-start talks; no authoritative comprehensive termination settlement was verified by the as-of time.",
+    "certainty": "limited",
+    "reason": "This is a bounded source check, not continuous monitoring. The latest authoritative UN source located was dated July 24; the August 11 status anchor is AP."
+  },
+  "limitations": [
+    "The fixed Skill windows are analytical design choices, not a complete political chronology.",
+    "No uniform source supplied exact UTC timestamps for every event; dates were not converted across time zones when doing so could shift a day.",
+    "Statements by conflict parties may contain contested legal and factual characterizations. Source wording is attributed rather than adopted as fact where contested.",
+    "The bounded search does not prove that no later event occurred after the latest source date.",
+    "City-specific events in Tehran were not used to choose the AOI and are outside this EventContext's marker contract."
+  ],
+  "noncausal_boundary": "Event markers contextualize observation dates only. They do not establish that any nighttime-light change was caused by conflict, outage, damage, ceasefire, recovery, policy, or any specific event.",
+  "validation": {
+    "json_parse_checked": true,
+    "all_source_urls_nonempty": true,
+    "each_formal_marker_has_direct_support": true,
+    "date_semantics_explicit": true,
+    "utc_primary_time_basis": true,
+    "window_filters_are_utc_half_open": true,
+    "date_only_events_not_coerced_to_midnight_utc": true,
+    "april_22_not_described_as_ceasefire_end": true,
+    "status": "passed"
+  },
+  "context_reuse": {
+    "source_path": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q19-tehran-city-longseries/event-context.json",
+    "source_sha256": "cadddb09b500f020bdf9a26a9429f9d0378dc4c1e699a3e0c6dd9d691543e3ce",
+    "scope": "Existing source-reported timeline markers reused for a live imagery extension; no new event-source search was performed."
+  }
+}

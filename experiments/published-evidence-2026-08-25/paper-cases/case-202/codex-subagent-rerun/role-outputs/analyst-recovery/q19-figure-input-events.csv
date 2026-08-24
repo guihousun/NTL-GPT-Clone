@@ -1,0 +1,5 @@
+date_utc,label,date_precision,window_context,ceasefire_end_status
+2026-04-08,Initial two-week ceasefire announced,date-only,ceasefire_evaluation_start,2026-04-22 is not ceasefire end
+2026-04-21,Ceasefire extension announced,date-only,ceasefire_evaluation_end_marker,2026-04-22 is not ceasefire end
+2026-06-17,Islamabad MoU signed,date-only,extended_monitoring_event_marker,2026-04-22 is not ceasefire end
+2026-07-07,Renewed hostilities (U.S. notice),date-only,extended_monitoring_event_marker,2026-04-22 is not ceasefire end

@@ -1,0 +1,17 @@
+﻿tool_id,class,roles,purpose
+save_task_plan,typed contract,"['NTL_Engineer', 'Single-Agent']",Persist one TaskPlan.
+save_evidence_report,typed contract,"['NTL_Engineer', 'Single-Agent']",Persist the final EvidenceReport when requested.
+save_observation_package,typed contract,"['NTL_Data_Searcher', 'Single-Agent']",Persist an ObservationPackage.
+save_analysis_package,typed contract,"['NTL_Analyst', 'Single-Agent']",Persist an AnalysisPackage.
+save_event_context,typed contract,"['NTL_Event_Tracker', 'Single-Agent']",Persist an EventContext.
+validate_contract,typed contract,"['NTL_Engineer', 'NTL_Data_Searcher', 'NTL_Analyst', 'NTL_Event_Tracker', 'Single-Agent']",Validate an opaque typed-package handle once.
+record_route_transition,runtime governance,"['NTL_Engineer', 'Single-Agent']",Persist a system-governed route-state transition.
+task,delegation middleware,['NTL_Engineer'],Delegate a bounded assignment to one registered specialist.
+ls,workspace middleware,"['NTL_Engineer', 'NTL_Data_Searcher', 'NTL_Analyst', 'NTL_Event_Tracker', 'Single-Agent']",List allowed workspace paths.
+read_file,workspace middleware,"['NTL_Engineer', 'NTL_Data_Searcher', 'NTL_Analyst', 'NTL_Event_Tracker', 'Single-Agent']",Read an allowed workspace file.
+write_file,workspace middleware,"['NTL_Engineer', 'NTL_Data_Searcher', 'NTL_Analyst', 'NTL_Event_Tracker', 'Single-Agent']",Create an allowed workspace file.
+edit_file,workspace middleware,"['NTL_Engineer', 'NTL_Data_Searcher', 'NTL_Analyst', 'NTL_Event_Tracker', 'Single-Agent']",Edit an allowed workspace file.
+delete,workspace middleware,"['NTL_Engineer', 'NTL_Data_Searcher', 'NTL_Analyst', 'NTL_Event_Tracker', 'Single-Agent']",Delete an allowed workspace artifact.
+glob,workspace middleware,"['NTL_Engineer', 'NTL_Data_Searcher', 'NTL_Analyst', 'NTL_Event_Tracker', 'Single-Agent']",Resolve allowed workspace path patterns.
+grep,workspace middleware,"['NTL_Engineer', 'NTL_Data_Searcher', 'NTL_Analyst', 'NTL_Event_Tracker', 'Single-Agent']",Search text in allowed workspace files.
+NTL_Knowledge_Base,supplemental RAG knowledge,"['NTL_Engineer', 'Single-Agent']",Low-priority theory or confirmed workflow-gap retrieval; Skills remain primary.

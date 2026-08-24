@@ -1,0 +1,116 @@
+{
+  "schema": "ntl.paper-case.formal-index-statistics.v1",
+  "status": "success",
+  "blindness": {
+    "read_existing_user_RBLI": false,
+    "read_existing_user_classification": false
+  },
+  "source": {
+    "path": "user-provided-local-data/NTL-GPT/SDGSAT_1/SDGSAT1_GLI_shanghai_radiance_rgb.tif",
+    "sha256": "a69a3a4f778031e6adf12aef83e4429cd9a44c04b68f7442ab9f50f8e9b7ef9f",
+    "original_path": "user-provided-local-data/SGDSAT-1/KX10_GIU_20220304_E121.82_N31.56_202200100146_L4A_A_RGB.tif",
+    "original_sha256": "8b78a2bc10b6d836ffa49e0595b07ed6f79b36f66e764b47caccd28cfea98ec0",
+    "band_order": [
+      "R",
+      "G",
+      "B"
+    ],
+    "band_order_evidence": "NTL-GPT SDGSAT1_compute_index runtime contract",
+    "crs": "EPSG:32651",
+    "transform": [
+      40.0,
+      0.0,
+      194936.55426564877,
+      0.0,
+      -40.0,
+      3669270.754403386
+    ],
+    "bounds": [
+      194936.55426564877,
+      3299270.754403386,
+      421896.55426564877,
+      3669270.754403386
+    ],
+    "width": 5674,
+    "height": 9250,
+    "resolution": [
+      40.0,
+      40.0
+    ],
+    "dtype": [
+      "float32",
+      "float32",
+      "float32"
+    ],
+    "nodata": -9999.0,
+    "source_band_statistics": {
+      "R": {
+        "valid_pixel_count": 52484500,
+        "nodata_pixel_count": 0,
+        "minimum": 0.0,
+        "maximum": 0.06099783256649971,
+        "sum": 24519.377429802153,
+        "mean": 0.00046717368803746157,
+        "population_standard_deviation": 0.0020556482839774503,
+        "valid_fraction": 1.0
+      },
+      "G": {
+        "valid_pixel_count": 52484500,
+        "nodata_pixel_count": 0,
+        "minimum": 0.0,
+        "maximum": 0.024240683764219284,
+        "sum": 9815.225439606234,
+        "mean": 0.00018701188807374052,
+        "population_standard_deviation": 0.0008290204842075143,
+        "valid_fraction": 1.0
+      },
+      "B": {
+        "valid_pixel_count": 52484500,
+        "nodata_pixel_count": 0,
+        "minimum": 0.0,
+        "maximum": 0.04456459730863571,
+        "sum": 6675.98764617869,
+        "mean": 0.00012719922350748678,
+        "population_standard_deviation": 0.0007960235553248246,
+        "valid_fraction": 1.0
+      }
+    }
+  },
+  "formulae": {
+    "RRLI": "BandR / BandG",
+    "RBLI": "BandB / BandG"
+  },
+  "output_nodata": -9999.0,
+  "statistics": {
+    "RRLI": {
+      "valid_pixel_count": 9784136,
+      "nodata_pixel_count": 42700364,
+      "minimum": 0.0006669595022685826,
+      "maximum": 6218.095703125,
+      "sum": 37555410.37605331,
+      "mean": 3.8383982373153143,
+      "population_standard_deviation": 13.68066167866466,
+      "valid_fraction": 0.1864195333860473
+    },
+    "RBLI": {
+      "valid_pixel_count": 9784136,
+      "nodata_pixel_count": 42700364,
+      "minimum": 0.0009931274689733982,
+      "maximum": 2864.698974609375,
+      "sum": 10980632.694800606,
+      "mean": 1.1222894586502687,
+      "population_standard_deviation": 6.314988539361317,
+      "valid_fraction": 0.1864195333860473
+    }
+  },
+  "outputs": [
+    {
+      "path": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q17-sdgsat-light-classification/formal-SDGSAT1-shanghai-RRLI.tif",
+      "sha256": "dccd7c22988cb0d0b71debe952a06f3c466cf8446aa9662b34966c0a302d4423"
+    },
+    {
+      "path": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q17-sdgsat-light-classification/formal-SDGSAT1-shanghai-RBLI.tif",
+      "sha256": "50fb93f7bedd9fc1ff74722a852354f28618790f1092f47a0ed8c4bc8f2080b1"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+﻿window,start_utc,end_utc,calendar_days,image_available_days,strict_qualified_days,mean_ANTL,change_vs_baseline_percent
+Pre-conflict baseline,2026-01-01,2026-02-27,58,58,47,67.23183490694599,0.0
+Conflict evaluation,2026-02-28,2026-04-07,39,36,20,55.61991566160809,-17.271459661051473
+Ceasefire evaluation,2026-04-08,2026-04-21,14,14,11,61.3582627055188,-8.736296145355348
+Extended monitoring,2026-04-22,2026-08-19,120,107,90,59.254862665306256,-11.86487361631655
