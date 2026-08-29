@@ -1,0 +1,33 @@
+record_type,aoi_radius_km,utc_product_date,local_night_date_asia_yangon,qa_valid_pixel_count,aoi_pixel_count,qa_valid_fraction,radiance_mean_nw_cm2_sr,radiance_median_nw_cm2_sr,baseline_mean_of_daily_means_nw_cm2_sr,baseline_median_of_daily_means_nw_cm2_sr,baseline_daily_mean_sample_std_nw_cm2_sr,first_night_absolute_difference_nw_cm2_sr,first_night_percent_difference,z_like_location,empirical_percentile_among_pre_daily_means,note
+pre_event_daily_observation,25,2025-03-21,2025-03-22,7747,9895,0.782920667,1.4809058074,0.712315321,,,,,,,,
+pre_event_daily_observation,25,2025-03-22,2025-03-23,9811,9895,0.9915108641,1.9020090729,1.0693557262,,,,,,,,
+pre_event_daily_observation,25,2025-03-23,2025-03-24,0,9895,0.0,,,,,,,,,,Missing: zero strict-QA valid pixels; not treated as zero radiance.
+pre_event_daily_observation,25,2025-03-24,2025-03-25,8282,9895,0.836988378,1.0916849007,0.4920056611,,,,,,,,
+pre_event_daily_observation,25,2025-03-25,2025-03-26,9714,9895,0.9817079333,1.3461674395,0.3905079663,,,,,,,,
+pre_event_daily_observation,25,2025-03-26,2025-03-27,9680,9895,0.9782718545,1.4497665392,0.5800252855,,,,,,,,
+pre_event_daily_observation,25,2025-03-27,2025-03-28,9879,9895,0.9983830217,1.624698869,0.8237463236,,,,,,,,
+first_post_event_local_night,25,2025-03-28,2025-03-29,9802,9895,0.9906013138,1.043512512,0.8317196667,1.4825387715,1.4653361733,0.2715162615,-0.4390262595,-29.613138485,-1.6169427829,0.0,
+late_followup_observation,25,2026-07-24,2026-07-25,0,9895,0.0,,,,,,,,,,Missing: zero strict-QA valid pixels; not treated as zero radiance.
+late_followup_observation,25,2026-07-25,2026-07-26,211,9895,0.021323901,4.3185016109,2.5857923031,,,,,,,,"About 16 months later; descriptive late follow-up only, not recovery."
+late_followup_observation,25,2026-07-26,2026-07-27,1094,9895,0.1105608893,0.1321177743,0.0099999998,,,,,,,,"About 16 months later; descriptive late follow-up only, not recovery."
+late_followup_observation,25,2026-07-27,2026-07-28,0,9895,0.0,,,,,,,,,,Missing: zero strict-QA valid pixels; not treated as zero radiance.
+late_followup_observation,25,2026-07-28,2026-07-29,6886,9895,0.6959070237,3.1115459415,0.0099999998,,,,,,,,"About 16 months later; descriptive late follow-up only, not recovery."
+late_followup_observation,25,2026-07-29,2026-07-30,0,9895,0.0,,,,,,,,,,Missing: zero strict-QA valid pixels; not treated as zero radiance.
+late_followup_observation,25,2026-07-30,2026-07-31,0,9895,0.0,,,,,,,,,,Missing: zero strict-QA valid pixels; not treated as zero radiance.
+late_followup_observation,25,2026-07-31,2026-08-01,25,9895,0.0025265285,0.8223932709,0.8055918217,,,,,,,,"About 16 months later; descriptive late follow-up only, not recovery."
+pre_event_daily_observation,50,2025-03-21,2025-03-22,29785,39575,0.7526216045,0.8630309633,0.6220144629,,,,,,,,
+pre_event_daily_observation,50,2025-03-22,2025-03-23,37217,39575,0.9404169299,1.1978076302,0.915214479,,,,,,,,
+pre_event_daily_observation,50,2025-03-23,2025-03-24,2307,39575,0.0582943778,0.5706632864,0.5518851876,,,,,,,,
+pre_event_daily_observation,50,2025-03-24,2025-03-25,29439,39575,0.7438787113,0.7369566927,0.4610076249,,,,,,,,
+pre_event_daily_observation,50,2025-03-25,2025-03-26,38438,39575,0.971269741,0.6751063323,0.3407382369,,,,,,,,
+pre_event_daily_observation,50,2025-03-26,2025-03-27,38916,39575,0.9833480733,0.8133710744,0.5143302381,,,,,,,,
+pre_event_daily_observation,50,2025-03-27,2025-03-28,39505,39575,0.9982312066,0.9798039961,0.6899275184,,,,,,,,
+first_post_event_local_night,50,2025-03-28,2025-03-29,39330,39575,0.993809223,0.874851274,0.8007637262,0.8338199965,0.8133710744,0.2077232716,0.0410312775,4.9208795269,0.1975285541,71.4285714286,
+late_followup_observation,50,2026-07-24,2026-07-25,338,39575,0.0085407454,0.6311981209,0.6488636434,,,,,,,,"About 16 months later; descriptive late follow-up only, not recovery."
+late_followup_observation,50,2026-07-25,2026-07-26,1927,39575,0.0486923563,0.7802380854,0.1797276586,,,,,,,,"About 16 months later; descriptive late follow-up only, not recovery."
+late_followup_observation,50,2026-07-26,2026-07-27,9432,39575,0.2383322805,0.2111666055,0.0099999998,,,,,,,,"About 16 months later; descriptive late follow-up only, not recovery."
+late_followup_observation,50,2026-07-27,2026-07-28,2808,39575,0.070953885,0.0645502247,0.0099999998,,,,,,,,"About 16 months later; descriptive late follow-up only, not recovery."
+late_followup_observation,50,2026-07-28,2026-07-29,15536,39575,0.3925710676,1.483236225,0.0099999998,,,,,,,,"About 16 months later; descriptive late follow-up only, not recovery."
+late_followup_observation,50,2026-07-29,2026-07-30,778,39575,0.0196588756,0.2199028435,0.0099999998,,,,,,,,"About 16 months later; descriptive late follow-up only, not recovery."
+late_followup_observation,50,2026-07-30,2026-07-31,0,39575,0.0,,,,,,,,,,Missing: zero strict-QA valid pixels; not treated as zero radiance.
+late_followup_observation,50,2026-07-31,2026-08-01,551,39575,0.0139229311,0.3537984149,0.0099999998,,,,,,,,"About 16 months later; descriptive late follow-up only, not recovery."

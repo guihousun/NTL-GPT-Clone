@@ -1,0 +1,109 @@
+{
+  "schema": "ntl.paper-case.formal-class-statistics.v1",
+  "case_id": "Q17-sdgsat-light-classification",
+  "status": "success",
+  "phase": "post-comparison-complete",
+  "method": {
+    "source": "Nighttime light in China's coastal zone: The type classification approach using SDGSAT-1 Glimmer Imager",
+    "doi": "10.1016/j.rse.2024.114104",
+    "ordered_rules": [
+      "valid RRLI/RBLI and RRLI > 9 => class 2 RLED",
+      "remaining valid pixels and RBLI > 0.57 => class 1 WLED",
+      "remaining valid pixels => class 3 Other",
+      "invalid index pixels => NoData 255"
+    ],
+    "threshold_tuning": false
+  },
+  "raster": {
+    "path": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q17-sdgsat-light-classification/formal-SDGSAT1-shanghai-light-classification.tif",
+    "sha256": "2a086016653569b5f6c73a40f2f9a6b64a0cc0f6568bce230383f9d49c327e7d",
+    "dtype": "uint8",
+    "nodata": 255,
+    "crs": "EPSG:32651",
+    "transform": [
+      40.0,
+      0.0,
+      194936.55426564877,
+      0.0,
+      -40.0,
+      3669270.754403386
+    ],
+    "width": 5674,
+    "height": 9250,
+    "pixel_size_m": [
+      40.0,
+      40.0
+    ]
+  },
+  "pixel_accounting": {
+    "total_pixels": 52484500,
+    "valid_index_pixels": 9784136,
+    "nodata_pixels": 42700364,
+    "class_sum_equals_valid_index_pixels": true,
+    "class_codes_outside_1_2_3": []
+  },
+  "classes": {
+    "1": {
+      "name": "WLED",
+      "pixel_count": 4211496,
+      "fraction_of_valid_index_pixels": 0.4304412775946696,
+      "planar_area_m2": 6738393600.0,
+      "planar_area_km2": 6738.3936
+    },
+    "2": {
+      "name": "RLED",
+      "pixel_count": 244523,
+      "fraction_of_valid_index_pixels": 0.024991782616267805,
+      "planar_area_m2": 391236800.0,
+      "planar_area_km2": 391.2368
+    },
+    "3": {
+      "name": "Other",
+      "pixel_count": 5328117,
+      "fraction_of_valid_index_pixels": 0.5445669397890627,
+      "planar_area_m2": 8524987200.0,
+      "planar_area_km2": 8524.9872
+    }
+  },
+  "area_note": "Area is pixel count multiplied by 40 m × 40 m in projected EPSG:32651; it is planar raster area, not an independently surveyed illuminated footprint.",
+  "validation": {
+    "reopened_all_blocks": true,
+    "unique_codes": [
+      1,
+      2,
+      3,
+      255
+    ],
+    "counts_match_write_pass": true,
+    "independent_threshold_sample_size": 4964,
+    "independent_threshold_sample_mismatches": 0
+  },
+  "preview": {
+    "path": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q17-sdgsat-light-classification/formal-classification-preview.png",
+    "sha256": "c81592329b94f52242adb4f4617efa125297c9464e386882417c0ba5b8dabed1",
+    "dpi": 300
+  },
+  "reproducibility": {
+    "script": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q17-sdgsat-light-classification/run_formal_q17_analysis.py",
+    "script_sha256": "e6ee2710f4dc6763306034867e05b7fe64297e6a15228ca443157abf6840f962"
+  },
+  "blindness": {
+    "user_reference_rbli_opened": true,
+    "user_reference_classification_opened": true,
+    "user_reference_outputs_opened_pre_lock": false,
+    "user_reference_outputs_opened_post_lock": true,
+    "gold_output_opened": false
+  },
+  "limitations": [
+    "Large ratios can arise where the green-band denominator is small.",
+    "Fixed spectral-ratio thresholds cannot resolve all mixed-light pixels or spectral mixtures.",
+    "The preceding destriping and radiometric-calibration chain was not rerun in this experiment; the user-approved preprocessed RGB was the analysis input.",
+    "No ground-reference light-type labels were available, so these results are not an accuracy assessment."
+  ],
+  "post_lock_comparison": {
+    "comparison_path": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q17-sdgsat-light-classification/formal-reference-comparison.json",
+    "comparison_sha256": "1ffef53d71da73a109296dd4bdc68bf15c78bb8a82f1b98444913de93ff39dd9",
+    "new_result_hash_unchanged": true,
+    "thresholds_or_masking_changed": false
+  }
+}

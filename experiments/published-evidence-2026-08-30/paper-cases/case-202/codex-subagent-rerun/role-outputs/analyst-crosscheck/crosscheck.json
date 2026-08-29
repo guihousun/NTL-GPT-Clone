@@ -1,0 +1,121 @@
+{
+  "simulation_scope": "Codex-subagent simulation only",
+  "input_csv": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q19-tehran-city-longseries/daily-vnp46a2.csv",
+  "windows_inclusive_utc": [
+    {
+      "window": "w1",
+      "start_date": "2026-01-01",
+      "end_date": "2026-02-27"
+    },
+    {
+      "window": "w2",
+      "start_date": "2026-02-28",
+      "end_date": "2026-04-07"
+    },
+    {
+      "window": "w3",
+      "start_date": "2026-04-08",
+      "end_date": "2026-04-21"
+    },
+    {
+      "window": "w4",
+      "start_date": "2026-04-22",
+      "end_date": "2026-07-31"
+    }
+  ],
+  "relative_definition": "100 * (window mean(mean) - w1 mean(mean)) / w1 mean(mean)",
+  "baseline_checks": {
+    "strict": {
+      "expected_n": 47,
+      "actual_n": 47,
+      "matches": true
+    },
+    "permissive": {
+      "expected_n": 48,
+      "actual_n": 48,
+      "matches": true
+    }
+  },
+  "rows": [
+    {
+      "qa_mode": "strict",
+      "window": "w1",
+      "start_date": "2026-01-01",
+      "end_date": "2026-02-27",
+      "n": 47,
+      "mean_mean": 67.23183490694599,
+      "relative_to_first_pct": 0.0,
+      "baseline_n": 47
+    },
+    {
+      "qa_mode": "strict",
+      "window": "w2",
+      "start_date": "2026-02-28",
+      "end_date": "2026-04-07",
+      "n": 20,
+      "mean_mean": 55.61991566160808,
+      "relative_to_first_pct": -17.271459661051487,
+      "baseline_n": 47
+    },
+    {
+      "qa_mode": "strict",
+      "window": "w3",
+      "start_date": "2026-04-08",
+      "end_date": "2026-04-21",
+      "n": 11,
+      "mean_mean": 61.3582627055188,
+      "relative_to_first_pct": -8.736296145355348,
+      "baseline_n": 47
+    },
+    {
+      "qa_mode": "strict",
+      "window": "w4",
+      "start_date": "2026-04-22",
+      "end_date": "2026-07-31",
+      "n": 83,
+      "mean_mean": 59.75243011388104,
+      "relative_to_first_pct": -11.124796464973803,
+      "baseline_n": 47
+    },
+    {
+      "qa_mode": "permissive",
+      "window": "w1",
+      "start_date": "2026-01-01",
+      "end_date": "2026-02-27",
+      "n": 48,
+      "mean_mean": 65.20254141144407,
+      "relative_to_first_pct": 0.0,
+      "baseline_n": 48
+    },
+    {
+      "qa_mode": "permissive",
+      "window": "w2",
+      "start_date": "2026-02-28",
+      "end_date": "2026-04-07",
+      "n": 20,
+      "mean_mean": 54.72279183826343,
+      "relative_to_first_pct": -16.07260905223133,
+      "baseline_n": 48
+    },
+    {
+      "qa_mode": "permissive",
+      "window": "w3",
+      "start_date": "2026-04-08",
+      "end_date": "2026-04-21",
+      "n": 12,
+      "mean_mean": 58.5741617953612,
+      "relative_to_first_pct": -10.165830154159435,
+      "baseline_n": 48
+    },
+    {
+      "qa_mode": "permissive",
+      "window": "w4",
+      "start_date": "2026-04-22",
+      "end_date": "2026-07-31",
+      "n": 84,
+      "mean_mean": 59.86343154492194,
+      "relative_to_first_pct": -8.188499636587844,
+      "baseline_n": 48
+    }
+  ]
+}

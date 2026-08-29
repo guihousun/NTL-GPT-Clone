@@ -1,0 +1,11 @@
+test_eligible_exact_product_is_retained (test_gee_ntl_date_boundary_handling.MyanmarFirstNightContractTests.test_eligible_exact_product_is_retained) ... ok
+test_event_is_normalized_to_yangon_offset (test_gee_ntl_date_boundary_handling.MyanmarFirstNightContractTests.test_event_is_normalized_to_yangon_offset) ... ok
+test_exact_product_eligibility_has_no_later_date_fallback (test_gee_ntl_date_boundary_handling.MyanmarFirstNightContractTests.test_exact_product_eligibility_has_no_later_date_fallback) ... ok
+test_first_post_event_local_night_is_next_local_date (test_gee_ntl_date_boundary_handling.MyanmarFirstNightContractTests.test_first_post_event_local_night_is_next_local_date) ... ok
+test_local_first_night_maps_to_prior_utc_product_date (test_gee_ntl_date_boundary_handling.MyanmarFirstNightContractTests.test_local_first_night_maps_to_prior_utc_product_date) ... ok
+test_single_day_end_is_exclusive_next_day (test_gee_ntl_date_boundary_handling.MyanmarFirstNightContractTests.test_single_day_end_is_exclusive_next_day) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.001s
+
+OK

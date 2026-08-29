@@ -1,0 +1,19 @@
+{
+  "case_id": "Case202-tehran-latest-vnp46a2",
+  "created_at_utc": "2026-08-21T09:16:36Z",
+  "query_record": {
+    "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/raw-gee-2026-08-19/gee-raw-aug12-18.json",
+    "sha256": "2111b6ee3340808647c9553ba983a72f933a731c0bbcf59e21f726e43b054d25"
+  },
+  "rasters": {
+    "2026-08-19": {
+      "bytes": 2971,
+      "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/raw-gee-2026-08-19/rasters/VNP46A2_2026-08-19_raw_qa.tif",
+      "server_mask_note": "server-side raw count is zero; numeric zero pixels in this GeoTIFF are export fill values, not observations",
+      "server_raw_band_count": 0,
+      "sha256": "067300ebf974cf579dcf35338c1e707dab64f26f0776492240b1705c0720d0bb",
+      "status": "downloaded_all_masked"
+    }
+  },
+  "schema_version": "ntl.case202.gee-raw-supplement-manifest.v1"
+}

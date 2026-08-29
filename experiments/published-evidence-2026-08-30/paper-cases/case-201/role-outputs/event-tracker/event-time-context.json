@@ -1,0 +1,86 @@
+{
+  "schema": "ntl.case201.event-time-context.v1",
+  "case_id": "CASE-201",
+  "role": "NTL Event Tracker",
+  "status": "complete_with_historical_timezone_conflict_preserved",
+  "generated_at_utc": "2026-08-18T07:22:39.241Z",
+  "inputs": [
+    {
+      "path": "experiments/paper-case-201-myanmar-first-local-night-2026-08-18/case-201.contract.md",
+      "sha256": "8e97e4a86a80e9fddd9d621686203020f9d2376408302b25a50551e08856c1b6",
+      "role": "case timing and conflict contract"
+    },
+    {
+      "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-event-context.json",
+      "sha256": "d71a3bc8e5032a0be54dd827a491b741cc77029287f12beceed180feb9563364",
+      "role": "supplied formal Q18 event context"
+    },
+    {
+      "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/event-context.json",
+      "sha256": "0e2852890d7284abc7101099c5ae6d55e78b9bf5d6784e8299e8c4e9e17b6aa5",
+      "role": "legacy Q18 context checked without mutation"
+    },
+    {
+      "path": "runtime/.ntl-gpt/skills/gee-ntl-date-boundary-handling/SKILL.md",
+      "sha256": "7f43d02a5db7b9cb3aa0381c26c0a96dfe5fd180fcf894384bf21e431ba0c8d9",
+      "role": "manually read runtime Skill"
+    }
+  ],
+  "event": {
+    "event_id_usgs": "us7000pn9s",
+    "event_time_utc": "2025-03-28T06:20:52Z",
+    "timezone": "Asia/Yangon",
+    "utc_offset_on_event_date": "+06:30",
+    "event_time_local": "2025-03-28T12:50:52+06:30",
+    "epicenter_wgs84_lon_lat": [
+      95.936,
+      22.011
+    ],
+    "time_authority": "The supplied event UTC timestamp is the only temporal authority for this case."
+  },
+  "normalization": {
+    "input_utc": "2025-03-28T06:20:52Z",
+    "normalized_utc": "2025-03-28T06:20:52Z",
+    "normalized_local": "2025-03-28T12:50:52+06:30",
+    "timezone_database_zone": "Asia/Yangon",
+    "status": "validated"
+  },
+  "historical_q18_timezone_conflict": {
+    "status": "preserved_without_mutation",
+    "historical_offset_declared_by_case_contract": "+08:00",
+    "contract_source": {
+      "path": "experiments/paper-case-201-myanmar-first-local-night-2026-08-18/case-201.contract.md",
+      "sha256": "8e97e4a86a80e9fddd9d621686203020f9d2376408302b25a50551e08856c1b6",
+      "lines": "32-38"
+    },
+    "current_supplied_formal_json": {
+      "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-event-context.json",
+      "sha256": "d71a3bc8e5032a0be54dd827a491b741cc77029287f12beceed180feb9563364",
+      "origin_time_local": "2025-03-28T12:50:52+06:30",
+      "timezone": "Asia/Yangon"
+    },
+    "legacy_q18_json_checked": {
+      "path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/event-context.json",
+      "sha256": "0e2852890d7284abc7101099c5ae6d55e78b9bf5d6784e8299e8c4e9e17b6aa5",
+      "origin_time_local": "2025-03-28T12:50:52+06:30"
+    },
+    "exact_historical_plus_08_value_in_current_checkout": null,
+    "filesystem_observation": "At execution time, the two checked Q18 JSON files exposed +06:30 and no +08:00 literal was present in the Q18 directory. The contract's declared historical +08:00 conflict is therefore recorded as a preserved historical discrepancy, not attributed to the current supplied JSON.",
+    "correct_authority": "Asia/Yangon at UTC+06:30, derived from the supplied UTC event timestamp",
+    "mutation_policy": "The old Q18 assets were not edited, normalized, or overwritten."
+  },
+  "validation": {
+    "status": "passed",
+    "checks": [
+      "UTC event string has an explicit Z offset.",
+      "ZoneInfo(Asia/Yangon) converts the event to 2025-03-28T12:50:52+06:30.",
+      "Current formal and legacy Q18 JSON hashes were captured before output generation.",
+      "Historical +08:00 conflict is documented without presenting it as the current JSON value."
+    ]
+  },
+  "limitations": [
+    "This artifact does not establish an exact satellite pixel acquisition timestamp.",
+    "The historical +08:00 JSON payload is not available in the current checkout; only the Case contract records that discrepancy.",
+    "No deployed runtime telemetry, model call, or benchmark execution is represented."
+  ]
+}

@@ -1,0 +1,21 @@
+rank,shape_name,shape_id,shape_group,shape_type,geometry_valid,is_q19_target,assigned_exact_attack_records,share_of_candidate_assigned_percent,share_of_all_exact_retained_percent,source_city_label_records,source_city_label_nonexact_records,combined_force_records,iran_axis_records,confirmed_airstrike_records,reported_airstrike_records,report_of_explosion_with_footage_records,other_retained_attack_type_records
+18,Amol,26516999B614175773337,IRN,ADM2,true,false,0,0.0,0.0,0,0,0,0,0,0,0,0
+12,Islamshahr,26516999B27698470337483,IRN,ADM2,true,false,3,1.21,0.313,0,0,3,0,1,2,0,0
+18,Baharestan,26516999B32274164067447,IRN,ADM2,true,false,0,0.0,0.0,2,2,0,0,0,0,0,0
+2,Tehran,26516999B12442173705609,IRN,ADM2,true,false,29,11.694,3.027,418,237,29,0,25,2,2,0
+14,Damavand,26516999B19088359236830,IRN,ADM2,true,false,1,0.403,0.104,3,2,1,0,1,0,0,0
+13,Robatkarim,26516999B89814030456652,IRN,ADM2,true,false,2,0.806,0.209,0,0,2,0,0,1,1,0
+5,Rey,26516999B97503362604777,IRN,ADM2,true,false,10,4.032,1.044,3,1,10,0,9,1,0,0
+18,Zarandieh,26516999B1107707028024,IRN,ADM2,true,false,0,0.0,0.0,0,0,0,0,0,0,0,0
+8,Savojbolagh,26516999B18640438628843,IRN,ADM2,true,false,5,2.016,0.522,0,0,5,0,1,2,2,0
+14,Shemiranat,26516999B22518076976615,IRN,ADM2,true,false,1,0.403,0.104,0,0,1,0,1,0,0,0
+9,Shahriar,26516999B66540867756489,IRN,ADM2,true,false,4,1.613,0.418,4,3,4,0,3,1,0,0
+9,Qods,26516999B5684873266134,IRN,ADM2,true,false,4,1.613,0.418,1,0,4,0,2,0,2,0
+14,Gharchak,26516999B60688920539787,IRN,ADM2,true,false,1,0.403,0.104,0,0,1,0,0,1,0,0
+3,Karaj,26516999B84495228881975,IRN,ADM2,true,false,18,7.258,1.879,28,13,18,0,6,3,9,0
+6,Malard,26516999B72896925290367,IRN,ADM2,true,false,6,2.419,0.626,1,1,6,0,5,1,0,0
+14,Varamin,26516999B88410465027536,IRN,ADM2,true,false,1,0.403,0.104,4,2,1,0,1,0,0,0
+4,Pakdasht,26516999B29825516258970,IRN,ADM2,true,false,11,4.435,1.148,1,1,11,0,6,2,3,0
+6,Paveh,26516999B30802534166857,IRN,ADM2,true,false,6,2.419,0.626,2,1,6,0,2,1,3,0
+1,City of Tehran,26516999B29761828880922,IRN,ADM2,true,true,142,57.258,14.823,0,0,142,0,58,50,34,0
+9,Shahariar,26516999B31487954135890,IRN,ADM2,true,false,4,1.613,0.418,0,0,4,0,3,1,0,0

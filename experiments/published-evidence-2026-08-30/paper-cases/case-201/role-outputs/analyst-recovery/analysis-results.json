@@ -1,0 +1,129 @@
+{
+  "event_anchor": {
+    "event_id_usgs": "us7000pn9s",
+    "event_product_date": "2025-03-28",
+    "event_time_local": "2025-03-28T12:50:52+06:30",
+    "event_time_utc": "2025-03-28T06:20:52Z",
+    "first_post_event_local_night_interpreted": "2025-03-29",
+    "official_name": "2025 Mandalay, Burma (Myanmar) Earthquake"
+  },
+  "excluded_rows": {
+    "later_followup_utc_product_dates_not_used": [
+      "2026-07-24",
+      "2026-07-25",
+      "2026-07-26",
+      "2026-07-27",
+      "2026-07-28",
+      "2026-07-29",
+      "2026-07-30",
+      "2026-07-31"
+    ],
+    "unqualified_pre_event_rows_not_used": [
+      {
+        "aoi_radius_km": 25,
+        "reason": "no finite radiance mean or qa_valid_pixel_count <= 0",
+        "utc_product_date": "2025-03-23"
+      }
+    ]
+  },
+  "execution_context": {
+    "benchmark_executed": false,
+    "external_services_used": [],
+    "mode": "local_csv_recalculation",
+    "runtime_deployed": false,
+    "standard_library_only": true
+  },
+  "inputs": {
+    "analysis_ready_csv": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-q18-analysis-ready.csv",
+    "event_context_json": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-event-context.json",
+    "observation_package_json": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-observation-package.json",
+    "sha256": {
+      "formal-event-context.json": "d71a3bc8e5032a0be54dd827a491b741cc77029287f12beceed180feb9563364",
+      "formal-observation-package.json": "7d9379dd8f066a37ac876a05ea346de797d2dfd40bc891a21592aa684255a804",
+      "formal-q18-analysis-ready.csv": "3c6777a41aa074a1357d25938120b026ab9cd7afa86bea3f419fbde64ce9d554"
+    }
+  },
+  "interpretation_guardrails": [
+    "This is a descriptive radiance comparison only.",
+    "25 km and 50 km support ranges are not pooled.",
+    "Later follow-up observations are not used.",
+    "No causal, damage, recovery, or statistical-significance claim is made."
+  ],
+  "method": {
+    "absolute_change": "event_mean - baseline_mean",
+    "baseline_statistic": "arithmetic mean of qualified daily AOI radiance means",
+    "baseline_window": "pre_event_contiguous_dates from observation JSON",
+    "event_row": "exact utc_product_date=2025-03-28 and first_post_event_local_night_interpreted",
+    "later_dates_used": false,
+    "percent_change": "100 * (event_mean - baseline_mean) / baseline_mean",
+    "support_handling": "25 km and 50 km are calculated and reported independently"
+  },
+  "results": [
+    {
+      "aoi_radius_km": 25,
+      "aoi_support": "25 km WGS84 ellipsoidal geodesic radius; pixel-centre distance <= radius; unweighted pixel mean",
+      "baseline": {
+        "mean_nw_cm2_sr": 1.48253877146,
+        "qualification_rule": "pre_event_contiguous_dates from observation JSON, temporal_relation=pre_event_local_night, finite radiance mean, and qa_valid_pixel_count > 0",
+        "qualified_n": 6,
+        "utc_product_dates": [
+          "2025-03-21",
+          "2025-03-22",
+          "2025-03-24",
+          "2025-03-25",
+          "2025-03-26",
+          "2025-03-27"
+        ]
+      },
+      "change": {
+        "absolute_nw_cm2_sr": -0.439026259486,
+        "percent": -29.613138484969,
+        "percent_rounded_2dp": -29.61
+      },
+      "event_row": {
+        "interpreted_local_night_date_asia_yangon": "2025-03-29",
+        "qa_valid_fraction": 0.990601313795,
+        "qa_valid_pixel_count": 9802,
+        "radiance_mean_nw_cm2_sr": 1.043512511975,
+        "temporal_relation": "first_post_event_local_night_interpreted",
+        "utc_product_date": "2025-03-28"
+      },
+      "interpretation": "Descriptive comparison for this support radius only; no causal, recovery, or statistical-significance inference."
+    },
+    {
+      "aoi_radius_km": 50,
+      "aoi_support": "50 km WGS84 ellipsoidal geodesic radius; pixel-centre distance <= radius; unweighted pixel mean",
+      "baseline": {
+        "mean_nw_cm2_sr": 0.833819996481,
+        "qualification_rule": "pre_event_contiguous_dates from observation JSON, temporal_relation=pre_event_local_night, finite radiance mean, and qa_valid_pixel_count > 0",
+        "qualified_n": 7,
+        "utc_product_dates": [
+          "2025-03-21",
+          "2025-03-22",
+          "2025-03-23",
+          "2025-03-24",
+          "2025-03-25",
+          "2025-03-26",
+          "2025-03-27"
+        ]
+      },
+      "change": {
+        "absolute_nw_cm2_sr": 0.041031277498,
+        "percent": 4.920879526878,
+        "percent_rounded_2dp": 4.92
+      },
+      "event_row": {
+        "interpreted_local_night_date_asia_yangon": "2025-03-29",
+        "qa_valid_fraction": 0.993809222994,
+        "qa_valid_pixel_count": 39330,
+        "radiance_mean_nw_cm2_sr": 0.874851273979,
+        "temporal_relation": "first_post_event_local_night_interpreted",
+        "utc_product_date": "2025-03-28"
+      },
+      "interpretation": "Descriptive comparison for this support radius only; no causal, recovery, or statistical-significance inference."
+    }
+  ],
+  "schema": "ntl.analyst-recovery.results.v1",
+  "status": "complete_descriptive_local_csv_recalculation",
+  "task_id": "Case-201-myanmar-first-local-night-2026-08-18"
+}

@@ -1,0 +1,16 @@
+{
+  "schema_version": "ntl.case201.contract-test-run.v1",
+  "executed_at_utc": "2026-08-18T07:21:37.717718Z",
+  "command": [
+    "local-user/miniconda3/python.exe",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "vault/ntl-gpt/experiments/paper-case-201-myanmar-first-local-night-2026-08-18/tests",
+    "-v"
+  ],
+  "returncode": 0,
+  "passed": true,
+  "output_path": "validation/contract-test-output.txt"
+}

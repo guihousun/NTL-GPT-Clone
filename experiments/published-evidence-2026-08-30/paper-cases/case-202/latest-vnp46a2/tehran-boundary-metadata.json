@@ -1,0 +1,69 @@
+{
+  "accessed_utc": "2026-08-20T17:51:37Z",
+  "artifact": {
+    "bytes": 382894,
+    "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/tehran-boundary.geojson",
+    "sha256": "66b65ad355fe607229f4e16dfce366e54d16ce81a2c208e63edbb0d838d7e02d"
+  },
+  "case_id": "Case202-tehran-latest-vnp46a2",
+  "geometry": {
+    "area_equal_area_km2_epsg6933": 628.22188,
+    "bbox": [
+      51.089009900187,
+      35.568207100477,
+      51.606300700117,
+      35.828472500506
+    ],
+    "crs": "EPSG:4326",
+    "geometry_type": "Polygon",
+    "is_empty": false,
+    "is_valid": true,
+    "validity_detail": "Valid Geometry",
+    "vertex_count_including_ring_closure": 4051
+  },
+  "limitations": [
+    "The source represents 2017 administrative geography and was built in 2023.",
+    "ADM2 canonical semantics are Shahrestan; this geometry is not labelled municipality.",
+    "The source-named unit is an administrative reporting context, not a functional urban footprint."
+  ],
+  "produced_by": "NTL_Data_Searcher",
+  "schema_version": "ntl.boundary-metadata.v1",
+  "selected_feature": {
+    "administrative_semantics": "geoBoundaries ADM2 / canonical Shahrestan / source-named unit 'City of Tehran'; not asserted to be a municipality",
+    "boundary_id": "IRN-ADM2-26516999",
+    "canonical_level": "Shahrestan",
+    "shape_group": "IRN",
+    "shape_id": "26516999B29761828880922",
+    "shape_name": "City of Tehran",
+    "shape_type": "ADM2",
+    "source_feature_name": "City of Tehran"
+  },
+  "source": {
+    "api_url": "httplocal-path/",
+    "boundary_source": "OpenStreetMap, Wambacher",
+    "boundary_source_url": "wambachers-osm.website/boundaries/",
+    "boundary_year_represented": "2017",
+    "build_date": "Dec 12, 2023",
+    "cache_feature_count": 432,
+    "cache_path": "vault/conflictntl/data/cache/legacy-build/admin_scale_results/geoboundaries_cache/geoBoundaries-IRN-ADM2.geojson",
+    "cache_sha256": "6f95cb3e108907663846f1e7479d07714fe95b5c3e0adf44ad94d27b8b42ff7a",
+    "exact_geojson_url": "httplocal-path/geoBoundaries-IRN-ADM2.geojson",
+    "license": "Open Data Commons Open Database License 1.0",
+    "provider": "geoBoundaries gbOpen",
+    "release_git_fragment": "9469f09",
+    "reuse_reason": "Validated local geoBoundaries IRN ADM2 cache; no repeat download.",
+    "source_data_update_date": "Thu Jan 19 07:31:04 2023",
+    "static_download_url": "httplocal-path/geoBoundaries-IRN-ADM2-all.zip"
+  },
+  "status": "validated",
+  "validation": {
+    "geometry_nonempty": true,
+    "geometry_valid": true,
+    "output_hash_recomputed": true,
+    "output_reopened": true,
+    "selected_feature_count": 1,
+    "source_name_exact_match": true,
+    "source_shape_type_is_adm2": true,
+    "status": "passed"
+  }
+}

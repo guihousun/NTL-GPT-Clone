@@ -1,0 +1,86 @@
+{
+  "schema_version": "codex-subagent-q19-input-audit.v1",
+  "generated_at_utc": "2026-08-17T12:55:36.149165Z",
+  "simulation_scope": "Codex-subagent case-evidence simulation; not deployed NTL-GPT runtime or benchmark evidence.",
+  "case_directory": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q19-tehran-city-longseries",
+  "baseline_contract": {
+    "time_basis": "UTC",
+    "start_date_inclusive": "2026-01-01",
+    "end_date_inclusive": "2026-02-27"
+  },
+  "source_files": {
+    "daily-vnp46a2.csv": {
+      "path": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q19-tehran-city-longseries/daily-vnp46a2.csv",
+      "bytes": 74552,
+      "sha256": "ddf35ce0af13ff42dc3538de1af1c98303a78d3da7fdc15585e5471f822151ac"
+    },
+    "daily-vnp46a2-raw.jsonl": {
+      "path": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q19-tehran-city-longseries/daily-vnp46a2-raw.jsonl",
+      "bytes": 164479,
+      "sha256": "2180f1e6cbceb9ec65e4f3a8bb2f346f33001377c5f32aa69aa1857e07dd0087"
+    },
+    "observation-package.json": {
+      "path": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q19-tehran-city-longseries/observation-package.json",
+      "bytes": 13076,
+      "sha256": "2f7d7ba4a79660944088b6cc69fe772c2c52c648f2763304134eff0ff6aad52e"
+    },
+    "tehran-boundary.geojson": {
+      "path": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q19-tehran-city-longseries/tehran-boundary.geojson",
+      "bytes": 382894,
+      "sha256": "66b65ad355fe607229f4e16dfce366e54d16ce81a2c208e63edbb0d838d7e02d"
+    },
+    "tehran-boundary-metadata.json": {
+      "path": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q19-tehran-city-longseries/tehran-boundary-metadata.json",
+      "bytes": 3009,
+      "sha256": "3eb130109a7b5a2003aa238f9876586c803b65d5af970f8101c933ed517827c4"
+    },
+    "gee-checkpoint.json": {
+      "path": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q19-tehran-city-longseries/gee-checkpoint.json",
+      "bytes": 1806,
+      "sha256": "f5d60d60d43785982ab7c7445d4b78df6b689ef0050908f7ea7b5efc145c0136"
+    }
+  },
+  "daily_table": {
+    "row_count": 428,
+    "columns_missing_from_contract": [],
+    "rows_per_date_distribution": {
+      "2": 214
+    },
+    "qa_modes": {
+      "permissive": {
+        "rows": 214,
+        "date_min": "2026-01-01",
+        "date_max": "2026-08-02",
+        "unique_dates": 214,
+        "image_available_rows": 200,
+        "qualified_rows": 164,
+        "baseline_calendar_rows": 58,
+        "baseline_image_available_rows": 58,
+        "baseline_qualified_rows": 48,
+        "units": [
+          "nW cm^-2 sr^-1"
+        ],
+        "scale_m": [
+          "500"
+        ]
+      },
+      "strict": {
+        "rows": 214,
+        "date_min": "2026-01-01",
+        "date_max": "2026-08-02",
+        "unique_dates": 214,
+        "image_available_rows": 200,
+        "qualified_rows": 161,
+        "baseline_calendar_rows": 58,
+        "baseline_image_available_rows": 58,
+        "baseline_qualified_rows": 47,
+        "units": [
+          "nW cm^-2 sr^-1"
+        ],
+        "scale_m": [
+          "500"
+        ]
+      }
+    }
+  }
+}

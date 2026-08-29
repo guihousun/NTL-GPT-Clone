@@ -1,0 +1,124 @@
+{
+  "schema_version": "ntl.case202.terminal-gap-audit.v1",
+  "case_id": "Case202-tehran-latest-vnp46a2",
+  "audit_type": "Codex-subagent workflow evidence",
+  "audited_at_utc": "2026-08-21T09:34:00Z",
+  "scope": [
+    "Verify the current GEE collection endpoint and strict usable endpoint.",
+    "Verify that 2026-08-13 through 2026-08-19 contain no numeric radiance in the current daily table.",
+    "Inspect the current SVG and PNG figure terminal connector state.",
+    "Do not modify analysis scripts, source results, figure outputs, registry, manuscript, or benchmark records."
+  ],
+  "status": "pass",
+  "data_checks": [
+    {
+      "id": "gee_collection_endpoint",
+      "status": "PASS",
+      "source": "gee-checkpoint.json",
+      "live_latest_image_date_utc": "2026-08-19",
+      "queried_at_utc": "2026-08-21T09:10:22Z",
+      "completed_at_utc": "2026-08-21T09:10:26Z",
+      "collection_id": "NASA/VIIRS/002/VNP46A2",
+      "evidence": "live_latest_image_date_utc is 2026-08-19 and live_latest_image_index is 2026_08_19."
+    },
+    {
+      "id": "strict_usable_endpoint",
+      "status": "PASS",
+      "source": "gee-checkpoint.json and daily-vnp46a2.csv",
+      "latest_strict_qualified_date_utc": "2026-08-12",
+      "latest_strict_mean_antal": 59.868755595489105,
+      "latest_strict_valid_count": 2644,
+      "latest_strict_total_count": 2644,
+      "evidence": "The last strict row with a numeric mean is 2026-08-12; the checkpoint records latest_strict_qualified_date_utc as 2026-08-12."
+    },
+    {
+      "id": "terminal_rows",
+      "status": "PASS",
+      "source": "daily-vnp46a2.csv",
+      "dates_checked": [
+        "2026-08-13",
+        "2026-08-14",
+        "2026-08-15",
+        "2026-08-16",
+        "2026-08-17",
+        "2026-08-18",
+        "2026-08-19"
+      ],
+      "row_count": 14,
+      "strict_rows": 7,
+      "permissive_rows": 7,
+      "all_image_available": true,
+      "all_qualified": false,
+      "all_mean_blank": true,
+      "all_valid_count_zero": true,
+      "all_total_count_zero": true,
+      "evidence": "Both QA modes have image_available=true, qualified=false, blank mean, valid_count=0, and total_count=0 for every checked date."
+    },
+    {
+      "id": "raw_gee_terminal_confirmation",
+      "status": "PASS",
+      "source": "raw-gee-2026-08-12-to-18/gee-raw-aug12-18.json and raw-gee-2026-08-19/gee-raw-aug12-18.json",
+      "evidence": "The direct raw GEE checks report 2026-08-12 with 2644 server pixels and 2026-08-13 through 2026-08-19 with zero server-side raw-band pixels; the 2026-08-19 raster is explicitly marked downloaded_all_masked. Numeric export zeros are documented as fill values, not observations."
+    }
+  ],
+  "figure_checks": {
+    "source_results": "outputs/analysis-results.json",
+    "display_endpoint_collection_image_date_utc": "2026-08-19",
+    "latest_strict_qualified_date_utc": "2026-08-12",
+    "svg": {
+      "status": "PASS",
+      "path": "outputs/case202-tehran-latest-timeseries.svg",
+      "source_plot_style_contract": {
+        "daily_grey_constant": "#9EA5AD",
+        "stroke_width": 0.65,
+        "dash_pattern_matplotlib": "(0, (2, 2))",
+        "dash_pattern_svg_expected": "1.3,1.3",
+        "stroke_opacity": 0.72,
+        "visual_layer": "same grey gap-connector layer"
+      },
+      "grey_terminal_connector": {
+        "expected_stroke": "#9ea5ad",
+        "expected_stroke_width": 0.65,
+        "expected_stroke_dasharray": "1.3,1.3",
+        "expected_stroke_opacity": 0.72,
+        "path_d": "M 472.273846 99.59273 L 485.740792 99.59273",
+        "geometry": "horizontal",
+        "reaches_collection_endpoint": true,
+        "endpoint_x_equals_blue_endpoint_x": true,
+        "current_embedded_style": {
+          "stroke": "#9ea5ad",
+          "stroke_width": 0.65,
+          "stroke_dasharray": "1.3,1.3",
+          "stroke_opacity": 0.72
+        },
+        "style_matches_final_source_contract": true
+      },
+      "blue_terminal_connector": {
+        "stroke": "#1a5aa3",
+        "stroke_width": 1.45,
+        "stroke_dasharray": "4.35,2.9",
+        "path_d": "M 472.273846 105.187966 L 485.740792 105.187966",
+        "geometry": "horizontal",
+        "reaches_collection_endpoint": true
+      },
+      "interpretation": "The current SVG contains both horizontal terminal paths from the final supported date to the 2026-08-19 collection endpoint. They are visual missing-data connectors only and do not create numeric observations."
+    },
+    "png": {
+      "status": "PASS",
+      "path": "outputs/case202-tehran-latest-timeseries.png",
+      "inspection": "The current raster was re-opened after export. The grey horizontal terminal segment is present and reaches the right-hand 2026-08-19 collection endpoint with the restored grey-gap style.",
+      "recommendation": "No further terminal-connector change is required by this audit."
+    }
+  },
+  "limitations": [
+    "The audit verifies the current artifact state; it does not establish that 2026-08-13 through 2026-08-19 had no data outside the Tehran ADM2 AOI.",
+    "The horizontal dashed connectors visually extend the last supported values and are not observed, imputed, or included in summary statistics.",
+    "The terminal connectors remain visual missing-data connectors only; they are not observed or imputed ANTL values."
+  ],
+  "artifact_sha256": {
+    "daily-vnp46a2.csv": "d3ffaced57456e69b08f644d4f326281302e723fe2d13502b6370e9a7be6b78e",
+    "gee-checkpoint.json": "51b3e90fb9445117cad0265036bd2ea4a1a6dcb76fa4af0dde1aa780107eacbc",
+    "outputs/case202-tehran-latest-timeseries.svg": "1effd533031bbdcf44d1a8fd137cc436a1d9770129314870fd9ed65d81f16cad",
+    "outputs/case202-tehran-latest-timeseries.png": "0a30a32eaadffba43bac12ac6793949570eb2dc8cec9f83d65453cf76ee27c3c"
+  }
+}

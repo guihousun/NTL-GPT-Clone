@@ -1,0 +1,61 @@
+{
+  "schema_version": "codex-subagent-q19-paper-evidence.v1",
+  "execution_identity": {
+    "kind": "Codex-subagent case-evidence simulation",
+    "not_deployed_ntl_gpt_runtime": true,
+    "not_deep_agents_trace": true,
+    "not_benchmark_evidence": true
+  },
+  "status": "accepted_with_boundaries",
+  "time_basis": "UTC",
+  "analysis_cutoff_date_utc": "2026-07-31",
+  "source_daily_table_max_date_utc": "2026-08-02",
+  "aoi": {
+    "name": "City of Tehran",
+    "semantics": "geoBoundaries ADM2 / canonical Shahrestan; administrative unit, not municipality or functional urban footprint"
+  },
+  "primary_result": {
+    "qa_mode": "strict",
+    "baseline": {
+      "start_date_utc": "2026-01-01",
+      "end_date_utc": "2026-02-27",
+      "qualified_days": 47,
+      "mean_nw_cm2_sr": 67.231834906946
+    },
+    "conflict": {
+      "start_date_utc": "2026-02-28",
+      "end_date_utc": "2026-04-07",
+      "qualified_days": 20,
+      "mean_nw_cm2_sr": 55.61991566160809,
+      "relative_change_vs_baseline_percent": -17.27145966105149
+    },
+    "ceasefire_evaluation": {
+      "start_date_utc": "2026-04-08",
+      "end_date_utc": "2026-04-21",
+      "qualified_days": 11,
+      "mean_nw_cm2_sr": 61.3582627055188,
+      "relative_change_vs_baseline_percent": -8.736296145355368
+    },
+    "extended_monitoring": {
+      "start_date_utc": "2026-04-22",
+      "end_date_utc": "2026-07-31",
+      "qualified_days": 83,
+      "mean_nw_cm2_sr": 59.752430113881054,
+      "relative_change_vs_baseline_percent": -11.1247964649738
+    }
+  },
+  "selection": {
+    "overall_highest_ranked_claim": "indeterminate",
+    "qualified_exact_coordinate_subset_rank": 1,
+    "qualified_exact_coordinate_subset_target_records": 142,
+    "qualified_exact_coordinate_subset_assigned_records": 248
+  },
+  "prohibited_claims": [
+    "unqualified overall highest-ranked city",
+    "causal conflict or ceasefire effect",
+    "outage, damage, or recovery trajectory",
+    "continuous live monitoring",
+    "deployed NTL-GPT or benchmark performance evidence"
+  ],
+  "verification": "validation/engineer-q19-validation.json"
+}

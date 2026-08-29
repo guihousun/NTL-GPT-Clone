@@ -1,0 +1,147 @@
+{
+  "schema_version": "codex-subagent-q19-engineer-validation.v1",
+  "generated_at_utc": "2026-08-17T13:22:18.150738Z",
+  "simulation_scope": "Codex-subagent case-evidence simulation; not deployed NTL-GPT runtime or benchmark evidence.",
+  "sources": {
+    "daily_csv_sha256": "ddf35ce0af13ff42dc3538de1af1c98303a78d3da7fdc15585e5471f822151ac",
+    "analyst_summary_sha256": "9612141f3cdcce7a25fee59923381cdb062d0e9714a1f41753bcda6cdf518def",
+    "crosscheck_sha256": "8317b0363358f2063db9cd2f5300d67ed00b5dd07c2dcbc21dc69c320a4e7240",
+    "figure_input_sha256": "8280f7827dd91381cbbafcb829a78bf5524651ba3e247895ac58d8aec3458cfb"
+  },
+  "recomputed": {
+    "strict": {
+      "baseline": {
+        "qualified_days": 47,
+        "mean": 67.231834906946,
+        "relative_pct": 0.0
+      },
+      "conflict": {
+        "qualified_days": 20,
+        "mean": 55.61991566160809,
+        "relative_pct": -17.27145966105149
+      },
+      "ceasefire_evaluation": {
+        "qualified_days": 11,
+        "mean": 61.3582627055188,
+        "relative_pct": -8.736296145355368
+      },
+      "extended_monitoring": {
+        "qualified_days": 83,
+        "mean": 59.752430113881054,
+        "relative_pct": -11.1247964649738
+      }
+    },
+    "permissive": {
+      "baseline": {
+        "qualified_days": 48,
+        "mean": 65.20254141144406,
+        "relative_pct": 0.0
+      },
+      "conflict": {
+        "qualified_days": 20,
+        "mean": 54.72279183826343,
+        "relative_pct": -16.07260905223131
+      },
+      "ceasefire_evaluation": {
+        "qualified_days": 12,
+        "mean": 58.57416179536121,
+        "relative_pct": -10.165830154159393
+      },
+      "extended_monitoring": {
+        "qualified_days": 84,
+        "mean": 59.86343154492192,
+        "relative_pct": -8.188499636587846
+      }
+    }
+  },
+  "checks": [
+    {
+      "check_id": "strict_baseline_three_way_recompute",
+      "passed": true,
+      "source": {
+        "qualified_days": 47,
+        "mean": 67.231834906946,
+        "relative_pct": 0.0
+      }
+    },
+    {
+      "check_id": "strict_conflict_three_way_recompute",
+      "passed": true,
+      "source": {
+        "qualified_days": 20,
+        "mean": 55.61991566160809,
+        "relative_pct": -17.27145966105149
+      }
+    },
+    {
+      "check_id": "strict_ceasefire_evaluation_three_way_recompute",
+      "passed": true,
+      "source": {
+        "qualified_days": 11,
+        "mean": 61.3582627055188,
+        "relative_pct": -8.736296145355368
+      }
+    },
+    {
+      "check_id": "strict_extended_monitoring_three_way_recompute",
+      "passed": true,
+      "source": {
+        "qualified_days": 83,
+        "mean": 59.752430113881054,
+        "relative_pct": -11.1247964649738
+      }
+    },
+    {
+      "check_id": "permissive_baseline_three_way_recompute",
+      "passed": true,
+      "source": {
+        "qualified_days": 48,
+        "mean": 65.20254141144406,
+        "relative_pct": 0.0
+      }
+    },
+    {
+      "check_id": "permissive_conflict_three_way_recompute",
+      "passed": true,
+      "source": {
+        "qualified_days": 20,
+        "mean": 54.72279183826343,
+        "relative_pct": -16.07260905223131
+      }
+    },
+    {
+      "check_id": "permissive_ceasefire_evaluation_three_way_recompute",
+      "passed": true,
+      "source": {
+        "qualified_days": 12,
+        "mean": 58.57416179536121,
+        "relative_pct": -10.165830154159393
+      }
+    },
+    {
+      "check_id": "permissive_extended_monitoring_three_way_recompute",
+      "passed": true,
+      "source": {
+        "qualified_days": 84,
+        "mean": 59.86343154492192,
+        "relative_pct": -8.188499636587846
+      }
+    },
+    {
+      "check_id": "event_overall_ranking_indeterminate",
+      "passed": true,
+      "observed": "indeterminate"
+    },
+    {
+      "check_id": "figure_input_cutoff",
+      "passed": true,
+      "post_cutoff_dates": []
+    },
+    {
+      "check_id": "figure_input_no_low_sample_rolling",
+      "passed": true,
+      "dates": []
+    }
+  ],
+  "overall_pass": true
+}

@@ -1,0 +1,78 @@
+{
+  "schema_version": "ntl.q19-analysis-validation.v1",
+  "case_id": "Q19-tehran-city-longseries",
+  "independent_recompute": {
+    "source_csv": "experiments/paper-case-multiagent-2026-08-13/Q19-tehran-city-longseries/daily-vnp46a2.csv",
+    "rows_read": 428,
+    "source_date_min_utc": "2026-01-01",
+    "source_date_max_utc": "2026-08-02",
+    "analysis_cutoff_date_utc": "2026-07-31",
+    "analysis_max_qualified_date_utc": "2026-07-31",
+    "rows_after_analysis_cutoff": 4,
+    "dates_after_analysis_cutoff_utc": [
+      "2026-08-01",
+      "2026-08-02"
+    ],
+    "qualified_baseline_days_by_qa_mode": {
+      "strict": 47,
+      "permissive": 48
+    }
+  },
+  "event_tracker": {
+    "source_json": "experiments/paper-case-codex-subagent-rerun-2026-08-17/role-outputs/event-tracker/event-selection.json",
+    "field": "verdict",
+    "overall_ranking_verdict": "indeterminate"
+  },
+  "checks": [
+    {
+      "check_id": "strict_baseline_qualified_days",
+      "expected": 47,
+      "observed": 47,
+      "passed": true,
+      "note": "Independent count of CSV rows with qa_mode=strict and qualified=true in the UTC baseline."
+    },
+    {
+      "check_id": "permissive_baseline_qualified_days",
+      "expected": 48,
+      "observed": 48,
+      "passed": true,
+      "note": "Independent count of CSV rows with qa_mode=permissive and qualified=true in the UTC baseline."
+    },
+    {
+      "check_id": "source_daily_table_cutoff",
+      "expected": "2026-08-02",
+      "observed": "2026-08-02",
+      "passed": true,
+      "note": "The supplied source daily table reaches 2026-08-02 UTC."
+    },
+    {
+      "check_id": "analysis_qualified_upper_bound",
+      "expected": true,
+      "observed": true,
+      "passed": true,
+      "note": "No qualified daily value used in the analysis is later than the 2026-07-31 UTC cutoff."
+    },
+    {
+      "check_id": "source_has_rows_after_analysis_cutoff",
+      "expected": true,
+      "observed": true,
+      "passed": true,
+      "note": "The source contains later rows that can demonstrate the cutoff was applied."
+    },
+    {
+      "check_id": "event_tracker_overall_ranking_verdict",
+      "expected": "indeterminate",
+      "observed": "indeterminate",
+      "passed": true,
+      "note": "The Event Tracker top-level verdict is the overall-ranking verdict used for this limitation."
+    },
+    {
+      "check_id": "audit_source_snapshot_cutoff_agrees",
+      "expected": "2026-08-02",
+      "observed": "2026-08-02",
+      "passed": true,
+      "note": "The independent CSV result agrees with the supplied Data Searcher source snapshot metadata."
+    }
+  ],
+  "overall_pass": true
+}

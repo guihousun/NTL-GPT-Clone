@@ -1,0 +1,1237 @@
+{
+  "case_id": "Case202-tehran-latest-vnp46a2",
+  "collection_metadata": {
+    "available_image_count": 7,
+    "available_image_dates": [
+      "2026-08-12",
+      "2026-08-13",
+      "2026-08-14",
+      "2026-08-15",
+      "2026-08-16",
+      "2026-08-17",
+      "2026-08-18"
+    ],
+    "image_count_in_window": 7
+  },
+  "comparison_with_existing_case202_chunk": {
+    "comparisons": [
+      {
+        "checks": {
+          "base_count": {
+            "equal": false,
+            "existing": 0,
+            "new": 2644
+          },
+          "base_max": {
+            "equal": false,
+            "existing": null,
+            "new": 229.23867797851562
+          },
+          "base_mean": {
+            "equal": false,
+            "existing": null,
+            "new": 59.868755595489105
+          },
+          "base_min": {
+            "equal": false,
+            "existing": null,
+            "new": 6.897564888000488
+          },
+          "permissive_count": {
+            "equal": false,
+            "existing": 0,
+            "new": 2644
+          },
+          "permissive_max": {
+            "equal": false,
+            "existing": null,
+            "new": 229.23867797851562
+          },
+          "permissive_mean": {
+            "equal": false,
+            "existing": null,
+            "new": 59.868755595489105
+          },
+          "permissive_min": {
+            "equal": false,
+            "existing": null,
+            "new": 6.897564888000488
+          },
+          "strict_count": {
+            "equal": false,
+            "existing": 0,
+            "new": 2644
+          },
+          "strict_max": {
+            "equal": false,
+            "existing": null,
+            "new": 229.23867797851562
+          },
+          "strict_mean": {
+            "equal": false,
+            "existing": null,
+            "new": 59.868755595489105
+          },
+          "strict_min": {
+            "equal": false,
+            "existing": null,
+            "new": 6.897564888000488
+          }
+        },
+        "date_utc": "2026-08-12"
+      },
+      {
+        "checks": {
+          "base_count": {
+            "equal": true,
+            "existing": 0,
+            "new": 0
+          },
+          "base_max": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "base_mean": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "base_min": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "permissive_count": {
+            "equal": true,
+            "existing": 0,
+            "new": 0
+          },
+          "permissive_max": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "permissive_mean": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "permissive_min": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "strict_count": {
+            "equal": true,
+            "existing": 0,
+            "new": 0
+          },
+          "strict_max": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "strict_mean": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "strict_min": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          }
+        },
+        "date_utc": "2026-08-13"
+      },
+      {
+        "checks": {
+          "base_count": {
+            "equal": true,
+            "existing": 0,
+            "new": 0
+          },
+          "base_max": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "base_mean": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "base_min": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "permissive_count": {
+            "equal": true,
+            "existing": 0,
+            "new": 0
+          },
+          "permissive_max": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "permissive_mean": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "permissive_min": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "strict_count": {
+            "equal": true,
+            "existing": 0,
+            "new": 0
+          },
+          "strict_max": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "strict_mean": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "strict_min": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          }
+        },
+        "date_utc": "2026-08-14"
+      },
+      {
+        "checks": {
+          "base_count": {
+            "equal": true,
+            "existing": 0,
+            "new": 0
+          },
+          "base_max": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "base_mean": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "base_min": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "permissive_count": {
+            "equal": true,
+            "existing": 0,
+            "new": 0
+          },
+          "permissive_max": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "permissive_mean": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "permissive_min": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "strict_count": {
+            "equal": true,
+            "existing": 0,
+            "new": 0
+          },
+          "strict_max": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "strict_mean": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "strict_min": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          }
+        },
+        "date_utc": "2026-08-15"
+      },
+      {
+        "checks": {
+          "base_count": {
+            "equal": true,
+            "existing": 0,
+            "new": 0
+          },
+          "base_max": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "base_mean": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "base_min": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "permissive_count": {
+            "equal": true,
+            "existing": 0,
+            "new": 0
+          },
+          "permissive_max": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "permissive_mean": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "permissive_min": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "strict_count": {
+            "equal": true,
+            "existing": 0,
+            "new": 0
+          },
+          "strict_max": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "strict_mean": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "strict_min": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          }
+        },
+        "date_utc": "2026-08-16"
+      },
+      {
+        "checks": {
+          "base_count": {
+            "equal": true,
+            "existing": 0,
+            "new": 0
+          },
+          "base_max": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "base_mean": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "base_min": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "permissive_count": {
+            "equal": true,
+            "existing": 0,
+            "new": 0
+          },
+          "permissive_max": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "permissive_mean": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "permissive_min": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "strict_count": {
+            "equal": true,
+            "existing": 0,
+            "new": 0
+          },
+          "strict_max": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "strict_mean": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "strict_min": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          }
+        },
+        "date_utc": "2026-08-17"
+      },
+      {
+        "checks": {
+          "base_count": {
+            "equal": true,
+            "existing": 0,
+            "new": 0
+          },
+          "base_max": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "base_mean": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "base_min": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "permissive_count": {
+            "equal": true,
+            "existing": 0,
+            "new": 0
+          },
+          "permissive_max": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "permissive_mean": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "permissive_min": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "strict_count": {
+            "equal": true,
+            "existing": 0,
+            "new": 0
+          },
+          "strict_max": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "strict_mean": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          },
+          "strict_min": {
+            "equal": true,
+            "existing": null,
+            "new": null
+          }
+        },
+        "date_utc": "2026-08-18"
+      }
+    ],
+    "existing_artifact": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/gee-chunk-2026-08.json",
+    "existing_artifact_sha256": "dc269a921fe80c580bc8a0171581707aa43417488a4d33107c21c5f183756b99",
+    "status": "difference_or_unavailable"
+  },
+  "completed_at_utc": "2026-08-21T09:01:00Z",
+  "dates": [
+    {
+      "DNB_BRDF_Corrected_NTL_count": 2644,
+      "DNB_BRDF_Corrected_NTL_max": 229.23867797851562,
+      "DNB_BRDF_Corrected_NTL_mean": 59.868755595489105,
+      "DNB_BRDF_Corrected_NTL_min": 6.897564888000488,
+      "Latest_High_Quality_Retrieval_count": 3324,
+      "Latest_High_Quality_Retrieval_max": 5,
+      "Latest_High_Quality_Retrieval_mean": 0.6597628272569096,
+      "Latest_High_Quality_Retrieval_min": 0,
+      "Mandatory_Quality_Flag_count": 2644,
+      "Mandatory_Quality_Flag_max": 0,
+      "Mandatory_Quality_Flag_mean": 0,
+      "Mandatory_Quality_Flag_min": 0,
+      "QF_Cloud_Mask_count": 3324,
+      "QF_Cloud_Mask_max": 754,
+      "QF_Cloud_Mask_mean": 134.48218043135202,
+      "QF_Cloud_Mask_min": 32,
+      "Snow_Flag_count": 3324,
+      "Snow_Flag_max": 0,
+      "Snow_Flag_mean": 0,
+      "Snow_Flag_min": 0,
+      "contract_base_count": 2644,
+      "contract_base_max": 229.23867797851562,
+      "contract_base_mean": 59.868755595489105,
+      "contract_base_min": 6.897564888000488,
+      "contract_permissive_count": 2644,
+      "contract_permissive_max": 229.23867797851562,
+      "contract_permissive_mean": 59.868755595489105,
+      "contract_permissive_min": 6.897564888000488,
+      "contract_strict_count": 2644,
+      "contract_strict_max": 229.23867797851562,
+      "contract_strict_mean": 59.868755595489105,
+      "contract_strict_min": 6.897564888000488,
+      "date_utc": "2026-08-12",
+      "download": {
+        "bytes": 35916,
+        "local_raster_inspection": {
+          "bands": {
+            "1": {
+              "count": 6844,
+              "max": 229.23867797851562,
+              "mean": 33.94489716173681,
+              "min": 0.0
+            },
+            "2": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "3": {
+              "count": 6844,
+              "max": 754.0,
+              "mean": 103.8895382817066,
+              "min": 32.0
+            },
+            "4": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "5": {
+              "count": 6844,
+              "max": 5.0,
+              "mean": 0.39114552893045,
+              "min": 0.0
+            }
+          },
+          "count": 5,
+          "crs": "EPSG:4326",
+          "driver": "GTiff",
+          "dtypes": [
+            "float64",
+            "float64",
+            "float64",
+            "float64",
+            "float64"
+          ],
+          "height": 59,
+          "nodata": null,
+          "status": "passed",
+          "transform": [
+            0.004491576420597608,
+            0.0,
+            51.08719020787719,
+            0.0,
+            -0.004491576420597608,
+            35.82930510710712,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "width": 116
+        },
+        "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/raw-gee-2026-08-12-to-18/rasters/VNP46A2_2026-08-12_raw_qa.tif",
+        "server_mask_note": "server-side raw count is authoritative because the GeoTIFF export has no explicit nodata mask",
+        "server_raw_band_count": 2644,
+        "sha256": "bd4ddc33ec23d3e59c92464a089169859ed3ebbe9a795763646630e19a6cfc81",
+        "status": "downloaded"
+      },
+      "image_available": true,
+      "qa_Latest_High_Quality_Retrieval_value_counts": {
+        "0.0": 2439,
+        "1.0": 46,
+        "2.0": 169,
+        "3.0": 223,
+        "4.0": 71,
+        "5.0": 141
+      },
+      "qa_Mandatory_Quality_Flag_value_counts": {
+        "0": 2439,
+        "null": 650
+      },
+      "qa_QF_Cloud_Mask_value_counts": {
+        "114": 8,
+        "162": 40,
+        "178": 4,
+        "226": 124,
+        "242": 32,
+        "32": 1,
+        "34": 2137,
+        "50": 301,
+        "674": 7,
+        "738": 282,
+        "754": 87,
+        "98": 66
+      },
+      "qa_Snow_Flag_value_counts": {
+        "0": 3089
+      },
+      "raw_availability": "image_present; raw_band_stats_may_be_all_masked",
+      "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_08_12",
+      "source_image_ids": [
+        "NASA/VIIRS/002/VNP46A2/2026_08_12"
+      ]
+    },
+    {
+      "DNB_BRDF_Corrected_NTL_count": 0,
+      "Latest_High_Quality_Retrieval_count": 0,
+      "Mandatory_Quality_Flag_count": 0,
+      "QF_Cloud_Mask_count": 0,
+      "Snow_Flag_count": 0,
+      "contract_base_count": 0,
+      "contract_permissive_count": 0,
+      "contract_strict_count": 0,
+      "date_utc": "2026-08-13",
+      "download": {
+        "bytes": 2971,
+        "local_raster_inspection": {
+          "bands": {
+            "1": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "2": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "3": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "4": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "5": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            }
+          },
+          "count": 5,
+          "crs": "EPSG:4326",
+          "driver": "GTiff",
+          "dtypes": [
+            "float64",
+            "float64",
+            "float64",
+            "float64",
+            "float64"
+          ],
+          "height": 59,
+          "nodata": null,
+          "status": "passed",
+          "transform": [
+            0.004491576420597608,
+            0.0,
+            51.08719020787719,
+            0.0,
+            -0.004491576420597608,
+            35.82930510710712,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "width": 116
+        },
+        "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/raw-gee-2026-08-12-to-18/rasters/VNP46A2_2026-08-13_raw_qa.tif",
+        "server_mask_note": "server-side raw count is zero; numeric zero pixels in this GeoTIFF are export fill values, not observations",
+        "server_raw_band_count": 0,
+        "sha256": "067300ebf974cf579dcf35338c1e707dab64f26f0776492240b1705c0720d0bb",
+        "status": "downloaded_all_masked"
+      },
+      "image_available": true,
+      "qa_Latest_High_Quality_Retrieval_value_counts": {
+        "null": 3089
+      },
+      "qa_Mandatory_Quality_Flag_value_counts": {
+        "null": 3089
+      },
+      "qa_QF_Cloud_Mask_value_counts": {
+        "null": 3089
+      },
+      "qa_Snow_Flag_value_counts": {
+        "null": 3089
+      },
+      "raw_availability": "image_present; raw_band_stats_may_be_all_masked",
+      "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_08_13",
+      "source_image_ids": [
+        "NASA/VIIRS/002/VNP46A2/2026_08_13"
+      ]
+    },
+    {
+      "DNB_BRDF_Corrected_NTL_count": 0,
+      "Latest_High_Quality_Retrieval_count": 0,
+      "Mandatory_Quality_Flag_count": 0,
+      "QF_Cloud_Mask_count": 0,
+      "Snow_Flag_count": 0,
+      "contract_base_count": 0,
+      "contract_permissive_count": 0,
+      "contract_strict_count": 0,
+      "date_utc": "2026-08-14",
+      "download": {
+        "bytes": 2971,
+        "local_raster_inspection": {
+          "bands": {
+            "1": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "2": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "3": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "4": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "5": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            }
+          },
+          "count": 5,
+          "crs": "EPSG:4326",
+          "driver": "GTiff",
+          "dtypes": [
+            "float64",
+            "float64",
+            "float64",
+            "float64",
+            "float64"
+          ],
+          "height": 59,
+          "nodata": null,
+          "status": "passed",
+          "transform": [
+            0.004491576420597608,
+            0.0,
+            51.08719020787719,
+            0.0,
+            -0.004491576420597608,
+            35.82930510710712,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "width": 116
+        },
+        "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/raw-gee-2026-08-12-to-18/rasters/VNP46A2_2026-08-14_raw_qa.tif",
+        "server_mask_note": "server-side raw count is zero; numeric zero pixels in this GeoTIFF are export fill values, not observations",
+        "server_raw_band_count": 0,
+        "sha256": "067300ebf974cf579dcf35338c1e707dab64f26f0776492240b1705c0720d0bb",
+        "status": "downloaded_all_masked"
+      },
+      "image_available": true,
+      "qa_Latest_High_Quality_Retrieval_value_counts": {
+        "null": 3089
+      },
+      "qa_Mandatory_Quality_Flag_value_counts": {
+        "null": 3089
+      },
+      "qa_QF_Cloud_Mask_value_counts": {
+        "null": 3089
+      },
+      "qa_Snow_Flag_value_counts": {
+        "null": 3089
+      },
+      "raw_availability": "image_present; raw_band_stats_may_be_all_masked",
+      "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_08_14",
+      "source_image_ids": [
+        "NASA/VIIRS/002/VNP46A2/2026_08_14"
+      ]
+    },
+    {
+      "DNB_BRDF_Corrected_NTL_count": 0,
+      "Latest_High_Quality_Retrieval_count": 0,
+      "Mandatory_Quality_Flag_count": 0,
+      "QF_Cloud_Mask_count": 0,
+      "Snow_Flag_count": 0,
+      "contract_base_count": 0,
+      "contract_permissive_count": 0,
+      "contract_strict_count": 0,
+      "date_utc": "2026-08-15",
+      "download": {
+        "bytes": 2971,
+        "local_raster_inspection": {
+          "bands": {
+            "1": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "2": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "3": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "4": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "5": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            }
+          },
+          "count": 5,
+          "crs": "EPSG:4326",
+          "driver": "GTiff",
+          "dtypes": [
+            "float64",
+            "float64",
+            "float64",
+            "float64",
+            "float64"
+          ],
+          "height": 59,
+          "nodata": null,
+          "status": "passed",
+          "transform": [
+            0.004491576420597608,
+            0.0,
+            51.08719020787719,
+            0.0,
+            -0.004491576420597608,
+            35.82930510710712,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "width": 116
+        },
+        "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/raw-gee-2026-08-12-to-18/rasters/VNP46A2_2026-08-15_raw_qa.tif",
+        "server_mask_note": "server-side raw count is zero; numeric zero pixels in this GeoTIFF are export fill values, not observations",
+        "server_raw_band_count": 0,
+        "sha256": "067300ebf974cf579dcf35338c1e707dab64f26f0776492240b1705c0720d0bb",
+        "status": "downloaded_all_masked"
+      },
+      "image_available": true,
+      "qa_Latest_High_Quality_Retrieval_value_counts": {
+        "null": 3089
+      },
+      "qa_Mandatory_Quality_Flag_value_counts": {
+        "null": 3089
+      },
+      "qa_QF_Cloud_Mask_value_counts": {
+        "null": 3089
+      },
+      "qa_Snow_Flag_value_counts": {
+        "null": 3089
+      },
+      "raw_availability": "image_present; raw_band_stats_may_be_all_masked",
+      "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_08_15",
+      "source_image_ids": [
+        "NASA/VIIRS/002/VNP46A2/2026_08_15"
+      ]
+    },
+    {
+      "DNB_BRDF_Corrected_NTL_count": 0,
+      "Latest_High_Quality_Retrieval_count": 0,
+      "Mandatory_Quality_Flag_count": 0,
+      "QF_Cloud_Mask_count": 0,
+      "Snow_Flag_count": 0,
+      "contract_base_count": 0,
+      "contract_permissive_count": 0,
+      "contract_strict_count": 0,
+      "date_utc": "2026-08-16",
+      "download": {
+        "bytes": 2971,
+        "local_raster_inspection": {
+          "bands": {
+            "1": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "2": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "3": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "4": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "5": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            }
+          },
+          "count": 5,
+          "crs": "EPSG:4326",
+          "driver": "GTiff",
+          "dtypes": [
+            "float64",
+            "float64",
+            "float64",
+            "float64",
+            "float64"
+          ],
+          "height": 59,
+          "nodata": null,
+          "status": "passed",
+          "transform": [
+            0.004491576420597608,
+            0.0,
+            51.08719020787719,
+            0.0,
+            -0.004491576420597608,
+            35.82930510710712,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "width": 116
+        },
+        "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/raw-gee-2026-08-12-to-18/rasters/VNP46A2_2026-08-16_raw_qa.tif",
+        "server_mask_note": "server-side raw count is zero; numeric zero pixels in this GeoTIFF are export fill values, not observations",
+        "server_raw_band_count": 0,
+        "sha256": "067300ebf974cf579dcf35338c1e707dab64f26f0776492240b1705c0720d0bb",
+        "status": "downloaded_all_masked"
+      },
+      "image_available": true,
+      "qa_Latest_High_Quality_Retrieval_value_counts": {
+        "null": 3089
+      },
+      "qa_Mandatory_Quality_Flag_value_counts": {
+        "null": 3089
+      },
+      "qa_QF_Cloud_Mask_value_counts": {
+        "null": 3089
+      },
+      "qa_Snow_Flag_value_counts": {
+        "null": 3089
+      },
+      "raw_availability": "image_present; raw_band_stats_may_be_all_masked",
+      "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_08_16",
+      "source_image_ids": [
+        "NASA/VIIRS/002/VNP46A2/2026_08_16"
+      ]
+    },
+    {
+      "DNB_BRDF_Corrected_NTL_count": 0,
+      "Latest_High_Quality_Retrieval_count": 0,
+      "Mandatory_Quality_Flag_count": 0,
+      "QF_Cloud_Mask_count": 0,
+      "Snow_Flag_count": 0,
+      "contract_base_count": 0,
+      "contract_permissive_count": 0,
+      "contract_strict_count": 0,
+      "date_utc": "2026-08-17",
+      "download": {
+        "bytes": 2971,
+        "local_raster_inspection": {
+          "bands": {
+            "1": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "2": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "3": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "4": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "5": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            }
+          },
+          "count": 5,
+          "crs": "EPSG:4326",
+          "driver": "GTiff",
+          "dtypes": [
+            "float64",
+            "float64",
+            "float64",
+            "float64",
+            "float64"
+          ],
+          "height": 59,
+          "nodata": null,
+          "status": "passed",
+          "transform": [
+            0.004491576420597608,
+            0.0,
+            51.08719020787719,
+            0.0,
+            -0.004491576420597608,
+            35.82930510710712,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "width": 116
+        },
+        "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/raw-gee-2026-08-12-to-18/rasters/VNP46A2_2026-08-17_raw_qa.tif",
+        "server_mask_note": "server-side raw count is zero; numeric zero pixels in this GeoTIFF are export fill values, not observations",
+        "server_raw_band_count": 0,
+        "sha256": "067300ebf974cf579dcf35338c1e707dab64f26f0776492240b1705c0720d0bb",
+        "status": "downloaded_all_masked"
+      },
+      "image_available": true,
+      "qa_Latest_High_Quality_Retrieval_value_counts": {
+        "null": 3089
+      },
+      "qa_Mandatory_Quality_Flag_value_counts": {
+        "null": 3089
+      },
+      "qa_QF_Cloud_Mask_value_counts": {
+        "null": 3089
+      },
+      "qa_Snow_Flag_value_counts": {
+        "null": 3089
+      },
+      "raw_availability": "image_present; raw_band_stats_may_be_all_masked",
+      "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_08_17",
+      "source_image_ids": [
+        "NASA/VIIRS/002/VNP46A2/2026_08_17"
+      ]
+    },
+    {
+      "DNB_BRDF_Corrected_NTL_count": 0,
+      "Latest_High_Quality_Retrieval_count": 0,
+      "Mandatory_Quality_Flag_count": 0,
+      "QF_Cloud_Mask_count": 0,
+      "Snow_Flag_count": 0,
+      "contract_base_count": 0,
+      "contract_permissive_count": 0,
+      "contract_strict_count": 0,
+      "date_utc": "2026-08-18",
+      "download": {
+        "bytes": 2971,
+        "local_raster_inspection": {
+          "bands": {
+            "1": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "2": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "3": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "4": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "5": {
+              "count": 6844,
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            }
+          },
+          "count": 5,
+          "crs": "EPSG:4326",
+          "driver": "GTiff",
+          "dtypes": [
+            "float64",
+            "float64",
+            "float64",
+            "float64",
+            "float64"
+          ],
+          "height": 59,
+          "nodata": null,
+          "status": "passed",
+          "transform": [
+            0.004491576420597608,
+            0.0,
+            51.08719020787719,
+            0.0,
+            -0.004491576420597608,
+            35.82930510710712,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "width": 116
+        },
+        "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/raw-gee-2026-08-12-to-18/rasters/VNP46A2_2026-08-18_raw_qa.tif",
+        "server_mask_note": "server-side raw count is zero; numeric zero pixels in this GeoTIFF are export fill values, not observations",
+        "server_raw_band_count": 0,
+        "sha256": "067300ebf974cf579dcf35338c1e707dab64f26f0776492240b1705c0720d0bb",
+        "status": "downloaded_all_masked"
+      },
+      "image_available": true,
+      "qa_Latest_High_Quality_Retrieval_value_counts": {
+        "null": 3089
+      },
+      "qa_Mandatory_Quality_Flag_value_counts": {
+        "null": 3089
+      },
+      "qa_QF_Cloud_Mask_value_counts": {
+        "null": 3089
+      },
+      "qa_Snow_Flag_value_counts": {
+        "null": 3089
+      },
+      "raw_availability": "image_present; raw_band_stats_may_be_all_masked",
+      "source_image_id": "NASA/VIIRS/002/VNP46A2/2026_08_18",
+      "source_image_ids": [
+        "NASA/VIIRS/002/VNP46A2/2026_08_18"
+      ]
+    }
+  ],
+  "download_summary": {
+    "dates_requested": 7,
+    "download_failed": 0,
+    "downloaded_all_masked": 6,
+    "downloaded_with_server_pixels": 1
+  },
+  "execution_notes": [
+    "An initial in-sandbox attempt could not access the existing Earth Engine credential store; the final query ran successfully in the approved credential context.",
+    "The live query result is retained separately from the pre-existing gee-chunk-2026-08.json because 2026-08-12 changed from zero to 2644 raw pixels between runs; no existing artifact was overwritten."
+  ],
+  "project_resolution_source": "easygee-settings",
+  "query": {
+    "aoi_path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/tehran-boundary.geojson",
+    "aoi_sha256": "66b65ad355fe607229f4e16dfce366e54d16ce81a2c208e63edbb0d838d7e02d",
+    "collection_id": "NASA/VIIRS/002/VNP46A2",
+    "crs": "EPSG:4326",
+    "date_end_inclusive_utc": "2026-08-18",
+    "date_start_inclusive_utc": "2026-08-12",
+    "filter_interval_utc": "[2026-08-12T00:00:00Z, 2026-08-19T00:00:00Z)",
+    "max_pixels": 10000000,
+    "primary_basis": "UTC product day",
+    "product_version": "002",
+    "qa_bands": [
+      "Mandatory_Quality_Flag",
+      "QF_Cloud_Mask",
+      "Snow_Flag",
+      "Latest_High_Quality_Retrieval"
+    ],
+    "qa_contract_reused": "Case 202 existing strict/permissive masks; no gap-filled band used",
+    "raw_band": "DNB_BRDF_Corrected_NTL",
+    "scale_m": 500,
+    "tile_scale": 2
+  },
+  "schema_version": "ntl.case202.gee-raw-supplement.v1",
+  "started_at_utc": "2026-08-21T09:00:35Z",
+  "status": "complete",
+  "validation": {
+    "all_expected_images_present": true,
+    "date_set_matches": true,
+    "expected_date_count": 7,
+    "raw_stats_retrieved_for_present_images": true,
+    "returned_date_count": 7
+  }
+}

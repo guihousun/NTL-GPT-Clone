@@ -1,0 +1,13 @@
+{
+  "error_count": 0,
+  "gate_status": "passed_with_warnings",
+  "return_code": 1,
+  "review_script": "local-user/.codex/plugins/cache/xujingchen1996-local/easygee/0.3.1/skills/easygee/scripts/review_ee_code.py",
+  "reviewed_at_utc": "2026-08-21T09:10:26Z",
+  "reviewed_file": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q19-tehran-city-longseries/extract_tehran_daily_vnp46a2.py",
+  "schema_version": "easygee.code-review.v1",
+  "stderr": "",
+  "stdout": "Earth Engine review: vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q19-tehran-city-longseries/extract_tehran_daily_vnp46a2.py\n[WARN] getinfo (line 339): Keep getInfo() calls tiny and diagnostic; export large results instead.\n  ee.FeatureCollection(feature_expressions).getInfo()\n[WARN] getinfo (line 436): Keep getInfo() calls tiny and diagnostic; export large results instead.\n  ee.Dictionary( { \"times_ms\": collection.aggregate_array(\"system:time_start\"), \"indices\": collection.aggregate_array(\"system:index\"), \"size\": collection.size(), } ).getInfo()\n[WARN] getinfo (line 688): Keep getInfo() calls tiny and diagnostic; export large results instead.\n  ee.Dictionary( { \"global_collection_size\": global_collection.size(), \"since_start_size\": since_start.size(), \"latest_time_ms\": latest_image.get(\"system:time_start\"), \"latest_index\"\n",
+  "strict": true,
+  "warning_count": 3
+}

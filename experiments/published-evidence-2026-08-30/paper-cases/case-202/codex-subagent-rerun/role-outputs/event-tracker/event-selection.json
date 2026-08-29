@@ -1,0 +1,486 @@
+{
+  "schema_version": "ntl.q19-event-selection-audit.v1",
+  "execution_identity": {
+    "role": "NTL_Event_Tracker",
+    "execution_context": "Codex-subagent simulation",
+    "not_deployed_ntl_gpt": true,
+    "no_live_query_performed": true
+  },
+  "case_id": "Q19-tehran-city-longseries",
+  "audit_generated_utc": "2026-08-17T12:53:46Z",
+  "claim": "City of Tehran is highest-ranked",
+  "verdict": "indeterminate",
+  "qualified_subset_verdict": "supported_on_exact_coordinate_subset",
+  "verdict_explanation": "City of Tehran ranks first among the 20 candidate ADM2 polygons for the exact-coordinate retained attack subset (142 of 248 assigned records; next candidate Tehran has 29). The unqualified complete-census claim is indeterminate because only 958 of 2702 retained attack records have valid exact coordinates and source city labels cannot replace polygon assignment.",
+  "aoi_contract": {
+    "target_shape_name": "City of Tehran",
+    "target_shape_id": "26516999B29761828880922",
+    "target_shape_type": "ADM2",
+    "target_semantics": "geoBoundaries ADM2 / canonical Shahrestan / source-named unit 'City of Tehran'; not asserted to be a municipality",
+    "candidate_feature_count": 20,
+    "candidate_source_sha256": "98386cd2ae02fed9f0c8d1f539b62ec3d020c056e2597218c5f2861742f88403"
+  },
+  "time_contract": {
+    "primary_time_basis": "UTC",
+    "ranking_start_date_inclusive": "2026-02-28",
+    "ranking_end_date_inclusive": "2026-04-21",
+    "ranking_filter_interval_utc": "[2026-02-28T00:00:00Z, 2026-04-22T00:00:00Z)",
+    "contract_baseline": "2026-01-01 through 2026-02-27 UTC",
+    "source_first_event_date_is_not_conflict_onset": true,
+    "date_only_rule": "event_date_utc is used as a source calendar date; nullable time_utc is not synthesized as a precise timestamp",
+    "window_summary": [
+      {
+        "window_id": "conflict_evaluation",
+        "start_date_inclusive": "2026-02-28",
+        "end_date_inclusive": "2026-04-07",
+        "source_rows": 2464,
+        "retained_attack_rows": 2388,
+        "retained_exact_coordinate_rows": 896,
+        "candidate_assigned_exact_rows": 242,
+        "target_city_assigned_exact_rows": 142
+      },
+      {
+        "window_id": "ceasefire_evaluation",
+        "start_date_inclusive": "2026-04-08",
+        "end_date_inclusive": "2026-04-21",
+        "source_rows": 318,
+        "retained_attack_rows": 314,
+        "retained_exact_coordinate_rows": 62,
+        "candidate_assigned_exact_rows": 6,
+        "target_city_assigned_exact_rows": 0
+      },
+      {
+        "window_id": "extended_monitoring_source_overlap",
+        "start_date_inclusive": "2026-04-22",
+        "end_date_inclusive": "2026-04-27",
+        "source_rows": 8,
+        "retained_attack_rows": 7,
+        "retained_exact_coordinate_rows": 3,
+        "candidate_assigned_exact_rows": 3,
+        "target_city_assigned_exact_rows": 0
+      },
+      {
+        "window_id": "contract_baseline",
+        "start_date_inclusive": "2026-01-01",
+        "end_date_inclusive": "2026-02-27",
+        "source_rows": 0,
+        "retained_attack_rows": 0,
+        "retained_exact_coordinate_rows": 0,
+        "candidate_assigned_exact_rows": 0,
+        "target_city_assigned_exact_rows": 0
+      }
+    ]
+  },
+  "event_source": {
+    "primary_local_input": {
+      "path": "vault/conflictntl/data/raw/events/source-events/ISW_storymap_events_2026-02-27_2026-04-27.csv",
+      "kind": "csv",
+      "exists": true,
+      "bytes": 1571856,
+      "sha256": "b469f0f073f7392f780604c2a1a9a9f933dddef1be99ba1f1efbb894a411cb13",
+      "rows": 2790
+    },
+    "source_metadata": {
+      "path": "vault/conflictntl/data/raw/events/source-events/ISW_storymap_events_2026-02-27_2026-04-27_metadata.json",
+      "kind": "json",
+      "exists": true,
+      "bytes": 1121,
+      "sha256": "ed865ab0f327d0acb257d914e01a022bd6c711fe8891253ea0457c44f293b056"
+    },
+    "per_layer_snapshots": [
+      {
+        "path": "vault/conflictntl/data/raw/events/storymap-snapshots/2026-05-13/combined_force_isw_storymap_events.csv",
+        "kind": "csv",
+        "exists": true,
+        "bytes": 803894,
+        "sha256": "7cf4065754dfbe5fec0fea7826df7666672a70b8e6888ec3c1f7c06d67170c88",
+        "rows": 1384
+      },
+      {
+        "path": "vault/conflictntl/data/raw/events/storymap-snapshots/2026-05-13/iran_axis_isw_storymap_events.csv",
+        "kind": "csv",
+        "exists": true,
+        "bytes": 770759,
+        "sha256": "c7827e79ae1e2479c8c01ad50248700960b7fcc4de3a44b521a0c86f4022bcb1",
+        "rows": 1490
+      }
+    ],
+    "snapshot_summary": {
+      "common_window_rows": 2790,
+      "common_window_metadata_records_all": 2874,
+      "common_window_metadata_records_filtered_common_window": 2790,
+      "common_window_first_event_date": "2026-02-28",
+      "common_window_last_event_date": "2026-04-27",
+      "snapshot_storymap_item_modified_utc": "2026-05-12T20:59:59Z",
+      "snapshot_pull_generated_utc": {
+        "combined_force_pull": "2026-05-13T02:14:11.589050Z",
+        "iran_axis_retry_pull": "2026-05-13T02:15:37.476350Z"
+      },
+      "combined_metadata_status": "partial",
+      "combined_metadata_raw_features": 1384,
+      "iran_metadata_status": "complete",
+      "iran_metadata_raw_features": 1490,
+      "source_layer_urls": {
+        "combined_force": "httplocal-path/0",
+        "iran_axis": "httplocal-path/0"
+      }
+    },
+    "fields_used": [
+      "event_family",
+      "objectid",
+      "event_id",
+      "event_date_utc",
+      "event_type",
+      "city",
+      "country",
+      "latitude",
+      "longitude",
+      "coord_type",
+      "source_1",
+      "source_2",
+      "sources"
+    ],
+    "deduplication_key": "(event_family, objectid); event_id is retained but is not unique in the snapshot"
+  },
+  "retention_rule": {
+    "included_event_types": [
+      "Anti-Tank Fire",
+      "Confirmed Airstrike",
+      "Direct Engagement",
+      "Drone & Missile Attack",
+      "Drone & Rocket Attack",
+      "Drone Attack",
+      "Missile Attack",
+      "Mortar Attack",
+      "Report of Explosion with Footage",
+      "Reported Airstrike",
+      "Rocket Attack"
+    ],
+    "excluded_event_type_examples": [
+      "unknown",
+      "Air Defense Activity",
+      "Evac Notice",
+      "Other (see note)"
+    ],
+    "require_exact_coordinate": true,
+    "valid_coordinate_bounds": "latitude [-90,90], longitude [-180,180]",
+    "retained_counts": {
+      "source_rows": 2790,
+      "window_rows": 2782,
+      "retained_attack_rows": 2702,
+      "retained_exact_attack_rows": 958,
+      "nonexact_or_invalid_retained_rows": 1744,
+      "candidate_assigned_exact_attack_rows": 248,
+      "exact_rows_outside_candidate_set": 710
+    },
+    "quality_percentages": {
+      "exact_of_retained_attack_percent": 35.455,
+      "candidate_assigned_of_exact_percent": 25.887,
+      "target_share_of_candidate_assigned_percent": 57.258
+    }
+  },
+  "spatial_rule": {
+    "coordinate_order": "GeoJSON/Point(longitude, latitude), CRS84/EPSG:4326",
+    "predicate": "candidate polygon covers point; boundary points included",
+    "no_nearest_assignment": true,
+    "overlapping_candidate_polygon_pairs_with_positive_area": [],
+    "candidate_geometry_validation": {
+      "feature_count": 20,
+      "all_nonempty_valid": true,
+      "target_feature_count": 1
+    }
+  },
+  "ranking": {
+    "csv": "vault/ntl-gpt/experiments/paper-case-codex-subagent-rerun-2026-08-17/role-outputs/event-tracker/city-ranking.csv",
+    "top_candidate": {
+      "rank": 1,
+      "shape_name": "City of Tehran",
+      "assigned_exact_attack_records": 142,
+      "shape_id": "26516999B29761828880922"
+    },
+    "target_rank": 1,
+    "target_assigned_count": 142,
+    "all_candidates": [
+      {
+        "rank": 1,
+        "shape_name": "City of Tehran",
+        "assigned_exact_attack_records": 142,
+        "shape_id": "26516999B29761828880922"
+      },
+      {
+        "rank": 2,
+        "shape_name": "Tehran",
+        "assigned_exact_attack_records": 29,
+        "shape_id": "26516999B12442173705609"
+      },
+      {
+        "rank": 3,
+        "shape_name": "Karaj",
+        "assigned_exact_attack_records": 18,
+        "shape_id": "26516999B84495228881975"
+      },
+      {
+        "rank": 4,
+        "shape_name": "Pakdasht",
+        "assigned_exact_attack_records": 11,
+        "shape_id": "26516999B29825516258970"
+      },
+      {
+        "rank": 5,
+        "shape_name": "Rey",
+        "assigned_exact_attack_records": 10,
+        "shape_id": "26516999B97503362604777"
+      },
+      {
+        "rank": 6,
+        "shape_name": "Malard",
+        "assigned_exact_attack_records": 6,
+        "shape_id": "26516999B72896925290367"
+      },
+      {
+        "rank": 6,
+        "shape_name": "Paveh",
+        "assigned_exact_attack_records": 6,
+        "shape_id": "26516999B30802534166857"
+      },
+      {
+        "rank": 8,
+        "shape_name": "Savojbolagh",
+        "assigned_exact_attack_records": 5,
+        "shape_id": "26516999B18640438628843"
+      },
+      {
+        "rank": 9,
+        "shape_name": "Shahriar",
+        "assigned_exact_attack_records": 4,
+        "shape_id": "26516999B66540867756489"
+      },
+      {
+        "rank": 9,
+        "shape_name": "Qods",
+        "assigned_exact_attack_records": 4,
+        "shape_id": "26516999B5684873266134"
+      },
+      {
+        "rank": 9,
+        "shape_name": "Shahariar",
+        "assigned_exact_attack_records": 4,
+        "shape_id": "26516999B31487954135890"
+      },
+      {
+        "rank": 12,
+        "shape_name": "Islamshahr",
+        "assigned_exact_attack_records": 3,
+        "shape_id": "26516999B27698470337483"
+      },
+      {
+        "rank": 13,
+        "shape_name": "Robatkarim",
+        "assigned_exact_attack_records": 2,
+        "shape_id": "26516999B89814030456652"
+      },
+      {
+        "rank": 14,
+        "shape_name": "Damavand",
+        "assigned_exact_attack_records": 1,
+        "shape_id": "26516999B19088359236830"
+      },
+      {
+        "rank": 14,
+        "shape_name": "Shemiranat",
+        "assigned_exact_attack_records": 1,
+        "shape_id": "26516999B22518076976615"
+      },
+      {
+        "rank": 14,
+        "shape_name": "Gharchak",
+        "assigned_exact_attack_records": 1,
+        "shape_id": "26516999B60688920539787"
+      },
+      {
+        "rank": 14,
+        "shape_name": "Varamin",
+        "assigned_exact_attack_records": 1,
+        "shape_id": "26516999B88410465027536"
+      },
+      {
+        "rank": 18,
+        "shape_name": "Amol",
+        "assigned_exact_attack_records": 0,
+        "shape_id": "26516999B614175773337"
+      },
+      {
+        "rank": 18,
+        "shape_name": "Baharestan",
+        "assigned_exact_attack_records": 0,
+        "shape_id": "26516999B32274164067447"
+      },
+      {
+        "rank": 18,
+        "shape_name": "Zarandieh",
+        "assigned_exact_attack_records": 0,
+        "shape_id": "26516999B1107707028024"
+      }
+    ]
+  },
+  "sensitivity": {
+    "primary_known_attack_types": {
+      "eligible_exact_rows": 958,
+      "candidate_assigned_rows": 248,
+      "target_count": 142,
+      "target_rank": 1,
+      "top_candidate": {
+        "rank": 1,
+        "shape_name": "City of Tehran",
+        "assigned_count": 142
+      }
+    },
+    "combined_force_airstrike_types_only": {
+      "eligible_exact_rows": 669,
+      "candidate_assigned_rows": 248,
+      "target_count": 142,
+      "target_rank": 1,
+      "top_candidate": {
+        "rank": 1,
+        "shape_name": "City of Tehran",
+        "assigned_count": 142
+      }
+    },
+    "all_exact_event_types_in_window": {
+      "eligible_exact_rows": 984,
+      "candidate_assigned_rows": 250,
+      "target_count": 143,
+      "target_rank": 1,
+      "top_candidate": {
+        "rank": 1,
+        "shape_name": "City of Tehran",
+        "assigned_count": 143
+      }
+    }
+  },
+  "source_city_label_diagnostic": {
+    "matching_candidate_labels_all_retained": {
+      "Tehran": 418,
+      "Damavand": 3,
+      "Rey": 3,
+      "Karaj": 28,
+      "Paveh": 2,
+      "Shahriar": 4,
+      "Malard": 1,
+      "Pakdasht": 1,
+      "Varamin": 4,
+      "Qods": 1,
+      "Baharestan": 2
+    },
+    "matching_candidate_labels_nonexact": {
+      "Tehran": 237,
+      "Rey": 1,
+      "Karaj": 13,
+      "Paveh": 1,
+      "Damavand": 2,
+      "Malard": 1,
+      "Pakdasht": 1,
+      "Varamin": 2,
+      "Shahriar": 3,
+      "Baharestan": 2
+    },
+    "diagnostic_only_not_used_for_assignment": true
+  },
+  "timeline_semantics": {
+    "source_context_as_of_utc": "2026-08-13T16:39:54Z",
+    "source_context_artifact": {
+      "path": "vault/ntl-gpt/experiments/paper-case-multiagent-2026-08-13/Q19-tehran-city-longseries/event-context.json",
+      "kind": "json",
+      "exists": true,
+      "bytes": 14234,
+      "sha256": "cadddb09b500f020bdf9a26a9429f9d0378dc4c1e699a3e0c6dd9d691543e3ce"
+    },
+    "formal_marker_recommendation": {
+      "formal_markers": [
+        {
+          "date": "2026-04-21",
+          "date_precision": "date-only",
+          "label": "Ceasefire extension announced",
+          "sources": [
+            "S02",
+            "S03"
+          ]
+        },
+        {
+          "date": "2026-06-17",
+          "date_precision": "date-only",
+          "label": "Islamabad MoU signed",
+          "sources": [
+            "S04",
+            "S05"
+          ]
+        },
+        {
+          "date": "2026-07-07",
+          "date_precision": "date-only",
+          "label": "Renewed hostilities (U.S. notice)",
+          "sources": [
+            "S06",
+            "S07"
+          ]
+        }
+      ],
+      "background_marker": {
+        "date": "2026-04-08",
+        "date_precision": "date-only",
+        "label": "Initial two-week ceasefire announced",
+        "sources": [
+          "S01"
+        ]
+      },
+      "caption_note": "April 8–21 is the fixed ConflictNTL ceasefire evaluation window. April 21 marks the U.S. extension announcement; the UN welcomed it on April 22. The post-April 21 span contains intermittent hostilities and later renewed military action and is not represented as a uniform ceasefire, recovery, or peace phase."
+    },
+    "source_conflicts": [
+      {
+        "conflict_id": "C01",
+        "issue": "Ceasefire extension marker date",
+        "records": [
+          "AP dates the U.S. extension announcement to April 21.",
+          "The UN note welcoming the announcement is dated April 22."
+        ],
+        "resolution": "Use April 21 for the decision/announcement marker. Retain April 22 as an institutional reporting date in provenance. Do not label either date as the ceasefire ending."
+      },
+      {
+        "conflict_id": "C02",
+        "issue": "Whether April 22 onward is one ceasefire phase",
+        "records": [
+          "The ceasefire was extended, but high-quality sources report intermittent fire and later escalations.",
+          "The June 17 MoU and July 7 renewed military action are separate anchors."
+        ],
+        "resolution": "Treat April 22 onward as an extended monitoring span with event markers, not a homogeneous ceasefire/recovery/peace period."
+      },
+      {
+        "conflict_id": "C03",
+        "issue": "Renewed-hostilities date versus reporting date",
+        "records": [
+          "The U.S. notice characterizes July 7 as the resumption date.",
+          "The UN report is dated July 8 and describes renewed attacks in the preceding two days."
+        ],
+        "resolution": "Use July 7 as the conservative event marker and describe July 8 as the UN reporting date. This does not resolve contested legal characterizations of responsibility."
+      }
+    ],
+    "critical_rule": "2026-04-22 is an institutional reporting date for the ceasefire extension, not evidence that the ceasefire ended",
+    "post_2026_04_22_semantics": "extended monitoring span, not a homogeneous ceasefire, recovery, or peace phase",
+    "historical_context_window_note": "The old Q19 event-context artifact used 2026-02-14 as its preconflict start; the rerun contract sets the baseline to 2026-01-01 through 2026-02-27. The ranking uses the rerun contract's Feb 28-Apr 21 union."
+  },
+  "auxiliary_map_context": {
+    "display_only_exact_airstrike_layer": {
+      "path": "vault/ntl-gpt/deliverables/figure-drafts/ntl-gpt-case-figures-unified-2026-08-17-v9-formal-25km-50km/assets/map-sources/tehran-isw-exact-airstrikes-v7.geojson",
+      "kind": "geojson",
+      "exists": true,
+      "bytes": 238965,
+      "sha256": "8a0d81e5b9087b41cf8f3aab8d9913213531a57d6a888bee13059c452714d247",
+      "features": 200
+    },
+    "display_only_point_count": 200,
+    "display_provenance_generated_utc": "2026-08-17T12:04:31.097715+00:00",
+    "not_used_for_ranking": true,
+    "reason": "The 200-point layer is a display/context derivative of the combined-force layer, not the complete dated dual-layer event census."
+  },
+  "limitations_reference": "limitations.md"
+}

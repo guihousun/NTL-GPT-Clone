@@ -1,0 +1,83 @@
+{
+  "schema_version": "ntl.case202.august-live-refresh.v1",
+  "case_id": "Case202-tehran-latest-vnp46a2",
+  "status": "passed",
+  "refreshed_at_utc": "2026-08-21T09:10:26Z",
+  "source": "Live GEE re-query through the accepted Q19 reducer and the frozen Case 202 QA contract.",
+  "project_resolution_source": "easygee-settings",
+  "date_scope_utc": [
+    "2026-08-12",
+    "2026-08-13",
+    "2026-08-14",
+    "2026-08-15",
+    "2026-08-16",
+    "2026-08-17",
+    "2026-08-18"
+  ],
+  "backup_hashes": {
+    "gee-chunk-2026-08.json": "dc269a921fe80c580bc8a0171581707aa43417488a4d33107c21c5f183756b99",
+    "daily-vnp46a2.csv": "bf89877f61dd3d87391b6eb046f7cb0d1a4c2cda5ef045f52ba60f11cceda5e3",
+    "daily-vnp46a2-raw.jsonl": "55b2a006ff63c635849b95e22248652d13f4fd7fed4dbef0f0d84af440582cbc",
+    "gee-checkpoint.json": "f3757a413f70a1fd70a4fa72db68f8002f74f3e7ec10a583eee57dd1d3555500",
+    "observation-package.json": "7235f51a9e67e3e3ee2a98697551d7c89829c0b79524b755dffda038da553cc2",
+    "gee-code-review.json": "d4403c73f3dc0271bb41f57b22ce1ca62a6ccbd81fe18be31b1707f0f6ea09f1"
+  },
+  "raw_supplement": {
+    "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/raw-gee-2026-08-12-to-18/gee-raw-aug12-18.json",
+    "sha256": "c386ba7b60aa6936dd966c3f0eb4c2e8e9cdf816bd1d9f19f682be2d2263cb02"
+  },
+  "updated_chunk": {
+    "path": "vault/ntl-gpt/experiments/case-202-tehran-latest-vnp46a2-2026-08-21/gee-chunk-2026-08.json",
+    "sha256": "0d58926d08a87fcd5416cba3c4f0ae90c983994bf7fa3065a421c686eba68482"
+  },
+  "rebuild": {
+    "daily_csv_sha256": "d3ffaced57456e69b08f644d4f326281302e723fe2d13502b6370e9a7be6b78e",
+    "daily_raw_jsonl_sha256": "f4dca756721930c7336626026938571031569793e5c41dbb706d242fe5f176dd",
+    "observation_package_sha256": "6c248ad4f6e86d10a3778e6bb7ff8404017048d77bf378963f9b4dcc91b509e0",
+    "gee_checkpoint_sha256": "51b3e90fb9445117cad0265036bd2ea4a1a6dcb76fa4af0dde1aa780107eacbc",
+    "full_run_status": "complete"
+  },
+  "latest_collection_image_date_utc": "2026-08-19",
+  "latest_strict_qualified_date_utc": "2026-08-12",
+  "august_12": {
+    "strict_mean": 59.868755595489105,
+    "strict_valid_count": 2644,
+    "strict_total_count": 2644,
+    "permissive_mean": 59.868755595489105,
+    "permissive_valid_count": 2644,
+    "permissive_total_count": 2644
+  },
+  "august_13_to_18": [
+    {
+      "date_utc": "2026-08-13",
+      "strict_qualified": "false",
+      "permissive_qualified": "false"
+    },
+    {
+      "date_utc": "2026-08-14",
+      "strict_qualified": "false",
+      "permissive_qualified": "false"
+    },
+    {
+      "date_utc": "2026-08-15",
+      "strict_qualified": "false",
+      "permissive_qualified": "false"
+    },
+    {
+      "date_utc": "2026-08-16",
+      "strict_qualified": "false",
+      "permissive_qualified": "false"
+    },
+    {
+      "date_utc": "2026-08-17",
+      "strict_qualified": "false",
+      "permissive_qualified": "false"
+    },
+    {
+      "date_utc": "2026-08-18",
+      "strict_qualified": "false",
+      "permissive_qualified": "false"
+    }
+  ],
+  "interpretation": "12 August is a newly refreshed valid observation. Products remain present through the current GEE endpoint, but 13--18 August have no retained daily value under the unchanged quality contract and remain explicit gaps; no interpolation or gap-filled band was used."
+}

@@ -1,0 +1,237 @@
+{
+  "case_id": "CASE-201",
+  "contract": {
+    "baseline_utc_window": [
+      "2025-03-21",
+      "2025-03-27"
+    ],
+    "exact_first_night_interpreted_local_date": "2025-03-29",
+    "exact_first_night_utc_product_date": "2025-03-28",
+    "fallback_rule": "If exact UTC 2025-03-28 is not qualified, report no_eligible_first_night_observation; do not substitute UTC 2025-03-29.",
+    "percent_change_formula": "100 * (exact_first_night_mean - baseline_mean) / baseline_mean",
+    "qualified_daily_mean_rule": "Use the formal CSV's strict-QA daily mean only when the radiance mean is present and qa_valid_pixel_count > 0; exclude blank/zero-valid rows."
+  },
+  "decision": {
+    "exact_2025_03_28_eligible_for_25km": true,
+    "exact_2025_03_28_eligible_for_50km": true,
+    "runtime_or_benchmark_claim": false,
+    "target_25km_percent_change": true,
+    "target_50km_percent_change": true
+  },
+  "input": {
+    "reader": "Python standard-library csv.DictReader",
+    "relative_path": "experiments/paper-case-multiagent-2026-08-13/Q18-myanmar-earthquake/formal-25km-50km-20260817/formal-q18-analysis-ready.csv",
+    "row_count": 32,
+    "sha256": "3c6777a41aa074a1357d25938120b026ab9cd7afa86bea3f419fbde64ce9d554"
+  },
+  "role": "NTL Analyst independent crosscheck",
+  "schema": "case-201.analyst-crosscheck.v1",
+  "supports": {
+    "25": {
+      "baseline": {
+        "daily_observations": [
+          {
+            "aoi_pixel_count": 9895,
+            "interpreted_local_night_date_asia_yangon": "2025-03-22",
+            "qa_valid_fraction": 0.782920667,
+            "qa_valid_pixel_count": 7747,
+            "qualified": true,
+            "radiance_mean_nw_cm2_sr": 1.4809058074,
+            "utc_product_date": "2025-03-21"
+          },
+          {
+            "aoi_pixel_count": 9895,
+            "interpreted_local_night_date_asia_yangon": "2025-03-23",
+            "qa_valid_fraction": 0.9915108641,
+            "qa_valid_pixel_count": 9811,
+            "qualified": true,
+            "radiance_mean_nw_cm2_sr": 1.9020090729,
+            "utc_product_date": "2025-03-22"
+          },
+          {
+            "aoi_pixel_count": 9895,
+            "interpreted_local_night_date_asia_yangon": "2025-03-24",
+            "qa_valid_fraction": 0.0,
+            "qa_valid_pixel_count": 0,
+            "qualified": false,
+            "radiance_mean_nw_cm2_sr": null,
+            "utc_product_date": "2025-03-23"
+          },
+          {
+            "aoi_pixel_count": 9895,
+            "interpreted_local_night_date_asia_yangon": "2025-03-25",
+            "qa_valid_fraction": 0.836988378,
+            "qa_valid_pixel_count": 8282,
+            "qualified": true,
+            "radiance_mean_nw_cm2_sr": 1.0916849007,
+            "utc_product_date": "2025-03-24"
+          },
+          {
+            "aoi_pixel_count": 9895,
+            "interpreted_local_night_date_asia_yangon": "2025-03-26",
+            "qa_valid_fraction": 0.9817079333,
+            "qa_valid_pixel_count": 9714,
+            "qualified": true,
+            "radiance_mean_nw_cm2_sr": 1.3461674395,
+            "utc_product_date": "2025-03-25"
+          },
+          {
+            "aoi_pixel_count": 9895,
+            "interpreted_local_night_date_asia_yangon": "2025-03-27",
+            "qa_valid_fraction": 0.9782718545,
+            "qa_valid_pixel_count": 9680,
+            "qualified": true,
+            "radiance_mean_nw_cm2_sr": 1.4497665392,
+            "utc_product_date": "2025-03-26"
+          },
+          {
+            "aoi_pixel_count": 9895,
+            "interpreted_local_night_date_asia_yangon": "2025-03-28",
+            "qa_valid_fraction": 0.9983830217,
+            "qa_valid_pixel_count": 9879,
+            "qualified": true,
+            "radiance_mean_nw_cm2_sr": 1.624698869,
+            "utc_product_date": "2025-03-27"
+          }
+        ],
+        "daily_rows_in_window": 7,
+        "excluded_unqualified_daily_n": 1,
+        "mean_of_qualified_daily_means_nw_cm2_sr": 1.4825387715,
+        "qualified_daily_mean_n": 6,
+        "utc_product_window": [
+          "2025-03-21",
+          "2025-03-27"
+        ]
+      },
+      "comparison": {
+        "absolute_difference_nw_cm2_sr": -0.4390262595,
+        "baseline_mean_nw_cm2_sr": 1.4825387715,
+        "exact_first_night_mean_nw_cm2_sr": 1.043512512,
+        "expected_percent_change": -29.61,
+        "percent_change_vs_baseline": -29.613138485,
+        "target_match_within_tolerance": true,
+        "tolerance_percentage_points": 0.01
+      },
+      "exact_first_night": {
+        "eligible": true,
+        "fallback_rule": "If the exact UTC 2025-03-28 row is not qualified, report no_eligible_first_night_observation; do not substitute UTC 2025-03-29.",
+        "interpreted_local_night_date_asia_yangon": "2025-03-29",
+        "no_later_product_date_fallback": true,
+        "observation": {
+          "aoi_pixel_count": 9895,
+          "interpreted_local_night_date_asia_yangon": "2025-03-29",
+          "qa_valid_fraction": 0.9906013138,
+          "qa_valid_pixel_count": 9802,
+          "qualified": true,
+          "radiance_mean_nw_cm2_sr": 1.043512512,
+          "utc_product_date": "2025-03-28"
+        },
+        "utc_product_date": "2025-03-28"
+      },
+      "support_km": 25
+    },
+    "50": {
+      "baseline": {
+        "daily_observations": [
+          {
+            "aoi_pixel_count": 39575,
+            "interpreted_local_night_date_asia_yangon": "2025-03-22",
+            "qa_valid_fraction": 0.7526216045,
+            "qa_valid_pixel_count": 29785,
+            "qualified": true,
+            "radiance_mean_nw_cm2_sr": 0.8630309633,
+            "utc_product_date": "2025-03-21"
+          },
+          {
+            "aoi_pixel_count": 39575,
+            "interpreted_local_night_date_asia_yangon": "2025-03-23",
+            "qa_valid_fraction": 0.9404169299,
+            "qa_valid_pixel_count": 37217,
+            "qualified": true,
+            "radiance_mean_nw_cm2_sr": 1.1978076302,
+            "utc_product_date": "2025-03-22"
+          },
+          {
+            "aoi_pixel_count": 39575,
+            "interpreted_local_night_date_asia_yangon": "2025-03-24",
+            "qa_valid_fraction": 0.0582943778,
+            "qa_valid_pixel_count": 2307,
+            "qualified": true,
+            "radiance_mean_nw_cm2_sr": 0.5706632864,
+            "utc_product_date": "2025-03-23"
+          },
+          {
+            "aoi_pixel_count": 39575,
+            "interpreted_local_night_date_asia_yangon": "2025-03-25",
+            "qa_valid_fraction": 0.7438787113,
+            "qa_valid_pixel_count": 29439,
+            "qualified": true,
+            "radiance_mean_nw_cm2_sr": 0.7369566927,
+            "utc_product_date": "2025-03-24"
+          },
+          {
+            "aoi_pixel_count": 39575,
+            "interpreted_local_night_date_asia_yangon": "2025-03-26",
+            "qa_valid_fraction": 0.971269741,
+            "qa_valid_pixel_count": 38438,
+            "qualified": true,
+            "radiance_mean_nw_cm2_sr": 0.6751063323,
+            "utc_product_date": "2025-03-25"
+          },
+          {
+            "aoi_pixel_count": 39575,
+            "interpreted_local_night_date_asia_yangon": "2025-03-27",
+            "qa_valid_fraction": 0.9833480733,
+            "qa_valid_pixel_count": 38916,
+            "qualified": true,
+            "radiance_mean_nw_cm2_sr": 0.8133710744,
+            "utc_product_date": "2025-03-26"
+          },
+          {
+            "aoi_pixel_count": 39575,
+            "interpreted_local_night_date_asia_yangon": "2025-03-28",
+            "qa_valid_fraction": 0.9982312066,
+            "qa_valid_pixel_count": 39505,
+            "qualified": true,
+            "radiance_mean_nw_cm2_sr": 0.9798039961,
+            "utc_product_date": "2025-03-27"
+          }
+        ],
+        "daily_rows_in_window": 7,
+        "excluded_unqualified_daily_n": 0,
+        "mean_of_qualified_daily_means_nw_cm2_sr": 0.8338199965,
+        "qualified_daily_mean_n": 7,
+        "utc_product_window": [
+          "2025-03-21",
+          "2025-03-27"
+        ]
+      },
+      "comparison": {
+        "absolute_difference_nw_cm2_sr": 0.0410312775,
+        "baseline_mean_nw_cm2_sr": 0.8338199965,
+        "exact_first_night_mean_nw_cm2_sr": 0.874851274,
+        "expected_percent_change": 4.92,
+        "percent_change_vs_baseline": 4.9208795269,
+        "target_match_within_tolerance": true,
+        "tolerance_percentage_points": 0.01
+      },
+      "exact_first_night": {
+        "eligible": true,
+        "fallback_rule": "If the exact UTC 2025-03-28 row is not qualified, report no_eligible_first_night_observation; do not substitute UTC 2025-03-29.",
+        "interpreted_local_night_date_asia_yangon": "2025-03-29",
+        "no_later_product_date_fallback": true,
+        "observation": {
+          "aoi_pixel_count": 39575,
+          "interpreted_local_night_date_asia_yangon": "2025-03-29",
+          "qa_valid_fraction": 0.993809223,
+          "qa_valid_pixel_count": 39330,
+          "qualified": true,
+          "radiance_mean_nw_cm2_sr": 0.874851274,
+          "utc_product_date": "2025-03-28"
+        },
+        "utc_product_date": "2025-03-28"
+      },
+      "support_km": 50
+    }
+  }
+}

@@ -1,0 +1,412 @@
+[
+  {
+    "skill_id": "code-execution-validation",
+    "description": "Apply the Analyst's internal Geo-CodeCoT lifecycle to v2 scripts, execution, artifacts, validation, and one bounded technical repair.",
+    "path": ".ntl-gpt/skills/analyst/code-execution-validation/SKILL.md",
+    "sha256": "12164672bdf935a5057841e9ddb576545dcbff208830b660c8affcaf26e1a9dd",
+    "runtime_status": "role-loaded",
+    "full_roles": [
+      "NTL Analyst"
+    ],
+    "single_agent": true,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "event-window-analysis",
+    "description": "Analyze accepted pre-event, event, and post-event nighttime-light windows while preserving temporal and non-attribution limits.",
+    "path": ".ntl-gpt/skills/analyst/event-window-analysis/SKILL.md",
+    "sha256": "c1a6edaf51c86bdf0ebcb598ec2cd3fd6feb375aa540db6c0da0add499dbda1f",
+    "runtime_status": "role-loaded",
+    "full_roles": [
+      "NTL Analyst"
+    ],
+    "single_agent": true,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "geospatial-visualization",
+    "description": "Generate evidence-linked nighttime-light maps and charts from validated analysis outputs without overstating visual patterns.",
+    "path": ".ntl-gpt/skills/analyst/geospatial-visualization/SKILL.md",
+    "sha256": "968a05d726ed978fd94a71baddc4d4e2ed6f32ed53f34f645848a7a44b3161dd",
+    "runtime_status": "role-loaded",
+    "full_roles": [
+      "NTL Analyst"
+    ],
+    "single_agent": true,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "ntl-statistics-and-time-series",
+    "description": "Execute task-specific nighttime-light statistics, time-series, trend, anomaly, and comparison workflows on accepted observations.",
+    "path": ".ntl-gpt/skills/analyst/ntl-statistics-and-time-series/SKILL.md",
+    "sha256": "9e5185689c7247cc23c9021ea4ce39e0d79f3e67895b97019b7c20b9100b5229",
+    "runtime_status": "role-loaded",
+    "full_roles": [
+      "NTL Analyst"
+    ],
+    "single_agent": true,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "thematic-modeling",
+    "description": "Execute assigned urban, classification, regression, indicator, and other thematic nighttime-light models with reproducible validation.",
+    "path": ".ntl-gpt/skills/analyst/thematic-modeling/SKILL.md",
+    "sha256": "5cf7385622ca9784a28cec6809785bf05e99969fd4610c6935b0bcdf731284c1",
+    "runtime_status": "role-loaded",
+    "full_roles": [
+      "NTL Analyst"
+    ],
+    "single_agent": true,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "code-generation-execution-loop",
+    "description": "Use when handling Engineer-owned geospatial scripts with contract-v2 preflight, direct execution, optional independent review, output validation, and bounded repair.",
+    "path": ".ntl-gpt/skills/code-generation-execution-loop/SKILL.md",
+    "sha256": "2af0f57eef07b026c51219fa7715507abb1ffe928e24aa7bb3dd66f94afb98f3",
+    "runtime_status": "repository skill; not role-loaded",
+    "full_roles": [],
+    "single_agent": false,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "architecture-and-capability-map",
+    "description": "Shared runtime memory for the four-role NTL-GPT routing and capability boundaries.",
+    "path": ".ntl-gpt/skills/common/architecture-and-capability-map/SKILL.md",
+    "sha256": "d824ebd24dddf0d91c0abcbb2d1ada0374f67d7558994e4f8a933d8c66477c05",
+    "runtime_status": "role-loaded",
+    "full_roles": [
+      "NTL Engineer",
+      "NTL Data Searcher",
+      "NTL Analyst",
+      "NTL Event Tracker"
+    ],
+    "single_agent": true,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "disaster-event-observation-workflow",
+    "description": "Route disaster, outage, accident, and recovery requests from source-bounded event facts through observation selection and bounded nighttime-light analysis. Use when a task needs an event time, event AOI, quality-screened observations, or event-window comparison.",
+    "path": ".ntl-gpt/skills/common/disaster-event-observation-workflow/SKILL.md",
+    "sha256": "590cf82721ce8eacc333608e0442d2a24390cdd2f47014d9b840846cf7f53f12",
+    "runtime_status": "role-loaded",
+    "full_roles": [
+      "NTL Engineer",
+      "NTL Data Searcher",
+      "NTL Analyst",
+      "NTL Event Tracker"
+    ],
+    "single_agent": true,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "provenance-and-evidence-boundary",
+    "description": "Preserve source provenance, temporal scope, uncertainty, and non-attribution boundaries across NTL-GPT roles.",
+    "path": ".ntl-gpt/skills/common/provenance-and-evidence-boundary/SKILL.md",
+    "sha256": "a3e32404ce07c62c2c4aa741bb0832d73544d697405d6a953354169adef948ae",
+    "runtime_status": "role-loaded",
+    "full_roles": [
+      "NTL Engineer",
+      "NTL Data Searcher",
+      "NTL Analyst",
+      "NTL Event Tracker"
+    ],
+    "single_agent": true,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "structured-handoff",
+    "description": "Choose between a typed NTL-GPT scientific package and a concise native summary for Engineer-specialist handoffs.",
+    "path": ".ntl-gpt/skills/common/structured-handoff/SKILL.md",
+    "sha256": "3a26b0a136733dca540121cb0d4a49fa1e7ff8db9339e3a773e026930c2003f5",
+    "runtime_status": "role-loaded",
+    "full_roles": [
+      "NTL Engineer",
+      "NTL Data Searcher",
+      "NTL Analyst",
+      "NTL Event Tracker"
+    ],
+    "single_agent": true,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "workspace-and-artifact-contract",
+    "description": "Enforce the isolated NTL-GPT workspace, artifact paths, manifests, and checksum rules shared by all four roles.",
+    "path": ".ntl-gpt/skills/common/workspace-and-artifact-contract/SKILL.md",
+    "sha256": "5298ff52e97f7435dd141b0bf5435b7c9f169fa5efd1dbab4acdd418b60a2eec",
+    "runtime_status": "role-loaded",
+    "full_roles": [
+      "NTL Engineer",
+      "NTL Data Searcher",
+      "NTL Analyst",
+      "NTL Event Tracker"
+    ],
+    "single_agent": true,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "conflict-city-ntl-analysis",
+    "description": "Use when a task asks NTL-GPT to retrieve an authorized structured conflict-event source, rank the cities with the most retrieved attack records in Iran and Israel (including all ties), and compare pre/post nighttime light. This workflow is source-gated, traceable, does not use QGIS MCP, and never treats NTL change as proof of damage or causation.",
+    "path": ".ntl-gpt/skills/conflict-city-ntl-analysis/SKILL.md",
+    "sha256": "318a038995ea6e0d2dd945371d3b5d4cf9f159ddbe949fbd27e211246a6f83ea",
+    "runtime_status": "repository skill; not role-loaded",
+    "full_roles": [],
+    "single_agent": false,
+    "case_evidence_note": "Manually used in the Codex-subagent conflict case evidence; not auto-loaded by current role_specs.py."
+  },
+  {
+    "skill_id": "conflict-ntl-workflow",
+    "description": "Use for conflict, war, strike, outage, infrastructure attack, refinery, port, airport, power-grid, thermal-anomaly, or other conflict-related event chains that need nighttime-light verification. This skill is not wired into OpenClaw routing by itself.",
+    "path": ".ntl-gpt/skills/conflict-ntl-workflow/SKILL.md",
+    "sha256": "561e3e8084086d99728ba3419665c290725a6682b0909343e6ee60b3fd216b55",
+    "runtime_status": "repository skill; not role-loaded",
+    "full_roles": [],
+    "single_agent": false,
+    "case_evidence_note": "Manually used in the Codex-subagent conflict case evidence; not auto-loaded by current role_specs.py."
+  },
+  {
+    "skill_id": "analysis-ready-preprocessing",
+    "description": "Apply accepted standard preprocessing and reusable fixed-formula features to produce a validated ObservationPackage.",
+    "path": ".ntl-gpt/skills/data_searcher/analysis-ready-preprocessing/SKILL.md",
+    "sha256": "8f58b99973066aea88ee8645d70ac1507affbb0fc2d2f5f23442303323fdbf1d",
+    "runtime_status": "role-loaded",
+    "full_roles": [
+      "NTL Data Searcher"
+    ],
+    "single_agent": true,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "dataset-and-product-selection",
+    "description": "Select and validate the nighttime-light or auxiliary product, band, resolution, and source required by an accepted assignment.",
+    "path": ".ntl-gpt/skills/data_searcher/dataset-and-product-selection/SKILL.md",
+    "sha256": "b12da0bdccc0146ed6a409f311dd6be431e903c0c2c412618ed442973905ab3d",
+    "runtime_status": "role-loaded",
+    "full_roles": [
+      "NTL Data Searcher"
+    ],
+    "single_agent": true,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "gee-earthdata-acquisition",
+    "description": "Execute validated Google Earth Engine, Earthdata, LAADS, CMR, direct-download, or batch-export acquisition plans.",
+    "path": ".ntl-gpt/skills/data_searcher/gee-earthdata-acquisition/SKILL.md",
+    "sha256": "8c3277b8c4a6dfeaf1daa8d0cf57c8630e0933190d344109837ac4dad266a697",
+    "runtime_status": "role-loaded",
+    "full_roles": [
+      "NTL Data Searcher"
+    ],
+    "single_agent": true,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "latest-observation-availability",
+    "description": "Resolve the latest quality-eligible observation as of the benchmark or task cutoff without using future information.",
+    "path": ".ntl-gpt/skills/data_searcher/latest-observation-availability/SKILL.md",
+    "sha256": "3db4a1c30401223f4ac0db1d77f78efce1bc7eecc23233cad9bc8b80948c3a23",
+    "runtime_status": "role-loaded",
+    "full_roles": [
+      "NTL Data Searcher"
+    ],
+    "single_agent": true,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "temporal-and-aoi-resolution",
+    "description": "Resolve AOI, timezone, local-night and UTC product dates, boundary provenance, and spatial support for observation preparation.",
+    "path": ".ntl-gpt/skills/data_searcher/temporal-and-aoi-resolution/SKILL.md",
+    "sha256": "73af3e4cfaf6be1b7b0ffdc6df43cb77f73ad4d6e41e6bce58885f132cefa34e",
+    "runtime_status": "role-loaded",
+    "full_roles": [
+      "NTL Data Searcher"
+    ],
+    "single_agent": true,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "evidence-synthesis",
+    "description": "Let NTL_Engineer synthesize accepted packages into a bounded final EvidenceReport without claiming independent verification.",
+    "path": ".ntl-gpt/skills/engineer/evidence-synthesis/SKILL.md",
+    "sha256": "d494987d360bd10420fe5745cf05049af4012d6f45372fae5a92b581e2f35f50",
+    "runtime_status": "role-loaded",
+    "full_roles": [
+      "NTL Engineer"
+    ],
+    "single_agent": true,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "handoff-acceptance",
+    "description": "Let NTL_Engineer validate a specialist's normal task result and typed scientific package against TaskPlan acceptance criteria.",
+    "path": ".ntl-gpt/skills/engineer/handoff-acceptance/SKILL.md",
+    "sha256": "3d22743373c13199b150676501658b60babf7ef5365e167158bc477f29b1acc8",
+    "runtime_status": "role-loaded",
+    "full_roles": [
+      "NTL Engineer"
+    ],
+    "single_agent": true,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "task-planning-and-routing",
+    "description": "Let NTL_Engineer create a typed TaskPlan and choose direct, observation, analysis, or event-context routes without over-delegation.",
+    "path": ".ntl-gpt/skills/engineer/task-planning-and-routing/SKILL.md",
+    "sha256": "49ba010d39b288d0ba8290f0b88a6e57115f1c254cacf0046e236c26d208c331",
+    "runtime_status": "role-loaded",
+    "full_roles": [
+      "NTL Engineer"
+    ],
+    "single_agent": true,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "conflict-event-context",
+    "description": "Build a traceable, source-bounded conflict-event context without converting reports into verified damage or attribution claims.",
+    "path": ".ntl-gpt/skills/event_tracker/conflict-event-context/SKILL.md",
+    "sha256": "af1510edf1402fe41c0c931add742259b171280799d81eb0ee214ce0288c0a84",
+    "runtime_status": "role-loaded",
+    "full_roles": [
+      "NTL Event Tracker"
+    ],
+    "single_agent": true,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "disaster-event-context",
+    "description": "Build source-bounded disaster, outage, accident, and recovery context as of an explicit cutoff for downstream observation planning.",
+    "path": ".ntl-gpt/skills/event_tracker/disaster-event-context/SKILL.md",
+    "sha256": "45bcbed2b6ed2f3d829681178c66be1ed5c12e1b126c28a22131e4aff5615d3f",
+    "runtime_status": "role-loaded",
+    "full_roles": [
+      "NTL Event Tracker"
+    ],
+    "single_agent": true,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "source-conflict-and-timeline",
+    "description": "Normalize event records, deduplicate reports, reconstruct an as-of timeline, and preserve unresolved source conflicts.",
+    "path": ".ntl-gpt/skills/event_tracker/source-conflict-and-timeline/SKILL.md",
+    "sha256": "e029bdd23d8e16eb0b20af36f9ffbdc4cabba3e103a3f3f6abcad8b89528a3cb",
+    "runtime_status": "role-loaded",
+    "full_roles": [
+      "NTL Event Tracker"
+    ],
+    "single_agent": true,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "gee-dataset-selection",
+    "description": "Use when choosing Earth Engine datasets, bands, date ranges, scale, reducers, or auxiliary data for NTL-GPT tasks; includes curated NTL, boundary, population, vegetation, land-cover, DEM, and event-context dataset metadata and selection rules.",
+    "path": ".ntl-gpt/skills/gee-dataset-selection/SKILL.md",
+    "sha256": "71734ba66c964b863f629d2dee84eafda620571c4f30b33606cb7a0b484b3dbf",
+    "runtime_status": "repository skill; not role-loaded",
+    "full_roles": [],
+    "single_agent": false,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "gee-ntl-date-boundary-handling",
+    "description": "Use for daily/event NTL timing and AOI handling: VIIRS first-night selection, filterDate end-exclusive windows, timezone conversion, event buffers, and no-data guards.",
+    "path": ".ntl-gpt/skills/gee-ntl-date-boundary-handling/SKILL.md",
+    "sha256": "1d49a25eb9729fba7b5b3a4dab99e25d56ac4da69d25681d9a1490b7838b06f4",
+    "runtime_status": "role-loaded",
+    "full_roles": [
+      "NTL Engineer",
+      "NTL Data Searcher"
+    ],
+    "single_agent": true,
+    "case_evidence_note": "Shared runtime Skill used for event/local-night and UTC product-date handling."
+  },
+  {
+    "skill_id": "gee-python-server-side-workflow",
+    "description": "Use when writing or validating GEE Python scripts for NTL analysis, especially server-side zonal statistics, country/multi-province summaries, long time series, event impact, reduceRegion/reduceRegions, and export/table outputs.",
+    "path": ".ntl-gpt/skills/gee-python-server-side-workflow/SKILL.md",
+    "sha256": "eccd2207bb6511253c7de3bbc23729243aaaa9708ecd9c3d951be8ebd0ec740f",
+    "runtime_status": "repository skill; not role-loaded",
+    "full_roles": [],
+    "single_agent": false,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "gee-routing-blueprint-strategy",
+    "description": "Use for unified NTL/general-GEE planning, validated direct download, server reduction, batch export, official Earthdata routing, and execution failure semantics.",
+    "path": ".ntl-gpt/skills/gee-routing-blueprint-strategy/SKILL.md",
+    "sha256": "948e80b30ea8f3fcc2d90e789dd593612da74c8f62b1494eb6c2c0f54d65fe6a",
+    "runtime_status": "repository skill; not role-loaded",
+    "full_roles": [],
+    "single_agent": false,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "geospatial-visualization-cjk",
+    "description": "Use when generating PNG/JPG charts or maps, especially when labels may contain Chinese text or mixed English/Chinese names.",
+    "path": ".ntl-gpt/skills/geospatial-visualization-cjk/SKILL.md",
+    "sha256": "660bc23647254377119909192b425754a69fae4c1651e7e15165526ea5d6aac1",
+    "runtime_status": "repository skill; not role-loaded",
+    "full_roles": [],
+    "single_agent": false,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "ntl-capability-routing",
+    "description": "Choose the lean NTL-GPT capability path before selecting tools. Use for tool pressure reduction, agent delegation, national-scale statistics, GEE routing, local-file analysis, and specialty NTL workflows.",
+    "path": ".ntl-gpt/skills/ntl-capability-routing/SKILL.md",
+    "sha256": "9a347c321152399ffdc13906f703e84ab01da9c8555883a90ff4fe9438fe5eaa",
+    "runtime_status": "repository skill; not role-loaded",
+    "full_roles": [],
+    "single_agent": false,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "ntl-gdp-regression-analysis",
+    "description": "Use when performing ANTL-GDP modeling with multi-year data, model comparison, diagnostics, and final indicator estimation outputs.",
+    "path": ".ntl-gpt/skills/ntl-gdp-regression-analysis/SKILL.md",
+    "sha256": "33772483b605a88311d368c971c26811ea47cc4a42f68e8dfc3c9b1de77358a3",
+    "runtime_status": "repository skill; not role-loaded",
+    "full_roles": [],
+    "single_agent": false,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "ntl-regression-evaluation",
+    "description": "Use after changing NTL-GPT skills, prompts, GEE routing, dataset selection, date handling, or execution tools; provides regression scenarios that catch known routing, dataset, first-night, file-management, and server-side computation failures.",
+    "path": ".ntl-gpt/skills/ntl-regression-evaluation/SKILL.md",
+    "sha256": "0bf8402dacb4c3176a641af72d3774ba56938b2863c733a5ad14a55ad3f7e2b5",
+    "runtime_status": "repository skill; not role-loaded",
+    "full_roles": [],
+    "single_agent": false,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "ntl-workflow-guidance",
+    "description": "Preferred workflow-selection skill for NTL-GPT tasks. Use first for NTL retrieval, statistics, trend, event impact, urban extraction, regression/indicator, and validation workflows before calling the supplemental NTL_Knowledge_Base tool.",
+    "path": ".ntl-gpt/skills/NTL-workflow-guidance/SKILL.md",
+    "sha256": "4f2f67de6a05f890baaa846d2d314ae77ce466638f84d15520d1ffa85d6bd425",
+    "runtime_status": "repository skill; not role-loaded",
+    "full_roles": [],
+    "single_agent": false,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "vnp46a2-official-h5-country-mosaic",
+    "description": "Use when a user explicitly needs audited, country-scale, daily non-gap-filled VNP46A2 GeoTIFFs from official NASA Earthdata HDF5 granules.",
+    "path": ".ntl-gpt/skills/vnp46a2-official-h5-country-mosaic/SKILL.md",
+    "sha256": "10fa2b26cd469379c30217a393509c358a259cea440ce487b718586137389577",
+    "runtime_status": "repository skill; not role-loaded",
+    "full_roles": [],
+    "single_agent": false,
+    "case_evidence_note": ""
+  },
+  {
+    "skill_id": "workflow-self-evolution",
+    "description": "Use after an NTL task finishes and the user explicitly agrees to record learning. Provides a conservative, file-based protocol for failure classification, candidate logging, and workflow updates without fake imports or automatic mutation.",
+    "path": ".ntl-gpt/skills/workflow-self-evolution/SKILL.md",
+    "sha256": "21819576ccddbf6e6140efbd3c71f6e0dbfe4d4e3af086bdbd4ae82081e721ec",
+    "runtime_status": "repository skill; not role-loaded",
+    "full_roles": [],
+    "single_agent": false,
+    "case_evidence_note": ""
+  }
+]

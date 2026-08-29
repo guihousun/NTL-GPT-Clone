@@ -1,0 +1,425 @@
+date_utc,analysis_phase,qa_mode,image_available,qualified,daily_mean_nw_cm2_sr,daily_median_nw_cm2_sr,valid_fraction,source_image_id,strict_centered_14day_mean_nw_cm2_sr,strict_centered_14day_actual_sample_count,rolling_note
+2026-01-01,pre_conflict_baseline,permissive,true,true,51.469204845557904,45.628936767578125,0.18396226415094338,NASA/VIIRS/002/VNP46A2/2026_01_01,,,
+2026-01-01,pre_conflict_baseline,strict,true,true,51.469204845557904,45.628936767578125,0.18396226415094338,NASA/VIIRS/002/VNP46A2/2026_01_01,60.373609397691,7,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-02,pre_conflict_baseline,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_01_02,,,
+2026-01-02,pre_conflict_baseline,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_01_02,60.373609397691,7,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-03,pre_conflict_baseline,permissive,true,true,50.819881308624694,51.25945472717285,0.24610974610974612,NASA/VIIRS/002/VNP46A2/2026_01_03,,,
+2026-01-03,pre_conflict_baseline,strict,true,true,51.64388043719854,51.68754267692566,0.24078624078624078,NASA/VIIRS/002/VNP46A2/2026_01_03,60.369333651539,8,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-04,pre_conflict_baseline,permissive,true,true,72.76277935039055,71.06392113569514,0.18042168674698794,NASA/VIIRS/002/VNP46A2/2026_01_04,,,
+2026-01-04,pre_conflict_baseline,strict,true,true,73.71423360053657,71.06392113569514,0.17710843373493976,NASA/VIIRS/002/VNP46A2/2026_01_04,60.493284957041,9,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-05,pre_conflict_baseline,permissive,true,true,73.61663687122231,70.91439656880253,0.20240963855421687,NASA/VIIRS/002/VNP46A2/2026_01_05,,,
+2026-01-05,pre_conflict_baseline,strict,true,true,73.77192234054323,70.91439656880253,0.20090361445783134,NASA/VIIRS/002/VNP46A2/2026_01_05,60.108974827916,10,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-06,pre_conflict_baseline,permissive,true,true,61.86619784614981,60.56110986073812,0.19569827325053013,NASA/VIIRS/002/VNP46A2/2026_01_06,,,
+2026-01-06,pre_conflict_baseline,strict,true,true,62.24348544134587,60.56110986073812,0.1938806422296274,NASA/VIIRS/002/VNP46A2/2026_01_06,65.461286695541,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-07,pre_conflict_baseline,permissive,true,true,57.14139945441182,56.44254698119797,0.19111969111969113,NASA/VIIRS/002/VNP46A2/2026_01_07,,,
+2026-01-07,pre_conflict_baseline,strict,true,true,57.81621905141558,56.44254698119797,0.18854568854568854,NASA/VIIRS/002/VNP46A2/2026_01_07,65.193408417954,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-08,pre_conflict_baseline,permissive,true,true,51.50680577548008,50.38495053383579,0.19890009165902842,NASA/VIIRS/002/VNP46A2/2026_01_08,,,
+2026-01-08,pre_conflict_baseline,strict,true,true,51.95632006724039,50.38495053383579,0.1967613809960281,NASA/VIIRS/002/VNP46A2/2026_01_08,67.341926646979,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-09,pre_conflict_baseline,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_01_09,,,
+2026-01-09,pre_conflict_baseline,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_01_09,68.571114658284,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-10,pre_conflict_baseline,permissive,true,true,60.31134574246805,57.56815915600523,0.2049306625577812,NASA/VIIRS/002/VNP46A2/2026_01_10,,,
+2026-01-10,pre_conflict_baseline,strict,true,true,60.339403428470426,57.56815915600523,0.20462249614791989,NASA/VIIRS/002/VNP46A2/2026_01_10,69.981717510041,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-11,pre_conflict_baseline,permissive,true,true,61.420693459389994,60.47942819226115,0.20186522262334536,NASA/VIIRS/002/VNP46A2/2026_01_11,,,
+2026-01-11,pre_conflict_baseline,strict,true,true,61.48489540106112,60.47942819226115,0.20156438026474127,NASA/VIIRS/002/VNP46A2/2026_01_11,67.063055004575,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-12,pre_conflict_baseline,permissive,true,true,47.82184312091489,48.5202117895151,0.3319327731092437,NASA/VIIRS/002/VNP46A2/2026_01_12,,,
+2026-01-12,pre_conflict_baseline,strict,true,true,56.65018366579065,54.341609954833984,0.14495798319327732,NASA/VIIRS/002/VNP46A2/2026_01_12,66.453157974032,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-13,pre_conflict_baseline,permissive,true,true,72.27926950226,66.25578918457032,0.19284294234592445,NASA/VIIRS/002/VNP46A2/2026_01_13,,,
+2026-01-13,pre_conflict_baseline,strict,true,true,118.9844053717935,123.65119171142578,0.015904572564612324,NASA/VIIRS/002/VNP46A2/2026_01_13,68.152352321244,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-14,pre_conflict_baseline,permissive,true,true,62.24674736449734,58.40394617716471,0.137104506232023,NASA/VIIRS/002/VNP46A2/2026_01_14,,,
+2026-01-14,pre_conflict_baseline,strict,true,true,62.24674736449734,58.40394617716471,0.137104506232023,NASA/VIIRS/002/VNP46A2/2026_01_14,70.267555056585,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-15,pre_conflict_baseline,permissive,true,true,77.25142359385562,74.47708334549552,0.19193742478941034,NASA/VIIRS/002/VNP46A2/2026_01_15,,,
+2026-01-15,pre_conflict_baseline,strict,true,true,77.25142359385562,74.47708334549552,0.19193742478941034,NASA/VIIRS/002/VNP46A2/2026_01_15,72.060387247395,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-16,pre_conflict_baseline,permissive,true,true,86.68753442364113,83.52444247404733,0.5148619957537155,NASA/VIIRS/002/VNP46A2/2026_01_16,,,
+2026-01-16,pre_conflict_baseline,strict,true,true,83.32137079394776,80.50697961464692,0.445859872611465,NASA/VIIRS/002/VNP46A2/2026_01_16,70.593030914049,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-17,pre_conflict_baseline,permissive,true,true,39.214055526355075,40.800331115722656,0.02666666666666667,NASA/VIIRS/002/VNP46A2/2026_01_17,,,
+2026-01-17,pre_conflict_baseline,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_01_17,70.332497610548,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-18,pre_conflict_baseline,permissive,true,true,42.06682949515492,43.60850261622082,0.0856,NASA/VIIRS/002/VNP46A2/2026_01_18,,,
+2026-01-18,pre_conflict_baseline,strict,true,true,38.69028353493828,42.54640579223633,0.0256,NASA/VIIRS/002/VNP46A2/2026_01_18,70.531127307761,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-19,pre_conflict_baseline,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_01_19,,,
+2026-01-19,pre_conflict_baseline,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_01_19,73.422644878948,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-20,pre_conflict_baseline,permissive,true,true,73.24072389447086,67.36303043365479,0.316961736150771,NASA/VIIRS/002/VNP46A2/2026_01_20,,,
+2026-01-20,pre_conflict_baseline,strict,true,true,80.93462326067682,73.65170715971401,0.15248429468874927,NASA/VIIRS/002/VNP46A2/2026_01_20,69.388064074324,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-21,pre_conflict_baseline,permissive,true,true,81.03588753169932,74.3670487837358,0.18159879336349924,NASA/VIIRS/002/VNP46A2/2026_01_21,,,
+2026-01-21,pre_conflict_baseline,strict,true,true,81.08344914016094,74.3670487837358,0.1812971342383107,NASA/VIIRS/002/VNP46A2/2026_01_21,70.037274684308,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-22,pre_conflict_baseline,permissive,true,true,71.67747416615465,76.4138412475586,0.17863720073664824,NASA/VIIRS/002/VNP46A2/2026_01_22,,,
+2026-01-22,pre_conflict_baseline,strict,true,true,71.67747416615465,76.4138412475586,0.17863720073664824,NASA/VIIRS/002/VNP46A2/2026_01_22,68.381089655110,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-23,pre_conflict_baseline,permissive,true,true,54.452111247235365,51.49644294151893,0.1632456703014753,NASA/VIIRS/002/VNP46A2/2026_01_23,,,
+2026-01-23,pre_conflict_baseline,strict,true,true,54.452111247235365,51.49644294151893,0.1632456703014753,NASA/VIIRS/002/VNP46A2/2026_01_23,66.909144184069,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-24,pre_conflict_baseline,permissive,true,true,57.21300378645918,56.498399959792565,0.14978381717109326,NASA/VIIRS/002/VNP46A2/2026_01_24,,,
+2026-01-24,pre_conflict_baseline,strict,true,true,57.21300378645918,56.498399959792565,0.14978381717109326,NASA/VIIRS/002/VNP46A2/2026_01_24,67.712649499869,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-25,pre_conflict_baseline,permissive,true,true,63.868451767617316,62.428217758595096,0.1585770274344287,NASA/VIIRS/002/VNP46A2/2026_01_25,,,
+2026-01-25,pre_conflict_baseline,strict,true,true,63.868451767617316,62.428217758595096,0.1585770274344287,NASA/VIIRS/002/VNP46A2/2026_01_25,71.216234580540,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-26,pre_conflict_baseline,permissive,true,true,91.19382477095145,85.18834231393046,0.16199939777175548,NASA/VIIRS/002/VNP46A2/2026_01_26,,,
+2026-01-26,pre_conflict_baseline,strict,true,true,91.34839452003362,85.18834231393046,0.16169828364950317,NASA/VIIRS/002/VNP46A2/2026_01_26,70.836913908929,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-27,pre_conflict_baseline,permissive,true,true,70.36074823353154,68.52652931213379,0.18561973525872444,NASA/VIIRS/002/VNP46A2/2026_01_27,,,
+2026-01-27,pre_conflict_baseline,strict,true,true,70.56943571631108,68.52652931213379,0.18501805054151624,NASA/VIIRS/002/VNP46A2/2026_01_27,69.995438129616,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-28,pre_conflict_baseline,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_01_28,,,
+2026-01-28,pre_conflict_baseline,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_01_28,67.199518223525,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-29,pre_conflict_baseline,permissive,true,true,58.56638397645594,57.58630910831647,0.22620967741935483,NASA/VIIRS/002/VNP46A2/2026_01_29,,,
+2026-01-29,pre_conflict_baseline,strict,true,true,59.033388272669924,57.58630910831647,0.22298387096774194,NASA/VIIRS/002/VNP46A2/2026_01_29,67.918398315802,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-30,pre_conflict_baseline,permissive,true,true,66.90030715983342,66.48735902362459,0.20611659764256132,NASA/VIIRS/002/VNP46A2/2026_01_30,,,
+2026-01-30,pre_conflict_baseline,strict,true,true,67.12997061250088,66.48735902362459,0.2035680152914941,NASA/VIIRS/002/VNP46A2/2026_01_30,69.142606231126,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-01-31,pre_conflict_baseline,permissive,true,true,76.46955007322892,78.72913939170613,0.31919642857142855,NASA/VIIRS/002/VNP46A2/2026_01_31,,,
+2026-01-31,pre_conflict_baseline,strict,true,true,76.55120797366453,78.72913939170613,0.3169642857142857,NASA/VIIRS/002/VNP46A2/2026_01_31,70.335566475593,10,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-01,pre_conflict_baseline,permissive,true,true,80.5215081283263,77.14311423526904,0.19283995186522263,NASA/VIIRS/002/VNP46A2/2026_02_01,,,
+2026-02-01,pre_conflict_baseline,strict,true,true,80.73330450299697,77.14311423526904,0.19193742478941034,NASA/VIIRS/002/VNP46A2/2026_02_01,70.291026374888,10,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-02,pre_conflict_baseline,permissive,true,true,66.26998956142641,60.81740264085485,0.1387141858839972,NASA/VIIRS/002/VNP46A2/2026_02_02,,,
+2026-02-02,pre_conflict_baseline,strict,true,true,66.28506584959338,60.81740264085485,0.13836477987421383,NASA/VIIRS/002/VNP46A2/2026_02_02,66.244133066734,10,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-03,pre_conflict_baseline,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_02_03,,,
+2026-02-03,pre_conflict_baseline,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_02_03,63.603208617465,10,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-04,pre_conflict_baseline,permissive,true,true,47.53241026706774,49.85343777653998,0.09278350515463918,NASA/VIIRS/002/VNP46A2/2026_02_04,,,
+2026-02-04,pre_conflict_baseline,strict,true,true,47.53241026706774,49.85343777653998,0.09278350515463918,NASA/VIIRS/002/VNP46A2/2026_02_04,64.766689213961,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-05,pre_conflict_baseline,permissive,true,true,80.30403527347123,77.45717114916232,0.11990034257240735,NASA/VIIRS/002/VNP46A2/2026_02_05,,,
+2026-02-05,pre_conflict_baseline,strict,true,true,80.30403527347123,77.45717114916232,0.11990034257240735,NASA/VIIRS/002/VNP46A2/2026_02_05,66.172107581449,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-06,pre_conflict_baseline,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_02_06,,,
+2026-02-06,pre_conflict_baseline,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_02_06,65.338644464752,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-07,pre_conflict_baseline,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_02_07,,,
+2026-02-07,pre_conflict_baseline,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_02_07,64.217388113861,10,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-08,pre_conflict_baseline,permissive,true,true,47.26403077680673,64.5948486328125,0.011655011655011656,NASA/VIIRS/002/VNP46A2/2026_02_08,,,
+2026-02-08,pre_conflict_baseline,strict,true,true,63.42305076057142,64.61819458007812,0.009324009324009324,NASA/VIIRS/002/VNP46A2/2026_02_08,62.731850233097,10,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-09,pre_conflict_baseline,permissive,true,true,50.879461438494495,45.970387906769375,0.19741480611045828,NASA/VIIRS/002/VNP46A2/2026_02_09,,,
+2026-02-09,pre_conflict_baseline,strict,true,true,50.879461438494495,45.970387906769375,0.19741480611045828,NASA/VIIRS/002/VNP46A2/2026_02_09,64.505303544983,10,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-10,pre_conflict_baseline,permissive,true,true,35.311820853062365,20.54912567138672,0.2727272727272727,NASA/VIIRS/002/VNP46A2/2026_02_10,,,
+2026-02-10,pre_conflict_baseline,strict,true,true,44.16019122361905,46.3993034362793,0.07142857142857142,NASA/VIIRS/002/VNP46A2/2026_02_10,64.505303544983,10,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-11,pre_conflict_baseline,permissive,true,true,76.4014951789202,75.36324395073785,0.19915764139590855,NASA/VIIRS/002/VNP46A2/2026_02_11,,,
+2026-02-11,pre_conflict_baseline,strict,true,true,76.4014951789202,75.36324395073785,0.19915764139590855,NASA/VIIRS/002/VNP46A2/2026_02_11,66.050394490226,10,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-12,pre_conflict_baseline,permissive,true,true,74.49299031503575,69.49932034810384,0.1770956316410862,NASA/VIIRS/002/VNP46A2/2026_02_12,,,
+2026-02-12,pre_conflict_baseline,strict,true,true,74.49299031503575,69.49932034810384,0.1770956316410862,NASA/VIIRS/002/VNP46A2/2026_02_12,63.611180991498,10,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-13,pre_conflict_baseline,permissive,true,true,57.96187632883676,55.59983357998288,0.2031152647975078,NASA/VIIRS/002/VNP46A2/2026_02_13,,,
+2026-02-13,pre_conflict_baseline,strict,true,true,57.96187632883676,55.59983357998288,0.2031152647975078,NASA/VIIRS/002/VNP46A2/2026_02_13,63.822913866379,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-14,pre_conflict_baseline,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_02_14,,,
+2026-02-14,pre_conflict_baseline,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_02_14,65.129581327012,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-15,pre_conflict_baseline,permissive,true,true,65.85848972205223,65.15190270731838,0.7939229843561973,NASA/VIIRS/002/VNP46A2/2026_02_15,,,
+2026-02-15,pre_conflict_baseline,strict,true,true,65.87792569535542,65.15190270731838,0.7936221419975933,NASA/VIIRS/002/VNP46A2/2026_02_15,66.498790703628,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-16,pre_conflict_baseline,permissive,true,true,84.01959896846083,82.38062125758121,0.20126353790613719,NASA/VIIRS/002/VNP46A2/2026_02_16,,,
+2026-02-16,pre_conflict_baseline,strict,true,true,84.01959896846083,82.38062125758121,0.20126353790613719,NASA/VIIRS/002/VNP46A2/2026_02_16,66.622574744445,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-17,pre_conflict_baseline,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_02_17,,,
+2026-02-17,pre_conflict_baseline,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_02_17,68.664609609975,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-18,pre_conflict_baseline,permissive,true,true,62.98331971948993,60.658616248998996,0.19284414796846575,NASA/VIIRS/002/VNP46A2/2026_02_18,,,
+2026-02-18,pre_conflict_baseline,strict,true,true,62.98331971948993,60.658616248998996,0.19284414796846575,NASA/VIIRS/002/VNP46A2/2026_02_18,67.394373998055,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-19,pre_conflict_baseline,permissive,true,true,59.612482833254056,64.03523635864258,0.3169811320754717,NASA/VIIRS/002/VNP46A2/2026_02_19,,,
+2026-02-19,pre_conflict_baseline,strict,true,true,55.91190028620066,48.93716049194336,0.09811320754716982,NASA/VIIRS/002/VNP46A2/2026_02_19,67.866990277481,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-20,pre_conflict_baseline,permissive,true,true,65.94024261518608,63.05254371785821,0.19273399014778325,NASA/VIIRS/002/VNP46A2/2026_02_20,,,
+2026-02-20,pre_conflict_baseline,strict,true,true,65.94024261518608,63.05254371785821,0.19273399014778325,NASA/VIIRS/002/VNP46A2/2026_02_20,69.297897280562,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-21,pre_conflict_baseline,permissive,true,true,79.50292339397643,77.61542320251465,0.18682310469314078,NASA/VIIRS/002/VNP46A2/2026_02_21,,,
+2026-02-21,pre_conflict_baseline,strict,true,true,79.50292339397643,77.61542320251465,0.18682310469314078,NASA/VIIRS/002/VNP46A2/2026_02_21,69.065847276332,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-22,pre_conflict_baseline,permissive,true,true,79.85356327996547,77.53113428842228,0.18772563176895307,NASA/VIIRS/002/VNP46A2/2026_02_22,,,
+2026-02-22,pre_conflict_baseline,strict,true,true,79.85356327996547,77.53113428842228,0.18772563176895307,NASA/VIIRS/002/VNP46A2/2026_02_22,68.104265942317,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-23,pre_conflict_baseline,permissive,true,true,67.58387158121292,65.65418243408203,0.12351945854483926,NASA/VIIRS/002/VNP46A2/2026_02_23,,,
+2026-02-23,pre_conflict_baseline,strict,true,true,52.364869928298816,58.75968933105469,0.021996615905245348,NASA/VIIRS/002/VNP46A2/2026_02_23,65.399307955267,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-24,pre_conflict_baseline,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_02_24,,,
+2026-02-24,pre_conflict_baseline,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_02_24,64.825425571678,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-25,pre_conflict_baseline,permissive,true,true,61.61920117305133,60.466201305389404,0.20575865415723066,NASA/VIIRS/002/VNP46A2/2026_02_25,,,
+2026-02-25,pre_conflict_baseline,strict,true,true,62.42890344779933,60.466201305389404,0.20122937560659981,NASA/VIIRS/002/VNP46A2/2026_02_25,65.443878633898,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-26,pre_conflict_baseline,permissive,true,true,78.86023983838469,78.668965307359,0.19975932611311673,NASA/VIIRS/002/VNP46A2/2026_02_26,,,
+2026-02-26,pre_conflict_baseline,strict,true,true,79.69176938872003,78.668965307359,0.1967509025270758,NASA/VIIRS/002/VNP46A2/2026_02_26,65.972519676829,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-27,pre_conflict_baseline,permissive,true,true,73.4873222148212,73.38010215759277,0.5105008077544426,NASA/VIIRS/002/VNP46A2/2026_02_27,,,
+2026-02-27,pre_conflict_baseline,strict,true,true,73.7018533627249,73.38010215759277,0.5040387722132472,NASA/VIIRS/002/VNP46A2/2026_02_27,65.975209431966,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-02-28,conflict_evaluation,permissive,true,true,66.21009680651272,66.47063718640999,0.2023629203271736,NASA/VIIRS/002/VNP46A2/2026_02_28,,,
+2026-02-28,conflict_evaluation,strict,true,true,66.51329722980394,67.6192178636434,0.20084822780975461,NASA/VIIRS/002/VNP46A2/2026_02_28,64.745417253601,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-01,conflict_evaluation,permissive,true,true,53.74998520160216,52.54548977876901,0.19881109643328929,NASA/VIIRS/002/VNP46A2/2026_03_01,,,
+2026-03-01,conflict_evaluation,strict,true,true,54.33894968717183,52.54548977876901,0.19583883751651254,NASA/VIIRS/002/VNP46A2/2026_03_01,63.234602650965,10,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-02,conflict_evaluation,permissive,true,true,50.5433491565126,51.461401995490576,0.19834710743801653,NASA/VIIRS/002/VNP46A2/2026_03_02,,,
+2026-03-02,conflict_evaluation,strict,true,true,51.560103123865154,51.461401995490576,0.1924931129476584,NASA/VIIRS/002/VNP46A2/2026_03_02,64.442350731261,9,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-03,conflict_evaluation,permissive,true,true,56.91872111001649,56.36291750253812,0.18484570730216926,NASA/VIIRS/002/VNP46A2/2026_03_03,,,
+2026-03-03,conflict_evaluation,strict,true,true,57.9388369686092,56.36291750253812,0.179040635502597,NASA/VIIRS/002/VNP46A2/2026_03_03,64.442350731261,9,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-04,conflict_evaluation,permissive,true,true,70.46831913643297,71.63754081726074,0.19795427196149218,NASA/VIIRS/002/VNP46A2/2026_03_04,,,
+2026-03-04,conflict_evaluation,strict,true,true,71.02320952835355,71.63754081726074,0.19494584837545126,NASA/VIIRS/002/VNP46A2/2026_03_04,64.694031641693,8,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-05,conflict_evaluation,permissive,true,true,62.461216911863254,61.59633373833824,0.19795427196149218,NASA/VIIRS/002/VNP46A2/2026_03_05,,,
+2026-03-05,conflict_evaluation,strict,true,true,62.78423384429892,61.59633373833824,0.19554753309265946,NASA/VIIRS/002/VNP46A2/2026_03_05,62.551497677833,7,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-06,conflict_evaluation,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_06,,,
+2026-03-06,conflict_evaluation,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_06,60.693105063684,6,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-07,conflict_evaluation,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_07,,,
+2026-03-07,conflict_evaluation,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_07,59.529066630460,5,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-08,conflict_evaluation,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_08,,,
+2026-03-08,conflict_evaluation,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_08,60.826595866282,4,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-09,conflict_evaluation,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_09,,,
+2026-03-09,conflict_evaluation,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_09,55.879504841768,4,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-10,conflict_evaluation,permissive,false,false,,,,,,,
+2026-03-10,conflict_evaluation,strict,false,false,,,,,52.405194262648,4,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-11,conflict_evaluation,permissive,false,false,,,,,,,
+2026-03-11,conflict_evaluation,strict,false,false,,,,,45.963941020710,4,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-12,conflict_evaluation,permissive,false,false,,,,,,,
+2026-03-12,conflict_evaluation,strict,false,false,,,,,40.357176746181,3,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-13,conflict_evaluation,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_13,,,
+2026-03-13,conflict_evaluation,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_13,44.072011046134,4,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-14,conflict_evaluation,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_14,,,
+2026-03-14,conflict_evaluation,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_14,46.023742541660,5,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-15,conflict_evaluation,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_15,,,
+2026-03-15,conflict_evaluation,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_15,46.023742541660,5,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-16,conflict_evaluation,permissive,true,true,35.619271418398185,38.28915214538574,0.10076670317634173,NASA/VIIRS/002/VNP46A2/2026_03_16,,,
+2026-03-16,conflict_evaluation,strict,true,true,31.771739025808895,32.07270050048828,0.03066812705366922,NASA/VIIRS/002/VNP46A2/2026_03_16,46.023742541660,5,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-17,conflict_evaluation,permissive,true,true,43.975017115891,43.68927764892578,0.22154471544715448,NASA/VIIRS/002/VNP46A2/2026_03_17,,,
+2026-03-17,conflict_evaluation,strict,true,true,44.041594652129476,43.68927764892578,0.22086720867208673,NASA/VIIRS/002/VNP46A2/2026_03_17,46.023742541660,5,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-18,conflict_evaluation,permissive,true,true,45.22564293047541,45.65950711745295,0.3662704309063893,NASA/VIIRS/002/VNP46A2/2026_03_18,,,
+2026-03-18,conflict_evaluation,strict,true,true,45.25819656060431,45.65950711745295,0.3610698365527489,NASA/VIIRS/002/VNP46A2/2026_03_18,52.362719552372,6,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-19,conflict_evaluation,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_19,,,
+2026-03-19,conflict_evaluation,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_19,52.362719552372,6,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-20,conflict_evaluation,permissive,true,true,55.21350958387623,55.416288204072444,0.1970517448856799,NASA/VIIRS/002/VNP46A2/2026_03_20,,,
+2026-03-20,conflict_evaluation,strict,true,true,55.21651394599171,55.416288204072444,0.1967509025270758,NASA/VIIRS/002/VNP46A2/2026_03_20,52.362719552372,6,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-21,conflict_evaluation,permissive,true,true,53.83066852376644,53.703102513992214,0.19434416365824309,NASA/VIIRS/002/VNP46A2/2026_03_21,,,
+2026-03-21,conflict_evaluation,strict,true,true,53.83066852376644,53.703102513992214,0.19434416365824309,NASA/VIIRS/002/VNP46A2/2026_03_21,52.362719552372,6,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-22,conflict_evaluation,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_22,,,
+2026-03-22,conflict_evaluation,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_22,52.362719552372,6,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-23,conflict_evaluation,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_23,,,
+2026-03-23,conflict_evaluation,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_23,54.481477170762,6,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-24,conflict_evaluation,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_24,,,
+2026-03-24,conflict_evaluation,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_24,56.435063889867,6,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-25,conflict_evaluation,permissive,true,true,71.3458586235048,70.17086029052734,0.21755564888702225,NASA/VIIRS/002/VNP46A2/2026_03_25,,,
+2026-03-25,conflict_evaluation,strict,true,true,84.05760460592982,79.42244490633834,0.08357832843343133,NASA/VIIRS/002/VNP46A2/2026_03_25,56.988956107680,6,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-26,conflict_evaluation,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_26,,,
+2026-03-26,conflict_evaluation,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_26,55.559654411193,7,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-27,conflict_evaluation,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_27,,,
+2026-03-27,conflict_evaluation,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_27,55.616844488726,6,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-28,conflict_evaluation,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_28,,,
+2026-03-28,conflict_evaluation,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_28,56.165306744684,6,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-29,conflict_evaluation,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_29,,,
+2026-03-29,conflict_evaluation,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_03_29,59.061761350488,7,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-30,conflict_evaluation,permissive,true,true,44.279211402499705,44.68127955186918,0.5346666666666666,NASA/VIIRS/002/VNP46A2/2026_03_30,,,
+2026-03-30,conflict_evaluation,strict,true,true,44.48428473614815,44.68127955186918,0.5293333333333333,NASA/VIIRS/002/VNP46A2/2026_03_30,58.987617409930,8,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-03-31,conflict_evaluation,permissive,true,true,53.55104010937379,46.524575353782865,0.17954545454545454,NASA/VIIRS/002/VNP46A2/2026_03_31,,,
+2026-03-31,conflict_evaluation,strict,true,true,55.76311496676285,54.60733985900879,0.15681818181818183,NASA/VIIRS/002/VNP46A2/2026_03_31,57.568996682418,9,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-01,conflict_evaluation,permissive,true,true,48.00891748367279,49.20807499475166,0.21547295255364157,NASA/VIIRS/002/VNP46A2/2026_04_01,,,
+2026-04-01,conflict_evaluation,strict,true,true,48.58154986748373,49.20807499475166,0.20973103656693864,NASA/VIIRS/002/VNP46A2/2026_04_01,53.739790635097,9,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-02,conflict_evaluation,permissive,true,true,46.56384319386922,44.55938048067346,0.2835906232132647,NASA/VIIRS/002/VNP46A2/2026_04_02,,,
+2026-04-02,conflict_evaluation,strict,true,true,46.983844232265966,44.55938048067346,0.2755860491709548,NASA/VIIRS/002/VNP46A2/2026_04_02,53.562869505113,10,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-03,conflict_evaluation,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_04_03,,,
+2026-04-03,conflict_evaluation,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_04_03,54.894157590938,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-04,conflict_evaluation,permissive,true,true,56.507559820126254,57.5574192919549,0.7757685352622061,NASA/VIIRS/002/VNP46A2/2026_04_04,,,
+2026-04-04,conflict_evaluation,strict,true,true,57.121442059510606,57.5574192919549,0.7610006027727547,NASA/VIIRS/002/VNP46A2/2026_04_04,55.877446286537,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-05,conflict_evaluation,permissive,true,true,76.34360470150166,75.00584792251796,0.7818892900120337,NASA/VIIRS/002/VNP46A2/2026_04_05,,,
+2026-04-05,conflict_evaluation,strict,true,true,76.44048898531274,75.00584792251796,0.7782791817087846,NASA/VIIRS/002/VNP46A2/2026_04_05,55.383323808090,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-06,conflict_evaluation,permissive,true,true,58.11919594918388,58.64282032337064,0.1970517448856799,NASA/VIIRS/002/VNP46A2/2026_04_06,,,
+2026-04-06,conflict_evaluation,strict,true,true,58.46860982602758,58.64282032337064,0.19374247894103488,NASA/VIIRS/002/VNP46A2/2026_04_06,55.959033877437,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-07,conflict_evaluation,permissive,true,true,45.5208075861892,46.492905876185844,0.24423076923076922,NASA/VIIRS/002/VNP46A2/2026_04_07,,,
+2026-04-07,conflict_evaluation,strict,true,true,46.22003086231678,46.492905876185844,0.2376923076923077,NASA/VIIRS/002/VNP46A2/2026_04_07,55.415812667082,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-08,fixed_ceasefire_evaluation,permissive,true,true,48.30027116246665,47.61356583771613,0.2680886658301966,NASA/VIIRS/002/VNP46A2/2026_04_08,,,
+2026-04-08,fixed_ceasefire_evaluation,strict,true,true,49.59475018004673,47.61356583771613,0.25386867419489756,NASA/VIIRS/002/VNP46A2/2026_04_08,56.425046996449,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-09,fixed_ceasefire_evaluation,permissive,true,true,51.3920634322407,51.52482362929696,0.20563112938943373,NASA/VIIRS/002/VNP46A2/2026_04_09,,,
+2026-04-09,fixed_ceasefire_evaluation,strict,true,true,51.970579335252,52.379302328854635,0.20088579563429296,NASA/VIIRS/002/VNP46A2/2026_04_09,58.498272016691,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-10,fixed_ceasefire_evaluation,permissive,true,true,68.2070384491954,65.10125236714751,0.2061823802163833,NASA/VIIRS/002/VNP46A2/2026_04_10,,,
+2026-04-10,fixed_ceasefire_evaluation,strict,true,true,68.2070384491954,65.10125236714751,0.2061823802163833,NASA/VIIRS/002/VNP46A2/2026_04_10,58.431704888211,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-11,fixed_ceasefire_evaluation,permissive,true,true,66.62801122576688,64.92429349658566,0.1970517448856799,NASA/VIIRS/002/VNP46A2/2026_04_11,,,
+2026-04-11,fixed_ceasefire_evaluation,strict,true,true,66.6936219381273,64.92429349658566,0.1967509025270758,NASA/VIIRS/002/VNP46A2/2026_04_11,58.532494336573,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-12,fixed_ceasefire_evaluation,permissive,true,true,49.453854066718925,48.6399373764907,0.19933655006031364,NASA/VIIRS/002/VNP46A2/2026_04_12,,,
+2026-04-12,fixed_ceasefire_evaluation,strict,true,true,49.453854066718925,48.6399373764907,0.19933655006031364,NASA/VIIRS/002/VNP46A2/2026_04_12,57.040161449178,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-13,fixed_ceasefire_evaluation,permissive,true,true,48.12454408252634,46.29911657224155,0.2235142118863049,NASA/VIIRS/002/VNP46A2/2026_04_13,,,
+2026-04-13,fixed_ceasefire_evaluation,strict,true,true,51.96851563766209,51.588227942593605,0.11326442721791559,NASA/VIIRS/002/VNP46A2/2026_04_13,56.910302505828,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-14,fixed_ceasefire_evaluation,permissive,true,true,48.701239232146335,48.863894121872484,0.24168845722824056,NASA/VIIRS/002/VNP46A2/2026_04_14,,,
+2026-04-14,fixed_ceasefire_evaluation,strict,true,true,48.701239232146335,48.863894121872484,0.24168845722824056,NASA/VIIRS/002/VNP46A2/2026_04_14,61.358262705519,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-15,fixed_ceasefire_evaluation,permissive,true,true,61.70159614925635,59.30167971788103,0.19434416365824309,NASA/VIIRS/002/VNP46A2/2026_04_15,,,
+2026-04-15,fixed_ceasefire_evaluation,strict,true,true,61.70159614925635,59.30167971788103,0.19434416365824309,NASA/VIIRS/002/VNP46A2/2026_04_15,62.852060714579,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-16,fixed_ceasefire_evaluation,permissive,true,true,73.93576949540609,73.30143826951847,0.1797752808988764,NASA/VIIRS/002/VNP46A2/2026_04_16,,,
+2026-04-16,fixed_ceasefire_evaluation,strict,true,true,73.93576949540609,73.30143826951847,0.1797752808988764,NASA/VIIRS/002/VNP46A2/2026_04_16,62.908417523019,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-17,fixed_ceasefire_evaluation,permissive,true,true,57.5663322179781,56.90724790519569,0.2021891152325935,NASA/VIIRS/002/VNP46A2/2026_04_17,,,
+2026-04-17,fixed_ceasefire_evaluation,strict,true,true,57.5663322179781,56.90724790519569,0.2021891152325935,NASA/VIIRS/002/VNP46A2/2026_04_17,60.860948932637,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-18,fixed_ceasefire_evaluation,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_04_18,,,
+2026-04-18,fixed_ceasefire_evaluation,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_04_18,60.277681632088,10,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-19,fixed_ceasefire_evaluation,permissive,true,true,33.731628971715146,32.774231347932236,0.2966684294024326,NASA/VIIRS/002/VNP46A2/2026_04_19,,,
+2026-04-19,fixed_ceasefire_evaluation,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_04_19,63.171026579283,10,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-20,fixed_ceasefire_evaluation,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_04_20,,,
+2026-04-20,fixed_ceasefire_evaluation,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_04_20,64.415750017241,9,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-21,fixed_ceasefire_evaluation,permissive,true,true,95.14759305891748,91.05298000249358,0.1871239470517449,NASA/VIIRS/002/VNP46A2/2026_04_21,,,
+2026-04-21,fixed_ceasefire_evaluation,strict,true,true,95.14759305891748,91.05298000249358,0.1871239470517449,NASA/VIIRS/002/VNP46A2/2026_04_21,66.380063865377,8,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-22,extended_monitoring,permissive,true,true,66.02652827970847,65.59888934199674,0.19253910950661854,NASA/VIIRS/002/VNP46A2/2026_04_22,,,
+2026-04-22,extended_monitoring,strict,true,true,66.02652827970847,65.59888934199674,0.19253910950661854,NASA/VIIRS/002/VNP46A2/2026_04_22,67.048416396252,7,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-23,extended_monitoring,permissive,true,true,52.590504228088086,53.49304118844696,0.20689655172413793,NASA/VIIRS/002/VNP46A2/2026_04_23,,,
+2026-04-23,extended_monitoring,strict,true,true,52.590504228088086,53.49304118844696,0.20689655172413793,NASA/VIIRS/002/VNP46A2/2026_04_23,65.900524213059,6,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-24,extended_monitoring,permissive,true,true,46.39553375870031,41.589818477630615,0.26480836236933797,NASA/VIIRS/002/VNP46A2/2026_04_24,,,
+2026-04-24,extended_monitoring,strict,true,true,45.68488395499419,40.51771934801778,0.2073170731707317,NASA/VIIRS/002/VNP46A2/2026_04_24,66.277466977366,6,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-25,extended_monitoring,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_04_25,,,
+2026-04-25,extended_monitoring,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_04_25,68.463102815611,7,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-26,extended_monitoring,permissive,true,true,77.19917566498081,72.77699737827272,0.8723051409618574,NASA/VIIRS/002/VNP46A2/2026_04_26,,,
+2026-04-26,extended_monitoring,strict,true,true,78.38730353866981,75.13680258300427,0.5058043117744611,NASA/VIIRS/002/VNP46A2/2026_04_26,66.258664133656,8,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-27,extended_monitoring,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_04_27,,,
+2026-04-27,extended_monitoring,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_04_27,64.344158239330,9,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-28,extended_monitoring,permissive,false,false,,,,,,,
+2026-04-28,extended_monitoring,strict,false,false,,,,,58.821629965208,9,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-29,extended_monitoring,permissive,false,false,,,,,,,
+2026-04-29,extended_monitoring,strict,false,false,,,,,56.975812790190,9,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-04-30,extended_monitoring,permissive,false,false,,,,,,,
+2026-04-30,extended_monitoring,strict,false,false,,,,,59.637476792991,9,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-01,extended_monitoring,permissive,true,true,59.56133603620055,56.99074057011905,0.19584837545126355,NASA/VIIRS/002/VNP46A2/2026_05_01,,,
+2026-05-01,extended_monitoring,strict,true,true,59.82798880381609,56.99074057011905,0.19374247894103488,NASA/VIIRS/002/VNP46A2/2026_05_01,62.278068798587,9,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-02,extended_monitoring,permissive,true,true,80.75783091264438,77.44453178427464,0.19825511432009627,NASA/VIIRS/002/VNP46A2/2026_05_02,,,
+2026-05-02,extended_monitoring,strict,true,true,81.57691784508091,78.59676211948742,0.19374247894103488,NASA/VIIRS/002/VNP46A2/2026_05_02,61.503390394953,10,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-03,extended_monitoring,permissive,true,true,50.73725212524845,51.499909233901256,0.22260869565217392,NASA/VIIRS/002/VNP46A2/2026_05_03,,,
+2026-05-03,extended_monitoring,strict,true,true,50.82759335997179,51.499909233901256,0.22144927536231884,NASA/VIIRS/002/VNP46A2/2026_05_03,59.126932005508,10,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-04,extended_monitoring,permissive,true,true,48.9783371431694,48.50276272732801,0.7970882620564149,NASA/VIIRS/002/VNP46A2/2026_05_04,,,
+2026-05-04,extended_monitoring,strict,true,true,49.02811108472739,48.50276272732801,0.7907188353048226,NASA/VIIRS/002/VNP46A2/2026_05_04,58.583075837315,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-05,extended_monitoring,permissive,true,true,45.422901472041964,43.460587682639854,0.990874524714829,NASA/VIIRS/002/VNP46A2/2026_05_05,,,
+2026-05-05,extended_monitoring,strict,true,true,45.4448385918175,43.460587682639854,0.9878326996197718,NASA/VIIRS/002/VNP46A2/2026_05_05,61.505318917366,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-06,extended_monitoring,permissive,true,true,49.3945090137323,49.46265032048464,0.9936034115138592,NASA/VIIRS/002/VNP46A2/2026_05_06,,,
+2026-05-06,extended_monitoring,strict,true,true,49.41417370454617,49.46265032048464,0.9914712153518124,NASA/VIIRS/002/VNP46A2/2026_05_06,62.967142345353,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-07,extended_monitoring,permissive,true,true,75.56819274131693,77.10662841796875,1.0,NASA/VIIRS/002/VNP46A2/2026_05_07,,,
+2026-05-07,extended_monitoring,strict,true,true,76.54548025329409,77.79794311523438,0.9465648854961832,NASA/VIIRS/002/VNP46A2/2026_05_07,62.691570943672,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-08,extended_monitoring,permissive,true,true,69.20885544770094,66.90834526775501,0.7968091511137869,NASA/VIIRS/002/VNP46A2/2026_05_08,,,
+2026-05-08,extended_monitoring,strict,true,true,69.45021200535687,66.90834526775501,0.7871763997591812,NASA/VIIRS/002/VNP46A2/2026_05_08,63.038700928375,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-09,extended_monitoring,permissive,true,true,54.34809434140589,53.06651863040227,0.7948255114320096,NASA/VIIRS/002/VNP46A2/2026_05_09,,,
+2026-05-09,extended_monitoring,strict,true,true,54.53128476225297,55.11568273473398,0.7867027677496992,NASA/VIIRS/002/VNP46A2/2026_05_09,60.763924149225,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-10,extended_monitoring,permissive,true,true,54.47796558228032,51.07372975522332,0.8420200712204597,NASA/VIIRS/002/VNP46A2/2026_05_10,,,
+2026-05-10,extended_monitoring,strict,true,true,54.62271964421996,51.07372975522332,0.8329556490773713,NASA/VIIRS/002/VNP46A2/2026_05_10,61.441502557202,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-11,extended_monitoring,permissive,true,true,53.967860896284655,53.02980395059275,0.7935503315250151,NASA/VIIRS/002/VNP46A2/2026_05_11,,,
+2026-05-11,extended_monitoring,strict,true,true,53.14451415537596,53.51992797576514,0.72875226039783,NASA/VIIRS/002/VNP46A2/2026_05_11,63.613681096106,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-12,extended_monitoring,permissive,true,true,92.16430902588702,86.92361335092629,1.0,NASA/VIIRS/002/VNP46A2/2026_05_12,,,
+2026-05-12,extended_monitoring,strict,true,true,93.64999279792626,86.92361335092629,0.963327859879584,NASA/VIIRS/002/VNP46A2/2026_05_12,65.011284365667,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-13,extended_monitoring,permissive,true,true,80.50902348120259,76.99705630790912,0.7957280385078219,NASA/VIIRS/002/VNP46A2/2026_05_13,,,
+2026-05-13,extended_monitoring,strict,true,true,80.50902348120259,76.99705630790912,0.7957280385078219,NASA/VIIRS/002/VNP46A2/2026_05_13,65.392990195572,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-14,extended_monitoring,permissive,true,true,59.01979980093654,59.51215507031528,0.9235852953325072,NASA/VIIRS/002/VNP46A2/2026_05_14,,,
+2026-05-14,extended_monitoring,strict,true,true,59.109142721824504,59.516657366548586,0.7517554729450641,NASA/VIIRS/002/VNP46A2/2026_05_14,63.572398479181,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-15,extended_monitoring,permissive,true,true,58.14697698281057,48.74267998799831,0.8966942148760331,NASA/VIIRS/002/VNP46A2/2026_05_15,,,
+2026-05-15,extended_monitoring,strict,true,true,64.68780858964666,50.54874356587728,0.6900826446280992,NASA/VIIRS/002/VNP46A2/2026_05_15,63.024369434005,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-16,extended_monitoring,permissive,true,true,49.73004293699407,49.03469479424192,0.7918170878459687,NASA/VIIRS/002/VNP46A2/2026_05_16,,,
+2026-05-16,extended_monitoring,strict,true,true,49.73004293699407,49.03469479424192,0.7918170878459687,NASA/VIIRS/002/VNP46A2/2026_05_16,64.930574731927,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-17,extended_monitoring,permissive,true,true,60.313691071636725,60.97213074745448,0.7972322503008423,NASA/VIIRS/002/VNP46A2/2026_05_17,,,
+2026-05-17,extended_monitoring,strict,true,true,60.313691071636725,60.97213074745448,0.7972322503008423,NASA/VIIRS/002/VNP46A2/2026_05_17,65.481980414736,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-18,extended_monitoring,permissive,true,true,79.4386106293878,76.62598457631672,0.7933212996389891,NASA/VIIRS/002/VNP46A2/2026_05_18,,,
+2026-05-18,extended_monitoring,strict,true,true,79.4386106293878,76.62598457631672,0.7933212996389891,NASA/VIIRS/002/VNP46A2/2026_05_18,65.568535839250,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-19,extended_monitoring,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_05_19,,,
+2026-05-19,extended_monitoring,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_05_19,62.794746419805,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-20,extended_monitoring,permissive,true,true,54.37634949332231,53.5403397488649,0.7939229843561973,NASA/VIIRS/002/VNP46A2/2026_05_20,,,
+2026-05-20,extended_monitoring,strict,true,true,54.37634949332231,53.5403397488649,0.7939229843561973,NASA/VIIRS/002/VNP46A2/2026_05_20,60.995846656294,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-21,extended_monitoring,permissive,true,true,53.30374260006937,52.52610685953671,0.7922353654837732,NASA/VIIRS/002/VNP46A2/2026_05_21,,,
+2026-05-21,extended_monitoring,strict,true,true,52.87778794020832,52.76284388491982,0.748559296329997,NASA/VIIRS/002/VNP46A2/2026_05_21,61.963468681089,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-22,extended_monitoring,permissive,true,true,62.32583441806563,61.047306882243156,0.9987966305655837,NASA/VIIRS/002/VNP46A2/2026_05_22,,,
+2026-05-22,extended_monitoring,strict,true,true,62.32583441806563,61.047306882243156,0.9987966305655837,NASA/VIIRS/002/VNP46A2/2026_05_22,62.399702113534,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-23,extended_monitoring,permissive,true,true,79.31195363523746,77.08787783673482,1.0,NASA/VIIRS/002/VNP46A2/2026_05_23,,,
+2026-05-23,extended_monitoring,strict,true,true,79.31195363523746,77.08787783673482,1.0,NASA/VIIRS/002/VNP46A2/2026_05_23,62.956352878797,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-24,extended_monitoring,permissive,true,true,61.78911287326495,60.89373265967292,1.0,NASA/VIIRS/002/VNP46A2/2026_05_24,,,
+2026-05-24,extended_monitoring,strict,true,true,61.790993520744,60.89373265967292,0.9981938591210114,NASA/VIIRS/002/VNP46A2/2026_05_24,62.374395889890,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-25,extended_monitoring,permissive,true,true,54.245977485118004,52.898219606137175,1.0,NASA/VIIRS/002/VNP46A2/2026_05_25,,,
+2026-05-25,extended_monitoring,strict,true,true,54.269734674050014,52.898219606137175,0.9993983152827918,NASA/VIIRS/002/VNP46A2/2026_05_25,60.952377994932,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-26,extended_monitoring,permissive,true,true,57.362755162332085,55.068973894296214,0.8112913287585777,NASA/VIIRS/002/VNP46A2/2026_05_26,,,
+2026-05-26,extended_monitoring,strict,true,true,57.59073034514802,55.068973894296214,0.8044291952588896,NASA/VIIRS/002/VNP46A2/2026_05_26,60.952377994932,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-27,extended_monitoring,permissive,true,true,56.914600429468926,56.977965200133674,0.8014075887392901,NASA/VIIRS/002/VNP46A2/2026_05_27,,,
+2026-05-27,extended_monitoring,strict,true,true,57.12332655555654,56.977965200133674,0.7946756425948592,NASA/VIIRS/002/VNP46A2/2026_05_27,62.501916930813,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-28,extended_monitoring,permissive,true,true,71.19747741918485,70.48577880859375,0.5344827586206896,NASA/VIIRS/002/VNP46A2/2026_05_28,,,
+2026-05-28,extended_monitoring,strict,true,true,71.68822904415937,70.48577880859375,0.5238726790450928,NASA/VIIRS/002/VNP46A2/2026_05_28,60.251663303735,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-29,extended_monitoring,permissive,true,true,70.06643181832273,67.07121497201258,0.812,NASA/VIIRS/002/VNP46A2/2026_05_29,,,
+2026-05-29,extended_monitoring,strict,true,true,70.3588432114265,67.07057059435601,0.7984615384615384,NASA/VIIRS/002/VNP46A2/2026_05_29,58.955529580518,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-30,extended_monitoring,permissive,true,true,56.672204112323364,55.532933275350935,0.792719614921781,NASA/VIIRS/002/VNP46A2/2026_05_30,,,
+2026-05-30,extended_monitoring,strict,true,true,56.96650288542192,55.532927927763566,0.7842960288808665,NASA/VIIRS/002/VNP46A2/2026_05_30,56.423235989295,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-05-31,extended_monitoring,permissive,true,true,52.315008341938245,50.4947531324347,0.7981818181818182,NASA/VIIRS/002/VNP46A2/2026_05_31,,,
+2026-05-31,extended_monitoring,strict,true,true,52.748250215840194,51.528168742907695,0.7857575757575758,NASA/VIIRS/002/VNP46A2/2026_05_31,55.935258031890,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-01,extended_monitoring,permissive,false,false,,,,,,,
+2026-06-01,extended_monitoring,strict,false,false,,,,,56.503084435078,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-02,extended_monitoring,permissive,false,false,,,,,,,
+2026-06-02,extended_monitoring,strict,false,false,,,,,56.612959748203,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-03,extended_monitoring,permissive,true,true,72.41437504221176,70.5568220668493,1.0,NASA/VIIRS/002/VNP46A2/2026_06_03,,,
+2026-06-03,extended_monitoring,strict,true,true,72.97081672389295,71.50806041874019,0.98,NASA/VIIRS/002/VNP46A2/2026_06_03,55.964544967861,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-04,extended_monitoring,permissive,true,true,25.874744415283203,25.874744415283203,1.0,NASA/VIIRS/002/VNP46A2/2026_06_04,,,
+2026-06-04,extended_monitoring,strict,true,true,25.874744415283203,25.874744415283203,1.0,NASA/VIIRS/002/VNP46A2/2026_06_04,53.071456784252,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-05,extended_monitoring,permissive,true,true,46.59325016869058,46.636580803537896,0.2163873370577281,NASA/VIIRS/002/VNP46A2/2026_06_05,,,
+2026-06-05,extended_monitoring,strict,true,true,46.77222973945023,46.636580803537896,0.213780260707635,NASA/VIIRS/002/VNP46A2/2026_06_05,51.428591863468,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-06,extended_monitoring,permissive,true,true,48.63327720245005,47.500610942001224,0.38553530751708426,NASA/VIIRS/002/VNP46A2/2026_06_06,,,
+2026-06-06,extended_monitoring,strict,true,true,48.92443054056511,47.500610942001224,0.3798405466970387,NASA/VIIRS/002/VNP46A2/2026_06_06,52.279290530032,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-07,extended_monitoring,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_06_07,,,
+2026-06-07,extended_monitoring,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_06_07,54.353244051265,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-08,extended_monitoring,permissive,true,true,59.14722642181667,60.46917851765951,0.23025435073627845,NASA/VIIRS/002/VNP46A2/2026_06_08,,,
+2026-06-08,extended_monitoring,strict,true,true,60.51582510911063,61.31179258032254,0.21686746987951808,NASA/VIIRS/002/VNP46A2/2026_06_08,54.732677289055,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-09,extended_monitoring,permissive,true,true,58.67688612601322,57.484217994893704,0.42166462668298654,NASA/VIIRS/002/VNP46A2/2026_06_09,,,
+2026-06-09,extended_monitoring,strict,true,true,58.79935878952238,57.484217994893704,0.41554467564259484,NASA/VIIRS/002/VNP46A2/2026_06_09,54.596241590160,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-10,extended_monitoring,permissive,true,true,49.92780985447622,49.60799452891122,0.4163677861102054,NASA/VIIRS/002/VNP46A2/2026_06_10,,,
+2026-06-10,extended_monitoring,strict,true,true,49.990763971802124,49.60799452891122,0.41408542549722854,NASA/VIIRS/002/VNP46A2/2026_06_10,52.961281978069,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-11,extended_monitoring,permissive,true,true,56.37001839314679,54.703751849644064,0.453416149068323,NASA/VIIRS/002/VNP46A2/2026_06_11,,,
+2026-06-11,extended_monitoring,strict,true,true,39.86425902446111,42.944679260253906,0.024844720496894408,NASA/VIIRS/002/VNP46A2/2026_06_11,55.845326638972,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-12,extended_monitoring,permissive,true,true,52.287329082795736,52.51703673498272,0.5238455715367146,NASA/VIIRS/002/VNP46A2/2026_06_12,,,
+2026-06-12,extended_monitoring,strict,true,true,52.287329082795736,52.51703673498272,0.5238455715367146,NASA/VIIRS/002/VNP46A2/2026_06_12,58.025833405733,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-13,extended_monitoring,permissive,true,true,66.28594083262016,67.45460825715668,0.41606498194945846,NASA/VIIRS/002/VNP46A2/2026_06_13,,,
+2026-06-13,extended_monitoring,strict,true,true,66.32418821762937,67.45460825715668,0.4157641395908544,NASA/VIIRS/002/VNP46A2/2026_06_13,58.707336259496,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-14,extended_monitoring,permissive,true,true,75.56173894940551,73.46293536999609,1.0,NASA/VIIRS/002/VNP46A2/2026_06_14,,,
+2026-06-14,extended_monitoring,strict,true,true,75.56173894940551,73.46293536999609,1.0,NASA/VIIRS/002/VNP46A2/2026_06_14,58.163471110908,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-15,extended_monitoring,permissive,true,true,58.906442904740516,58.99877430038478,1.0,NASA/VIIRS/002/VNP46A2/2026_06_15,,,
+2026-06-15,extended_monitoring,strict,true,true,58.906442904740516,58.99877430038478,1.0,NASA/VIIRS/002/VNP46A2/2026_06_15,57.475109837846,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-16,extended_monitoring,permissive,true,true,52.945848456180265,52.480767975665806,1.0,NASA/VIIRS/002/VNP46A2/2026_06_16,,,
+2026-06-16,extended_monitoring,strict,true,true,52.959013203418586,52.480767975665806,0.9996991576413959,NASA/VIIRS/002/VNP46A2/2026_06_16,57.517747032895,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-17,extended_monitoring,permissive,true,true,51.676519194300624,51.578385863234665,0.4259541984732824,NASA/VIIRS/002/VNP46A2/2026_06_17,,,
+2026-06-17,extended_monitoring,strict,true,true,51.716341766709206,51.578385863234665,0.4250381679389313,NASA/VIIRS/002/VNP46A2/2026_06_17,59.552200971482,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-18,extended_monitoring,permissive,true,true,63.36732500702756,63.62255024492227,0.4086642599277978,NASA/VIIRS/002/VNP46A2/2026_06_18,,,
+2026-06-18,extended_monitoring,strict,true,true,63.36732500702756,63.62255024492227,0.4086642599277978,NASA/VIIRS/002/VNP46A2/2026_06_18,61.588585542861,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-19,extended_monitoring,permissive,true,true,75.11881770734053,75.59363962809245,0.4196750902527076,NASA/VIIRS/002/VNP46A2/2026_06_19,,,
+2026-06-19,extended_monitoring,strict,true,true,75.11881770734053,75.59363962809245,0.4196750902527076,NASA/VIIRS/002/VNP46A2/2026_06_19,61.927702537998,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-20,extended_monitoring,permissive,true,true,58.6403995322294,57.49366341969356,0.4187518842327404,NASA/VIIRS/002/VNP46A2/2026_06_20,,,
+2026-06-20,extended_monitoring,strict,true,true,57.78396763948638,57.47189225565385,0.3931263189629183,NASA/VIIRS/002/VNP46A2/2026_06_20,60.948149115347,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-21,extended_monitoring,permissive,true,true,51.05147411644098,50.52169604395892,0.4968483500185391,NASA/VIIRS/002/VNP46A2/2026_06_21,,,
+2026-06-21,extended_monitoring,strict,true,true,51.093224179257525,50.52169604395892,0.4961067853170189,NASA/VIIRS/002/VNP46A2/2026_06_21,59.227847280125,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-22,extended_monitoring,permissive,true,true,51.48706527373253,51.4645931637256,0.649746192893401,NASA/VIIRS/002/VNP46A2/2026_06_22,,,
+2026-06-22,extended_monitoring,strict,true,true,50.87876728624252,51.4645931637256,0.6294416243654822,NASA/VIIRS/002/VNP46A2/2026_06_22,59.423116085155,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-23,extended_monitoring,permissive,true,true,61.022716106469176,62.44008271263104,0.5038363171355499,NASA/VIIRS/002/VNP46A2/2026_06_23,,,
+2026-06-23,extended_monitoring,strict,true,true,59.39627952021103,61.478688169094994,0.4497016197783461,NASA/VIIRS/002/VNP46A2/2026_06_23,60.625643675223,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-24,extended_monitoring,permissive,true,true,78.47311911202692,78.65309409497951,0.29031287605294825,NASA/VIIRS/002/VNP46A2/2026_06_24,,,
+2026-06-24,extended_monitoring,strict,true,true,78.47311911202692,78.65309409497951,0.29031287605294825,NASA/VIIRS/002/VNP46A2/2026_06_24,61.003480965998,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-25,extended_monitoring,permissive,true,true,68.37364302376727,68.95415429812418,0.40974729241877256,NASA/VIIRS/002/VNP46A2/2026_06_25,,,
+2026-06-25,extended_monitoring,strict,true,true,68.37364302376727,68.95415429812418,0.40974729241877256,NASA/VIIRS/002/VNP46A2/2026_06_25,60.335230011275,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-26,extended_monitoring,permissive,true,true,51.53373413025102,50.504441687753676,0.4101399924328415,NASA/VIIRS/002/VNP46A2/2026_06_26,,,
+2026-06-26,extended_monitoring,strict,true,true,57.034967014713864,53.56959053061751,0.22398789254634885,NASA/VIIRS/002/VNP46A2/2026_06_26,58.820780850116,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-27,extended_monitoring,permissive,true,true,52.33295107089045,51.49933963351779,0.453374025093252,NASA/VIIRS/002/VNP46A2/2026_06_27,,,
+2026-06-27,extended_monitoring,strict,true,true,52.61044030050875,51.49933963351779,0.4486266531027467,NASA/VIIRS/002/VNP46A2/2026_06_27,59.415775704788,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-28,extended_monitoring,permissive,true,true,51.10018545149055,51.56153241099558,0.4166666666666667,NASA/VIIRS/002/VNP46A2/2026_06_28,,,
+2026-06-28,extended_monitoring,strict,true,true,51.47751325629752,51.56153241099558,0.41064981949458484,NASA/VIIRS/002/VNP46A2/2026_06_28,61.568377871151,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-29,extended_monitoring,permissive,true,true,61.39745844235717,58.42130824440824,0.42718446601941745,NASA/VIIRS/002/VNP46A2/2026_06_29,,,
+2026-06-29,extended_monitoring,strict,true,true,61.6402061751682,58.42130824440824,0.4223300970873786,NASA/VIIRS/002/VNP46A2/2026_06_29,62.171140818455,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-06-30,extended_monitoring,permissive,true,true,69.70469212779807,66.9720834119289,1.0,NASA/VIIRS/002/VNP46A2/2026_06_30,,,
+2026-06-30,extended_monitoring,strict,true,true,69.79439946436344,66.9720834119289,0.9930806257521059,NASA/VIIRS/002/VNP46A2/2026_06_30,61.642669654542,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-01,extended_monitoring,permissive,true,true,56.951321856405976,54.957744687417446,1.0,NASA/VIIRS/002/VNP46A2/2026_07_01,,,
+2026-07-01,extended_monitoring,strict,true,true,57.006063837563566,54.957744687417446,0.9962145110410094,NASA/VIIRS/002/VNP46A2/2026_07_01,59.779603556720,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-02,extended_monitoring,permissive,true,true,53.92992625513201,53.03872280536244,0.9990974729241877,NASA/VIIRS/002/VNP46A2/2026_07_02,,,
+2026-07-02,extended_monitoring,strict,true,true,54.0118116409089,53.03872280536244,0.9936823104693141,NASA/VIIRS/002/VNP46A2/2026_07_02,59.303060057800,14,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-03,extended_monitoring,permissive,true,true,53.87049402225691,53.022827947884984,0.9987121699935608,NASA/VIIRS/002/VNP46A2/2026_07_03,,,
+2026-07-03,extended_monitoring,strict,true,true,53.91652945110919,53.022827947884984,0.9951706374758532,NASA/VIIRS/002/VNP46A2/2026_07_03,59.477528753422,13,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-04,extended_monitoring,permissive,true,true,66.01037680521777,61.03827453715914,0.1953727506426735,NASA/VIIRS/002/VNP46A2/2026_07_04,,,
+2026-07-04,extended_monitoring,strict,true,true,66.11389560489948,61.03827453715914,0.19408740359897173,NASA/VIIRS/002/VNP46A2/2026_07_04,60.049786124498,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-05,extended_monitoring,permissive,true,true,80.94076477822016,76.92651134070164,1.0,NASA/VIIRS/002/VNP46A2/2026_07_05,,,
+2026-07-05,extended_monitoring,strict,true,true,81.22965450833433,76.92651134070164,0.9882671480144405,NASA/VIIRS/002/VNP46A2/2026_07_05,60.829083657970,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-06,extended_monitoring,permissive,true,true,59.299997228793785,56.406663067722484,0.9980806142034548,NASA/VIIRS/002/VNP46A2/2026_07_06,,,
+2026-07-06,extended_monitoring,strict,true,true,59.31744854849213,56.406663067722484,0.9942418426103646,NASA/VIIRS/002/VNP46A2/2026_07_06,60.747971406251,10,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-07,extended_monitoring,permissive,true,true,51.865439810009846,50.52526638399016,1.0,NASA/VIIRS/002/VNP46A2/2026_07_07,,,
+2026-07-07,extended_monitoring,strict,true,true,51.99768322543953,50.52526638399016,0.9942839951865222,NASA/VIIRS/002/VNP46A2/2026_07_07,59.742812733127,9,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-08,extended_monitoring,permissive,true,true,52.25113328333935,50.51724206811701,1.0,NASA/VIIRS/002/VNP46A2/2026_07_08,,,
+2026-07-08,extended_monitoring,strict,true,true,52.390193742518996,50.51724206811701,0.9945815773630343,NASA/VIIRS/002/VNP46A2/2026_07_08,60.084906345072,8,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-09,extended_monitoring,permissive,true,true,61.639430252997,61.01712043574187,0.9987948177161796,NASA/VIIRS/002/VNP46A2/2026_07_09,,,
+2026-07-09,extended_monitoring,strict,true,true,61.702034038877294,61.01712043574187,0.9954805664356734,NASA/VIIRS/002/VNP46A2/2026_07_09,60.952491302810,7,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-10,extended_monitoring,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_07_10,,,
+2026-07-10,extended_monitoring,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_07_10,61.250930984434,7,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-11,extended_monitoring,permissive,false,false,,,,,,,
+2026-07-11,extended_monitoring,strict,false,false,,,,,58.624238373245,7,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-12,extended_monitoring,permissive,false,false,,,,,,,
+2026-07-12,extended_monitoring,strict,false,false,,,,,54.413566584261,7,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-13,extended_monitoring,permissive,false,false,,,,,,,
+2026-07-13,extended_monitoring,strict,false,false,,,,,57.659874886568,7,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-14,extended_monitoring,permissive,false,false,,,,,,,
+2026-07-14,extended_monitoring,strict,false,false,,,,,59.976901106607,7,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-15,extended_monitoring,permissive,false,false,,,,,,,
+2026-07-15,extended_monitoring,strict,false,false,,,,,61.241352333955,6,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-16,extended_monitoring,permissive,false,false,,,,,,,
+2026-07-16,extended_monitoring,strict,false,false,,,,,61.149215992971,5,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-17,extended_monitoring,permissive,true,true,56.933210261819355,55.55279051346637,0.9984544049459042,NASA/VIIRS/002/VNP46A2/2026_07_17,,,
+2026-07-17,extended_monitoring,strict,true,true,56.00560722247775,55.543895333396165,0.9190108191653786,NASA/VIIRS/002/VNP46A2/2026_07_17,59.839788357223,6,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-18,extended_monitoring,permissive,true,true,47.83296758922705,47.47544612348862,1.0,NASA/VIIRS/002/VNP46A2/2026_07_18,,,
+2026-07-18,extended_monitoring,strict,true,true,47.727047326572404,46.529701457304114,0.6134969325153374,NASA/VIIRS/002/VNP46A2/2026_07_18,54.888898130355,7,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-19,extended_monitoring,permissive,true,true,52.430803710490366,51.46889953635104,1.0,NASA/VIIRS/002/VNP46A2/2026_07_19,,,
+2026-07-19,extended_monitoring,strict,true,true,51.754951985449054,51.467066480461966,0.9310483870967742,NASA/VIIRS/002/VNP46A2/2026_07_19,57.051847662135,8,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-20,extended_monitoring,permissive,true,true,74.92855296986265,69.10544033793576,1.0,NASA/VIIRS/002/VNP46A2/2026_07_20,,,
+2026-07-20,extended_monitoring,strict,true,true,82.04160666463963,72.42712783813477,0.34908604547481054,NASA/VIIRS/002/VNP46A2/2026_07_20,57.562360026711,9,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-21,extended_monitoring,permissive,true,true,68.21686676571449,64.50489895725143,1.0,NASA/VIIRS/002/VNP46A2/2026_07_21,,,
+2026-07-21,extended_monitoring,strict,true,true,68.21686676571449,64.50489895725143,1.0,NASA/VIIRS/002/VNP46A2/2026_07_21,57.067065929089,10,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-22,extended_monitoring,permissive,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_07_22,,,
+2026-07-22,extended_monitoring,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_07_22,56.833104444237,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-23,extended_monitoring,permissive,true,true,47.94558327933929,46.78095586793415,1.0,NASA/VIIRS/002/VNP46A2/2026_07_23,,,
+2026-07-23,extended_monitoring,strict,true,false,,,,NASA/VIIRS/002/VNP46A2/2026_07_23,56.768800694864,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-24,extended_monitoring,permissive,true,true,53.16407596711657,51.55396659052181,0.9966827503015682,NASA/VIIRS/002/VNP46A2/2026_07_24,,,
+2026-07-24,extended_monitoring,strict,true,true,53.2926501784837,51.54923163458,0.9831121833534379,NASA/VIIRS/002/VNP46A2/2026_07_24,58.440060260549,12,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-25,extended_monitoring,permissive,true,true,55.72085709948032,56.55445938011762,1.0,NASA/VIIRS/002/VNP46A2/2026_07_25,,,
+2026-07-25,extended_monitoring,strict,true,true,25.18355676914618,23.431713104248047,0.0047430830039525695,NASA/VIIRS/002/VNP46A2/2026_07_25,59.413970527274,11,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-26,extended_monitoring,permissive,true,true,72.10641073257888,71.00059701425387,1.0,NASA/VIIRS/002/VNP46A2/2026_07_26,,,
+2026-07-26,extended_monitoring,strict,true,true,72.1924943845941,71.00059701425387,0.9945848375451264,NASA/VIIRS/002/VNP46A2/2026_07_26,60.179872381457,10,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-27,extended_monitoring,permissive,true,true,61.602017630785184,59.478574398905025,1.0,NASA/VIIRS/002/VNP46A2/2026_07_27,,,
+2026-07-27,extended_monitoring,strict,true,true,61.64645894332552,59.478574398905025,0.9963898916967509,NASA/VIIRS/002/VNP46A2/2026_07_27,57.750790794436,9,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-28,extended_monitoring,permissive,true,true,52.39029336326335,51.54462362788329,1.0,NASA/VIIRS/002/VNP46A2/2026_07_28,,,
+2026-07-28,extended_monitoring,strict,true,true,52.60941905049157,51.54462362788329,0.9918772563176895,NASA/VIIRS/002/VNP46A2/2026_07_28,56.442531298027,8,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-29,extended_monitoring,permissive,true,true,54.0839650767849,51.50466347084265,1.0,NASA/VIIRS/002/VNP46A2/2026_07_29,,,
+2026-07-29,extended_monitoring,strict,true,true,54.4934895957073,51.50466347084265,0.9843561973525873,NASA/VIIRS/002/VNP46A2/2026_07_29,56.442531298027,8,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-30,extended_monitoring,permissive,true,true,55.97797618790935,55.435659950321686,1.0,NASA/VIIRS/002/VNP46A2/2026_07_30,,,
+2026-07-30,extended_monitoring,strict,true,true,56.06145945176635,55.435659950321686,0.9963340122199593,NASA/VIIRS/002/VNP46A2/2026_07_30,56.442531298027,8,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
+2026-07-31,extended_monitoring,permissive,true,true,75.69201733973848,72.45565986633301,1.0,NASA/VIIRS/002/VNP46A2/2026_07_31,,,
+2026-07-31,extended_monitoring,strict,true,true,76.06072201069725,72.45565986633301,0.989247311827957,NASA/VIIRS/002/VNP46A2/2026_07_31,56.892514315104,7,"centred [-6,+7] calendar-day window; actual qualified strict observations only; no interpolation; requires >=3 samples"
